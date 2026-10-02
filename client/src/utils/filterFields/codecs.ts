@@ -251,6 +251,36 @@ function normalizeMeasure(
 const normalizeNumber = (field: NumberField, value: unknown): unknown =>
   field.measure === undefined ? value : normalizeMeasure(field.measure, value);
 
+/** The presence choices of a number row: "is not set" and "is set" */
+const PRESENCE_MODIFIERS = ["IS_NULL", "NOT_NULL"] as const;
+type Presence = (typeof PRESENCE_MODIFIERS)[number];
+
+const asPresence = (value: unknown): Presence | undefined =>
+  PRESENCE_MODIFIERS.find((modifier) => modifier === value);
+
+/**
+ * The presence choice a number row holds, if any. While one is set the
+ * bounds are ignored: not sent, not written to the URL, not on the chip.
+ */
+const presenceOf = (field: NumberField, state: PanelState) =>
+  field.modifierKey === undefined
+    ? undefined
+    : asPresence(state[field.modifierKey]);
+
+/**
+ * A number row's request criterion: the presence choice with no value, else
+ * its range
+ */
+function numberRowCriterion(field: NumberField, state: PanelState) {
+  const presence = presenceOf(field, state);
+  return presence === undefined
+    ? numberCriterion(
+        normalizeNumber(field, state[field.key]),
+        field.scale ?? 1
+      )
+    : { modifier: presence };
+}
+
 /**
  * A number range: both bounds BETWEEN them; one bound GREATER_THAN min - 1
  * or LESS_THAN max + 1, so a lone whole bound is inclusive (S13 revisits
@@ -399,6 +429,12 @@ function numberChip(
   state: PanelState,
   unitPreference: string
 ): ChipParts | null {
+  const presence = presenceOf(field, state);
+  if (presence !== undefined) {
+    const words = field.presenceLabels ?? { isNull: "Not set", notNull: "Set" };
+    const word = presence === "IS_NULL" ? words.isNull : words.notNull;
+    return { label: chipLabel(field), values: [word.toLowerCase()] };
+  }
   const { min, max } = rangeOf(normalizeNumber(field, state[field.key]));
   const low = boundText(min);
   const high = boundText(max);
@@ -821,14 +857,17 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
     keys: keysOf,
     normalize: normalizeNumber,
     isActive: (field, state) =>
+      presenceOf(field, state) !== undefined ||
       hasBound(normalizeNumber(field, state[field.key])),
-    toCriterion: (field, _spec, state) =>
-      numberCriterion(
-        normalizeNumber(field, state[field.key]),
-        field.scale ?? 1
-      ),
-    // A bound that is a number or text writes, zero included
+    toCriterion: (field, _spec, state) => numberRowCriterion(field, state),
+    // A presence choice writes alone; else a bound that is a number or
+    // text writes, zero included
     writeUrl: (field, state, params) => {
+      const presence = presenceOf(field, state);
+      if (presence !== undefined && field.modifierKey !== undefined) {
+        params.set(field.modifierKey, presence);
+        return;
+      }
       const { min, max } = rangeOf(normalizeNumber(field, state[field.key]));
       const low = boundParam(min);
       const high = boundParam(max);
@@ -846,12 +885,27 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
         field.measure === undefined
           ? range
           : normalizeMeasure(field.measure, range);
-      return read === undefined || Object.keys(read).length === 0
-        ? {}
-        : { [field.key]: read };
+      const presence =
+        field.modifierKey === undefined
+          ? undefined
+          : asPresence(params.get(field.modifierKey));
+      return {
+        ...(read === undefined || Object.keys(read).length === 0
+          ? {}
+          : { [field.key]: read }),
+        ...(presence === undefined || field.modifierKey === undefined
+          ? {}
+          : { [field.modifierKey]: presence }),
+      };
     },
-    // In the panel's unit; a body measure read leniently
+    // In the panel's unit; a body measure read leniently; a presence
+    // criterion as its choice
     fromCriterion: (field, _spec, criterion) => {
+      const parts = partsOf(criterion, ["modifier"]);
+      const presence = asPresence(parts?.modifier);
+      if (presence !== undefined && field.modifierKey !== undefined) {
+        return { [field.modifierKey]: presence };
+      }
       const range = rangeFromCriterion(criterion, field.scale ?? 1);
       const read =
         range === undefined ? undefined : normalizeNumber(field, range);

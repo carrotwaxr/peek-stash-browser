@@ -335,6 +335,139 @@
       }
     },
     {
+      "label": "rating: BETWEEN min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        },
+        "ratingModifier": "BETWEEN"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "GREATER_THAN",
+          "value": 24
+        }
+      }
+    },
+    {
+      "label": "rating: BETWEEN max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        },
+        "ratingModifier": "BETWEEN"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "LESS_THAN",
+          "value": 76
+        }
+      }
+    },
+    {
+      "label": "rating: BETWEEN min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        },
+        "ratingModifier": "BETWEEN"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "BETWEEN",
+          "value": 25,
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "rating: IS_NULL min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        },
+        "ratingModifier": "IS_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: IS_NULL max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        },
+        "ratingModifier": "IS_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: IS_NULL min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        },
+        "ratingModifier": "IS_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: NOT_NULL min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        },
+        "ratingModifier": "NOT_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: NOT_NULL max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        },
+        "ratingModifier": "NOT_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: NOT_NULL min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        },
+        "ratingModifier": "NOT_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
       "label": "rating: min only",
       "state": {
         "rating": {
@@ -419,6 +552,139 @@
           "modifier": "BETWEEN",
           "value": 250,
           "value2": 750
+        }
+      }
+    },
+    {
+      "label": "duration: BETWEEN min only",
+      "state": {
+        "duration": {
+          "min": "76"
+        },
+        "durationModifier": "BETWEEN"
+      },
+      "request": {
+        "duration": {
+          "modifier": "GREATER_THAN",
+          "value": 4559
+        }
+      }
+    },
+    {
+      "label": "duration: BETWEEN max only",
+      "state": {
+        "duration": {
+          "max": "225"
+        },
+        "durationModifier": "BETWEEN"
+      },
+      "request": {
+        "duration": {
+          "modifier": "LESS_THAN",
+          "value": 13501
+        }
+      }
+    },
+    {
+      "label": "duration: BETWEEN min and max",
+      "state": {
+        "duration": {
+          "min": "76",
+          "max": "225"
+        },
+        "durationModifier": "BETWEEN"
+      },
+      "request": {
+        "duration": {
+          "modifier": "BETWEEN",
+          "value": 4560,
+          "value2": 13500
+        }
+      }
+    },
+    {
+      "label": "duration: IS_NULL min only",
+      "state": {
+        "duration": {
+          "min": "76"
+        },
+        "durationModifier": "IS_NULL"
+      },
+      "request": {
+        "duration": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "duration: IS_NULL max only",
+      "state": {
+        "duration": {
+          "max": "225"
+        },
+        "durationModifier": "IS_NULL"
+      },
+      "request": {
+        "duration": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "duration: IS_NULL min and max",
+      "state": {
+        "duration": {
+          "min": "76",
+          "max": "225"
+        },
+        "durationModifier": "IS_NULL"
+      },
+      "request": {
+        "duration": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "duration: NOT_NULL min only",
+      "state": {
+        "duration": {
+          "min": "76"
+        },
+        "durationModifier": "NOT_NULL"
+      },
+      "request": {
+        "duration": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "duration: NOT_NULL max only",
+      "state": {
+        "duration": {
+          "max": "225"
+        },
+        "durationModifier": "NOT_NULL"
+      },
+      "request": {
+        "duration": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "duration: NOT_NULL min and max",
+      "state": {
+        "duration": {
+          "min": "76",
+          "max": "225"
+        },
+        "durationModifier": "NOT_NULL"
+      },
+      "request": {
+        "duration": {
+          "modifier": "NOT_NULL"
         }
       }
     },

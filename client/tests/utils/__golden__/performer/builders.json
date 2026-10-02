@@ -385,6 +385,139 @@
       }
     },
     {
+      "label": "rating: BETWEEN min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        },
+        "ratingModifier": "BETWEEN"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "GREATER_THAN",
+          "value": 24
+        }
+      }
+    },
+    {
+      "label": "rating: BETWEEN max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        },
+        "ratingModifier": "BETWEEN"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "LESS_THAN",
+          "value": 76
+        }
+      }
+    },
+    {
+      "label": "rating: BETWEEN min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        },
+        "ratingModifier": "BETWEEN"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "BETWEEN",
+          "value": 25,
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "rating: IS_NULL min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        },
+        "ratingModifier": "IS_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: IS_NULL max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        },
+        "ratingModifier": "IS_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: IS_NULL min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        },
+        "ratingModifier": "IS_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: NOT_NULL min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        },
+        "ratingModifier": "NOT_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: NOT_NULL max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        },
+        "ratingModifier": "NOT_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "rating: NOT_NULL min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        },
+        "ratingModifier": "NOT_NULL"
+      },
+      "request": {
+        "rating100": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
       "label": "rating: min only",
       "state": {
         "rating": {
@@ -654,6 +787,139 @@
           "modifier": "BETWEEN",
           "value": 1950,
           "value2": 2050
+        }
+      }
+    },
+    {
+      "label": "careerLength: BETWEEN min only",
+      "state": {
+        "careerLength": {
+          "min": "13"
+        },
+        "careerLengthModifier": "BETWEEN"
+      },
+      "request": {
+        "career_length": {
+          "modifier": "GREATER_THAN",
+          "value": 12
+        }
+      }
+    },
+    {
+      "label": "careerLength: BETWEEN max only",
+      "state": {
+        "careerLength": {
+          "max": "38"
+        },
+        "careerLengthModifier": "BETWEEN"
+      },
+      "request": {
+        "career_length": {
+          "modifier": "LESS_THAN",
+          "value": 39
+        }
+      }
+    },
+    {
+      "label": "careerLength: BETWEEN min and max",
+      "state": {
+        "careerLength": {
+          "min": "13",
+          "max": "38"
+        },
+        "careerLengthModifier": "BETWEEN"
+      },
+      "request": {
+        "career_length": {
+          "modifier": "BETWEEN",
+          "value": 13,
+          "value2": 38
+        }
+      }
+    },
+    {
+      "label": "careerLength: IS_NULL min only",
+      "state": {
+        "careerLength": {
+          "min": "13"
+        },
+        "careerLengthModifier": "IS_NULL"
+      },
+      "request": {
+        "career_length": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "careerLength: IS_NULL max only",
+      "state": {
+        "careerLength": {
+          "max": "38"
+        },
+        "careerLengthModifier": "IS_NULL"
+      },
+      "request": {
+        "career_length": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "careerLength: IS_NULL min and max",
+      "state": {
+        "careerLength": {
+          "min": "13",
+          "max": "38"
+        },
+        "careerLengthModifier": "IS_NULL"
+      },
+      "request": {
+        "career_length": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "careerLength: NOT_NULL min only",
+      "state": {
+        "careerLength": {
+          "min": "13"
+        },
+        "careerLengthModifier": "NOT_NULL"
+      },
+      "request": {
+        "career_length": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "careerLength: NOT_NULL max only",
+      "state": {
+        "careerLength": {
+          "max": "38"
+        },
+        "careerLengthModifier": "NOT_NULL"
+      },
+      "request": {
+        "career_length": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "careerLength: NOT_NULL min and max",
+      "state": {
+        "careerLength": {
+          "min": "13",
+          "max": "38"
+        },
+        "careerLengthModifier": "NOT_NULL"
+      },
+      "request": {
+        "career_length": {
+          "modifier": "NOT_NULL"
         }
       }
     },
@@ -1214,6 +1480,139 @@
       }
     },
     {
+      "label": "height: BETWEEN min only",
+      "state": {
+        "height": {
+          "min": "138"
+        },
+        "heightModifier": "BETWEEN"
+      },
+      "request": {
+        "height": {
+          "modifier": "GREATER_THAN",
+          "value": 137
+        }
+      }
+    },
+    {
+      "label": "height: BETWEEN max only",
+      "state": {
+        "height": {
+          "max": "213"
+        },
+        "heightModifier": "BETWEEN"
+      },
+      "request": {
+        "height": {
+          "modifier": "LESS_THAN",
+          "value": 214
+        }
+      }
+    },
+    {
+      "label": "height: BETWEEN min and max",
+      "state": {
+        "height": {
+          "min": "138",
+          "max": "213"
+        },
+        "heightModifier": "BETWEEN"
+      },
+      "request": {
+        "height": {
+          "modifier": "BETWEEN",
+          "value": 138,
+          "value2": 213
+        }
+      }
+    },
+    {
+      "label": "height: IS_NULL min only",
+      "state": {
+        "height": {
+          "min": "138"
+        },
+        "heightModifier": "IS_NULL"
+      },
+      "request": {
+        "height": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "height: IS_NULL max only",
+      "state": {
+        "height": {
+          "max": "213"
+        },
+        "heightModifier": "IS_NULL"
+      },
+      "request": {
+        "height": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "height: IS_NULL min and max",
+      "state": {
+        "height": {
+          "min": "138",
+          "max": "213"
+        },
+        "heightModifier": "IS_NULL"
+      },
+      "request": {
+        "height": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "height: NOT_NULL min only",
+      "state": {
+        "height": {
+          "min": "138"
+        },
+        "heightModifier": "NOT_NULL"
+      },
+      "request": {
+        "height": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "height: NOT_NULL max only",
+      "state": {
+        "height": {
+          "max": "213"
+        },
+        "heightModifier": "NOT_NULL"
+      },
+      "request": {
+        "height": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "height: NOT_NULL min and max",
+      "state": {
+        "height": {
+          "min": "138",
+          "max": "213"
+        },
+        "heightModifier": "NOT_NULL"
+      },
+      "request": {
+        "height": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
       "label": "height: min only",
       "state": {
         "height": {
@@ -1258,6 +1657,139 @@
       }
     },
     {
+      "label": "weight: BETWEEN min only",
+      "state": {
+        "weight": {
+          "min": "73"
+        },
+        "weightModifier": "BETWEEN"
+      },
+      "request": {
+        "weight": {
+          "modifier": "GREATER_THAN",
+          "value": 72
+        }
+      }
+    },
+    {
+      "label": "weight: BETWEEN max only",
+      "state": {
+        "weight": {
+          "max": "158"
+        },
+        "weightModifier": "BETWEEN"
+      },
+      "request": {
+        "weight": {
+          "modifier": "LESS_THAN",
+          "value": 159
+        }
+      }
+    },
+    {
+      "label": "weight: BETWEEN min and max",
+      "state": {
+        "weight": {
+          "min": "73",
+          "max": "158"
+        },
+        "weightModifier": "BETWEEN"
+      },
+      "request": {
+        "weight": {
+          "modifier": "BETWEEN",
+          "value": 73,
+          "value2": 158
+        }
+      }
+    },
+    {
+      "label": "weight: IS_NULL min only",
+      "state": {
+        "weight": {
+          "min": "73"
+        },
+        "weightModifier": "IS_NULL"
+      },
+      "request": {
+        "weight": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "weight: IS_NULL max only",
+      "state": {
+        "weight": {
+          "max": "158"
+        },
+        "weightModifier": "IS_NULL"
+      },
+      "request": {
+        "weight": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "weight: IS_NULL min and max",
+      "state": {
+        "weight": {
+          "min": "73",
+          "max": "158"
+        },
+        "weightModifier": "IS_NULL"
+      },
+      "request": {
+        "weight": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "weight: NOT_NULL min only",
+      "state": {
+        "weight": {
+          "min": "73"
+        },
+        "weightModifier": "NOT_NULL"
+      },
+      "request": {
+        "weight": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "weight: NOT_NULL max only",
+      "state": {
+        "weight": {
+          "max": "158"
+        },
+        "weightModifier": "NOT_NULL"
+      },
+      "request": {
+        "weight": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "weight: NOT_NULL min and max",
+      "state": {
+        "weight": {
+          "min": "73",
+          "max": "158"
+        },
+        "weightModifier": "NOT_NULL"
+      },
+      "request": {
+        "weight": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
       "label": "weight: min only",
       "state": {
         "weight": {
@@ -1298,6 +1830,139 @@
           "modifier": "BETWEEN",
           "value": 73,
           "value2": 158
+        }
+      }
+    },
+    {
+      "label": "penisLength: BETWEEN min only",
+      "state": {
+        "penisLength": {
+          "min": "10"
+        },
+        "penisLengthModifier": "BETWEEN"
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "GREATER_THAN",
+          "value": 9
+        }
+      }
+    },
+    {
+      "label": "penisLength: BETWEEN max only",
+      "state": {
+        "penisLength": {
+          "max": "30"
+        },
+        "penisLengthModifier": "BETWEEN"
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "LESS_THAN",
+          "value": 31
+        }
+      }
+    },
+    {
+      "label": "penisLength: BETWEEN min and max",
+      "state": {
+        "penisLength": {
+          "min": "10",
+          "max": "30"
+        },
+        "penisLengthModifier": "BETWEEN"
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "BETWEEN",
+          "value": 10,
+          "value2": 30
+        }
+      }
+    },
+    {
+      "label": "penisLength: IS_NULL min only",
+      "state": {
+        "penisLength": {
+          "min": "10"
+        },
+        "penisLengthModifier": "IS_NULL"
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "penisLength: IS_NULL max only",
+      "state": {
+        "penisLength": {
+          "max": "30"
+        },
+        "penisLengthModifier": "IS_NULL"
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "penisLength: IS_NULL min and max",
+      "state": {
+        "penisLength": {
+          "min": "10",
+          "max": "30"
+        },
+        "penisLengthModifier": "IS_NULL"
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "penisLength: NOT_NULL min only",
+      "state": {
+        "penisLength": {
+          "min": "10"
+        },
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "penisLength: NOT_NULL max only",
+      "state": {
+        "penisLength": {
+          "max": "30"
+        },
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "penisLength: NOT_NULL min and max",
+      "state": {
+        "penisLength": {
+          "min": "10",
+          "max": "30"
+        },
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "NOT_NULL"
         }
       }
     },
@@ -1406,6 +2071,139 @@
   "imperial": {
     "imperialOptions": [
       {
+        "label": "height: BETWEEN min only",
+        "state": {
+          "height": {
+            "min": "167"
+          },
+          "heightModifier": "BETWEEN"
+        },
+        "request": {
+          "height": {
+            "modifier": "GREATER_THAN",
+            "value": 166
+          }
+        }
+      },
+      {
+        "label": "height: BETWEEN max only",
+        "state": {
+          "height": {
+            "max": "189"
+          },
+          "heightModifier": "BETWEEN"
+        },
+        "request": {
+          "height": {
+            "modifier": "LESS_THAN",
+            "value": 190
+          }
+        }
+      },
+      {
+        "label": "height: BETWEEN min and max",
+        "state": {
+          "height": {
+            "min": "167",
+            "max": "189"
+          },
+          "heightModifier": "BETWEEN"
+        },
+        "request": {
+          "height": {
+            "modifier": "BETWEEN",
+            "value": 167,
+            "value2": 189
+          }
+        }
+      },
+      {
+        "label": "height: IS_NULL min only",
+        "state": {
+          "height": {
+            "min": "167"
+          },
+          "heightModifier": "IS_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: IS_NULL max only",
+        "state": {
+          "height": {
+            "max": "189"
+          },
+          "heightModifier": "IS_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: IS_NULL min and max",
+        "state": {
+          "height": {
+            "min": "167",
+            "max": "189"
+          },
+          "heightModifier": "IS_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: NOT_NULL min only",
+        "state": {
+          "height": {
+            "min": "167"
+          },
+          "heightModifier": "NOT_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: NOT_NULL max only",
+        "state": {
+          "height": {
+            "max": "189"
+          },
+          "heightModifier": "NOT_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: NOT_NULL min and max",
+        "state": {
+          "height": {
+            "min": "167",
+            "max": "189"
+          },
+          "heightModifier": "NOT_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
         "label": "height: min only",
         "state": {
           "height": {
@@ -1450,6 +2248,139 @@
         }
       },
       {
+        "label": "weight: BETWEEN min only",
+        "state": {
+          "weight": {
+            "min": "163"
+          },
+          "weightModifier": "BETWEEN"
+        },
+        "request": {
+          "weight": {
+            "modifier": "GREATER_THAN",
+            "value": 162
+          }
+        }
+      },
+      {
+        "label": "weight: BETWEEN max only",
+        "state": {
+          "weight": {
+            "max": "388"
+          },
+          "weightModifier": "BETWEEN"
+        },
+        "request": {
+          "weight": {
+            "modifier": "LESS_THAN",
+            "value": 389
+          }
+        }
+      },
+      {
+        "label": "weight: BETWEEN min and max",
+        "state": {
+          "weight": {
+            "min": "163",
+            "max": "388"
+          },
+          "weightModifier": "BETWEEN"
+        },
+        "request": {
+          "weight": {
+            "modifier": "BETWEEN",
+            "value": 163,
+            "value2": 388
+          }
+        }
+      },
+      {
+        "label": "weight: IS_NULL min only",
+        "state": {
+          "weight": {
+            "min": "163"
+          },
+          "weightModifier": "IS_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: IS_NULL max only",
+        "state": {
+          "weight": {
+            "max": "388"
+          },
+          "weightModifier": "IS_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: IS_NULL min and max",
+        "state": {
+          "weight": {
+            "min": "163",
+            "max": "388"
+          },
+          "weightModifier": "IS_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: NOT_NULL min only",
+        "state": {
+          "weight": {
+            "min": "163"
+          },
+          "weightModifier": "NOT_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: NOT_NULL max only",
+        "state": {
+          "weight": {
+            "max": "388"
+          },
+          "weightModifier": "NOT_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: NOT_NULL min and max",
+        "state": {
+          "weight": {
+            "min": "163",
+            "max": "388"
+          },
+          "weightModifier": "NOT_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
         "label": "weight: min only",
         "state": {
           "weight": {
@@ -1490,6 +2421,139 @@
             "modifier": "BETWEEN",
             "value": 163,
             "value2": 388
+          }
+        }
+      },
+      {
+        "label": "penisLength: BETWEEN min only",
+        "state": {
+          "penisLength": {
+            "min": "5"
+          },
+          "penisLengthModifier": "BETWEEN"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "GREATER_THAN",
+            "value": 4
+          }
+        }
+      },
+      {
+        "label": "penisLength: BETWEEN max only",
+        "state": {
+          "penisLength": {
+            "max": "12"
+          },
+          "penisLengthModifier": "BETWEEN"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "LESS_THAN",
+            "value": 13
+          }
+        }
+      },
+      {
+        "label": "penisLength: BETWEEN min and max",
+        "state": {
+          "penisLength": {
+            "min": "5",
+            "max": "12"
+          },
+          "penisLengthModifier": "BETWEEN"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "BETWEEN",
+            "value": 5,
+            "value2": 12
+          }
+        }
+      },
+      {
+        "label": "penisLength: IS_NULL min only",
+        "state": {
+          "penisLength": {
+            "min": "5"
+          },
+          "penisLengthModifier": "IS_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: IS_NULL max only",
+        "state": {
+          "penisLength": {
+            "max": "12"
+          },
+          "penisLengthModifier": "IS_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: IS_NULL min and max",
+        "state": {
+          "penisLength": {
+            "min": "5",
+            "max": "12"
+          },
+          "penisLengthModifier": "IS_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: NOT_NULL min only",
+        "state": {
+          "penisLength": {
+            "min": "5"
+          },
+          "penisLengthModifier": "NOT_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: NOT_NULL max only",
+        "state": {
+          "penisLength": {
+            "max": "12"
+          },
+          "penisLengthModifier": "NOT_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: NOT_NULL min and max",
+        "state": {
+          "penisLength": {
+            "min": "5",
+            "max": "12"
+          },
+          "penisLengthModifier": "NOT_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "NOT_NULL"
           }
         }
       },
@@ -1540,6 +2604,139 @@
     ],
     "metricOptions": [
       {
+        "label": "height: BETWEEN min only",
+        "state": {
+          "height": {
+            "min": "138"
+          },
+          "heightModifier": "BETWEEN"
+        },
+        "request": {
+          "height": {
+            "modifier": "GREATER_THAN",
+            "value": 137
+          }
+        }
+      },
+      {
+        "label": "height: BETWEEN max only",
+        "state": {
+          "height": {
+            "max": "213"
+          },
+          "heightModifier": "BETWEEN"
+        },
+        "request": {
+          "height": {
+            "modifier": "LESS_THAN",
+            "value": 214
+          }
+        }
+      },
+      {
+        "label": "height: BETWEEN min and max",
+        "state": {
+          "height": {
+            "min": "138",
+            "max": "213"
+          },
+          "heightModifier": "BETWEEN"
+        },
+        "request": {
+          "height": {
+            "modifier": "BETWEEN",
+            "value": 138,
+            "value2": 213
+          }
+        }
+      },
+      {
+        "label": "height: IS_NULL min only",
+        "state": {
+          "height": {
+            "min": "138"
+          },
+          "heightModifier": "IS_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: IS_NULL max only",
+        "state": {
+          "height": {
+            "max": "213"
+          },
+          "heightModifier": "IS_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: IS_NULL min and max",
+        "state": {
+          "height": {
+            "min": "138",
+            "max": "213"
+          },
+          "heightModifier": "IS_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: NOT_NULL min only",
+        "state": {
+          "height": {
+            "min": "138"
+          },
+          "heightModifier": "NOT_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: NOT_NULL max only",
+        "state": {
+          "height": {
+            "max": "213"
+          },
+          "heightModifier": "NOT_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "height: NOT_NULL min and max",
+        "state": {
+          "height": {
+            "min": "138",
+            "max": "213"
+          },
+          "heightModifier": "NOT_NULL"
+        },
+        "request": {
+          "height": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
         "label": "height: min only",
         "state": {
           "height": {
@@ -1584,6 +2781,139 @@
         }
       },
       {
+        "label": "weight: BETWEEN min only",
+        "state": {
+          "weight": {
+            "min": "73"
+          },
+          "weightModifier": "BETWEEN"
+        },
+        "request": {
+          "weight": {
+            "modifier": "GREATER_THAN",
+            "value": 72
+          }
+        }
+      },
+      {
+        "label": "weight: BETWEEN max only",
+        "state": {
+          "weight": {
+            "max": "158"
+          },
+          "weightModifier": "BETWEEN"
+        },
+        "request": {
+          "weight": {
+            "modifier": "LESS_THAN",
+            "value": 159
+          }
+        }
+      },
+      {
+        "label": "weight: BETWEEN min and max",
+        "state": {
+          "weight": {
+            "min": "73",
+            "max": "158"
+          },
+          "weightModifier": "BETWEEN"
+        },
+        "request": {
+          "weight": {
+            "modifier": "BETWEEN",
+            "value": 73,
+            "value2": 158
+          }
+        }
+      },
+      {
+        "label": "weight: IS_NULL min only",
+        "state": {
+          "weight": {
+            "min": "73"
+          },
+          "weightModifier": "IS_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: IS_NULL max only",
+        "state": {
+          "weight": {
+            "max": "158"
+          },
+          "weightModifier": "IS_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: IS_NULL min and max",
+        "state": {
+          "weight": {
+            "min": "73",
+            "max": "158"
+          },
+          "weightModifier": "IS_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: NOT_NULL min only",
+        "state": {
+          "weight": {
+            "min": "73"
+          },
+          "weightModifier": "NOT_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: NOT_NULL max only",
+        "state": {
+          "weight": {
+            "max": "158"
+          },
+          "weightModifier": "NOT_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "weight: NOT_NULL min and max",
+        "state": {
+          "weight": {
+            "min": "73",
+            "max": "158"
+          },
+          "weightModifier": "NOT_NULL"
+        },
+        "request": {
+          "weight": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
         "label": "weight: min only",
         "state": {
           "weight": {
@@ -1624,6 +2954,139 @@
             "modifier": "BETWEEN",
             "value": 73,
             "value2": 158
+          }
+        }
+      },
+      {
+        "label": "penisLength: BETWEEN min only",
+        "state": {
+          "penisLength": {
+            "min": "10"
+          },
+          "penisLengthModifier": "BETWEEN"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "GREATER_THAN",
+            "value": 9
+          }
+        }
+      },
+      {
+        "label": "penisLength: BETWEEN max only",
+        "state": {
+          "penisLength": {
+            "max": "30"
+          },
+          "penisLengthModifier": "BETWEEN"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "LESS_THAN",
+            "value": 31
+          }
+        }
+      },
+      {
+        "label": "penisLength: BETWEEN min and max",
+        "state": {
+          "penisLength": {
+            "min": "10",
+            "max": "30"
+          },
+          "penisLengthModifier": "BETWEEN"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "BETWEEN",
+            "value": 10,
+            "value2": 30
+          }
+        }
+      },
+      {
+        "label": "penisLength: IS_NULL min only",
+        "state": {
+          "penisLength": {
+            "min": "10"
+          },
+          "penisLengthModifier": "IS_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: IS_NULL max only",
+        "state": {
+          "penisLength": {
+            "max": "30"
+          },
+          "penisLengthModifier": "IS_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: IS_NULL min and max",
+        "state": {
+          "penisLength": {
+            "min": "10",
+            "max": "30"
+          },
+          "penisLengthModifier": "IS_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "IS_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: NOT_NULL min only",
+        "state": {
+          "penisLength": {
+            "min": "10"
+          },
+          "penisLengthModifier": "NOT_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: NOT_NULL max only",
+        "state": {
+          "penisLength": {
+            "max": "30"
+          },
+          "penisLengthModifier": "NOT_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "NOT_NULL"
+          }
+        }
+      },
+      {
+        "label": "penisLength: NOT_NULL min and max",
+        "state": {
+          "penisLength": {
+            "min": "10",
+            "max": "30"
+          },
+          "penisLengthModifier": "NOT_NULL"
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "NOT_NULL"
           }
         }
       },

@@ -90,6 +90,28 @@ describe("cleanPresetState", () => {
     expect(stored.filters).toHaveProperty("notAFilter", true);
   });
 
+  it("a number's presence choice stays: Not rated on Rating, Not set on Height; a comparison it does not take goes", () => {
+    const scene = cleanPresetState(
+      "scene",
+      preset({ filters: { ratingModifier: "IS_NULL" } })
+    );
+    const performer = cleanPresetState(
+      "performer",
+      preset({ filters: { heightModifier: "NOT_NULL" }, sort: "name" })
+    );
+    const refused = cleanPresetState(
+      "scene",
+      preset({ filters: { ratingModifier: "AROUND" } })
+    );
+
+    expect(scene.report.droppedKeys).toEqual([]);
+    expect(scene.value).toEqual(
+      preset({ filters: { ratingModifier: "IS_NULL" } })
+    );
+    expect(performer.report.droppedKeys).toEqual([]);
+    expect(refused.report.droppedKeys).toEqual(["ratingModifier"]);
+  });
+
   it("a modifier outside its field's list goes: Has ALL on a one-studio field, an unknown resolution comparison", () => {
     const gallery = cleanPresetState(
       "gallery",

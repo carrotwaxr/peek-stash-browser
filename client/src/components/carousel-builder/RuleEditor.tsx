@@ -36,6 +36,9 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
     (f) => f.key === rule.filterKey || !usedFilterKeys.has(f.key)
   );
 
+  const isRange = filterDef?.type === "range";
+  const presence = rule.modifier === "IS_NULL" || rule.modifier === "NOT_NULL";
+
   const handleFilterChange = (newFilterKey: string) => {
     const newDef = CAROUSEL_FILTER_DEFINITIONS.find(
       (f) => f.key === newFilterKey
@@ -91,6 +94,7 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
             Condition
           </label>
           <select
+            aria-label="Condition"
             value={rule.modifier || filterDef.defaultModifier}
             onChange={(e) => onChange({ modifier: e.target.value })}
             className="w-full px-3 py-2 rounded-lg border text-sm"
@@ -109,13 +113,22 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
         </div>
       )}
 
-      {/* Value Input */}
-      <div className="flex-1 min-w-[200px] space-y-1">
-        <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
-          Value
-        </label>
-        <RuleValueInput filterDef={filterDef} rule={rule} onChange={onChange} />
-      </div>
+      {/* Value Input; "Not set" and "Set" on a range take no value */}
+      {!(isRange && presence) && (
+        <div className="flex-1 min-w-[200px] space-y-1">
+          <label
+            className="block text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Value
+          </label>
+          <RuleValueInput
+            filterDef={filterDef}
+            rule={rule}
+            onChange={onChange}
+          />
+        </div>
+      )}
 
       {/* Hierarchy Toggle */}
       {filterDef?.supportsHierarchy && (

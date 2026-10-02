@@ -19,6 +19,7 @@
     "gender_start",
     "gender_end",
     "rating",
+    "ratingModifier",
     "rating_min",
     "rating_max",
     "rating_start",
@@ -54,6 +55,7 @@
     "deathYear_start",
     "deathYear_end",
     "careerLength",
+    "careerLengthModifier",
     "careerLength_min",
     "careerLength_max",
     "careerLength_start",
@@ -114,16 +116,19 @@
     "piercings_start",
     "piercings_end",
     "height",
+    "heightModifier",
     "height_min",
     "height_max",
     "height_start",
     "height_end",
     "weight",
+    "weightModifier",
     "weight_min",
     "weight_max",
     "weight_start",
     "weight_end",
     "penisLength",
+    "penisLengthModifier",
     "penisLength_min",
     "penisLength_max",
     "penisLength_start",
@@ -396,6 +401,85 @@
       "lossless": true
     },
     {
+      "label": "rating: BETWEEN min only",
+      "params": "rating_min=25",
+      "parsed": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: BETWEEN max only",
+      "params": "rating_max=75",
+      "parsed": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: BETWEEN min and max",
+      "params": "rating_min=25&rating_max=75",
+      "parsed": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: IS_NULL min only",
+      "params": "ratingModifier=IS_NULL",
+      "parsed": {
+        "ratingModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: IS_NULL max only",
+      "params": "ratingModifier=IS_NULL",
+      "parsed": {
+        "ratingModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: IS_NULL min and max",
+      "params": "ratingModifier=IS_NULL",
+      "parsed": {
+        "ratingModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: NOT_NULL min only",
+      "params": "ratingModifier=NOT_NULL",
+      "parsed": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: NOT_NULL max only",
+      "params": "ratingModifier=NOT_NULL",
+      "parsed": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: NOT_NULL min and max",
+      "params": "ratingModifier=NOT_NULL",
+      "parsed": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
       "label": "rating: min only",
       "params": "rating_min=25",
       "parsed": {
@@ -588,6 +672,85 @@
         }
       },
       "lossless": true
+    },
+    {
+      "label": "careerLength: BETWEEN min only",
+      "params": "careerLength_min=13",
+      "parsed": {
+        "careerLength": {
+          "min": "13"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "careerLength: BETWEEN max only",
+      "params": "careerLength_max=38",
+      "parsed": {
+        "careerLength": {
+          "max": "38"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "careerLength: BETWEEN min and max",
+      "params": "careerLength_min=13&careerLength_max=38",
+      "parsed": {
+        "careerLength": {
+          "min": "13",
+          "max": "38"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "careerLength: IS_NULL min only",
+      "params": "careerLengthModifier=IS_NULL",
+      "parsed": {
+        "careerLengthModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "careerLength: IS_NULL max only",
+      "params": "careerLengthModifier=IS_NULL",
+      "parsed": {
+        "careerLengthModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "careerLength: IS_NULL min and max",
+      "params": "careerLengthModifier=IS_NULL",
+      "parsed": {
+        "careerLengthModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "careerLength: NOT_NULL min only",
+      "params": "careerLengthModifier=NOT_NULL",
+      "parsed": {
+        "careerLengthModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "careerLength: NOT_NULL max only",
+      "params": "careerLengthModifier=NOT_NULL",
+      "parsed": {
+        "careerLengthModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "careerLength: NOT_NULL min and max",
+      "params": "careerLengthModifier=NOT_NULL",
+      "parsed": {
+        "careerLengthModifier": "NOT_NULL"
+      },
+      "lossless": false
     },
     {
       "label": "careerLength: min only",
@@ -969,6 +1132,85 @@
       "lossless": true
     },
     {
+      "label": "height: BETWEEN min only",
+      "params": "height_min=138",
+      "parsed": {
+        "height": {
+          "min": "138"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: BETWEEN max only",
+      "params": "height_max=213",
+      "parsed": {
+        "height": {
+          "max": "213"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: BETWEEN min and max",
+      "params": "height_min=138&height_max=213",
+      "parsed": {
+        "height": {
+          "min": "138",
+          "max": "213"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: IS_NULL min only",
+      "params": "heightModifier=IS_NULL",
+      "parsed": {
+        "heightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: IS_NULL max only",
+      "params": "heightModifier=IS_NULL",
+      "parsed": {
+        "heightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: IS_NULL min and max",
+      "params": "heightModifier=IS_NULL",
+      "parsed": {
+        "heightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: NOT_NULL min only",
+      "params": "heightModifier=NOT_NULL",
+      "parsed": {
+        "heightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: NOT_NULL max only",
+      "params": "heightModifier=NOT_NULL",
+      "parsed": {
+        "heightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: NOT_NULL min and max",
+      "params": "heightModifier=NOT_NULL",
+      "parsed": {
+        "heightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
       "label": "height: min only",
       "params": "height_min=138",
       "parsed": {
@@ -1000,6 +1242,85 @@
       "lossless": true
     },
     {
+      "label": "weight: BETWEEN min only",
+      "params": "weight_min=73",
+      "parsed": {
+        "weight": {
+          "min": "73"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: BETWEEN max only",
+      "params": "weight_max=158",
+      "parsed": {
+        "weight": {
+          "max": "158"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: BETWEEN min and max",
+      "params": "weight_min=73&weight_max=158",
+      "parsed": {
+        "weight": {
+          "min": "73",
+          "max": "158"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: IS_NULL min only",
+      "params": "weightModifier=IS_NULL",
+      "parsed": {
+        "weightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: IS_NULL max only",
+      "params": "weightModifier=IS_NULL",
+      "parsed": {
+        "weightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: IS_NULL min and max",
+      "params": "weightModifier=IS_NULL",
+      "parsed": {
+        "weightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: NOT_NULL min only",
+      "params": "weightModifier=NOT_NULL",
+      "parsed": {
+        "weightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: NOT_NULL max only",
+      "params": "weightModifier=NOT_NULL",
+      "parsed": {
+        "weightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: NOT_NULL min and max",
+      "params": "weightModifier=NOT_NULL",
+      "parsed": {
+        "weightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
       "label": "weight: min only",
       "params": "weight_min=73",
       "parsed": {
@@ -1029,6 +1350,85 @@
         }
       },
       "lossless": true
+    },
+    {
+      "label": "penisLength: BETWEEN min only",
+      "params": "penisLength_min=10",
+      "parsed": {
+        "penisLength": {
+          "min": "10"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: BETWEEN max only",
+      "params": "penisLength_max=30",
+      "parsed": {
+        "penisLength": {
+          "max": "30"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: BETWEEN min and max",
+      "params": "penisLength_min=10&penisLength_max=30",
+      "parsed": {
+        "penisLength": {
+          "min": "10",
+          "max": "30"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: IS_NULL min only",
+      "params": "penisLengthModifier=IS_NULL",
+      "parsed": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: IS_NULL max only",
+      "params": "penisLengthModifier=IS_NULL",
+      "parsed": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: IS_NULL min and max",
+      "params": "penisLengthModifier=IS_NULL",
+      "parsed": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: NOT_NULL min only",
+      "params": "penisLengthModifier=NOT_NULL",
+      "parsed": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: NOT_NULL max only",
+      "params": "penisLengthModifier=NOT_NULL",
+      "parsed": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: NOT_NULL min and max",
+      "params": "penisLengthModifier=NOT_NULL",
+      "parsed": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "lossless": false
     },
     {
       "label": "penisLength: min only",
@@ -1103,6 +1503,85 @@
   ],
   "imperialRoundTrip": [
     {
+      "label": "height: BETWEEN min only",
+      "params": "height_min=167",
+      "parsed": {
+        "height": {
+          "min": "167"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: BETWEEN max only",
+      "params": "height_max=189",
+      "parsed": {
+        "height": {
+          "max": "189"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: BETWEEN min and max",
+      "params": "height_min=167&height_max=189",
+      "parsed": {
+        "height": {
+          "min": "167",
+          "max": "189"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: IS_NULL min only",
+      "params": "heightModifier=IS_NULL",
+      "parsed": {
+        "heightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: IS_NULL max only",
+      "params": "heightModifier=IS_NULL",
+      "parsed": {
+        "heightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: IS_NULL min and max",
+      "params": "heightModifier=IS_NULL",
+      "parsed": {
+        "heightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: NOT_NULL min only",
+      "params": "heightModifier=NOT_NULL",
+      "parsed": {
+        "heightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: NOT_NULL max only",
+      "params": "heightModifier=NOT_NULL",
+      "parsed": {
+        "heightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "height: NOT_NULL min and max",
+      "params": "heightModifier=NOT_NULL",
+      "parsed": {
+        "heightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
       "label": "height: min only",
       "params": "height_min=167",
       "parsed": {
@@ -1134,6 +1613,85 @@
       "lossless": true
     },
     {
+      "label": "weight: BETWEEN min only",
+      "params": "weight_min=163",
+      "parsed": {
+        "weight": {
+          "min": "163"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: BETWEEN max only",
+      "params": "weight_max=388",
+      "parsed": {
+        "weight": {
+          "max": "388"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: BETWEEN min and max",
+      "params": "weight_min=163&weight_max=388",
+      "parsed": {
+        "weight": {
+          "min": "163",
+          "max": "388"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: IS_NULL min only",
+      "params": "weightModifier=IS_NULL",
+      "parsed": {
+        "weightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: IS_NULL max only",
+      "params": "weightModifier=IS_NULL",
+      "parsed": {
+        "weightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: IS_NULL min and max",
+      "params": "weightModifier=IS_NULL",
+      "parsed": {
+        "weightModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: NOT_NULL min only",
+      "params": "weightModifier=NOT_NULL",
+      "parsed": {
+        "weightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: NOT_NULL max only",
+      "params": "weightModifier=NOT_NULL",
+      "parsed": {
+        "weightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "weight: NOT_NULL min and max",
+      "params": "weightModifier=NOT_NULL",
+      "parsed": {
+        "weightModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
       "label": "weight: min only",
       "params": "weight_min=163",
       "parsed": {
@@ -1163,6 +1721,85 @@
         }
       },
       "lossless": true
+    },
+    {
+      "label": "penisLength: BETWEEN min only",
+      "params": "penisLength_min=5",
+      "parsed": {
+        "penisLength": {
+          "min": "5"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: BETWEEN max only",
+      "params": "penisLength_max=12",
+      "parsed": {
+        "penisLength": {
+          "max": "12"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: BETWEEN min and max",
+      "params": "penisLength_min=5&penisLength_max=12",
+      "parsed": {
+        "penisLength": {
+          "min": "5",
+          "max": "12"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: IS_NULL min only",
+      "params": "penisLengthModifier=IS_NULL",
+      "parsed": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: IS_NULL max only",
+      "params": "penisLengthModifier=IS_NULL",
+      "parsed": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: IS_NULL min and max",
+      "params": "penisLengthModifier=IS_NULL",
+      "parsed": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: NOT_NULL min only",
+      "params": "penisLengthModifier=NOT_NULL",
+      "parsed": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: NOT_NULL max only",
+      "params": "penisLengthModifier=NOT_NULL",
+      "parsed": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "penisLength: NOT_NULL min and max",
+      "params": "penisLengthModifier=NOT_NULL",
+      "parsed": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "lossless": false
     },
     {
       "label": "penisLength: min only",
@@ -1442,6 +2079,85 @@
       "hasFilters": true
     },
     {
+      "label": "rating: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&rating_min=25",
+      "filters": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&rating_max=75",
+      "filters": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&rating_min=25&rating_max=75",
+      "filters": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&ratingModifier=IS_NULL",
+      "filters": {
+        "ratingModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&ratingModifier=IS_NULL",
+      "filters": {
+        "ratingModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&ratingModifier=IS_NULL",
+      "filters": {
+        "ratingModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&ratingModifier=NOT_NULL",
+      "filters": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&ratingModifier=NOT_NULL",
+      "filters": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&ratingModifier=NOT_NULL",
+      "filters": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "rating: min only",
       "written": "instance=inst-a&tab=x&rating_min=25",
       "filters": {
@@ -1632,6 +2348,85 @@
           "min": "1950",
           "max": "2050"
         }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&careerLength_min=13",
+      "filters": {
+        "careerLength": {
+          "min": "13"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&careerLength_max=38",
+      "filters": {
+        "careerLength": {
+          "max": "38"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&careerLength_min=13&careerLength_max=38",
+      "filters": {
+        "careerLength": {
+          "min": "13",
+          "max": "38"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&careerLengthModifier=IS_NULL",
+      "filters": {
+        "careerLengthModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&careerLengthModifier=IS_NULL",
+      "filters": {
+        "careerLengthModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&careerLengthModifier=IS_NULL",
+      "filters": {
+        "careerLengthModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&careerLengthModifier=NOT_NULL",
+      "filters": {
+        "careerLengthModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&careerLengthModifier=NOT_NULL",
+      "filters": {
+        "careerLengthModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&careerLengthModifier=NOT_NULL",
+      "filters": {
+        "careerLengthModifier": "NOT_NULL"
       },
       "hasFilters": true
     },
@@ -2015,6 +2810,85 @@
       "hasFilters": true
     },
     {
+      "label": "height: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&height_min=138",
+      "filters": {
+        "height": {
+          "min": "138"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&height_max=213",
+      "filters": {
+        "height": {
+          "max": "213"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&height_min=138&height_max=213",
+      "filters": {
+        "height": {
+          "min": "138",
+          "max": "213"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&heightModifier=IS_NULL",
+      "filters": {
+        "heightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&heightModifier=IS_NULL",
+      "filters": {
+        "heightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&heightModifier=IS_NULL",
+      "filters": {
+        "heightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&heightModifier=NOT_NULL",
+      "filters": {
+        "heightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&heightModifier=NOT_NULL",
+      "filters": {
+        "heightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&heightModifier=NOT_NULL",
+      "filters": {
+        "heightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "height: min only",
       "written": "instance=inst-a&tab=x&height_min=138",
       "filters": {
@@ -2046,6 +2920,85 @@
       "hasFilters": true
     },
     {
+      "label": "weight: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&weight_min=73",
+      "filters": {
+        "weight": {
+          "min": "73"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&weight_max=158",
+      "filters": {
+        "weight": {
+          "max": "158"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&weight_min=73&weight_max=158",
+      "filters": {
+        "weight": {
+          "min": "73",
+          "max": "158"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&weightModifier=IS_NULL",
+      "filters": {
+        "weightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&weightModifier=IS_NULL",
+      "filters": {
+        "weightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&weightModifier=IS_NULL",
+      "filters": {
+        "weightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&weightModifier=NOT_NULL",
+      "filters": {
+        "weightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&weightModifier=NOT_NULL",
+      "filters": {
+        "weightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&weightModifier=NOT_NULL",
+      "filters": {
+        "weightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "weight: min only",
       "written": "instance=inst-a&tab=x&weight_min=73",
       "filters": {
@@ -2073,6 +3026,85 @@
           "min": "73",
           "max": "158"
         }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&penisLength_min=10",
+      "filters": {
+        "penisLength": {
+          "min": "10"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&penisLength_max=30",
+      "filters": {
+        "penisLength": {
+          "max": "30"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&penisLength_min=10&penisLength_max=30",
+      "filters": {
+        "penisLength": {
+          "min": "10",
+          "max": "30"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=IS_NULL",
+      "filters": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=IS_NULL",
+      "filters": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=IS_NULL",
+      "filters": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=NOT_NULL",
+      "filters": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=NOT_NULL",
+      "filters": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=NOT_NULL",
+      "filters": {
+        "penisLengthModifier": "NOT_NULL"
       },
       "hasFilters": true
     },
@@ -2149,6 +3181,85 @@
   ],
   "imperialListParams": [
     {
+      "label": "height: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&height_min=167",
+      "filters": {
+        "height": {
+          "min": "167"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&height_max=189",
+      "filters": {
+        "height": {
+          "max": "189"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&height_min=167&height_max=189",
+      "filters": {
+        "height": {
+          "min": "167",
+          "max": "189"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&heightModifier=IS_NULL",
+      "filters": {
+        "heightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&heightModifier=IS_NULL",
+      "filters": {
+        "heightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&heightModifier=IS_NULL",
+      "filters": {
+        "heightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&heightModifier=NOT_NULL",
+      "filters": {
+        "heightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&heightModifier=NOT_NULL",
+      "filters": {
+        "heightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&heightModifier=NOT_NULL",
+      "filters": {
+        "heightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "height: min only",
       "written": "instance=inst-a&tab=x&height_min=167",
       "filters": {
@@ -2180,6 +3291,85 @@
       "hasFilters": true
     },
     {
+      "label": "weight: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&weight_min=163",
+      "filters": {
+        "weight": {
+          "min": "163"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&weight_max=388",
+      "filters": {
+        "weight": {
+          "max": "388"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&weight_min=163&weight_max=388",
+      "filters": {
+        "weight": {
+          "min": "163",
+          "max": "388"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&weightModifier=IS_NULL",
+      "filters": {
+        "weightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&weightModifier=IS_NULL",
+      "filters": {
+        "weightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&weightModifier=IS_NULL",
+      "filters": {
+        "weightModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&weightModifier=NOT_NULL",
+      "filters": {
+        "weightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&weightModifier=NOT_NULL",
+      "filters": {
+        "weightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&weightModifier=NOT_NULL",
+      "filters": {
+        "weightModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "weight: min only",
       "written": "instance=inst-a&tab=x&weight_min=163",
       "filters": {
@@ -2207,6 +3397,85 @@
           "min": "163",
           "max": "388"
         }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&penisLength_min=5",
+      "filters": {
+        "penisLength": {
+          "min": "5"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&penisLength_max=12",
+      "filters": {
+        "penisLength": {
+          "max": "12"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&penisLength_min=5&penisLength_max=12",
+      "filters": {
+        "penisLength": {
+          "min": "5",
+          "max": "12"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=IS_NULL",
+      "filters": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=IS_NULL",
+      "filters": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=IS_NULL",
+      "filters": {
+        "penisLengthModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=NOT_NULL",
+      "filters": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=NOT_NULL",
+      "filters": {
+        "penisLengthModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&penisLengthModifier=NOT_NULL",
+      "filters": {
+        "penisLengthModifier": "NOT_NULL"
       },
       "hasFilters": true
     },

@@ -203,7 +203,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 0,
-      "max": 100
+      "max": 100,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not rated"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Rated"
+        }
+      ],
+      "modifierKey": "ratingModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "resolution",
@@ -1611,6 +1627,200 @@
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?playDuration_min=76&playDuration_max=225&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "rating: BETWEEN min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        },
+        "ratingModifier": "BETWEEN"
+      },
+      "rules": {
+        "rating100": {
+          "modifier": "GREATER_THAN",
+          "value": 24
+        }
+      },
+      "back": {
+        "rating": {
+          "min": 25
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?rating_min=25&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "rating: BETWEEN max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        },
+        "ratingModifier": "BETWEEN"
+      },
+      "rules": {
+        "rating100": {
+          "modifier": "LESS_THAN",
+          "value": 76
+        }
+      },
+      "back": {
+        "rating": {
+          "max": 75
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?rating_max=75&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "rating: BETWEEN min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        },
+        "ratingModifier": "BETWEEN"
+      },
+      "rules": {
+        "rating100": {
+          "modifier": "BETWEEN",
+          "value": 25,
+          "value2": 75
+        }
+      },
+      "back": {
+        "rating": {
+          "min": 25,
+          "max": 75
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?rating_min=25&rating_max=75&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "rating: IS_NULL min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        },
+        "ratingModifier": "IS_NULL"
+      },
+      "rules": {
+        "rating100": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "ratingModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?ratingModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "rating: IS_NULL max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        },
+        "ratingModifier": "IS_NULL"
+      },
+      "rules": {
+        "rating100": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "ratingModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?ratingModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "rating: IS_NULL min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        },
+        "ratingModifier": "IS_NULL"
+      },
+      "rules": {
+        "rating100": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "ratingModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?ratingModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "rating: NOT_NULL min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        },
+        "ratingModifier": "NOT_NULL"
+      },
+      "rules": {
+        "rating100": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?ratingModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "rating: NOT_NULL max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        },
+        "ratingModifier": "NOT_NULL"
+      },
+      "rules": {
+        "rating100": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?ratingModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "rating: NOT_NULL min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        },
+        "ratingModifier": "NOT_NULL"
+      },
+      "rules": {
+        "rating100": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?ratingModifier=NOT_NULL&sort=created_at&dir=ASC"
     },
     {
       "label": "rating: min only",

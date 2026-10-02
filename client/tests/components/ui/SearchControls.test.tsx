@@ -556,6 +556,42 @@ describe("SearchControls", () => {
       expect(list.actions).toEqual(["PUSH"]);
     });
 
+    it("choosing Not rated hides the bounds and sends IS_NULL", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls({}, { url: "/scenes?rating_min=40" });
+      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+        rating100: { modifier: "GREATER_THAN", value: 39 },
+      });
+
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      const rating = must(
+        screen.getByText("Rating (0-100)", { selector: "label" }).parentElement,
+        "the Rating control"
+      );
+      expect(within(rating).getAllByRole("spinbutton")).toHaveLength(2);
+      const condition = within(rating).getByRole("combobox", {
+        name: "Rating (0-100) condition",
+      });
+      expect(condition).toHaveDisplayValue("Between");
+
+      await user.selectOptions(condition, "Not rated");
+      expect(within(rating).queryAllByRole("spinbutton")).toHaveLength(0);
+      await user.selectOptions(condition, "Between");
+      expect(within(rating).getAllByRole("spinbutton")).toHaveLength(2);
+      await user.selectOptions(condition, "Not rated");
+      await user.click(
+        must(screen.getByText("Apply Filters").closest("button"))
+      );
+
+      await waitFor(() =>
+        expect(list.lastQuery().scene_filter).toEqual({
+          rating100: { modifier: "IS_NULL" },
+        })
+      );
+      expect(list.params().get("ratingModifier")).toBe("IS_NULL");
+      expect(list.params().has("rating_min")).toBe(false);
+    });
+
     it("removing a chip asks for the list without its filter", async () => {
       const user = userEvent.setup();
       const list = renderSearchControls({}, { url: "/scenes?favorite=true" });

@@ -114,6 +114,51 @@ describe("CarouselBuilder", () => {
     expect(Object.keys(rules)).toEqual(["rating100"]);
   });
 
+  it('a Rating Not rated rule saves rating100: { modifier: "IS_NULL" } and survives an edit', async () => {
+    const stored = {
+      ...CAROUSEL,
+      rules: { rating100: { modifier: "IS_NULL" } },
+    };
+    const fetchMock = stubApi({
+      "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
+      "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+    });
+    renderEditor(createQueryClient());
+
+    await screen.findByDisplayValue("Highly rated");
+    // The stored rule reads as the Not rated choice, with no bounds to fill
+    const condition = screen.getByRole("combobox", { name: "Condition" });
+    expect(condition).toHaveDisplayValue("Not rated");
+    expect(screen.queryByPlaceholderText("Min")).toBeNull();
+
+    // Choosing Between brings the bounds back; Not rated hides them again
+    fireEvent.change(condition, { target: { value: "BETWEEN" } });
+    expect(screen.getByPlaceholderText("Min")).toBeVisible();
+    fireEvent.change(condition, { target: { value: "IS_NULL" } });
+    expect(screen.queryByPlaceholderText("Min")).toBeNull();
+
+    fireEvent.change(await screen.findByDisplayValue("Highly rated"), {
+      target: { value: "Renamed" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+    const update = await screen.findByRole("button", { name: /Update/ });
+    await waitFor(() => expect(update).toBeEnabled());
+    fireEvent.click(update);
+    await screen.findByText("Settings");
+
+    const sent = (match: (url: string, method?: string) => boolean) =>
+      JSON.parse(
+        fetchMock.mock.calls.find(([url, init]) =>
+          match(url, init?.method)
+        )?.[1]?.body as string
+      ) as { rules: unknown };
+    const stays = { rating100: { modifier: "IS_NULL" } };
+    expect(sent((url) => url.includes("/carousels/preview")).rules).toEqual(
+      stays
+    );
+    expect(sent((_url, method) => method === "PUT").rules).toEqual(stays);
+  });
+
   it("saving an edited carousel makes Home ask for its scenes again", async () => {
     const fetchMock = stubApi({
       // The edit's read and its save
