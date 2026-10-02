@@ -23,8 +23,15 @@
  * (numbers, dates, text, career years, favorites) the builders share live
  * here too.
  */
-import type { RefModifier } from "@peek/shared-types/filters/index.js";
-import type { FilterRef, NumberCriterion } from "../types/parsedFilters.js";
+import type {
+  RefModifier,
+  Resolution,
+} from "@peek/shared-types/filters/index.js";
+import type {
+  EnumCriterion,
+  FilterRef,
+  NumberCriterion,
+} from "../types/parsedFilters.js";
 import { type EntityRef, distinctRefs, pairsJson } from "./entityRef.js";
 
 export type SqlParam = string | number | boolean;
@@ -1158,4 +1165,55 @@ export function buildFavoriteFilter(
  */
 export function sceneUntaggedSql(alias: string): string {
   return `(${alias}.tagCount = 0 AND NOT EXISTS (SELECT 1 FROM SceneInheritedTag ${alias}ut WHERE ${alias}ut.sceneId = ${alias}.id AND ${alias}ut.sceneInstanceId = ${alias}.stashInstanceId))`;
+}
+
+/**
+ * Stash's resolution ranges, in pixels on a file's shorter side, copied as
+ * they are, overlaps included (VR_HD 1920 to 2159 sits inside FOUR_K 1920 to
+ * 2559): `stash/pkg/models/resolution.go` (`resolutionRanges`).
+ */
+export const RESOLUTION_RANGES: Readonly<
+  Record<Resolution, { readonly min: number; readonly max: number }>
+> = {
+  VERY_LOW: { min: 144, max: 239 },
+  LOW: { min: 240, max: 359 },
+  R360P: { min: 360, max: 479 },
+  STANDARD: { min: 480, max: 539 },
+  WEB_HD: { min: 540, max: 719 },
+  STANDARD_HD: { min: 720, max: 1079 },
+  FULL_HD: { min: 1080, max: 1439 },
+  QUAD_HD: { min: 1440, max: 1919 },
+  VR_HD: { min: 1920, max: 2159 },
+  FOUR_K: { min: 1920, max: 2559 },
+  FIVE_K: { min: 2560, max: 2999 },
+  SIX_K: { min: 3000, max: 3583 },
+  SEVEN_K: { min: 3584, max: 3839 },
+  EIGHT_K: { min: 3840, max: 6143 },
+  HUGE: { min: 6144, max: 9999 },
+};
+
+/**
+ * The resolution filter over a file's width and height columns, as Stash
+ * builds it (`stash/pkg/sqlite/criterion_handlers.go`,
+ * `resolutionCriterionHandler`): the shorter side against the range, so a
+ * portrait 1080 by 1920 file is 1080p. EQUALS is `BETWEEN min AND max`,
+ * NOT_EQUALS `NOT BETWEEN`, GREATER_THAN is past the range's top and
+ * LESS_THAN under its bottom. No COALESCE: a file with no size is NULL
+ * here and never matches, not even NOT_EQUALS. The bounds are the table's
+ * own numbers, so they are written in, not bound.
+ */
+export function resolutionClause(
+  criterion: EnumCriterion<Resolution>,
+  widthCol: string,
+  heightCol: string
+): FilterClause {
+  const { min, max } = RESOLUTION_RANGES[criterion.value];
+  const shorter = `MIN(${widthCol}, ${heightCol})`;
+  const sql = {
+    EQUALS: `${shorter} BETWEEN ${min} AND ${max}`,
+    NOT_EQUALS: `${shorter} NOT BETWEEN ${min} AND ${max}`,
+    GREATER_THAN: `${shorter} > ${max}`,
+    LESS_THAN: `${shorter} < ${min}`,
+  }[criterion.modifier];
+  return { sql, params: [] };
 }

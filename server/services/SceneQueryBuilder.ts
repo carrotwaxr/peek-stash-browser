@@ -8,10 +8,7 @@
  * random sort, the primary key ending every order and the count are the
  * base's.
  */
-import type {
-  Resolution,
-  SortDirection,
-} from "@peek/shared-types/filters/index.js";
+import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type {
   GalleryRef,
   GroupRef,
@@ -25,7 +22,6 @@ import type {
   SceneQueryRow,
 } from "../types/internal/queryRows.js";
 import type {
-  EnumCriterion,
   MultiEnumCriterion,
   ParsedFilter,
   RefCriterion,
@@ -46,6 +42,7 @@ import {
   noClause,
   performerAgeExists,
   refClause,
+  resolutionClause,
   sceneUntaggedSql,
 } from "../utils/sqlClauses.js";
 import {
@@ -183,28 +180,6 @@ const SCENE_STUDIO: ColumnTarget = {
   parentAlias: "s",
   idCol: "studioId",
   instanceCol: "stashInstanceId",
-};
-
-/**
- * The pixel height each resolution names; SEVEN_K and HUGE take Stash's
- * range minimums. PR 9 moves the filter to Stash's ranges.
- */
-const RESOLUTION_HEIGHTS: Readonly<Record<Resolution, number>> = {
-  VERY_LOW: 144,
-  LOW: 240,
-  R360P: 360,
-  STANDARD: 480,
-  WEB_HD: 540,
-  STANDARD_HD: 720,
-  FULL_HD: 1080,
-  QUAD_HD: 1440,
-  VR_HD: 1920,
-  FOUR_K: 2160,
-  FIVE_K: 2880,
-  SIX_K: 3240,
-  SEVEN_K: 3584,
-  EIGHT_K: 4320,
-  HUGE: 6144,
 };
 
 /** The junction Performer Age reads a scene's performers from */
@@ -363,7 +338,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
   protected override readonly fieldClauses: FieldClauses<"scene"> = {
     // Metadata
     duration: (c) => buildNumericFilter(c, "s.duration"),
-    resolution: (c) => this.resolutionClause(c),
+    resolution: (c) => resolutionClause(c, "s.fileWidth", "s.fileHeight"),
     // No tag, own or inherited (the folder view's Untagged), or some tag
     tagged: (tagged) => {
       const untagged = sceneUntaggedSql("s");
@@ -471,18 +446,6 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     return hierarchicalRefClause("studio", SCENE_STUDIO, criterion, ctx, {
       name: ctx.name,
     });
-  }
-
-  private resolutionClause(criterion: EnumCriterion<Resolution>): FilterClause {
-    const height = RESOLUTION_HEIGHTS[criterion.value];
-    const col = "COALESCE(s.fileHeight, 0)";
-    const operator = {
-      EQUALS: "=",
-      NOT_EQUALS: "!=",
-      GREATER_THAN: ">",
-      LESS_THAN: "<",
-    }[criterion.modifier];
-    return { sql: `${col} ${operator} ?`, params: [height] };
   }
 
   private orientationClause(
