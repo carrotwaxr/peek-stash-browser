@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { getClipPreviewUrl } from "../../api";
 import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { useInView } from "../../hooks/useInView";
-import { releaseVideoOnUnmount } from "../../utils/releaseVideo";
+import { usePreviewVideoRef } from "../../hooks/usePreviewVideoRef";
 import type { Clip } from "./ClipCard";
 
 interface Props {
@@ -41,6 +41,8 @@ const ClipCardPreview = ({
   const previewUrl = clip.isGenerated
     ? getClipPreviewUrl(clip.id, clip.instanceId)
     : null;
+  // The video's ref loads the preview and releases it on leave
+  const previewVideoRef = usePreviewVideoRef(previewUrl);
   // Prefer the marker's own screenshot over the scene cover
   const screenshotUrl =
     clip.screenshotUrl || clip.scene?.pathScreenshot || null;
@@ -78,8 +80,7 @@ const ClipCardPreview = ({
       {/* Video preview overlay - only render when hovering to trigger load */}
       {shouldShowVideo && (
         <video
-          ref={releaseVideoOnUnmount}
-          src={previewUrl}
+          ref={previewVideoRef}
           className={`absolute inset-0 w-full h-full pointer-events-none ${objectFitClass}`}
           style={{ backgroundColor: "var(--bg-secondary)" }}
           autoPlay
