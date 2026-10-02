@@ -1,7 +1,7 @@
 /**
  * What each editor kind does with a panel row: the keys it holds, whether
  * it filters, its request criterion and how a stored one reads back, its
- * URL parameters and (filled by a later task) its chip.
+ * URL parameters and its chip.
  *
  * Body measures (Height, Weight, Penis Length) are metric in the state, the
  * URL, presets and requests; `normalize` reads them leniently (any finite
@@ -27,11 +27,21 @@ import type {
   TextField,
 } from "@peek/shared-types";
 import { makeCompositeKey, parseCompositeKey } from "../compositeKey";
+import {
+  UNITS,
+  cmToFeetInches,
+  cmToLengthInches,
+  kgToLbs,
+} from "../unitConversions";
 
 /** The panel's filters: each row's key and companions, as the URL and presets hold them */
 export type PanelState = Readonly<Record<string, unknown>>;
 
-/** An active filter's chip, in parts: "Tags: any of A, B (with sub-tags)" */
+/**
+ * An active filter's chip, in parts: "Tags: any of A, B, with sub-tags" is
+ * the label `Tags`, the condition `any of`, the ids' names and the suffix
+ * `, with sub-tags`
+ */
 export interface ChipParts {
   readonly label: string;
   readonly condition?: string;
@@ -63,7 +73,16 @@ export interface FieldCodec<F extends PanelField> {
   writeUrl(field: F, state: PanelState, params: URLSearchParams): void;
   /** The row's state the URL names; nothing for a key it lacks */
   readUrl(field: F, params: URLSearchParams): PanelState;
-  chip(field: F, spec: FieldSpec, state: PanelState): ChipParts | null;
+  /**
+   * The row's chip, or null when it does not filter. Body measures read in
+   * `unitPreference` (the state is metric either way).
+   */
+  chip(
+    field: F,
+    spec: FieldSpec,
+    state: PanelState,
+    unitPreference?: string
+  ): ChipParts | null;
 }
 
 /**
@@ -268,15 +287,194 @@ const enumModifierOf = (
 /** A row's value as it is */
 const identity = (_field: PanelField, value: unknown): unknown => value;
 
-/** A member a later task fills */
-const notYet = (member: string) => (): never => {
-  throw new Error(`${member}: not yet`);
+// ── Chips ─────────────────────────────────────────────────────────────────
+
+/** The row's name on a chip: its label without the unit in brackets ("Rating (0-100)") */
+const chipLabel = (field: PanelField): string =>
+  field.label.replace(/ \([^)]*\)$/, "");
+
+/** The condition select's words on a chip */
+const REF_CONDITIONS = {
+  has: {
+    INCLUDES_ALL: "all of",
+    INCLUDES: "any of",
+    EXCLUDES: "none of",
+  },
+  in: {
+    INCLUDES_ALL: "in all of",
+    INCLUDES: "in any of",
+    EXCLUDES: "not in",
+  },
+} as const;
+
+const ENUM_CONDITIONS: Readonly<Record<string, string>> = {
+  EQUALS: "is",
+  NOT_EQUALS: "is not",
+  GREATER_THAN: "higher than",
+  LESS_THAN: "lower than",
 };
 
-/** The member C7 fills, throwing until then */
-const pending = {
-  chip: notYet("chip"),
-};
+/** A ref row's chip: its ids to be named, its condition and whether it takes sub-entities */
+function refChip(
+  field: RefField,
+  spec: FieldSpec,
+  state: PanelState
+): ChipParts | null {
+  if (spec.kind !== "ref") return null;
+  const criterion = refCriterionOf(spec, field, state);
+  if (criterion === undefined || valuesOf(state[field.key]).length === 0) {
+    return null;
+  }
+  const words: Readonly<Record<string, string>> =
+    REF_CONDITIONS[field.modifierLabels ?? "has"];
+  // One modifier offered: no condition select, so no condition to name
+  const condition =
+    field.modifiers.length > 1 ? words[criterion.modifier] : undefined;
+  const withDescendants =
+    criterion.depth !== undefined && criterion.depth !== 0;
+  return {
+    label: chipLabel(field),
+    ...(condition === undefined ? {} : { condition }),
+    ids: criterion.value,
+    ...(withDescendants
+      ? {
+          suffix: `, with ${(field.hierarchyLabel ?? "sub-items").replace(/^Include /i, "")}`,
+        }
+      : {}),
+  };
+}
+
+/** A range's lone or both bounds in words: "40 to 80", "at least 40", "at most 40" */
+function rangeParts(
+  low: string | undefined,
+  high: string | undefined,
+  unit = ""
+): Pick<ChipParts, "condition" | "values"> {
+  if (low !== undefined && high !== undefined) {
+    return { values: [`${low} to ${high}${unit}`] };
+  }
+  return low !== undefined
+    ? { condition: "at least", values: [`${low}${unit}`] }
+    : { condition: "at most", values: [`${high ?? ""}${unit}`] };
+}
+
+/** A bound's text, or undefined when it holds none */
+const boundText = (value: unknown): string | undefined =>
+  isBound(value) ? String(value) : undefined;
+
+/**
+ * A body measure's metric bound as the viewer reads it: its number and the
+ * unit after the range. An imperial height reads as feet and inches, each
+ * bound with its own unit (`5 ft 10 in`); a value that is no number shows
+ * as it is.
+ */
+function measureBound(
+  measure: NonNullable<NumberField["measure"]>,
+  value: string,
+  unitPreference: string
+): { text: string; unit: string } {
+  const metric = Number(value);
+  const imperial = unitPreference === UNITS.IMPERIAL;
+  if (!Number.isFinite(metric)) return { text: value, unit: "" };
+  switch (measure) {
+    case "height": {
+      if (!imperial) return { text: value, unit: " cm" };
+      const { feet, inches } = cmToFeetInches(metric);
+      return { text: `${feet} ft ${inches} in`, unit: "" };
+    }
+    case "weight":
+      return imperial
+        ? { text: String(kgToLbs(metric)), unit: " lbs" }
+        : { text: value, unit: " kg" };
+    case "length":
+      return imperial
+        ? { text: String(cmToLengthInches(metric)), unit: " in" }
+        : { text: value, unit: " cm" };
+  }
+}
+
+/** A number row's chip: its range in the viewer's unit */
+function numberChip(
+  field: NumberField,
+  state: PanelState,
+  unitPreference: string
+): ChipParts | null {
+  const { min, max } = rangeOf(normalizeNumber(field, state[field.key]));
+  const low = boundText(min);
+  const high = boundText(max);
+  if (low === undefined && high === undefined) return null;
+  const label = chipLabel(field);
+  if (field.measure !== undefined) {
+    const { measure } = field;
+    const shown = [low, high].map((bound) =>
+      bound === undefined
+        ? undefined
+        : measureBound(measure, bound, unitPreference)
+    );
+    return {
+      label,
+      ...rangeParts(
+        shown[0]?.text,
+        shown[1]?.text,
+        (shown[0] ?? shown[1])?.unit
+      ),
+    };
+  }
+  return {
+    label,
+    ...rangeParts(low, high, field.unit === undefined ? "" : ` ${field.unit}`),
+  };
+}
+
+/** A date row's chip: "from 2020-01-01", "until 2020-12-31" or both */
+function dateChip(field: PanelField, state: PanelState): ChipParts | null {
+  const { start, end } = rangeOf(state[field.key]) as {
+    start?: unknown;
+    end?: unknown;
+  };
+  const from = dayOf(start);
+  const to = dayOf(end);
+  const label = chipLabel(field);
+  if (from !== undefined && to !== undefined) {
+    return { label, values: [`${from} to ${to}`] };
+  }
+  if (from !== undefined) return { label, condition: "from", values: [from] };
+  if (to !== undefined) return { label, condition: "until", values: [to] };
+  return null;
+}
+
+/** A select's chip: its choices' labels, and the comparison when the row has a condition select */
+function enumChip(
+  field: EnumField,
+  spec: FieldSpec,
+  state: PanelState
+): ChipParts | null {
+  const stored = valuesOf(state[field.key]);
+  if (stored.length === 0) return null;
+  const values = stored.map(
+    (value) =>
+      field.choices.find((choice) => choice.value === value)?.label ?? value
+  );
+  const chosen = field.modifierKey && state[field.modifierKey];
+  const modifier =
+    field.modifierKey === undefined
+      ? undefined
+      : enumModifierOf(
+          field.modifiers,
+          chosen,
+          field.defaultModifier ??
+            (spec.kind === "enum" || spec.kind === "text"
+              ? spec.defaultModifier
+              : "EQUALS")
+        );
+  const condition =
+    modifier === undefined ? undefined : ENUM_CONDITIONS[modifier];
+  return {
+    label: chipLabel(field),
+    ...(condition === undefined ? {} : { condition }),
+    values,
+  };
+}
 
 // ── Stored criteria read back ─────────────────────────────────────────────
 
@@ -617,7 +815,7 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       };
     }),
     fromCriterion: refFromCriterion,
-    ...pending,
+    chip: (field, spec, state) => refChip(field, spec, state),
   },
   number: {
     keys: keysOf,
@@ -659,7 +857,8 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
         range === undefined ? undefined : normalizeNumber(field, range);
       return read === undefined ? {} : { [field.key]: read };
     },
-    ...pending,
+    chip: (field, _spec, state, unitPreference = UNITS.METRIC) =>
+      numberChip(field, state, unitPreference),
   },
   date: {
     keys: keysOf,
@@ -710,7 +909,7 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       const range = dateRangeFromCriterion(criterion);
       return range === undefined ? {} : { [field.key]: range };
     },
-    ...pending,
+    chip: (field, _spec, state) => dateChip(field, state),
   },
   text: {
     keys: keysOf,
@@ -733,7 +932,13 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       return text === "" ? undefined : { value: text, modifier: "INCLUDES" };
     },
     fromCriterion: textFromCriterion,
-    ...pending,
+    chip: (field, _spec, state) => {
+      const value = state[field.key];
+      const text = typeof value === "string" ? value.trim() : "";
+      return text === ""
+        ? null
+        : { label: chipLabel(field), values: [`"${text}"`] };
+    },
   },
   enum: {
     keys: keysOf,
@@ -780,7 +985,7 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
           };
     },
     fromCriterion: enumFromCriterion,
-    ...pending,
+    chip: (field, spec, state) => enumChip(field, spec, state),
   },
   choice: {
     keys: keysOf,
@@ -814,7 +1019,16 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       );
       return choice === undefined ? {} : { [field.key]: choice.value };
     },
-    ...pending,
+    chip: (field, _spec, state) => {
+      const value = state[field.key];
+      const text = typeof value === "boolean" ? String(value) : value;
+      const choice = field.choices.find(
+        (each) => each.value === text && each.sends !== undefined
+      );
+      return choice === undefined
+        ? null
+        : { label: chipLabel(field), values: [choice.label] };
+    },
   },
   toggle: {
     keys: keysOf,
@@ -836,7 +1050,10 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
         : undefined,
     fromCriterion: (field, _spec, criterion) =>
       criterion === true ? { [field.key]: true } : {},
-    ...pending,
+    chip: (field, _spec, state) =>
+      state[field.key] === true || state[field.key] === "TRUE"
+        ? { label: field.label }
+        : null,
   },
 };
 

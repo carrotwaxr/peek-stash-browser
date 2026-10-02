@@ -12,6 +12,7 @@ import { useFilterOptions, useLockedFields } from "../../hooks/useListOptions";
 import type { ListUrlState, PresetToLoad } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
+import { activeFieldCount } from "../../utils/filterFields";
 import { sortOptionsFor, withoutLockedOptions } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
 import {
@@ -64,13 +65,6 @@ interface SearchControlsProps {
 
 const NO_FILTERS: Record<string, unknown> = {};
 
-/** A filter value that filters: not empty, and an object with a value set */
-const isActiveFilter = (value: unknown) =>
-  value !== undefined &&
-  value !== "" &&
-  (typeof value !== "object" ||
-    value === null ||
-    Object.values(value).some((v) => v !== "" && v !== undefined));
 const NO_SETTINGS: SettingConfig[] = [];
 
 /**
@@ -100,6 +94,10 @@ const SearchControls = ({
   const [highlightedFilterKey, setHighlightedFilterKey] = useState<
     string | null
   >(null);
+  // The field a chip opened: its first control takes focus once drawn
+  const [focusRequest, setFocusRequest] = useState<{ key: string } | null>(
+    null
+  );
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const topPaginationRef = useRef<HTMLDivElement>(null); // Ref for top pagination element
   const filterRefs = useRef<Record<string, HTMLElement | null>>({}); // Refs for filter controls (for scroll-to-highlight)
@@ -219,9 +217,17 @@ const SearchControls = ({
 
       // Set the highlighted filter key (triggers scroll and animation)
       setHighlightedFilterKey(filterKey);
+      // And focus its first control, drawn by the next render
+      setFocusRequest({ key: filterKey });
     },
     [filterOptions, collapsedSections]
   );
+
+  useEffect(() => {
+    if (focusRequest) {
+      document.getElementById(`filter-${focusRequest.key}`)?.focus();
+    }
+  }, [focusRequest]);
 
   // Clear highlight after animation completes
   useEffect(() => {
@@ -295,10 +301,11 @@ const SearchControls = ({
     setIsFilterPanelOpen((prev) => !prev);
   }, []);
 
-  // How many filters are active: the Filters button's badge
+  // How many filters are active, one per field as the chips draw them: the
+  // Filters button's badge
   const activeFilterCount = useMemo(
-    () => Object.values(filters).filter(isActiveFilter).length,
-    [filters]
+    () => activeFieldCount(artifactType as ListEntity, filters, filterOptions),
+    [artifactType, filters, filterOptions]
   );
   const hasActiveFilters = activeFilterCount > 0;
 
@@ -490,6 +497,7 @@ const SearchControls = ({
 
             {/* Active Filter Chips */}
             <ActiveFilterChips
+              kind={artifactType as ListEntity}
               filters={filters}
               filterOptions={filterOptions}
               onRemoveFilter={removeFilter}
@@ -619,6 +627,7 @@ const SearchControls = ({
                 if (el) filterRefs.current[key] = el;
               }}
               isHighlighted={highlightedFilterKey === key}
+              controlId={`filter-${key}`}
               onChange={(value: unknown) => handleFilterChange(key, value)}
               value={panelFilters[key] || defaultValue}
               type={

@@ -44,6 +44,9 @@ export const queryKeys = {
       id: string | undefined,
       options: Record<string, boolean>
     ) => ["performers", instanceId, "counts", id, options] as const,
+    // The names of the ids a filter chip shows (`useRefNames`)
+    names: (ids: readonly string[]) =>
+      ["performers", undefined, "names", ids] as const,
   },
   studios: {
     all: (instanceId?: string) => ["studios", instanceId] as const,
@@ -56,6 +59,9 @@ export const queryKeys = {
       id: string | undefined,
       options: Record<string, boolean>
     ) => ["studios", instanceId, "counts", id, options] as const,
+    // The names of the ids a filter chip shows (`useRefNames`)
+    names: (ids: readonly string[]) =>
+      ["studios", undefined, "names", ids] as const,
   },
   tags: {
     all: (instanceId?: string) => ["tags", instanceId] as const,
@@ -70,6 +76,9 @@ export const queryKeys = {
       id: string | undefined,
       options: Record<string, boolean>
     ) => ["tags", instanceId, "counts", id, options] as const,
+    // The names of the ids a filter chip shows (`useRefNames`)
+    names: (ids: readonly string[]) =>
+      ["tags", undefined, "names", ids] as const,
   },
   galleries: {
     all: (instanceId?: string) => ["galleries", instanceId] as const,
@@ -82,6 +91,9 @@ export const queryKeys = {
       id: string | undefined,
       options: Record<string, boolean>
     ) => ["galleries", instanceId, "counts", id, options] as const,
+    // The names of the ids a filter chip shows (`useRefNames`)
+    names: (ids: readonly string[]) =>
+      ["galleries", undefined, "names", ids] as const,
   },
   groups: {
     all: (instanceId?: string) => ["groups", instanceId] as const,
@@ -94,6 +106,9 @@ export const queryKeys = {
       id: string | undefined,
       options: Record<string, boolean>
     ) => ["groups", instanceId, "counts", id, options] as const,
+    // The names of the ids a filter chip shows (`useRefNames`)
+    names: (ids: readonly string[]) =>
+      ["groups", undefined, "names", ids] as const,
   },
   images: {
     all: (instanceId?: string) => ["images", instanceId] as const,

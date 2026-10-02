@@ -335,6 +335,42 @@ describe("useListUrlState", () => {
       expect(list.state.filters).toEqual({ rating: { min: "80" } });
     });
 
+    it("removing a chip clears its companions", async () => {
+      const list = renderList(
+        "/scenes?tagIds=1:a,2:a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1&favorite=true",
+        SCENE_OPTIONS
+      );
+      expect(list.state.filters).toMatchObject({
+        tagIdsModifier: "INCLUDES_ALL",
+        tagIdsDepth: -1,
+      });
+
+      await actAsync(() => list.state.removeFilter("tagIds"));
+
+      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.params().has("tagIdsModifier")).toBe(false);
+      expect(list.params().has("tagIdsDepth")).toBe(false);
+    });
+
+    it("removing a chip a default preset supplied clears its companions too", async () => {
+      const list = renderList("/scenes", SCENE_OPTIONS, {
+        context: "scene",
+        preset: preset({
+          filters: {
+            tagIds: ["1:a"],
+            tagIdsModifier: "EXCLUDES",
+            tagIdsDepth: -1,
+            favorite: true,
+          },
+        }),
+      });
+      expect(list.state.filters).toMatchObject({ tagIdsDepth: -1 });
+
+      await actAsync(() => list.state.removeFilter("tagIds"));
+
+      expect(list.state.filters).toEqual({ favorite: true });
+    });
+
     it("loading a preset with no filters leaves the list unfiltered", async () => {
       const list = renderList("/scenes", SCENE_OPTIONS, favoritePreset);
 

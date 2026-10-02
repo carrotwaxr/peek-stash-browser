@@ -28,6 +28,8 @@ export interface MeasureRange {
 }
 
 interface MeasureInputsProps {
+  /** The first input's id, where a filter chip moves focus */
+  id?: string | undefined;
   value: unknown;
   onChange: (value: unknown) => void;
   inputClasses: string;
@@ -78,6 +80,7 @@ function useTypedText(metric: string, show: (metric: string) => string) {
 }
 
 interface UnitInputProps {
+  id?: string | undefined;
   side: RangeSide;
   label: string;
   /** What the state holds for this bound */
@@ -96,6 +99,7 @@ interface UnitInputProps {
 }
 
 function UnitInput({
+  id,
   side,
   label,
   metric,
@@ -110,6 +114,7 @@ function UnitInput({
   const { text, typed, tidy } = useTypedText(metric, show);
   return (
     <input
+      id={id}
       type="text"
       inputMode={inputMode}
       value={text}
@@ -135,6 +140,7 @@ interface WeightLengthProps extends MeasureInputsProps {
 
 /** Weight in lbs: whole pounds, stored as the whole kg that display as typed */
 export function ImperialWeightRange({
+  id,
   value,
   onChange,
   label,
@@ -147,6 +153,7 @@ export function ImperialWeightRange({
       {SIDES.map((side) => (
         <UnitInput
           key={side}
+          id={side === "min" ? id : undefined}
           side={side}
           label={label}
           metric={boundText(range[side])}
@@ -170,6 +177,7 @@ export function ImperialWeightRange({
 
 /** Penis Length in inches: stored in cm, two decimals */
 export function ImperialLengthRange({
+  id,
   value,
   onChange,
   label,
@@ -182,6 +190,7 @@ export function ImperialLengthRange({
       {SIDES.map((side) => (
         <UnitInput
           key={side}
+          id={side === "min" ? id : undefined}
           side={side}
           label={label}
           metric={boundText(range[side])}
@@ -204,6 +213,8 @@ export function ImperialLengthRange({
 }
 
 interface HeightBoundProps {
+  /** The feet input's id, in place of its own */
+  id?: string | undefined;
   side: RangeSide;
   metric: string;
   onWrite: (metric: string) => void;
@@ -213,6 +224,7 @@ interface HeightBoundProps {
 
 /** One height bound: feet and inches inputs over one whole-cm bound */
 function HeightBound({
+  id,
   side,
   metric,
   onWrite,
@@ -256,11 +268,11 @@ function HeightBound({
       </legend>
       <div className="flex space-x-2 mt-1">
         <div className="flex-1">
-          <label htmlFor={`height-feet-${side}`} className="sr-only">
+          <label htmlFor={id ?? `height-feet-${side}`} className="sr-only">
             {word} height feet
           </label>
           <input
-            id={`height-feet-${side}`}
+            id={id ?? `height-feet-${side}`}
             type="text"
             inputMode="numeric"
             value={feet}
@@ -302,6 +314,7 @@ function HeightBound({
 
 /** Height in feet and inches: each bound stored as the whole cm that display as typed */
 export function ImperialHeightRange({
+  id,
   value,
   onChange,
   inputClasses,
@@ -313,6 +326,7 @@ export function ImperialHeightRange({
       {SIDES.map((side) => (
         <HeightBound
           key={side}
+          id={side === "min" ? id : undefined}
           side={side}
           metric={boundText(range[side])}
           onWrite={(metric) => onChange({ ...range, [side]: metric })}

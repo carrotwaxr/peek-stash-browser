@@ -1,5 +1,12 @@
+import type { ListKind } from "@peek/shared-types";
 import { LucideX } from "lucide-react";
-import type { FilterOption } from "../../utils/filterConfig";
+import { useRefNames } from "../../api/hooks";
+import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
+import {
+  type ChipParts,
+  type FilterOption,
+  chipsOf,
+} from "../../utils/filterFields";
 import Button from "./Button";
 
 interface PermanentFiltersMetadata {
@@ -10,15 +17,89 @@ interface PermanentFiltersMetadata {
 }
 
 interface Props {
+  kind: ListKind;
   filters: Record<string, unknown>;
-  filterOptions: FilterOption[];
+  /** The panel's options the page leaves free: a locked field has no chip */
+  filterOptions: readonly FilterOption[];
   onRemoveFilter: (key: string) => void;
   onChipClick?: (key: string) => void;
   permanentFilters?: Record<string, unknown>;
   permanentFiltersMetadata?: PermanentFiltersMetadata;
 }
 
+/** Names a chip looks up: the rest show as a count */
+const NAMES_SHOWN = 3;
+
+/** The chip's text, from its parts and the names its ids resolved to */
+function chipText(
+  parts: ChipParts,
+  resolved: { names: readonly string[]; unavailable: number } | undefined
+): string {
+  const { label, condition, values, ids, suffix = "" } = parts;
+  if (ids !== undefined) {
+    // Names not known yet (loading, failed, or no lookup): how many
+    if (resolved === undefined) return `${label}: ${ids.length} selected`;
+    const listed = [
+      ...resolved.names,
+      ...(resolved.unavailable > 0
+        ? [`${resolved.unavailable} unavailable`]
+        : []),
+    ].join(", ");
+    const more = ids.length - NAMES_SHOWN;
+    const body = more > 0 ? `${listed} +${more} more` : listed;
+    // A condition on nothing named reads as nonsense
+    const named = resolved.names.length > 0 && condition !== undefined;
+    return `${label}: ${named ? `${condition} ` : ""}${body}${suffix}`;
+  }
+  const body = [condition, ...(values ?? [])].filter(Boolean).join(" ");
+  return body === "" ? label : `${label}: ${body}${suffix}`;
+}
+
+interface ChipProps {
+  parts: ChipParts;
+  /** The panel option's entity (`tags`), for resolving names */
+  entityType: string | undefined;
+  onRemove: () => void;
+  onOpen: () => void;
+}
+
+/** One chip: its body opens the field, its button removes the filter */
+const FilterChip = ({ parts, entityType, onRemove, onOpen }: ChipProps) => {
+  const lookedUp = parts.ids?.slice(0, NAMES_SHOWN) ?? [];
+  const { data } = useRefNames(entityType, lookedUp);
+  const text = chipText(parts, data);
+
+  return (
+    <div
+      className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full text-sm border transition-colors"
+      style={{
+        backgroundColor: "var(--bg-secondary)",
+        borderColor: "var(--accent-primary)",
+        color: "var(--text-primary)",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Edit filter: ${text}`}
+        className="text-left cursor-pointer hover:opacity-80 rounded-full"
+      >
+        {text}
+      </button>
+      <Button
+        onClick={onRemove}
+        variant="tertiary"
+        className="hover:opacity-70 !p-0 !border-0"
+        aria-label={`Remove filter: ${text}`}
+        title={`Remove filter: ${text}`}
+        icon={<LucideX className="w-3.5 h-3.5" />}
+      />
+    </div>
+  );
+};
+
 const ActiveFilterChips = ({
+  kind,
   filters,
   filterOptions,
   onRemoveFilter,
@@ -26,199 +107,58 @@ const ActiveFilterChips = ({
   permanentFilters = {},
   permanentFiltersMetadata = {},
 }: Props) => {
-  const getFilterLabel = (
-    _filterKey: string,
-    filterValue: unknown,
-    filterConfig: FilterOption
-  ) => {
-    const { label, type, options } = filterConfig;
+  const { unitPreference } = useUnitPreference();
 
-    // Skip undefined or empty values
-    if (
-      filterValue === undefined ||
-      filterValue === "" ||
-      filterValue === false
-    ) {
-      return null;
-    }
+  // A detail page's own filters: a plain label, no edit and no remove
+  const permanentLabels = [
+    ...(permanentFiltersMetadata.performers ?? []).map(
+      (performer) => `Performer: ${performer.name}`
+    ),
+    ...(permanentFiltersMetadata.studios ?? []).map(
+      (studio) => `Studio: ${studio.name}`
+    ),
+    ...(permanentFiltersMetadata.tags ?? []).map((tag) => `Tag: ${tag.name}`),
+  ];
 
-    switch (type) {
-      case "checkbox":
-        return filterValue === true ? label : null;
+  const chips = chipsOf(
+    kind,
+    filters,
+    filterOptions.filter(
+      (option) => permanentFilters[option.key] === undefined
+    ),
+    unitPreference
+  );
 
-      case "select": {
-        const selectedOption = options?.find(
-          (opt: { value: string; label: string }) => opt.value === filterValue
-        );
-        if (selectedOption) return `${label}: ${selectedOption.label}`;
-        // A value that is not a string, number or boolean has no text
-        return typeof filterValue === "string" ||
-          typeof filterValue === "number" ||
-          typeof filterValue === "boolean"
-          ? `${label}: ${filterValue}`
-          : label;
-      }
-
-      case "text":
-        return typeof filterValue === "string" ||
-          typeof filterValue === "number"
-          ? `${label}: "${filterValue}"`
-          : label;
-
-      case "searchable-select": {
-        // For multi-select, show count if array
-        if (Array.isArray(filterValue)) {
-          if (filterValue.length === 0) return null;
-          return filterValue.length === 1
-            ? `${label}: 1 selected`
-            : `${label}: ${filterValue.length} selected`;
-        }
-        // For single select, just show that it's set
-        return filterValue ? `${label}: selected` : null;
-      }
-
-      case "range": {
-        const range = filterValue as {
-          min?: string | number;
-          max?: string | number;
-        } | null;
-        if (!range?.min && !range?.max) return null;
-        if (range.min && range.max) {
-          return `${label}: ${range.min} - ${range.max}`;
-        }
-        if (range.min) {
-          return `${label}: ≥ ${range.min}`;
-        }
-        return `${label}: ≤ ${range.max}`;
-      }
-
-      case "date-range": {
-        const dateRange = filterValue as {
-          start?: string;
-          end?: string;
-        } | null;
-        if (!dateRange?.start && !dateRange?.end) return null;
-        if (dateRange.start && dateRange.end) {
-          return `${label}: ${dateRange.start} to ${dateRange.end}`;
-        }
-        if (dateRange.start) {
-          return `${label}: After ${dateRange.start}`;
-        }
-        return `${label}: Before ${dateRange.end}`;
-      }
-
-      default:
-        return null;
-    }
-  };
-
-  // Build array of permanent filter chips
-  const permanentChips: Array<{
-    key: string;
-    label: string;
-    isPermanent: boolean;
-  }> = [];
-
-  // Check for performer permanent filters
-  permanentFiltersMetadata.performers?.forEach((performer) => {
-    permanentChips.push({
-      key: `permanent-performer-${performer.id}`,
-      label: `Performer: ${performer.name}`,
-      isPermanent: true,
-    });
-  });
-
-  // Check for studio permanent filters
-  permanentFiltersMetadata.studios?.forEach((studio) => {
-    permanentChips.push({
-      key: `permanent-studio-${studio.id}`,
-      label: `Studio: ${studio.name}`,
-      isPermanent: true,
-    });
-  });
-
-  // Check for tag permanent filters
-  permanentFiltersMetadata.tags?.forEach((tag) => {
-    permanentChips.push({
-      key: `permanent-tag-${tag.id}`,
-      label: `Tag: ${tag.name}`,
-      isPermanent: true,
-    });
-  });
-
-  // Build array of regular active filter chips (exclude permanent filters)
-  const activeChips: Array<{
-    key: string;
-    label: string;
-    isPermanent: boolean;
-  }> = [];
-
-  filterOptions.forEach((filterConfig) => {
-    // Skip if this is a permanent filter
-    if (permanentFilters[filterConfig.key] !== undefined) {
-      return;
-    }
-
-    const filterValue = filters[filterConfig.key];
-    const chipLabel = getFilterLabel(
-      filterConfig.key,
-      filterValue,
-      filterConfig
-    );
-
-    if (chipLabel) {
-      activeChips.push({
-        key: filterConfig.key,
-        label: chipLabel,
-        isPermanent: false,
-      });
-    }
-  });
-
-  // Combine permanent and active chips
-  const allChips = [...permanentChips, ...activeChips];
-
-  if (allChips.length === 0) {
+  if (permanentLabels.length === 0 && chips.length === 0) {
     return null;
   }
 
   return (
     <div className="flex flex-wrap gap-2 mb-4">
-      {allChips.map((chip) => (
+      {permanentLabels.map((label, index) => (
         <div
-          key={chip.key}
-          onClick={() => !chip.isPermanent && onChipClick?.(chip.key)}
-          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-colors ${
-            !chip.isPermanent ? "cursor-pointer hover:opacity-80" : ""
-          }`}
+          key={`${index}-${label}`}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border"
           style={{
-            backgroundColor: chip.isPermanent
-              ? "var(--bg-tertiary)"
-              : "var(--bg-secondary)",
-            borderColor: chip.isPermanent
-              ? "var(--border-color)"
-              : "var(--accent-primary)",
-            color: chip.isPermanent
-              ? "var(--text-secondary)"
-              : "var(--text-primary)",
-            opacity: chip.isPermanent ? 0.7 : 1,
+            backgroundColor: "var(--bg-tertiary)",
+            borderColor: "var(--border-color)",
+            color: "var(--text-secondary)",
+            opacity: 0.7,
           }}
         >
-          <span>{chip.label}</span>
-          {!chip.isPermanent && (
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemoveFilter(chip.key);
-              }}
-              variant="tertiary"
-              className="hover:opacity-70 !p-0 !border-0"
-              aria-label={`Remove filter: ${chip.label}`}
-              title={`Remove filter: ${chip.label}`}
-              icon={<LucideX className="w-3.5 h-3.5" />}
-            />
-          )}
+          <span>{label}</span>
         </div>
+      ))}
+      {chips.map(({ key, parts }) => (
+        <FilterChip
+          key={key}
+          parts={parts}
+          entityType={
+            filterOptions.find((option) => option.key === key)?.entityType
+          }
+          onRemove={() => onRemoveFilter(key)}
+          onOpen={() => onChipClick?.(key)}
+        />
       ))}
     </div>
   );

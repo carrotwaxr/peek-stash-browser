@@ -192,6 +192,15 @@ const CarouselBuilder = () => {
   };
 
   /**
+   * Drop the stored rules the editor cannot show
+   */
+  const removeKept = () => {
+    setKept({});
+    setPreviewValid(false);
+    setPreviewScenes(null);
+  };
+
+  /**
    * Preview the carousel results
    */
   const handlePreview = async () => {
@@ -468,6 +477,27 @@ const CarouselBuilder = () => {
               </div>
             )}
           </div>
+
+          {/* Stored rules no row can edit: kept until removed */}
+          {Object.keys(kept).length > 0 && (
+            <div
+              className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                borderColor: "var(--border-color)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              <span>
+                {Object.keys(kept).length} more{" "}
+                {Object.keys(kept).length === 1 ? "rule" : "rules"} this editor
+                can&apos;t show
+              </span>
+              <Button variant="secondary" size="sm" onClick={removeKept}>
+                Remove
+              </Button>
+            </div>
+          )}
 
           {/* Add Rule Button */}
           <Button

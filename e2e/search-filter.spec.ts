@@ -146,6 +146,33 @@ test.describe("Search and Filter", () => {
     ).toHaveCount(0);
   });
 
+  test("a performer chip names the performer", async ({ page }) => {
+    const list = new ListPage(page);
+    await list.goto("/scenes");
+    requireData(await list.waitForResults("Scene"), "scenes");
+
+    await list.openFilters();
+    await page.getByText("Select performers...", { exact: true }).click();
+    const input = page.getByPlaceholder("Type to search...");
+    const dropdown = input.locator(
+      "xpath=ancestor::div[contains(@class, 'absolute')]"
+    );
+    const option = dropdown.getByRole("button").first();
+    await expect(option).toBeVisible({ timeout: 15_000 });
+    const name = ((await option.textContent()) ?? "").trim();
+    expect(name).not.toBe("");
+    await option.click();
+    await page.getByRole("button", { name: "Apply Filters" }).click();
+
+    // The chip names the pick and its condition, never its id
+    await expect(
+      page.getByRole("button", {
+        name: `Edit filter: Performers: any of ${name}`,
+        exact: true,
+      })
+    ).toBeVisible({ timeout: 15_000 });
+  });
+
   test("sort direction toggles between ascending and descending", async ({
     page,
   }) => {

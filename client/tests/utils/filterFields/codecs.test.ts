@@ -12,6 +12,7 @@ import {
 } from "@peek/shared-types";
 import { describe, expect, it } from "vitest";
 import { CODECS, codecOf, valuesOf } from "@/utils/filterFields";
+import { SPECS } from "@/utils/filterFields/options";
 
 /** A list's panel row by key */
 const field = (kind: ListKind, key: string): PanelField => {
@@ -118,13 +119,58 @@ describe("codecs", () => {
       false
     );
   });
+});
 
-  it("the member the chips fill says so", () => {
-    const tags = rowOf("scene", "tagIds", "ref");
+describe("the chip member", () => {
+  const spec = (kind: ListKind, row: PanelField) => {
+    const found = SPECS[kind][row.field];
+    if (found === undefined) throw new Error(`No field ${row.field}`);
+    return found;
+  };
+  const chip = (
+    kind: ListKind,
+    key: string,
+    state: Record<string, unknown>,
+    unit?: string
+  ) => {
+    const row = field(kind, key);
+    return codecOf(row).chip(row, spec(kind, row), state, unit);
+  };
 
-    expect(() => CODECS.ref.chip(tags, { kind: "ref" } as never, {})).toThrow(
-      "chip: not yet"
-    );
+  it("a ref chip is its label, condition, ids and sub-tags suffix, and none while it has no ids", () => {
+    expect(
+      chip("scene", "tagIds", {
+        tagIds: ["1:a", "2:a"],
+        tagIdsModifier: "EXCLUDES",
+        tagIdsDepth: -1,
+      })
+    ).toEqual({
+      label: "Tags",
+      condition: "none of",
+      ids: ["1:a", "2:a"],
+      suffix: ", with sub-tags",
+    });
+    expect(chip("scene", "tagIds", { tagIdsModifier: "EXCLUDES" })).toBeNull();
+  });
+
+  it("a row that does not filter has no chip", () => {
+    expect(chip("scene", "favorite", { favorite: false })).toBeNull();
+    expect(chip("scene", "rating", { rating: { min: "" } })).toBeNull();
+    expect(chip("scene", "title", { title: "  " })).toBeNull();
+    expect(chip("clip", "isGenerated", { isGenerated: "all" })).toBeNull();
+  });
+
+  it("a body measure reads in the viewer's unit from the metric state", () => {
+    const state = { height: { min: 178, max: 188 } };
+
+    expect(chip("performer", "height", state)).toEqual({
+      label: "Height",
+      values: ["178 to 188 cm"],
+    });
+    expect(chip("performer", "height", state, "imperial")).toEqual({
+      label: "Height",
+      values: ["5 ft 10 in to 6 ft 2 in"],
+    });
   });
 });
 

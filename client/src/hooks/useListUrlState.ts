@@ -17,7 +17,12 @@
  */
 import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { DEFAULT_SORT, Q_MAX_LENGTH } from "@peek/shared-types";
+import {
+  DEFAULT_SORT,
+  PANEL_FIELDS,
+  type PanelField,
+  Q_MAX_LENGTH,
+} from "@peek/shared-types";
 import {
   type SavedPreset,
   presetsForContext,
@@ -25,7 +30,7 @@ import {
   useFilterPresets,
 } from "../api/hooks/usePresets";
 import type { FilterOption } from "../utils/filterConfig";
-import { normalizePanelState } from "../utils/filterFields";
+import { codecOf, normalizePanelState } from "../utils/filterFields";
 import {
   buildListQuery,
   freshSeed,
@@ -343,12 +348,19 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     [write]
   );
 
+  // A chip's field goes with its companions: its condition and depth
   const removeFilter = useCallback(
     (key: string) => {
-      const { [key]: _removed, ...rest } = filters;
+      const row = (PANEL_FIELDS[entityType] as readonly PanelField[]).find(
+        (each) => each.key === key
+      );
+      const removed = new Set(row ? codecOf(row).keys(row) : [key]);
+      const rest = Object.fromEntries(
+        Object.entries(filters).filter(([name]) => !removed.has(name))
+      );
       write({ filters: rest, page: 1 }, "push");
     },
-    [filters, write]
+    [entityType, filters, write]
   );
 
   const clearFilters = useCallback(
