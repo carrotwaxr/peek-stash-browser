@@ -163,7 +163,7 @@ Not recommended without additional protection. For remote access:
 
 - [Troubleshooting Guide](troubleshooting.md)
 - [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-- [Stash Discord](https://discord.gg/2TsNFKt) - #third-party-integrations channel
+- [Peek on the Stash forum](https://discourse.stashapp.cc/t/peek-stash-browser/4018) for questions
 
 ### How do I report a bug?
 
