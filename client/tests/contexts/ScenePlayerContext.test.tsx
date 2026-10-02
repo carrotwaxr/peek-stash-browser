@@ -854,6 +854,42 @@ describe("ScenePlayerContext", () => {
       expect(result.current.currentIndex).toBe(1);
     });
 
+    // The router shows a replace in a transition, so on a busy page the
+    // entry written when the queue opened can show after a step the user
+    // already took: it is the provider's own write, not a Back to index 0
+    it("its own entry write showing after a step does not send the queue back", async () => {
+      const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]));
+      await waitFor(() => {
+        expect(entryQueue()?.controls).toBeDefined();
+      });
+      const written: unknown = probe.location?.state;
+      // The next scene's answer waits until the late write has shown
+      let answerNext = () => {};
+      const answer = mockPost.getMockImplementation();
+      mockPost.mockImplementationOnce(
+        (path: unknown, body: unknown) =>
+          new Promise((resolve) => {
+            answerNext = () => resolve(answer?.(path, body));
+          })
+      );
+
+      act(() => {
+        result.current.dispatch({ type: "NEXT_SCENE" });
+      });
+      // The router reads it back from the browser's history: a copy
+      await go("/scene/1", { replace: true, state: structuredClone(written) });
+      act(() => {
+        answerNext();
+      });
+
+      await waitFor(() => {
+        expect(probe.location?.pathname).toBe("/scene/2");
+      });
+      expect(result.current.currentIndex).toBe(1);
+      expect(result.current.scene?.id).toBe("2");
+      expect(entryQueue()?.currentIndex).toBe(1);
+    });
+
     it("advancing replaces the router location: the path is the entry's scene, state.playlist.currentIndex is the new index, and history length is unchanged", async () => {
       const replaceState = vi.spyOn(window.history, "replaceState");
       const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]), {
