@@ -355,9 +355,9 @@ describe("GroupQueryBuilder", () => {
       const { sql } = pageStatement();
       for (const fragment of [
         "(r.favorite = 0 OR r.favorite IS NULL)",
-        "COALESCE(r.rating, 0) BETWEEN ? AND ?",
+        "r.rating BETWEEN ? AND ?",
         "MAX(g.sceneCount - COALESCE(d.scenes, 0), 0) > ?",
-        "COALESCE(g.duration, 0) < ?",
+        "g.duration < ?",
         "LOWER(g.name) = LOWER(?)",
         "(LOWER(g.synopsis) LIKE LOWER(?))",
         "(g.director IS NOT NULL AND g.director != '')",

@@ -214,6 +214,10 @@ A filter that picks performers, tags, studios, collections or galleries has a dr
 - A gallery or an image has one studio, so its Studios filter offers only **Has ANY** and **Has NONE**.
 - Ticking **Include sub-tags** or **Include sub-studios** sets the dropdown to **Has ANY**.
 
+### Number Ranges
+
+A number range (rating, height, weight, duration and the like) never matches an item with no value: "rating at most 40" lists only items you rated 40 or less, not the ones you have not rated, and "weight at most 60 kg" only performers with a weight.
+
 ### Date Ranges
 
 Set a start date, an end date, or both. A start alone matches later dates, an end alone earlier dates, and both the dates in between.

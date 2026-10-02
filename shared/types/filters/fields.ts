@@ -13,7 +13,9 @@ import {
   type EntityKind,
   type FieldSpec,
   GENDERS,
+  NULLABLE_NUMBER_MODIFIERS,
   ORIENTATIONS,
+  PRESENCE_MODIFIERS,
   RESOLUTIONS,
   bool,
   date,
@@ -47,6 +49,14 @@ const count = () =>
   num({ modifiers: COUNT_MODIFIERS, defaultModifier: "EQUALS" });
 
 /**
+ * A number a row may lack (the viewer's rating, a height): a comparison
+ * never matches a row without one, and IS_NULL and NOT_NULL find "not set"
+ * and "is set". Counts, O counts and plays are never missing (none is 0), so
+ * they stay `num()`.
+ */
+const nullableNum = () => num({ modifiers: NULLABLE_NUMBER_MODIFIERS });
+
+/**
  * A performer attribute Stash stores as free text (ethnicity, hair colour,
  * eye colour, breast type): compared whole, ignoring case, so a value the
  * option lists (ETHNICITIES and the rest) lack still filters
@@ -75,7 +85,7 @@ export const SCENE_FIELDS = {
   studios: ref("studio", { hierarchical: true, single: true }),
   groups: ref("group"),
   galleries: ref("gallery"),
-  rating100: num(),
+  rating100: nullableNum(),
   o_counter: num(),
   play_count: num(),
   play_duration: num(),
@@ -126,15 +136,15 @@ export const PERFORMER_FIELDS = {
   scenes: ref("scene"),
   /** Performers in scenes of these groups */
   groups: ref("group"),
-  rating100: num(),
+  rating100: nullableNum(),
   o_counter: num(),
   play_count: num(),
   scene_count: num(),
-  height: num(),
-  weight: num(),
-  penis_length: num(),
+  height: nullableNum(),
+  weight: nullableNum(),
+  penis_length: nullableNum(),
   /** Years between the first and last year of Stash's career text */
-  career_length: num(),
+  career_length: nullableNum(),
   age: count(),
   birth_year: count(),
   death_year: count(),
@@ -151,7 +161,7 @@ export const STUDIO_FIELDS = {
   name: text(),
   details: text(),
   tags: ref("tag", { hierarchical: true }),
-  rating100: num(),
+  rating100: nullableNum(),
   o_counter: num(),
   play_count: num(),
   scene_count: num(),
@@ -174,7 +184,7 @@ export const TAG_FIELDS = {
   scenes: ref("scene", { path: ["scenes_filter", "id"] }),
   /** Tags on scenes of these groups */
   groups: ref("group", { path: ["scenes_filter", "groups"] }),
-  rating100: num(),
+  rating100: nullableNum(),
   o_counter: num(),
   play_count: num(),
   scene_count: num(),
@@ -197,9 +207,9 @@ export const GROUP_FIELDS = {
   performers: ref("performer"),
   /** The direct sub-groups of these groups (no depth, as the card counts them) */
   containing_groups: ref("group"),
-  rating100: num(),
+  rating100: nullableNum(),
   scene_count: num(),
-  duration: num(),
+  duration: nullableNum(),
   date: date(),
   created_at: date(),
   updated_at: date(),
@@ -215,7 +225,7 @@ export const GALLERY_FIELDS = {
   performers: ref("performer"),
   /** Galleries linked to these scenes */
   scenes: ref("scene"),
-  rating100: num(),
+  rating100: nullableNum(),
   image_count: num(),
   /** The gallery's tags; 0 is the folder view's Untagged */
   tag_count: count(),
@@ -234,7 +244,7 @@ export const IMAGE_FIELDS = {
   studios: ref("studio", { hierarchical: true, single: true }),
   performers: ref("performer"),
   galleries: ref("gallery"),
-  rating100: num({ modifiers: COUNT_MODIFIERS }),
+  rating100: num({ modifiers: [...COUNT_MODIFIERS, ...PRESENCE_MODIFIERS] }),
   o_counter: num({ modifiers: COUNT_MODIFIERS }),
   /** The image's tags, its galleries' included; 0 is the folder view's Untagged */
   tag_count: count(),

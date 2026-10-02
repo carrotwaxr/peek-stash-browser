@@ -361,7 +361,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    */
   protected override readonly fieldClauses: FieldClauses<"scene"> = {
     // Metadata
-    duration: (c) => buildNumericFilter(c, "COALESCE(s.duration, 0)"),
+    duration: (c) => buildNumericFilter(c, "s.duration"),
     resolution: (c) => this.resolutionClause(c),
     // No tag, own or inherited (the folder view's Untagged), or some tag
     tagged: (tagged) => {
@@ -382,7 +382,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
 
     // The viewer's own data
     favorite: (favorite) => buildFavoriteFilter(favorite),
-    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    rating100: (c) => buildNumericFilter(c, "r.rating"),
     play_count: (c) => buildNumericFilter(c, "COALESCE(w.playCount, 0)"),
     o_counter: (c) => buildNumericFilter(c, "COALESCE(w.oCount, 0)"),
 
@@ -398,8 +398,8 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     last_played_at: (c) => buildEpochDateFilter(c, "w.lastPlayedAt"),
 
     // Numbers
-    bitrate: (c) => buildNumericFilter(c, "COALESCE(s.fileBitRate, 0)"),
-    framerate: (c) => buildNumericFilter(c, "COALESCE(s.fileFrameRate, 0)"),
+    bitrate: (c) => buildNumericFilter(c, "s.fileBitRate"),
+    framerate: (c) => buildNumericFilter(c, "s.fileFrameRate"),
     play_duration: (c) => buildNumericFilter(c, "COALESCE(w.playDuration, 0)"),
 
     // Counts, stored by sync (SCENE_DERIVED_COLUMNS_SQL): the scene's

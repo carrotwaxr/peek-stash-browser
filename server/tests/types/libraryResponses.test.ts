@@ -48,10 +48,8 @@ describe("library list requests", () => {
     expectTypeOf<FindPerformersRequest>().not.toHaveProperty("scene_filter");
   });
 
-  it("a number criterion without IS_NULL or NOT_NULL always has a value", () => {
-    expectTypeOf<
-      NonNullable<NonNullable<FindImagesRequest["image_filter"]>["rating100"]>
-    >().toEqualTypeOf<{
+  it("a number criterion has a value, BETWEEN either side, IS_NULL and NOT_NULL none and only where offered", () => {
+    type Comparison = {
       modifier?:
         | "EQUALS"
         | "NOT_EQUALS"
@@ -61,7 +59,22 @@ describe("library list requests", () => {
         | null;
       value: number;
       value2?: number | null;
-    }>();
+    };
+    type OpenBetween = {
+      modifier: "BETWEEN";
+      value?: number | null;
+      value2?: number | null;
+    };
+    expectTypeOf<
+      NonNullable<NonNullable<FindImagesRequest["image_filter"]>["o_counter"]>
+    >().toEqualTypeOf<Comparison | OpenBetween>();
+    expectTypeOf<
+      NonNullable<NonNullable<FindImagesRequest["image_filter"]>["rating100"]>
+    >().toEqualTypeOf<
+      | Comparison
+      | OpenBetween
+      | { modifier: "IS_NULL" | "NOT_NULL"; value?: null; value2?: null }
+    >();
   });
 });
 

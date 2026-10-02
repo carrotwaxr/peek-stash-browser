@@ -143,37 +143,23 @@ const CAREER_YEARS = careerYearsSql("p.careerLength");
 
 /**
  * A number derived from a date column (a year, an age): a performer without
- * the date matches only NOT_EQUALS. The other modifiers the contract allows
- * none of here filter nothing.
+ * the date never matches, NOT_EQUALS and NOT_BETWEEN included. IS_NULL and
+ * NOT_NULL, which the contract allows none of here, filter nothing.
  */
 function datedNumberClause(
   criterion: NumberCriterion,
   column: string,
   expr: string
 ): FilterClause {
-  const present = `${column} IS NOT NULL`;
-  switch (criterion.modifier) {
-    case "EQUALS":
-      return { sql: `(${present} AND ${expr} = ?)`, params: [criterion.value] };
-    case "NOT_EQUALS":
-      return {
-        sql: `(${column} IS NULL OR ${expr} != ?)`,
-        params: [criterion.value],
-      };
-    case "GREATER_THAN":
-      return { sql: `(${present} AND ${expr} > ?)`, params: [criterion.value] };
-    case "LESS_THAN":
-      return { sql: `(${present} AND ${expr} < ?)`, params: [criterion.value] };
-    case "BETWEEN":
-      return {
-        sql: `(${present} AND ${expr} BETWEEN ? AND ?)`,
-        params: [criterion.value, criterion.value2],
-      };
-    case "NOT_BETWEEN":
-    case "IS_NULL":
-    case "NOT_NULL":
-      return noClause();
+  if (criterion.modifier === "IS_NULL" || criterion.modifier === "NOT_NULL") {
+    return noClause();
   }
+  const clause = buildNumericFilter(criterion, expr);
+  if (!clause.sql) return clause;
+  return {
+    sql: `(${column} IS NOT NULL AND ${clause.sql})`,
+    params: clause.params,
+  };
 }
 
 /**
@@ -265,7 +251,7 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
   protected override readonly fieldClauses: FieldClauses<"performer"> = {
     // The viewer's own data
     favorite: (favorite) => buildFavoriteFilter(favorite),
-    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    rating100: (c) => buildNumericFilter(c, "r.rating"),
     o_counter: (c) => buildNumericFilter(c, "COALESCE(s.oCounter, 0)"),
     play_count: (c) => buildNumericFilter(c, "COALESCE(s.playCount, 0)"),
 
@@ -286,13 +272,14 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
     piercings: (c) => buildTextFilter(c, "p.piercings"),
     measurements: (c) => buildTextFilter(c, "p.measurements"),
 
-    // Body
-    height: (c) => buildNumericFilter(c, "COALESCE(p.heightCm, 0)"),
-    weight: (c) => buildNumericFilter(c, "COALESCE(p.weightKg, 0)"),
-    // No COALESCE: a performer without a length never matches, as in Stash
+    // Body: a performer without a value matches only IS_NULL
+    height: (c) => buildNumericFilter(c, "p.heightCm"),
+    weight: (c) => buildNumericFilter(c, "p.weightKg"),
+    // A performer without a value never matches a comparison, as in Stash
     penis_length: (c) => buildNumericFilter(c, "p.penisLength"),
 
-    // Career: a performer without a value never matches
+    // Career: a performer without a value (or with text that names no years)
+    // matches only IS_NULL
     career_length: (c) => buildNumericFilter(c, CAREER_YEARS),
 
     // Compared whole, ignoring case

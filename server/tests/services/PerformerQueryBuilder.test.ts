@@ -358,7 +358,7 @@ describe("PerformerQueryBuilder", () => {
       );
     });
 
-    it("birth year, death year and age need the date, and NOT_EQUALS keeps performers without one", async () => {
+    it("birth year, death year and age need the date, NOT_EQUALS included", async () => {
       await run({
         filter: {
           birth_year: { modifier: "BETWEEN", value: 1990, value2: 1995 },
@@ -372,11 +372,40 @@ describe("PerformerQueryBuilder", () => {
         "(p.birthdate IS NOT NULL AND CAST(SUBSTR(p.birthdate, 1, 4) AS INTEGER) BETWEEN ? AND ?)"
       );
       expect(sql).toContain(
-        "(p.deathDate IS NULL OR CAST(SUBSTR(p.deathDate, 1, 4) AS INTEGER) != ?)"
+        "(p.deathDate IS NOT NULL AND CAST(SUBSTR(p.deathDate, 1, 4) AS INTEGER) != ?)"
       );
       expect(sql).toContain(
         "(p.birthdate IS NOT NULL AND CAST((julianday(date('now')) - julianday(p.birthdate)) / 365.25 AS INTEGER) < ?)"
       );
+    });
+
+    it("weight has no COALESCE", async () => {
+      await run({
+        filter: { weight: { modifier: "LESS_THAN", value: 60 } },
+      });
+      expect(pageStatement().sql).toContain("p.weightKg < ?");
+      expect(pageStatement().sql).not.toContain("COALESCE(p.weightKg");
+
+      mockPrisma.$queryRawUnsafe.mockClear();
+      await run({
+        filter: {
+          weight: { modifier: "BETWEEN", value: undefined, value2: 60 },
+        },
+      });
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("p.weightKg <= ?");
+      expect(sql).not.toContain("COALESCE(p.weightKg");
+      expect(params).toContain(60);
+    });
+
+    it("age not 30 leaves out performers with no birthdate", async () => {
+      await run({ filter: { age: { modifier: "NOT_EQUALS", value: 30 } } });
+
+      const { sql } = pageStatement();
+      expect(sql).toContain(
+        "(p.birthdate IS NOT NULL AND CAST((julianday(date('now')) - julianday(p.birthdate)) / 365.25 AS INTEGER) != ?)"
+      );
+      expect(sql).not.toContain("p.birthdate IS NULL OR");
     });
 
     it("the viewer's numbers, the counts and the text and date fields each reach SQL", async () => {
@@ -405,12 +434,12 @@ describe("PerformerQueryBuilder", () => {
       const { sql } = pageStatement();
       for (const fragment of [
         "r.favorite = 1",
-        "COALESCE(r.rating, 0) > ?",
+        "r.rating > ?",
         "COALESCE(s.oCounter, 0) = ?",
         "COALESCE(s.playCount, 0) < ?",
         "MAX(p.sceneCount - COALESCE(d.scenes, 0), 0) BETWEEN ? AND ?",
-        "COALESCE(p.heightCm, 0) > ?",
-        "COALESCE(p.weightKg, 0) < ?",
+        "p.heightCm > ?",
+        "p.weightKg < ?",
         "(LOWER(p.name) LIKE LOWER(?) OR LOWER(p.aliasList) LIKE LOWER(?))",
         "(p.details IS NULL OR p.details = '')",
         "(p.tattoos IS NULL OR LOWER(p.tattoos) NOT LIKE LOWER(?))",
