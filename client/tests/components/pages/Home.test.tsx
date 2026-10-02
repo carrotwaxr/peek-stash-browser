@@ -75,7 +75,7 @@ vi.mock("@/utils/entityLinks", () => ({
   getEntityPath: vi.fn(() => "/scene/1"),
 }));
 vi.mock("@/utils/filterConfig", () => ({
-  carouselRulesToFilterState: vi.fn(() => ({})),
+  carouselRulesToFilterState: vi.fn(() => ({ state: {}, kept: {} })),
   SCENE_FILTER_OPTIONS: [],
 }));
 vi.mock("@/utils/urlParams", () => ({

@@ -5,6 +5,7 @@
  */
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "@/api/queryClient";
@@ -24,9 +25,61 @@ const CAROUSEL = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
+/** The builder editing carousel c1 */
+function renderEditor(client: QueryClient) {
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={["/settings/carousels/c1/edit"]}>
+        <Routes>
+          <Route
+            path="/settings/carousels/:id/edit"
+            element={<CarouselBuilder />}
+          />
+          <Route path="/settings" element={<div>Settings</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
 describe("CarouselBuilder", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("editing a carousel keeps a rule it cannot edit", async () => {
+    const tags = { value: ["284"], modifier: "INCLUDES_ALL" };
+    const stored = { ...CAROUSEL, rules: { organized: true, tags } };
+    const fetchMock = stubApi({
+      "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
+      "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+      "/library/tags/minimal": () => jsonResponse(200, { tags: [] }),
+    });
+    renderEditor(createQueryClient());
+
+    const title = await screen.findByDisplayValue("Highly rated");
+    fireEvent.change(title, { target: { value: "Renamed" } });
+    fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+    const update = await screen.findByRole("button", { name: /Update/ });
+    await waitFor(() => expect(update).toBeEnabled());
+    fireEvent.click(update);
+    await screen.findByText("Settings");
+
+    const bodyOf = (method: string) =>
+      JSON.parse(
+        fetchMock.mock.calls.find(([, init]) => init?.method === method)?.[1]
+          ?.body as string
+      ) as { rules: unknown; title?: string };
+    const preview = fetchMock.mock.calls.find(([url]) =>
+      url.includes("/carousels/preview")
+    );
+    expect(JSON.parse(preview?.[1]?.body as string)).toMatchObject({
+      rules: { organized: true, tags },
+    });
+    expect(bodyOf("PUT")).toMatchObject({
+      title: "Renamed",
+      rules: { organized: true, tags },
+    });
   });
 
   it("saving an edited carousel makes Home ask for its scenes again", async () => {
@@ -40,19 +93,7 @@ describe("CarouselBuilder", () => {
     client.setQueryData(queryKeys.carousels.list(), { carousels: [CAROUSEL] });
     client.setQueryData(queryKeys.carousels.execute("c1"), { scenes: [] });
 
-    render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={["/settings/carousels/c1/edit"]}>
-          <Routes>
-            <Route
-              path="/settings/carousels/:id/edit"
-              element={<CarouselBuilder />}
-            />
-            <Route path="/settings" element={<div>Settings</div>} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
+    renderEditor(client);
 
     await screen.findByDisplayValue("Highly rated");
     fireEvent.click(screen.getByRole("button", { name: /Preview/ }));

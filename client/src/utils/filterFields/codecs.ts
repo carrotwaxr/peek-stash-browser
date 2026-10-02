@@ -1,7 +1,7 @@
 /**
  * What each editor kind does with a panel row: the keys it holds, whether
- * it filters, its request criterion, its URL parameters and (filled by
- * later tasks) its chip and how a stored criterion reads back.
+ * it filters, its request criterion and how a stored one reads back, its
+ * URL parameters and (filled by a later task) its chip.
  *
  * Body measures (Height, Weight, Penis Length) are metric in the state, the
  * URL, presets and requests; `normalize` reads them leniently (any finite
@@ -17,12 +17,14 @@
  */
 import type {
   EditorKind,
+  EnumField,
   FieldSpec,
   NumberField,
   PanelField,
   RefField,
   RefModifier,
   RefSpec,
+  TextField,
 } from "@peek/shared-types";
 import { makeCompositeKey, parseCompositeKey } from "../compositeKey";
 
@@ -52,6 +54,10 @@ export interface FieldCodec<F extends PanelField> {
    */
   normalize(field: F, value: unknown): unknown;
   toCriterion(field: F, spec: FieldSpec, state: PanelState): unknown;
+  /**
+   * A stored criterion as the row's state, the inverse of `toCriterion`;
+   * empty when the row cannot edit it, so the caller keeps it as stored
+   */
   fromCriterion(field: F, spec: FieldSpec, criterion: unknown): PanelState;
   /** Sets the row's key and companions in the URL's parameters */
   writeUrl(field: F, state: PanelState, params: URLSearchParams): void;
@@ -267,11 +273,183 @@ const notYet = (member: string) => (): never => {
   throw new Error(`${member}: not yet`);
 };
 
-/** The members C6 and C7 fill, throwing until then */
+/** The member C7 fills, throwing until then */
 const pending = {
-  fromCriterion: notYet("fromCriterion"),
   chip: notYet("chip"),
 };
+
+// ── Stored criteria read back ─────────────────────────────────────────────
+
+/**
+ * A stored criterion's parts, or undefined when it is no object or carries
+ * a key the row cannot edit (a later task's `excludes`), so the caller
+ * keeps it as stored
+ */
+function partsOf(
+  criterion: unknown,
+  allowed: readonly string[]
+): Record<string, unknown> | undefined {
+  if (
+    typeof criterion !== "object" ||
+    criterion === null ||
+    Array.isArray(criterion)
+  ) {
+    return undefined;
+  }
+  return Object.keys(criterion).every((key) => allowed.includes(key))
+    ? (criterion as Record<string, unknown>)
+    : undefined;
+}
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+/**
+ * A stored number criterion as the range control holds it, in the panel's
+ * unit: BETWEEN its two values; the old lone bounds back to the bound typed
+ * (GREATER_THAN v is a min of v + 1, LESS_THAN v a max of v - 1); undefined
+ * for any other shape. S13 adds the one-sided BETWEEN.
+ */
+function rangeFromCriterion(
+  criterion: unknown,
+  scale: number
+): { min?: number; max?: number } | undefined {
+  const parts = partsOf(criterion, ["modifier", "value", "value2"]);
+  if (parts === undefined) return undefined;
+  const { modifier, value, value2 } = parts;
+  if (!isFiniteNumber(value)) return undefined;
+  if (modifier === "BETWEEN") {
+    return isFiniteNumber(value2)
+      ? { min: value / scale, max: value2 / scale }
+      : undefined;
+  }
+  if (value2 !== undefined) return undefined;
+  if (modifier === "GREATER_THAN") return { min: (value + 1) / scale };
+  if (modifier === "LESS_THAN") return { max: (value - 1) / scale };
+  return undefined;
+}
+
+/**
+ * A stored date criterion as the date range control holds it: BETWEEN its
+ * two days, GREATER_THAN a start, LESS_THAN an end; undefined for any other
+ * shape
+ */
+function dateRangeFromCriterion(
+  criterion: unknown
+): { start?: string; end?: string } | undefined {
+  const parts = partsOf(criterion, ["modifier", "value", "value2"]);
+  if (parts === undefined) return undefined;
+  const from = dayOf(parts.value);
+  if (from === undefined) return undefined;
+  if (parts.modifier === "BETWEEN") {
+    const to = dayOf(parts.value2);
+    return to === undefined ? undefined : { start: from, end: to };
+  }
+  if (parts.value2 !== undefined) return undefined;
+  if (parts.modifier === "GREATER_THAN") return { start: from };
+  if (parts.modifier === "LESS_THAN") return { end: from };
+  return undefined;
+}
+
+/**
+ * A stored ref criterion as the row edits it: its ids as stored (a bare id
+ * stays bare, a lone id is a one-element list), the modifier when the row
+ * offers it and the depth when the row takes one. Nothing when the row
+ * cannot edit it: no ids, a modifier it does not offer, several ids on a
+ * one-pick row, a depth it does not take.
+ */
+function refFromCriterion(
+  field: RefField,
+  spec: FieldSpec,
+  criterion: unknown
+): PanelState {
+  const parts = partsOf(criterion, ["value", "modifier", "depth"]);
+  if (parts === undefined || spec.kind !== "ref") return {};
+  const ids = valuesOf(parts.value);
+  const modifier = parts.modifier ?? spec.defaultModifier;
+  const offered = field.modifiers.some((each) => each === modifier);
+  const { depth } = parts;
+  const takesDepth =
+    depth === undefined ||
+    (field.hierarchyKey !== undefined && isWholeNumber(depth));
+  if (
+    ids.length === 0 ||
+    !offered ||
+    !takesDepth ||
+    (!field.multi && ids.length > 1)
+  ) {
+    return {};
+  }
+  return {
+    [field.key]: field.multi ? ids : ids[0],
+    ...(field.modifierKey === undefined
+      ? {}
+      : { [field.modifierKey]: modifier }),
+    ...(field.hierarchyKey === undefined || depth === undefined
+      ? {}
+      : { [field.hierarchyKey]: depth }),
+  };
+}
+
+/**
+ * A stored select criterion as the row edits it: one value the row offers,
+ * with its modifier when the row has a condition select (else the modifier
+ * the row sends). Nothing for a value or modifier the row cannot show.
+ */
+function enumFromCriterion(
+  field: EnumField,
+  spec: FieldSpec,
+  criterion: unknown
+): PanelState {
+  const parts = partsOf(criterion, ["value", "modifier"]);
+  if (parts === undefined) return {};
+  const values = valuesOf(parts.value);
+  const [value] = values;
+  if (
+    values.length !== 1 ||
+    value === undefined ||
+    !field.choices.some((choice) => choice.value === value)
+  ) {
+    return {};
+  }
+  if (spec.kind === "enum" && spec.multi) {
+    // A list matching any of them sends no modifier
+    return parts.modifier === undefined ? { [field.key]: value } : {};
+  }
+  if (spec.kind !== "enum" && spec.kind !== "text") return {};
+  const sent = field.defaultModifier ?? spec.defaultModifier;
+  const modifier = parts.modifier ?? spec.defaultModifier;
+  // What `toCriterion` can send: the row's condition select's (a values
+  // field falls back to the field's), else the one it always sends
+  const offered: readonly string[] =
+    field.modifierKey === undefined
+      ? [sent]
+      : (field.modifiers ?? (spec.kind === "enum" ? spec.modifiers : [sent]));
+  if (typeof modifier !== "string" || !offered.includes(modifier)) return {};
+  return {
+    [field.key]: value,
+    ...(field.modifierKey === undefined
+      ? {}
+      : { [field.modifierKey]: modifier }),
+  };
+}
+
+/** A stored text criterion: a substring with something in it, else nothing */
+function textFromCriterion(
+  field: TextField,
+  spec: FieldSpec,
+  criterion: unknown
+): PanelState {
+  const parts = partsOf(criterion, ["value", "modifier"]);
+  if (parts === undefined || spec.kind !== "text") return {};
+  const { value } = parts;
+  const modifier = parts.modifier ?? spec.defaultModifier;
+  return typeof value === "string" &&
+    value.trim() !== "" &&
+    modifier === "INCLUDES"
+    ? { [field.key]: value }
+    : {};
+}
 
 // ── The URL ───────────────────────────────────────────────────────────────
 
@@ -438,6 +616,7 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
         [field.key]: field.multi ? value.split(",").filter(Boolean) : value,
       };
     }),
+    fromCriterion: refFromCriterion,
     ...pending,
   },
   number: {
@@ -472,6 +651,13 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       return read === undefined || Object.keys(read).length === 0
         ? {}
         : { [field.key]: read };
+    },
+    // In the panel's unit; a body measure read leniently
+    fromCriterion: (field, _spec, criterion) => {
+      const range = rangeFromCriterion(criterion, field.scale ?? 1);
+      const read =
+        range === undefined ? undefined : normalizeNumber(field, range);
+      return read === undefined ? {} : { [field.key]: read };
     },
     ...pending,
   },
@@ -520,6 +706,10 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       if (to !== undefined) return { modifier: "LESS_THAN", value: to };
       return undefined;
     },
+    fromCriterion: (field, _spec, criterion) => {
+      const range = dateRangeFromCriterion(criterion);
+      return range === undefined ? {} : { [field.key]: range };
+    },
     ...pending,
   },
   text: {
@@ -542,6 +732,7 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       const text = typeof value === "string" ? value.trim() : "";
       return text === "" ? undefined : { value: text, modifier: "INCLUDES" };
     },
+    fromCriterion: textFromCriterion,
     ...pending,
   },
   enum: {
@@ -588,6 +779,7 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
             ),
           };
     },
+    fromCriterion: enumFromCriterion,
     ...pending,
   },
   choice: {
@@ -615,6 +807,13 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
         field.choices.find((each) => each.value === field.defaultValue);
       return choice?.sends;
     },
+    // The choice that sends the stored value
+    fromCriterion: (field, _spec, criterion) => {
+      const choice = field.choices.find(
+        (each) => each.sends !== undefined && each.sends === criterion
+      );
+      return choice === undefined ? {} : { [field.key]: choice.value };
+    },
     ...pending,
   },
   toggle: {
@@ -635,6 +834,8 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       state[field.key] === true || state[field.key] === "TRUE"
         ? true
         : undefined,
+    fromCriterion: (field, _spec, criterion) =>
+      criterion === true ? { [field.key]: true } : {},
     ...pending,
   },
 };

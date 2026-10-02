@@ -49,7 +49,8 @@ export interface PanelTable {
   readonly specs: Readonly<Record<string, FieldSpec>>;
 }
 
-const tableOf = (kind: ListKind): PanelTable => ({
+/** A list's whole panel table */
+export const panelTableOf = (kind: ListKind): PanelTable => ({
   rows: PANEL_FIELDS[kind],
   specs: SPECS[kind],
 });
@@ -99,7 +100,7 @@ function permanentCriterion(
 export function buildPanelFilter<K extends ListKind>(
   kind: K,
   state: PanelState,
-  table: PanelTable = tableOf(kind)
+  table: PanelTable = panelTableOf(kind)
 ): PanelFilters[K] {
   const specs = new Map(Object.entries(table.specs));
   const filter: Record<string, unknown> = {};
@@ -144,6 +145,67 @@ export function buildPanelFilter<K extends ListKind>(
   }
 
   return filter as PanelFilters[K];
+}
+
+/** A stored request filter as panel state, and what no row could read */
+export interface ReadPanelFilter {
+  readonly state: PanelState;
+  /** Each stored criterion no row edits, as stored */
+  readonly kept: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * A stored request filter (a carousel's rules) read back into the panel's
+ * state, the inverse of `buildPanelFilter`: each row's codec reads its
+ * field's criterion (`fromCriterion`; a field with a `path` from where it
+ * nests). Every criterion no row reads, or a row cannot edit (a modifier
+ * it does not offer, a key it does not know), is kept as stored, so
+ * building the state again and merging `kept` under it loses nothing.
+ * Clips' flat GET parameters are not read.
+ */
+export function readPanelFilter(
+  kind: Exclude<ListKind, "clip">,
+  filter: unknown,
+  table: PanelTable = panelTableOf(kind)
+): ReadPanelFilter {
+  if (!isObject(filter)) return { state: {}, kept: {} };
+  const state: Record<string, unknown> = {};
+  /** The top-level criteria read, and the nested ones by their outer key */
+  const read = new Set<string>();
+  const readNested = new Map<string, Set<string>>();
+
+  for (const row of table.rows) {
+    const spec = table.specs[row.field];
+    if (spec === undefined) {
+      throw new Error(`${kind} panel row ${row.key}: no field ${row.field}`);
+    }
+    const path = spec.kind === "ref" ? spec.path : undefined;
+    const outer = path?.[0] ?? row.field;
+    const holder = path === undefined ? filter : filter[outer];
+    const name = path?.[1] ?? row.field;
+    const done = path === undefined ? read : readNested.get(outer);
+    if (!isObject(holder) || !(name in holder) || done?.has(name)) continue;
+
+    const codec = codecOf(row);
+    const rowState = codec.fromCriterion(row, spec, holder[name]);
+    if (!codec.isActive(row, rowState)) continue;
+    Object.assign(state, rowState);
+    if (path === undefined) read.add(name);
+    else readNested.set(outer, new Set([...(done ?? []), name]));
+  }
+
+  const kept: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(filter)) {
+    const nested = readNested.get(key);
+    if (read.has(key)) continue;
+    if (nested === undefined || !isObject(value)) {
+      kept[key] = value;
+      continue;
+    }
+    const rest = Object.entries(value).filter(([inner]) => !nested.has(inner));
+    if (rest.length > 0) kept[key] = Object.fromEntries(rest);
+  }
+  return { state, kept };
 }
 
 /**

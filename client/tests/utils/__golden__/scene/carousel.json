@@ -1,13 +1,20 @@
 {
   "definitions": [
     {
+      "key": "audioCodec",
+      "label": "Audio Codec",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "e.g. aac, mp3",
+      "maxLength": 500
+    },
+    {
       "key": "bitrate",
-      "label": "Bitrate",
+      "label": "Bitrate (Mbps)",
       "type": "range",
+      "defaultValue": {},
       "min": 0,
-      "max": 100,
-      "step": 1,
-      "valueUnit": "Mbps"
+      "max": 100
     },
     {
       "key": "groupIds",
@@ -15,87 +22,138 @@
       "type": "searchable-select",
       "entityType": "groups",
       "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select collections...",
       "modifierOptions": [
         {
           "value": "INCLUDES",
-          "label": "in any of"
+          "label": "In ANY of these"
         },
         {
           "value": "EXCLUDES",
-          "label": "not in"
+          "label": "NOT in these"
         }
       ],
-      "defaultModifier": "INCLUDES"
+      "modifierKey": "groupIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "countFilterContext": "scenes"
     },
     {
       "key": "createdAt",
       "label": "Created Date",
-      "type": "date-range"
+      "type": "date-range",
+      "defaultValue": {}
     },
     {
       "key": "details",
-      "label": "Details Contains",
+      "label": "Details Search",
       "type": "text",
+      "defaultValue": "",
       "placeholder": "Search details...",
       "maxLength": 500
     },
     {
+      "key": "director",
+      "label": "Director Search",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search director...",
+      "maxLength": 500
+    },
+    {
       "key": "duration",
-      "label": "Duration",
+      "label": "Duration (minutes)",
       "type": "range",
+      "defaultValue": {},
       "min": 1,
-      "max": 300,
-      "step": 1,
-      "valueUnit": "minutes"
+      "max": 300
     },
     {
       "key": "performerFavorite",
       "label": "Favorite Performers",
-      "type": "checkbox"
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Favorite Performers Only"
     },
     {
       "key": "favorite",
       "label": "Favorite Scenes",
-      "type": "checkbox"
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Favorites Only"
     },
     {
       "key": "studioFavorite",
       "label": "Favorite Studios",
-      "type": "checkbox"
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Favorite Studios Only"
     },
     {
       "key": "tagFavorite",
       "label": "Favorite Tags",
-      "type": "checkbox"
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Favorite Tags Only"
+    },
+    {
+      "key": "framerate",
+      "label": "Framerate (fps)",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 120
     },
     {
       "key": "lastPlayedAt",
       "label": "Last Played Date",
-      "type": "date-range"
+      "type": "date-range",
+      "defaultValue": {}
     },
     {
       "key": "oCount",
       "label": "O Count",
       "type": "range",
+      "defaultValue": {},
       "min": 0,
-      "max": 300,
-      "step": 1
+      "max": 300
+    },
+    {
+      "key": "orientation",
+      "label": "Orientation",
+      "type": "select",
+      "defaultValue": "",
+      "options": [
+        {
+          "value": "LANDSCAPE",
+          "label": "Landscape"
+        },
+        {
+          "value": "PORTRAIT",
+          "label": "Portrait"
+        },
+        {
+          "value": "SQUARE",
+          "label": "Square"
+        }
+      ],
+      "placeholder": "Any orientation"
     },
     {
       "key": "performerAge",
       "label": "Performer Age",
       "type": "range",
+      "defaultValue": {},
       "min": 18,
-      "max": 100,
-      "step": 1
+      "max": 100
     },
     {
       "key": "performerCount",
       "label": "Performer Count",
       "type": "range",
+      "defaultValue": {},
       "min": 0,
-      "max": 20,
-      "step": 1
+      "max": 20
     },
     {
       "key": "performerIds",
@@ -103,51 +161,55 @@
       "type": "searchable-select",
       "entityType": "performers",
       "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select performers...",
       "modifierOptions": [
         {
-          "value": "INCLUDES",
-          "label": "includes any of"
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
         },
         {
-          "value": "INCLUDES_ALL",
-          "label": "includes all of"
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
         },
         {
           "value": "EXCLUDES",
-          "label": "excludes"
+          "label": "Has NONE of these"
         }
       ],
-      "defaultModifier": "INCLUDES"
+      "modifierKey": "performerIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "countFilterContext": "scenes"
     },
     {
       "key": "playCount",
       "label": "Play Count",
       "type": "range",
+      "defaultValue": {},
       "min": 0,
-      "max": 1000,
-      "step": 1
+      "max": 1000
     },
     {
       "key": "playDuration",
-      "label": "Play Duration",
+      "label": "Play Duration (minutes)",
       "type": "range",
+      "defaultValue": {},
       "min": 1,
-      "max": 300,
-      "step": 1,
-      "valueUnit": "minutes"
+      "max": 300
     },
     {
       "key": "rating",
-      "label": "Rating",
+      "label": "Rating (0-100)",
       "type": "range",
+      "defaultValue": {},
       "min": 0,
-      "max": 100,
-      "step": 1
+      "max": 100
     },
     {
       "key": "resolution",
       "label": "Resolution",
       "type": "select",
+      "defaultValue": "",
       "options": [
         {
           "value": "VERY_LOW",
@@ -186,34 +248,53 @@
           "label": "4K"
         },
         {
+          "value": "FIVE_K",
+          "label": "5K"
+        },
+        {
+          "value": "SIX_K",
+          "label": "6K"
+        },
+        {
+          "value": "SEVEN_K",
+          "label": "7K"
+        },
+        {
           "value": "EIGHT_K",
           "label": "8K"
+        },
+        {
+          "value": "HUGE",
+          "label": "Huge"
         }
       ],
+      "placeholder": "Any resolution",
       "modifierOptions": [
         {
           "value": "EQUALS",
-          "label": "equals"
+          "label": "Equals"
         },
         {
           "value": "NOT_EQUALS",
-          "label": "not equals"
+          "label": "Not Equals"
         },
         {
           "value": "GREATER_THAN",
-          "label": "greater than"
+          "label": "Greater Than"
         },
         {
           "value": "LESS_THAN",
-          "label": "less than"
+          "label": "Less Than"
         }
       ],
-      "defaultModifier": "GREATER_THAN"
+      "modifierKey": "resolutionModifier",
+      "defaultModifier": "EQUALS"
     },
     {
       "key": "date",
       "label": "Scene Date",
-      "type": "date-range"
+      "type": "date-range",
+      "defaultValue": {}
     },
     {
       "key": "studioId",
@@ -221,7 +302,20 @@
       "type": "searchable-select",
       "entityType": "studios",
       "multi": false,
-      "supportsHierarchy": true
+      "defaultValue": "",
+      "placeholder": "Select studio...",
+      "supportsHierarchy": true,
+      "hierarchyKey": "studioIdDepth",
+      "hierarchyLabel": "Include sub-studios",
+      "countFilterContext": "scenes"
+    },
+    {
+      "key": "tagCount",
+      "label": "Tag Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 50
     },
     {
       "key": "tagIds",
@@ -229,32 +323,71 @@
       "type": "searchable-select",
       "entityType": "tags",
       "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select tags...",
       "modifierOptions": [
         {
-          "value": "INCLUDES",
-          "label": "includes any of"
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
         },
         {
-          "value": "INCLUDES_ALL",
-          "label": "includes all of"
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
         },
         {
           "value": "EXCLUDES",
-          "label": "excludes"
+          "label": "Has NONE of these"
         }
       ],
+      "modifierKey": "tagIdsModifier",
       "defaultModifier": "INCLUDES_ALL",
-      "supportsHierarchy": true
+      "supportsHierarchy": true,
+      "hierarchyKey": "tagIdsDepth",
+      "hierarchyLabel": "Include sub-tags",
+      "countFilterContext": "scenes"
     },
     {
       "key": "title",
-      "label": "Title Contains",
+      "label": "Title Search",
       "type": "text",
+      "defaultValue": "",
       "placeholder": "Search title...",
+      "maxLength": 500
+    },
+    {
+      "key": "updatedAt",
+      "label": "Updated Date",
+      "type": "date-range",
+      "defaultValue": {}
+    },
+    {
+      "key": "videoCodec",
+      "label": "Video Codec",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "e.g. h264, hevc",
       "maxLength": 500
     }
   ],
   "samples": [
+    {
+      "label": "audioCodec: text",
+      "state": {
+        "audioCodec": "contract"
+      },
+      "rules": {
+        "audio_codec": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "audioCodec": "contract"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?audioCodec=contract&sort=created_at&dir=ASC"
+    },
     {
       "label": "bitrate: min only",
       "state": {
@@ -273,7 +406,8 @@
           "min": 25
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?bitrate_min=25&sort=created_at&dir=ASC"
     },
     {
@@ -294,7 +428,8 @@
           "max": 75
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?bitrate_max=75&sort=created_at&dir=ASC"
     },
     {
@@ -318,7 +453,8 @@
           "max": 75
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?bitrate_min=25&bitrate_max=75&sort=created_at&dir=ASC"
     },
     {
@@ -343,6 +479,7 @@
         ],
         "groupIdsModifier": "INCLUDES"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES&sort=created_at&dir=ASC"
     },
@@ -371,6 +508,7 @@
         ],
         "groupIdsModifier": "INCLUDES"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES&sort=created_at&dir=ASC"
     },
@@ -396,6 +534,7 @@
         ],
         "groupIdsModifier": "EXCLUDES"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?groupIds=1%3Ainst-a&groupIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
     },
@@ -424,6 +563,7 @@
         ],
         "groupIdsModifier": "EXCLUDES"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
     },
@@ -448,7 +588,8 @@
         ],
         "groupIdsModifier": "INCLUDES"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES&sort=created_at&dir=ASC"
     },
     {
@@ -475,7 +616,8 @@
         ],
         "groupIdsModifier": "INCLUDES"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES&sort=created_at&dir=ASC"
     },
     {
@@ -496,6 +638,7 @@
           "start": "2020-01-01"
         }
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?createdAt_start=2020-01-01&sort=created_at&dir=ASC"
     },
@@ -517,6 +660,7 @@
           "end": "2024-12-31"
         }
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?createdAt_end=2024-12-31&sort=created_at&dir=ASC"
     },
@@ -541,6 +685,7 @@
           "end": "2024-12-31"
         }
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?createdAt_start=2020-01-01&createdAt_end=2024-12-31&sort=created_at&dir=ASC"
     },
@@ -558,8 +703,27 @@
       "back": {
         "details": "contract"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?details=contract&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "director: text",
+      "state": {
+        "director": "contract"
+      },
+      "rules": {
+        "director": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "director": "contract"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?director=contract&sort=created_at&dir=ASC"
     },
     {
       "label": "duration: min only",
@@ -579,7 +743,8 @@
           "min": 76
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?duration_min=76&sort=created_at&dir=ASC"
     },
     {
@@ -600,7 +765,8 @@
           "max": 225
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?duration_max=225&sort=created_at&dir=ASC"
     },
     {
@@ -624,7 +790,8 @@
           "max": 225
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?duration_min=76&duration_max=225&sort=created_at&dir=ASC"
     },
     {
@@ -638,6 +805,7 @@
       "back": {
         "performerFavorite": true
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?performerFavorite=true&sort=created_at&dir=ASC"
     },
@@ -652,6 +820,7 @@
       "back": {
         "favorite": true
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?favorite=true&sort=created_at&dir=ASC"
     },
@@ -666,6 +835,7 @@
       "back": {
         "studioFavorite": true
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?studioFavorite=true&sort=created_at&dir=ASC"
     },
@@ -680,8 +850,78 @@
       "back": {
         "tagFavorite": true
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagFavorite=true&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "framerate: min only",
+      "state": {
+        "framerate": {
+          "min": "30"
+        }
+      },
+      "rules": {
+        "framerate": {
+          "modifier": "GREATER_THAN",
+          "value": 29
+        }
+      },
+      "back": {
+        "framerate": {
+          "min": 30
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?framerate_min=30&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "framerate: max only",
+      "state": {
+        "framerate": {
+          "max": "90"
+        }
+      },
+      "rules": {
+        "framerate": {
+          "modifier": "LESS_THAN",
+          "value": 91
+        }
+      },
+      "back": {
+        "framerate": {
+          "max": 90
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?framerate_max=90&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "framerate: min and max",
+      "state": {
+        "framerate": {
+          "min": "30",
+          "max": "90"
+        }
+      },
+      "rules": {
+        "framerate": {
+          "modifier": "BETWEEN",
+          "value": 30,
+          "value2": 90
+        }
+      },
+      "back": {
+        "framerate": {
+          "min": 30,
+          "max": 90
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?framerate_min=30&framerate_max=90&sort=created_at&dir=ASC"
     },
     {
       "label": "lastPlayedAt: start only",
@@ -701,6 +941,7 @@
           "start": "2020-01-01"
         }
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?lastPlayedAt_start=2020-01-01&sort=created_at&dir=ASC"
     },
@@ -722,6 +963,7 @@
           "end": "2024-12-31"
         }
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?lastPlayedAt_end=2024-12-31&sort=created_at&dir=ASC"
     },
@@ -746,6 +988,7 @@
           "end": "2024-12-31"
         }
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?lastPlayedAt_start=2020-01-01&lastPlayedAt_end=2024-12-31&sort=created_at&dir=ASC"
     },
@@ -767,7 +1010,8 @@
           "min": 75
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?oCount_min=75&sort=created_at&dir=ASC"
     },
     {
@@ -788,7 +1032,8 @@
           "max": 225
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?oCount_max=225&sort=created_at&dir=ASC"
     },
     {
@@ -812,8 +1057,66 @@
           "max": 225
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?oCount_min=75&oCount_max=225&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "orientation: LANDSCAPE",
+      "state": {
+        "orientation": "LANDSCAPE"
+      },
+      "rules": {
+        "orientation": {
+          "value": [
+            "LANDSCAPE"
+          ]
+        }
+      },
+      "back": {
+        "orientation": "LANDSCAPE"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?orientation=LANDSCAPE&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "orientation: PORTRAIT",
+      "state": {
+        "orientation": "PORTRAIT"
+      },
+      "rules": {
+        "orientation": {
+          "value": [
+            "PORTRAIT"
+          ]
+        }
+      },
+      "back": {
+        "orientation": "PORTRAIT"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?orientation=PORTRAIT&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "orientation: SQUARE",
+      "state": {
+        "orientation": "SQUARE"
+      },
+      "rules": {
+        "orientation": {
+          "value": [
+            "SQUARE"
+          ]
+        }
+      },
+      "back": {
+        "orientation": "SQUARE"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?orientation=SQUARE&sort=created_at&dir=ASC"
     },
     {
       "label": "performerAge: min only",
@@ -828,9 +1131,14 @@
           "value": 38
         }
       },
-      "back": {},
-      "lossless": false,
-      "seeMore": "/scenes?sort=created_at&dir=ASC"
+      "back": {
+        "performerAge": {
+          "min": 39
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerAge_min=39&sort=created_at&dir=ASC"
     },
     {
       "label": "performerAge: max only",
@@ -845,9 +1153,14 @@
           "value": 81
         }
       },
-      "back": {},
-      "lossless": false,
-      "seeMore": "/scenes?sort=created_at&dir=ASC"
+      "back": {
+        "performerAge": {
+          "max": 80
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerAge_max=80&sort=created_at&dir=ASC"
     },
     {
       "label": "performerAge: min and max",
@@ -864,9 +1177,15 @@
           "value2": 80
         }
       },
-      "back": {},
-      "lossless": false,
-      "seeMore": "/scenes?sort=created_at&dir=ASC"
+      "back": {
+        "performerAge": {
+          "min": 39,
+          "max": 80
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerAge_min=39&performerAge_max=80&sort=created_at&dir=ASC"
     },
     {
       "label": "performerCount: min only",
@@ -886,7 +1205,8 @@
           "min": 5
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?performerCount_min=5&sort=created_at&dir=ASC"
     },
     {
@@ -907,7 +1227,8 @@
           "max": 15
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?performerCount_max=15&sort=created_at&dir=ASC"
     },
     {
@@ -931,61 +1252,9 @@
           "max": 15
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?performerCount_min=5&performerCount_max=15&sort=created_at&dir=ASC"
-    },
-    {
-      "label": "performerIds: INCLUDES one id",
-      "state": {
-        "performerIds": [
-          "1:inst-a"
-        ],
-        "performerIdsModifier": "INCLUDES"
-      },
-      "rules": {
-        "performers": {
-          "value": [
-            "1:inst-a"
-          ],
-          "modifier": "INCLUDES"
-        }
-      },
-      "back": {
-        "performerIds": [
-          "1:inst-a"
-        ],
-        "performerIdsModifier": "INCLUDES"
-      },
-      "lossless": true,
-      "seeMore": "/scenes?performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES&sort=created_at&dir=ASC"
-    },
-    {
-      "label": "performerIds: INCLUDES two ids",
-      "state": {
-        "performerIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "performerIdsModifier": "INCLUDES"
-      },
-      "rules": {
-        "performers": {
-          "value": [
-            "1:inst-a",
-            "2:inst-b"
-          ],
-          "modifier": "INCLUDES"
-        }
-      },
-      "back": {
-        "performerIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "performerIdsModifier": "INCLUDES"
-      },
-      "lossless": true,
-      "seeMore": "/scenes?performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES&sort=created_at&dir=ASC"
     },
     {
       "label": "performerIds: INCLUDES_ALL one id",
@@ -1009,6 +1278,7 @@
         ],
         "performerIdsModifier": "INCLUDES_ALL"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
     },
@@ -1037,8 +1307,64 @@
         ],
         "performerIdsModifier": "INCLUDES_ALL"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerIds: INCLUDES one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerIds: INCLUDES two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES&sort=created_at&dir=ASC"
     },
     {
       "label": "performerIds: EXCLUDES one id",
@@ -1062,6 +1388,7 @@
         ],
         "performerIdsModifier": "EXCLUDES"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?performerIds=1%3Ainst-a&performerIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
     },
@@ -1090,6 +1417,7 @@
         ],
         "performerIdsModifier": "EXCLUDES"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
     },
@@ -1114,7 +1442,8 @@
         ],
         "performerIdsModifier": "INCLUDES"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES&sort=created_at&dir=ASC"
     },
     {
@@ -1141,7 +1470,8 @@
         ],
         "performerIdsModifier": "INCLUDES"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES&sort=created_at&dir=ASC"
     },
     {
@@ -1162,7 +1492,8 @@
           "min": 250
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?playCount_min=250&sort=created_at&dir=ASC"
     },
     {
@@ -1183,7 +1514,8 @@
           "max": 750
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?playCount_max=750&sort=created_at&dir=ASC"
     },
     {
@@ -1207,7 +1539,8 @@
           "max": 750
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?playCount_min=250&playCount_max=750&sort=created_at&dir=ASC"
     },
     {
@@ -1228,7 +1561,8 @@
           "min": 76
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?playDuration_min=76&sort=created_at&dir=ASC"
     },
     {
@@ -1249,7 +1583,8 @@
           "max": 225
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?playDuration_max=225&sort=created_at&dir=ASC"
     },
     {
@@ -1273,7 +1608,8 @@
           "max": 225
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?playDuration_min=76&playDuration_max=225&sort=created_at&dir=ASC"
     },
     {
@@ -1294,7 +1630,8 @@
           "min": 25
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?rating_min=25&sort=created_at&dir=ASC"
     },
     {
@@ -1315,7 +1652,8 @@
           "max": 75
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?rating_max=75&sort=created_at&dir=ASC"
     },
     {
@@ -1339,7 +1677,8 @@
           "max": 75
         }
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?rating_min=25&rating_max=75&sort=created_at&dir=ASC"
     },
     {
@@ -1358,6 +1697,7 @@
         "resolution": "VERY_LOW",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=VERY_LOW&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
@@ -1377,6 +1717,7 @@
         "resolution": "LOW",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=LOW&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
@@ -1396,6 +1737,7 @@
         "resolution": "R360P",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=R360P&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
@@ -1415,6 +1757,7 @@
         "resolution": "STANDARD",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
@@ -1434,6 +1777,7 @@
         "resolution": "WEB_HD",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=WEB_HD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
@@ -1453,6 +1797,7 @@
         "resolution": "STANDARD_HD",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD_HD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
@@ -1472,6 +1817,7 @@
         "resolution": "FULL_HD",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=FULL_HD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
@@ -1491,6 +1837,7 @@
         "resolution": "QUAD_HD",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=QUAD_HD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
@@ -1510,8 +1857,69 @@
         "resolution": "FOUR_K",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=FOUR_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: EQUALS FIVE_K",
+      "state": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "rules": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=FIVE_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: EQUALS SIX_K",
+      "state": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SIX_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: EQUALS SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SEVEN_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
       "label": "resolution: EQUALS EIGHT_K",
@@ -1529,8 +1937,29 @@
         "resolution": "EIGHT_K",
         "resolutionModifier": "EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=EIGHT_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: EQUALS HUGE",
+      "state": {
+        "resolution": "HUGE",
+        "resolutionModifier": "EQUALS"
+      },
+      "rules": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "HUGE",
+        "resolutionModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=HUGE&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
       "label": "resolution: NOT_EQUALS VERY_LOW",
@@ -1548,6 +1977,7 @@
         "resolution": "VERY_LOW",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=VERY_LOW&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
@@ -1567,6 +1997,7 @@
         "resolution": "LOW",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=LOW&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
@@ -1586,6 +2017,7 @@
         "resolution": "R360P",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=R360P&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
@@ -1605,6 +2037,7 @@
         "resolution": "STANDARD",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
@@ -1624,6 +2057,7 @@
         "resolution": "WEB_HD",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=WEB_HD&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
@@ -1643,6 +2077,7 @@
         "resolution": "STANDARD_HD",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD_HD&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
@@ -1662,6 +2097,7 @@
         "resolution": "FULL_HD",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=FULL_HD&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
@@ -1681,6 +2117,7 @@
         "resolution": "QUAD_HD",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=QUAD_HD&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
@@ -1700,8 +2137,69 @@
         "resolution": "FOUR_K",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=FOUR_K&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: NOT_EQUALS FIVE_K",
+      "state": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=FIVE_K&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: NOT_EQUALS SIX_K",
+      "state": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SIX_K&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: NOT_EQUALS SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SEVEN_K&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
     {
       "label": "resolution: NOT_EQUALS EIGHT_K",
@@ -1719,8 +2217,29 @@
         "resolution": "EIGHT_K",
         "resolutionModifier": "NOT_EQUALS"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=EIGHT_K&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: NOT_EQUALS HUGE",
+      "state": {
+        "resolution": "HUGE",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "HUGE",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=HUGE&resolutionModifier=NOT_EQUALS&sort=created_at&dir=ASC"
     },
     {
       "label": "resolution: GREATER_THAN VERY_LOW",
@@ -1738,6 +2257,7 @@
         "resolution": "VERY_LOW",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=VERY_LOW&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
@@ -1757,6 +2277,7 @@
         "resolution": "LOW",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=LOW&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
@@ -1776,6 +2297,7 @@
         "resolution": "R360P",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=R360P&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
@@ -1795,6 +2317,7 @@
         "resolution": "STANDARD",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
@@ -1814,6 +2337,7 @@
         "resolution": "WEB_HD",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=WEB_HD&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
@@ -1833,6 +2357,7 @@
         "resolution": "STANDARD_HD",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD_HD&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
@@ -1852,6 +2377,7 @@
         "resolution": "FULL_HD",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=FULL_HD&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
@@ -1871,6 +2397,7 @@
         "resolution": "QUAD_HD",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=QUAD_HD&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
@@ -1890,8 +2417,69 @@
         "resolution": "FOUR_K",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=FOUR_K&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: GREATER_THAN FIVE_K",
+      "state": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "rules": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "GREATER_THAN"
+        }
+      },
+      "back": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=FIVE_K&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: GREATER_THAN SIX_K",
+      "state": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "GREATER_THAN"
+        }
+      },
+      "back": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SIX_K&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: GREATER_THAN SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "GREATER_THAN"
+        }
+      },
+      "back": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SEVEN_K&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
     {
       "label": "resolution: GREATER_THAN EIGHT_K",
@@ -1909,8 +2497,29 @@
         "resolution": "EIGHT_K",
         "resolutionModifier": "GREATER_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=EIGHT_K&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: GREATER_THAN HUGE",
+      "state": {
+        "resolution": "HUGE",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "rules": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "GREATER_THAN"
+        }
+      },
+      "back": {
+        "resolution": "HUGE",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=HUGE&resolutionModifier=GREATER_THAN&sort=created_at&dir=ASC"
     },
     {
       "label": "resolution: LESS_THAN VERY_LOW",
@@ -1928,6 +2537,7 @@
         "resolution": "VERY_LOW",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=VERY_LOW&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
@@ -1947,6 +2557,7 @@
         "resolution": "LOW",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=LOW&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
@@ -1966,6 +2577,7 @@
         "resolution": "R360P",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=R360P&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
@@ -1985,6 +2597,7 @@
         "resolution": "STANDARD",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
@@ -2004,6 +2617,7 @@
         "resolution": "WEB_HD",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=WEB_HD&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
@@ -2023,6 +2637,7 @@
         "resolution": "STANDARD_HD",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD_HD&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
@@ -2042,6 +2657,7 @@
         "resolution": "FULL_HD",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=FULL_HD&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
@@ -2061,6 +2677,7 @@
         "resolution": "QUAD_HD",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=QUAD_HD&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
@@ -2080,8 +2697,69 @@
         "resolution": "FOUR_K",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=FOUR_K&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: LESS_THAN FIVE_K",
+      "state": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "rules": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "LESS_THAN"
+        }
+      },
+      "back": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=FIVE_K&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: LESS_THAN SIX_K",
+      "state": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "LESS_THAN"
+        }
+      },
+      "back": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SIX_K&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: LESS_THAN SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "LESS_THAN"
+        }
+      },
+      "back": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SEVEN_K&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
     {
       "label": "resolution: LESS_THAN EIGHT_K",
@@ -2099,8 +2777,29 @@
         "resolution": "EIGHT_K",
         "resolutionModifier": "LESS_THAN"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?resolution=EIGHT_K&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: LESS_THAN HUGE",
+      "state": {
+        "resolution": "HUGE",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "rules": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "LESS_THAN"
+        }
+      },
+      "back": {
+        "resolution": "HUGE",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=HUGE&resolutionModifier=LESS_THAN&sort=created_at&dir=ASC"
     },
     {
       "label": "resolution: VERY_LOW",
@@ -2117,7 +2816,8 @@
         "resolution": "VERY_LOW",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=VERY_LOW&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
@@ -2135,7 +2835,8 @@
         "resolution": "LOW",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=LOW&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
@@ -2153,7 +2854,8 @@
         "resolution": "R360P",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=R360P&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
@@ -2171,7 +2873,8 @@
         "resolution": "STANDARD",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
@@ -2189,7 +2892,8 @@
         "resolution": "WEB_HD",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=WEB_HD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
@@ -2207,7 +2911,8 @@
         "resolution": "STANDARD_HD",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=STANDARD_HD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
@@ -2225,7 +2930,8 @@
         "resolution": "FULL_HD",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=FULL_HD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
@@ -2243,7 +2949,8 @@
         "resolution": "QUAD_HD",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=QUAD_HD&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
@@ -2261,8 +2968,66 @@
         "resolution": "FOUR_K",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=FOUR_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: FIVE_K",
+      "state": {
+        "resolution": "FIVE_K"
+      },
+      "rules": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=FIVE_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: SIX_K",
+      "state": {
+        "resolution": "SIX_K"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SIX_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K"
+      },
+      "rules": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=SEVEN_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
       "label": "resolution: EIGHT_K",
@@ -2279,8 +3044,28 @@
         "resolution": "EIGHT_K",
         "resolutionModifier": "EQUALS"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?resolution=EIGHT_K&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "resolution: HUGE",
+      "state": {
+        "resolution": "HUGE"
+      },
+      "rules": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "resolution": "HUGE",
+        "resolutionModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?resolution=HUGE&resolutionModifier=EQUALS&sort=created_at&dir=ASC"
     },
     {
       "label": "date: start only",
@@ -2300,6 +3085,7 @@
           "start": "2020-01-01"
         }
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?date_start=2020-01-01&sort=created_at&dir=ASC"
     },
@@ -2321,6 +3107,7 @@
           "end": "2024-12-31"
         }
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?date_end=2024-12-31&sort=created_at&dir=ASC"
     },
@@ -2345,6 +3132,7 @@
           "end": "2024-12-31"
         }
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?date_start=2020-01-01&date_end=2024-12-31&sort=created_at&dir=ASC"
     },
@@ -2364,6 +3152,7 @@
       "back": {
         "studioId": "1:inst-a"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?studioId=1%3Ainst-a&sort=created_at&dir=ASC"
     },
@@ -2386,120 +3175,78 @@
         "studioId": "1:inst-a",
         "studioIdDepth": -1
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?studioId=1%3Ainst-a&studioIdDepth=-1&sort=created_at&dir=ASC"
     },
     {
-      "label": "tagIds: INCLUDES one id",
+      "label": "tagCount: min only",
       "state": {
-        "tagIds": [
-          "1:inst-a"
-        ],
-        "tagIdsModifier": "INCLUDES"
+        "tagCount": {
+          "min": "13"
+        }
       },
       "rules": {
-        "tags": {
-          "value": [
-            "1:inst-a"
-          ],
-          "modifier": "INCLUDES"
+        "tag_count": {
+          "modifier": "GREATER_THAN",
+          "value": 12
         }
       },
       "back": {
-        "tagIds": [
-          "1:inst-a"
-        ],
-        "tagIdsModifier": "INCLUDES"
+        "tagCount": {
+          "min": 13
+        }
       },
+      "kept": {},
       "lossless": true,
-      "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+      "seeMore": "/scenes?tagCount_min=13&sort=created_at&dir=ASC"
     },
     {
-      "label": "tagIds: INCLUDES two ids",
+      "label": "tagCount: max only",
       "state": {
-        "tagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "tagIdsModifier": "INCLUDES"
+        "tagCount": {
+          "max": "38"
+        }
       },
       "rules": {
-        "tags": {
-          "value": [
-            "1:inst-a",
-            "2:inst-b"
-          ],
-          "modifier": "INCLUDES"
+        "tag_count": {
+          "modifier": "LESS_THAN",
+          "value": 39
         }
       },
       "back": {
-        "tagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "tagIdsModifier": "INCLUDES"
+        "tagCount": {
+          "max": 38
+        }
       },
+      "kept": {},
       "lossless": true,
-      "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+      "seeMore": "/scenes?tagCount_max=38&sort=created_at&dir=ASC"
     },
     {
-      "label": "tagIds: INCLUDES one id, with sub-items",
+      "label": "tagCount: min and max",
       "state": {
-        "tagIds": [
-          "1:inst-a"
-        ],
-        "tagIdsDepth": -1,
-        "tagIdsModifier": "INCLUDES"
+        "tagCount": {
+          "min": "13",
+          "max": "38"
+        }
       },
       "rules": {
-        "tags": {
-          "value": [
-            "1:inst-a"
-          ],
-          "modifier": "INCLUDES",
-          "depth": -1
+        "tag_count": {
+          "modifier": "BETWEEN",
+          "value": 13,
+          "value2": 38
         }
       },
       "back": {
-        "tagIds": [
-          "1:inst-a"
-        ],
-        "tagIdsModifier": "INCLUDES",
-        "tagIdsDepth": -1
-      },
-      "lossless": true,
-      "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1&sort=created_at&dir=ASC"
-    },
-    {
-      "label": "tagIds: INCLUDES two ids, with sub-items",
-      "state": {
-        "tagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "tagIdsDepth": -1,
-        "tagIdsModifier": "INCLUDES"
-      },
-      "rules": {
-        "tags": {
-          "value": [
-            "1:inst-a",
-            "2:inst-b"
-          ],
-          "modifier": "INCLUDES",
-          "depth": -1
+        "tagCount": {
+          "min": 13,
+          "max": 38
         }
       },
-      "back": {
-        "tagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "tagIdsModifier": "INCLUDES",
-        "tagIdsDepth": -1
-      },
+      "kept": {},
       "lossless": true,
-      "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1&sort=created_at&dir=ASC"
+      "seeMore": "/scenes?tagCount_min=13&tagCount_max=38&sort=created_at&dir=ASC"
     },
     {
       "label": "tagIds: INCLUDES_ALL one id",
@@ -2523,6 +3270,7 @@
         ],
         "tagIdsModifier": "INCLUDES_ALL"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
     },
@@ -2551,6 +3299,7 @@
         ],
         "tagIdsModifier": "INCLUDES_ALL"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
     },
@@ -2579,6 +3328,7 @@
         "tagIdsModifier": "INCLUDES_ALL",
         "tagIdsDepth": -1
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1&sort=created_at&dir=ASC"
     },
@@ -2610,8 +3360,125 @@
         "tagIdsModifier": "INCLUDES_ALL",
         "tagIdsDepth": -1
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1&sort=created_at&dir=ASC"
     },
     {
       "label": "tagIds: EXCLUDES one id",
@@ -2635,6 +3502,7 @@
         ],
         "tagIdsModifier": "EXCLUDES"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
     },
@@ -2663,6 +3531,7 @@
         ],
         "tagIdsModifier": "EXCLUDES"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
     },
@@ -2691,6 +3560,7 @@
         "tagIdsModifier": "EXCLUDES",
         "tagIdsDepth": -1
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&tagIdsDepth=-1&sort=created_at&dir=ASC"
     },
@@ -2722,6 +3592,7 @@
         "tagIdsModifier": "EXCLUDES",
         "tagIdsDepth": -1
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1&sort=created_at&dir=ASC"
     },
@@ -2746,7 +3617,8 @@
         ],
         "tagIdsModifier": "INCLUDES_ALL"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
     },
     {
@@ -2773,7 +3645,8 @@
         ],
         "tagIdsModifier": "INCLUDES_ALL"
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
     },
     {
@@ -2800,7 +3673,8 @@
         "tagIdsModifier": "INCLUDES_ALL",
         "tagIdsDepth": -1
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1&sort=created_at&dir=ASC"
     },
     {
@@ -2830,7 +3704,8 @@
         "tagIdsModifier": "INCLUDES_ALL",
         "tagIdsDepth": -1
       },
-      "lossless": false,
+      "kept": {},
+      "lossless": true,
       "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1&sort=created_at&dir=ASC"
     },
     {
@@ -2847,8 +3722,96 @@
       "back": {
         "title": "contract"
       },
+      "kept": {},
       "lossless": true,
       "seeMore": "/scenes?title=contract&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "updatedAt: start only",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "rules": {
+        "updated_at": {
+          "modifier": "GREATER_THAN",
+          "value": "2020-01-01"
+        }
+      },
+      "back": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?updatedAt_start=2020-01-01&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "updatedAt: end only",
+      "state": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "rules": {
+        "updated_at": {
+          "modifier": "LESS_THAN",
+          "value": "2024-12-31"
+        }
+      },
+      "back": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?updatedAt_end=2024-12-31&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "updatedAt: start and end",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "rules": {
+        "updated_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      },
+      "back": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?updatedAt_start=2020-01-01&updatedAt_end=2024-12-31&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "videoCodec: text",
+      "state": {
+        "videoCodec": "contract"
+      },
+      "rules": {
+        "video_codec": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "videoCodec": "contract"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?videoCodec=contract&sort=created_at&dir=ASC"
     }
   ],
   "prod": {
@@ -2866,6 +3829,7 @@
       ],
       "tagIdsModifier": "INCLUDES_ALL"
     },
+    "kept": {},
     "seeMore": "/scenes?tagIds=284&tagIdsModifier=INCLUDES_ALL&sort=random&dir=DESC",
     "rebuilt": {
       "tags": {

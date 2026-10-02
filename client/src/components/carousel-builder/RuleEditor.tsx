@@ -1,5 +1,8 @@
 import { Trash2 } from "lucide-react";
-import { CAROUSEL_FILTER_DEFINITIONS } from "../../utils/filterConfig";
+import {
+  CAROUSEL_FILTER_DEFINITIONS,
+  type FilterOption,
+} from "../../utils/filterConfig";
 import SearchableSelect from "../ui/SearchableSelect";
 import { Button } from "../ui/index";
 
@@ -9,23 +12,6 @@ interface CarouselRule {
   value: unknown;
   modifier?: string;
   depth?: number;
-}
-
-interface FilterDefinition {
-  key: string;
-  label: string;
-  type: string;
-  multi?: boolean;
-  entityType?: string;
-  modifierOptions?: Array<{ value: string; label: string }>;
-  defaultModifier?: string;
-  supportsHierarchy?: boolean;
-  options?: Array<{ value: string; label: string }>;
-  placeholder?: string;
-  maxLength?: number;
-  min?: number;
-  max?: number;
-  valueUnit?: string;
 }
 
 interface Props {
@@ -173,7 +159,7 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
 };
 
 interface RuleValueInputProps {
-  filterDef: FilterDefinition | undefined;
+  filterDef: FilterOption | undefined;
   rule: CarouselRule;
   onChange: (updates: Partial<CarouselRule>) => void;
 }
@@ -204,7 +190,10 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
           value={rule.value as string | string[]}
           onChange={(val) => onChange({ value: val })}
           multi={filterDef.multi}
-          placeholder={`Select ${filterDef.label.toLowerCase()}...`}
+          placeholder={
+            filterDef.placeholder ??
+            `Select ${(filterDef.label ?? filterDef.key).toLowerCase()}...`
+          }
         />
       );
 
@@ -282,24 +271,38 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
 };
 
 interface RangeInputProps {
-  filterDef: FilterDefinition;
+  filterDef: FilterOption;
   value: { min?: number; max?: number } | undefined;
   onChange: (value: { min?: number; max?: number }) => void;
 }
 
 /**
+ * A typed bound: a number, decimals kept unless the field steps in whole
+ * units; nothing for a blank or a non-number
+ */
+const boundOf = (
+  text: string,
+  step: number | undefined
+): number | undefined => {
+  if (text.trim() === "") return undefined;
+  const value = Number(text);
+  if (!Number.isFinite(value)) return undefined;
+  return step !== undefined && Number.isInteger(step)
+    ? Math.trunc(value)
+    : value;
+};
+
+/**
  * RangeInput Component
- * Min/max input for numeric range filters.
+ * Min/max input for numeric range filters, in the unit its label names.
  */
 const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
   const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const min = e.target.value === "" ? undefined : parseInt(e.target.value);
-    onChange({ ...value, min });
+    onChange({ ...value, min: boundOf(e.target.value, filterDef.step) });
   };
 
   const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const max = e.target.value === "" ? undefined : parseInt(e.target.value);
-    onChange({ ...value, max });
+    onChange({ ...value, max: boundOf(e.target.value, filterDef.step) });
   };
 
   return (
@@ -311,6 +314,7 @@ const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
         placeholder="Min"
         min={filterDef.min}
         max={filterDef.max}
+        step={filterDef.step ?? "any"}
         className="w-24 px-3 py-2 rounded-lg border text-sm"
         style={{
           backgroundColor: "var(--bg-primary)",
@@ -326,6 +330,7 @@ const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
         placeholder="Max"
         min={filterDef.min}
         max={filterDef.max}
+        step={filterDef.step ?? "any"}
         className="w-24 px-3 py-2 rounded-lg border text-sm"
         style={{
           backgroundColor: "var(--bg-primary)",
@@ -333,11 +338,6 @@ const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
           color: "var(--text-primary)",
         }}
       />
-      {filterDef.valueUnit && (
-        <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-          {filterDef.valueUnit}
-        </span>
-      )}
     </div>
   );
 };

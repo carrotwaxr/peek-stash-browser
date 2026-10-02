@@ -46,6 +46,7 @@ import {
   SCENE_FILTER_OPTIONS,
   STUDIO_FILTER_OPTIONS,
   TAG_FILTER_OPTIONS,
+  buildCarouselRules,
   buildClipFilter,
   buildGalleryFilter,
   buildGroupFilter,
@@ -146,7 +147,7 @@ interface Sample {
   state: State;
 }
 
-/** How a panel names an option's companions: the option's own, or the carousel builder's */
+/** How a panel names an option's companions */
 interface Companions {
   modifierKey: (option: FilterOption) => string | undefined;
   hierarchyKey: (option: FilterOption) => string | undefined;
@@ -155,14 +156,6 @@ interface Companions {
 const PANEL_COMPANIONS: Companions = {
   modifierKey: (option) => option.modifierKey,
   hierarchyKey: (option) => option.hierarchyKey,
-};
-
-/** The carousel builder keeps `<key>Modifier` and `<key>Depth` */
-const CAROUSEL_COMPANIONS: Companions = {
-  modifierKey: (option) =>
-    option.modifierOptions ? `${option.key}Modifier` : undefined,
-  hierarchyKey: (option) =>
-    option.supportsHierarchy ? `${option.key}Depth` : undefined,
 };
 
 /**
@@ -711,15 +704,16 @@ function prodPresetResults(list: ListKind) {
 describe("scene", () => {
   it("carousel", async () => {
     const samples = CAROUSEL_FILTER_DEFINITIONS.flatMap((definition) =>
-      samplesOf(definition, CAROUSEL_COMPANIONS)
+      samplesOf(definition)
     ).map((sample) => {
-      const rules = buildSceneFilter(sample.state);
-      const back = carouselRulesToFilterState(rules);
+      const rules = buildCarouselRules(sample.state);
+      const { state: back, kept } = carouselRulesToFilterState(rules);
       return {
         ...sample,
         rules,
         back,
-        lossless: isDeepStrictEqual(back, sample.state),
+        kept,
+        lossless: isDeepStrictEqual(buildCarouselRules(back, kept), rules),
         seeMore: buildCustomCarouselUrl(
           untrusted<Record<string, unknown>>(rules),
           "created_at",
@@ -730,15 +724,17 @@ describe("scene", () => {
     const prodRules = untrusted<Record<string, unknown>>(
       JSON.parse(PROD_CAROUSEL.rules)
     );
+    const prodRead = carouselRulesToFilterState(prodRules);
     const prod = {
       rules: prodRules,
-      back: carouselRulesToFilterState(prodRules),
+      back: prodRead.state,
+      kept: prodRead.kept,
       seeMore: buildCustomCarouselUrl(
         prodRules,
         PROD_CAROUSEL.sort,
         PROD_CAROUSEL.direction
       ),
-      rebuilt: buildSceneFilter(carouselRulesToFilterState(prodRules)),
+      rebuilt: buildCarouselRules(prodRead.state, prodRead.kept),
     };
     const seeMoreCases = [
       { label: "no rules", rules: null, sort: undefined, direction: undefined },

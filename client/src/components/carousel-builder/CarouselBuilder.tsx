@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { PreviewCarouselResponse } from "@peek/shared-types";
 import {
@@ -13,11 +13,13 @@ import {
 import { libraryApi } from "../../api";
 import { useSaveCarousel } from "../../api/hooks/useCarousels";
 import {
+  CAROUSEL_FIELDS,
   CAROUSEL_FILTER_DEFINITIONS,
   SCENE_SORT_OPTIONS,
-  buildSceneFilter,
+  buildCarouselRules,
   carouselRulesToFilterState,
 } from "../../utils/filterConfig";
+import { type PanelState, codecOf } from "../../utils/filterFields";
 import { Button } from "../ui/index";
 import CarouselPreview from "./CarouselPreview";
 import IconPickerButton from "./IconPickerButton";
@@ -36,6 +38,53 @@ interface CarouselRule {
   depth?: number;
 }
 
+/** A modifier as a rule holds it: a string, else none */
+const modifierOf = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
+
+/** A depth as a rule holds it: a number, else none */
+const depthOf = (value: unknown): number | undefined =>
+  typeof value === "number" ? value : undefined;
+
+/**
+ * The builder's rules from the scene rows' state: one rule per row that
+ * filters, with its modifier and depth companions
+ */
+function convertFilterStateToRules(state: PanelState): CarouselRule[] {
+  return CAROUSEL_FIELDS.filter((row) => codecOf(row).isActive(row, state)).map(
+    (row) => ({
+      id: generateRuleId(),
+      filterKey: row.key,
+      value: state[row.key],
+      modifier:
+        row.modifierKey === undefined
+          ? undefined
+          : modifierOf(state[row.modifierKey]),
+      depth:
+        row.hierarchyKey === undefined
+          ? undefined
+          : depthOf(state[row.hierarchyKey]),
+    })
+  );
+}
+
+/** The scene rows' state from the builder's rules, for `buildCarouselRules` */
+function convertRulesToFilterState(rules: readonly CarouselRule[]): PanelState {
+  const state: Record<string, unknown> = {};
+  for (const rule of rules) {
+    const row = CAROUSEL_FIELDS.find((each) => each.key === rule.filterKey);
+    if (row === undefined) continue;
+    state[row.key] = rule.value;
+    if (row.modifierKey !== undefined && rule.modifier !== undefined) {
+      state[row.modifierKey] = rule.modifier;
+    }
+    if (row.hierarchyKey !== undefined && rule.depth !== undefined) {
+      state[row.hierarchyKey] = rule.depth;
+    }
+  }
+  return state;
+}
+
 /**
  * CarouselBuilder Component
  * Full-page editor for creating and editing custom carousels.
@@ -51,6 +100,8 @@ const CarouselBuilder = () => {
   const [title, setTitle] = useState("");
   const [icon, setIcon] = useState("Film");
   const [rules, setRules] = useState<CarouselRule[]>([]); // Array of rule objects
+  // Stored rules no row can edit: saved and previewed as they are
+  const [kept, setKept] = useState<Readonly<Record<string, unknown>>>({});
   const [sort, setSort] = useState("random");
   const [direction, setDirection] = useState("DESC");
 
@@ -78,10 +129,10 @@ const CarouselBuilder = () => {
         setSort(carousel.sort);
         setDirection(carousel.direction);
 
-        // Convert stored rules back to editable format
-        const filterState = carouselRulesToFilterState(carousel.rules);
-        const ruleList = convertFilterStateToRules(filterState);
-        setRules(ruleList);
+        // Convert stored rules back to editable format, keeping the rest
+        const stored = carouselRulesToFilterState(carousel.rules);
+        setRules(convertFilterStateToRules(stored.state));
+        setKept(stored.kept);
       } catch (err) {
         setError((err as Error).message || "Failed to load carousel");
       } finally {
@@ -91,177 +142,6 @@ const CarouselBuilder = () => {
 
     void loadCarousel();
   }, [id, isEditing]);
-
-  /**
-   * Convert filter state (flat object) to rule array for the editor
-   */
-  const convertFilterStateToRules = (
-    filterState: Record<string, unknown>
-  ): CarouselRule[] => {
-    const ruleList: CarouselRule[] = [];
-
-    // Entity selection rules
-    if ((filterState.performerIds as unknown[] | undefined)?.length) {
-      ruleList.push({
-        id: generateRuleId(),
-        filterKey: "performerIds",
-        value: filterState.performerIds,
-        modifier: (filterState.performerIdsModifier as string) || "INCLUDES",
-      });
-    }
-
-    if (filterState.studioId) {
-      ruleList.push({
-        id: generateRuleId(),
-        filterKey: "studioId",
-        value: filterState.studioId,
-        depth: filterState.studioIdDepth as number | undefined,
-      });
-    }
-
-    if ((filterState.tagIds as unknown[] | undefined)?.length) {
-      ruleList.push({
-        id: generateRuleId(),
-        filterKey: "tagIds",
-        value: filterState.tagIds,
-        modifier: (filterState.tagIdsModifier as string) || "INCLUDES_ALL",
-        depth: filterState.tagIdsDepth as number | undefined,
-      });
-    }
-
-    if ((filterState.groupIds as unknown[] | undefined)?.length) {
-      ruleList.push({
-        id: generateRuleId(),
-        filterKey: "groupIds",
-        value: filterState.groupIds,
-        modifier: (filterState.groupIdsModifier as string) || "INCLUDES",
-      });
-    }
-
-    // Range rules
-    [
-      "rating",
-      "oCount",
-      "duration",
-      "playCount",
-      "playDuration",
-      "performerCount",
-      "performerAge",
-      "bitrate",
-    ].forEach((key) => {
-      const val = filterState[key] as Record<string, unknown> | undefined;
-      if (val?.min !== undefined || val?.max !== undefined) {
-        ruleList.push({
-          id: generateRuleId(),
-          filterKey: key,
-          value: filterState[key],
-        });
-      }
-    });
-
-    // Boolean rules
-    ["favorite", "performerFavorite", "studioFavorite", "tagFavorite"].forEach(
-      (key) => {
-        if (filterState[key] === true) {
-          ruleList.push({
-            id: generateRuleId(),
-            filterKey: key,
-            value: true,
-          });
-        }
-      }
-    );
-
-    // Resolution
-    if (filterState.resolution) {
-      ruleList.push({
-        id: generateRuleId(),
-        filterKey: "resolution",
-        value: filterState.resolution,
-        modifier: (filterState.resolutionModifier as string) || "EQUALS",
-      });
-    }
-
-    // Text rules
-    ["title", "details"].forEach((key) => {
-      if (filterState[key]) {
-        ruleList.push({
-          id: generateRuleId(),
-          filterKey: key,
-          value: filterState[key],
-        });
-      }
-    });
-
-    // Date range rules
-    ["date", "createdAt", "lastPlayedAt"].forEach((key) => {
-      const val = filterState[key] as Record<string, unknown> | undefined;
-      if (val?.start || val?.end) {
-        ruleList.push({
-          id: generateRuleId(),
-          filterKey: key,
-          value: filterState[key],
-        });
-      }
-    });
-
-    return ruleList;
-  };
-
-  /**
-   * Convert rule array back to filter state for buildSceneFilter
-   */
-  const convertRulesToFilterState = useCallback(() => {
-    const filterState: Record<string, unknown> = {};
-
-    rules.forEach((rule) => {
-      const def = CAROUSEL_FILTER_DEFINITIONS.find(
-        (d) => d.key === rule.filterKey
-      );
-      if (!def) return;
-
-      switch (def.type) {
-        case "searchable-select":
-          if (def.multi) {
-            filterState[rule.filterKey] = rule.value || [];
-            if (def.modifierOptions && rule.modifier) {
-              filterState[`${rule.filterKey}Modifier`] = rule.modifier;
-            }
-          } else {
-            filterState[rule.filterKey] = rule.value || "";
-          }
-          if (def.supportsHierarchy && rule.depth !== undefined) {
-            filterState[`${rule.filterKey}Depth`] = rule.depth;
-          }
-          break;
-
-        case "range":
-          filterState[rule.filterKey] = rule.value || {};
-          break;
-
-        case "checkbox":
-          filterState[rule.filterKey] = rule.value === true;
-          break;
-
-        case "select":
-          filterState[rule.filterKey] = rule.value || "";
-          if (def.modifierOptions && rule.modifier) {
-            filterState[`${rule.filterKey}Modifier`] = rule.modifier;
-          }
-          break;
-
-        case "text":
-          filterState[rule.filterKey] = rule.value || "";
-          break;
-
-        case "date-range":
-          filterState[rule.filterKey] = rule.value || {};
-          break;
-      }
-    });
-
-    return filterState;
-  }, [rules]);
 
   /**
    * Add a new rule
@@ -324,8 +204,10 @@ const CarouselBuilder = () => {
     setPreviewError(null);
 
     try {
-      const filterState = convertRulesToFilterState();
-      const apiRules = buildSceneFilter(filterState);
+      const apiRules = buildCarouselRules(
+        convertRulesToFilterState(rules),
+        kept
+      );
 
       const result = await libraryApi.previewCarousel({
         rules: apiRules,
@@ -367,8 +249,10 @@ const CarouselBuilder = () => {
     setError(null);
 
     try {
-      const filterState = convertRulesToFilterState();
-      const apiRules = buildSceneFilter(filterState);
+      const apiRules = buildCarouselRules(
+        convertRulesToFilterState(rules),
+        kept
+      );
 
       const carouselData = {
         title: title.trim(),

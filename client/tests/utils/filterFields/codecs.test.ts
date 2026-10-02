@@ -119,15 +119,12 @@ describe("codecs", () => {
     );
   });
 
-  it("the members the chips and carousels fill say so", () => {
+  it("the member the chips fill says so", () => {
     const tags = rowOf("scene", "tagIds", "ref");
 
     expect(() => CODECS.ref.chip(tags, { kind: "ref" } as never, {})).toThrow(
       "chip: not yet"
     );
-    expect(() =>
-      CODECS.ref.fromCriterion(tags, { kind: "ref" } as never, {})
-    ).toThrow("fromCriterion: not yet");
   });
 });
 
