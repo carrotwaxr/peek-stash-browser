@@ -32,6 +32,7 @@ import {
   idClause,
   instanceClause,
   instanceColumnClause,
+  orientationClause,
   pairs,
   performerAgeExists,
   performerTagsClause,
@@ -2135,5 +2136,30 @@ describe("buildTextFilter STARTS_WITH", () => {
       "(p.name LIKE ? ESCAPE '\\' OR p.details LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(p.aliasList) THEN p.aliasList ELSE '[]' END) a WHERE a.value LIKE ? ESCAPE '\\'))"
     );
     expect(result.params).toEqual(["ab%", "ab%", "ab%"]);
+  });
+});
+
+describe("orientationClause", () => {
+  it("compares the two columns, any of several values", () => {
+    expect(
+      orientationClause(
+        { modifier: "INCLUDES", values: ["PORTRAIT"] },
+        "w",
+        "h"
+      )
+    ).toEqual({
+      sql: "((w < h))",
+      params: [],
+    });
+    expect(
+      orientationClause(
+        { modifier: "INCLUDES", values: ["SQUARE", "LANDSCAPE"] },
+        "i.w",
+        "i.h"
+      )
+    ).toEqual({
+      sql: "((i.w = i.h AND i.w > 0) OR (i.w > i.h))",
+      params: [],
+    });
   });
 });

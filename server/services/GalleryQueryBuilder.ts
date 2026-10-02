@@ -241,6 +241,27 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
 
     // Text
     title: (c) => buildTextFilter(c, galleryNameSql("g")),
+    details: (c) => buildTextFilter(c, "g.details"),
+    code: (c) => buildTextFilter(c, "g.code"),
+    photographer: (c) => buildTextFilter(c, "g.photographer"),
+    // A folder gallery's folder, a zip gallery's file
+    path: (c) =>
+      buildTextFilter(
+        c,
+        "COALESCE(NULLIF(g.folderPath, ''), NULLIF(g.filePath, ''))"
+      ),
+    url: (c) => buildTextFilter(c, null, { lists: ["g.urls"] }),
+
+    organized: (organized) => ({
+      sql: "g.organized = ?",
+      params: [organized ? 1 : 0],
+    }),
+    is_zip: (isZip) => ({
+      sql: isZip
+        ? "NULLIF(g.filePath, '') IS NOT NULL"
+        : "NULLIF(g.filePath, '') IS NULL",
+      params: [],
+    }),
 
     // Dates
     date: (c) => buildDayFilter(c, "g.date"),

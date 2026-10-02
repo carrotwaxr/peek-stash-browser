@@ -314,6 +314,19 @@ export const GALLERY_FIELDS = {
   ids: ref("gallery", { single: true }),
   instance_id: instance(),
   title: text(),
+  details: text(),
+  code: text(),
+  photographer: text(),
+  /**
+   * A folder gallery's folder path, a zip gallery's file path, as Peek
+   * stores them
+   */
+  path: path(),
+  /** Any one of the gallery's URLs, each matched on its own text */
+  url: text(),
+  organized: bool(),
+  /** Galleries that are one zip file (true) or a folder (false) */
+  is_zip: bool(),
   tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
   studios: ref("studio", {
     hierarchical: true,
@@ -339,6 +352,18 @@ export const GALLERY_FIELDS = {
 export const IMAGE_FIELDS = {
   ids: ref("image", { single: true }),
   instance_id: instance(),
+  title: text(),
+  details: text(),
+  code: text(),
+  photographer: text(),
+  /** The image file's path, as Peek stores it */
+  path: path(),
+  /** Any one of the image's URLs, each matched on its own text */
+  url: text(),
+  organized: bool(),
+  /** The shorter side of the image against Stash's resolution ranges */
+  resolution: enumOf(RESOLUTIONS, { modifiers: COMPARISON_MODIFIERS }),
+  orientation: enumOf(ORIENTATIONS, { multi: true }),
   tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
   studios: ref("studio", {
     hierarchical: true,

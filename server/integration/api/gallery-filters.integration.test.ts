@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { must } from "../../tests/helpers/must.js";
+import { parseListRequest } from "../../utils/listRequest.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
@@ -627,5 +631,330 @@ describe("Gallery Filters", () => {
       expect(aspectRatio).toBeGreaterThan(0);
       expect(Number.isFinite(aspectRatio)).toBe(true);
     });
+  });
+});
+
+/**
+ * Gallery details, code, photographer, path, URL, organized and is_zip
+ * (items 63 and 66), from the wire through the parser into the gallery
+ * builder, on seeded rows.
+ *
+ * Two made-up instances reusing ids, as two Stash servers do: spg-x and
+ * spg-y, both enabled and both selected by every viewer. Gallery ids are
+ * 7899000 + n. Users: A, whose hides are none, and B, who hid gallery 60@x.
+ * Every seeded row is deleted before the describe ends.
+ */
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
+
+const GX = "spg-x";
+const GY = "spg-y";
+const GALLERY_INSTANCES = [GX, GY];
+const GALLERY_PREFIX = "spg-it";
+const galleryId = (n: number) => String(7899000 + n);
+
+describeWithDb("Gallery own fields (seeded)", () => {
+  const user = { A: 0, B: 0 };
+
+  async function removeRows(): Promise<void> {
+    await prisma.user.deleteMany({
+      where: { username: { startsWith: GALLERY_PREFIX } },
+    });
+    await prisma.stashGallery.deleteMany({
+      where: { stashInstanceId: { in: GALLERY_INSTANCES } },
+    });
+    await prisma.stashInstance.deleteMany({
+      where: { id: { in: GALLERY_INSTANCES } },
+    });
+  }
+
+  /** The galleries of one instance a wire `gallery_filter` lists, as numbers; the count is checked */
+  async function ns(
+    viewer: number,
+    galleryFilter: Record<string, unknown>,
+    instance = GX
+  ): Promise<number[]> {
+    const request = parseListRequest(
+      "gallery",
+      { filter: { per_page: 250 }, gallery_filter: galleryFilter },
+      { userId: viewer }
+    );
+    const { items, total } = await galleryQueryBuilder.execute({
+      userId: viewer,
+      allowedInstanceIds: await getUserAllowedInstanceIds(viewer),
+      request,
+    });
+    expect(total).toBe(items.length);
+    return items
+      .filter((gallery) => gallery.instanceId === instance)
+      .map((gallery) => Number(gallery.id) - 7899000)
+      .sort((a, b) => a - b);
+  }
+
+  const text = (field: string, modifier: string, value?: string) => ({
+    [field]: value === undefined ? { modifier } : { value, modifier },
+  });
+
+  beforeAll(async () => {
+    await removeRows();
+
+    for (const [i, id] of GALLERY_INSTANCES.entries()) {
+      await prisma.stashInstance.create({
+        data: {
+          id,
+          name: id,
+          url: "http://127.0.0.1:9/graphql",
+          apiKey: "fixture-key",
+          enabled: true,
+          priority: 950 + i,
+          firstSyncedAt: new Date(),
+        },
+      });
+    }
+
+    const makeUser = async (name: string) =>
+      (
+        await prisma.user.create({
+          data: {
+            username: `${GALLERY_PREFIX}-${name}`,
+            password: "not-a-real-hash",
+            role: "USER",
+            stashInstances: {
+              create: GALLERY_INSTANCES.map((instanceId) => ({ instanceId })),
+            },
+          },
+        })
+      ).id;
+    user.A = await makeUser("a");
+    user.B = await makeUser("b");
+
+    const gallery = (
+      n: number,
+      instance: string,
+      extra: Record<string, unknown> = {}
+    ) => ({
+      id: galleryId(n),
+      stashInstanceId: instance,
+      title: `SPG ${n} ${instance}`,
+      ...extra,
+    });
+    await prisma.stashGallery.createMany({
+      data: [
+        // Details, codes, photographers: 1 holds an underscore, 2 a
+        // lookalike, 3 a percent
+        gallery(1, GX, { details: "d_1", code: "C_1", photographer: "p_1" }),
+        gallery(2, GX, { details: "dx1", code: "CX1", photographer: "px1" }),
+        gallery(3, GX, {
+          details: "100% detail",
+          code: "100%",
+          photographer: "100% shots",
+        }),
+        gallery(1, GY, { details: "d_1", code: "C_1", photographer: "p_1" }),
+        gallery(3, GY, { details: "100% elsewhere" }),
+        // Paths: folder galleries 4 to 7 and a zip 8 (its full path), 9 a zip
+        // whose name holds an underscore; 8 and 9 have no folder
+        gallery(4, GX, { folderPath: "/a_b/folder" }),
+        gallery(5, GX, { folderPath: "/axb/folder" }),
+        gallery(6, GX, { folderPath: "/z/a_b/folder" }),
+        gallery(7, GX, { folderPath: "/100%/folder" }),
+        gallery(8, GX, {
+          folderPath: null,
+          filePath: "/zips/set.zip",
+          fileBasename: "set.zip",
+        }),
+        gallery(9, GX, {
+          folderPath: null,
+          filePath: "/a_b/zips/set.zip",
+          fileBasename: "set.zip",
+        }),
+        gallery(4, GY, { folderPath: "/a_b/other" }),
+        gallery(8, GY, { filePath: "/100%/other.zip" }),
+        // URLs
+        gallery(10, GX, {
+          urls: JSON.stringify(["https://a.test/1", "https://example.com/2"]),
+        }),
+        gallery(11, GX, { urls: JSON.stringify(["https://other.test/"]) }),
+        gallery(12, GX, { urls: null }),
+        gallery(13, GX, { urls: "" }),
+        gallery(14, GX, { urls: "[]" }),
+        gallery(10, GY, { urls: JSON.stringify(["https://nothing.test/"]) }),
+        // Organized
+        gallery(20, GX, { organized: true }),
+        gallery(21, GX),
+        gallery(20, GY),
+        // Hidden by B, with every field set
+        gallery(60, GX, {
+          details: "hidden details",
+          code: "HID",
+          photographer: "hidden photographer",
+          folderPath: "/hidden/folder",
+          urls: JSON.stringify(["https://hidden.test/"]),
+          organized: false,
+        }),
+        gallery(61, GX, {
+          folderPath: null,
+          filePath: "/hidden/zip.zip",
+          fileBasename: "zip.zip",
+        }),
+      ],
+    });
+
+    for (const n of [60, 61]) {
+      await prisma.userHiddenEntity.create({
+        data: {
+          userId: user.B,
+          entityType: "gallery",
+          entityId: galleryId(n),
+          instanceId: GX,
+        },
+      });
+      await prisma.userExcludedEntity.create({
+        data: {
+          userId: user.B,
+          entityType: "gallery",
+          entityId: galleryId(n),
+          instanceId: GX,
+          reason: "hidden",
+        },
+      });
+    }
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  it("details, code and photographer match literally, per instance", async () => {
+    for (const field of ["details", "code", "photographer"]) {
+      const underscore = { details: "d_", code: "C_", photographer: "p_" }[
+        field
+      ] as string;
+      expect(await ns(user.A, text(field, "INCLUDES", underscore))).toEqual([
+        1,
+      ]);
+      expect(await ns(user.A, text(field, "INCLUDES", underscore), GY)).toEqual(
+        [1]
+      );
+    }
+    expect(await ns(user.A, text("details", "INCLUDES", "100%"))).toEqual([3]);
+    expect(await ns(user.A, text("details", "INCLUDES", "100%"), GY)).toEqual([
+      3,
+    ]);
+    expect(await ns(user.A, text("code", "EQUALS", "C_1"))).toEqual([1]);
+    expect(await ns(user.A, text("code", "EQUALS", "C%"))).toEqual([]);
+    expect(await ns(user.A, text("photographer", "EQUALS", "p_1"))).toEqual([
+      1,
+    ]);
+    expect(
+      await ns(user.A, text("photographer", "NOT_EQUALS", "p_1"))
+    ).not.toContain(1);
+  });
+
+  it("path STARTS_WITH matches a folder gallery and a zip gallery by its full path", async () => {
+    // A folder gallery by its folder, a zip gallery by its file's path
+    expect(await ns(user.A, text("path", "STARTS_WITH", "/a_b/"))).toEqual([
+      4, 9,
+    ]);
+    expect(await ns(user.A, text("path", "STARTS_WITH", "/zips/"))).toEqual([
+      8,
+    ]);
+    expect(await ns(user.A, text("path", "EQUALS", "/zips/set.zip"))).toEqual([
+      8,
+    ]);
+    expect(await ns(user.A, text("path", "EQUALS", "/a_b/folder"))).toEqual([
+      4,
+    ]);
+    expect(await ns(user.A, text("path", "STARTS_WITH", "/z/"))).toEqual([6]);
+    // The same id on the other instance is another gallery
+    expect(await ns(user.A, text("path", "STARTS_WITH", "/a_b/"), GY)).toEqual([
+      4,
+    ]);
+    // A literal percent, in a folder and in a zip's path
+    expect(await ns(user.A, text("path", "INCLUDES", "%"))).toEqual([7]);
+    expect(await ns(user.A, text("path", "INCLUDES", "%"), GY)).toEqual([8]);
+  });
+
+  it("is_zip matches the galleries that are one file", async () => {
+    const zips = await ns(user.A, { is_zip: true });
+    expect(zips).toEqual([8, 9, 61]);
+    const folders = await ns(user.A, { is_zip: false });
+    expect(folders).toEqual(expect.arrayContaining([4, 5, 6, 7, 10, 60]));
+    expect(folders).not.toContain(8);
+    expect(await ns(user.A, { is_zip: true }, GY)).toEqual([8]);
+    // The two together are every gallery of the instance
+    expect(zips.length + folders.length).toBe((await ns(user.A, {})).length);
+  });
+
+  it("url matches any of the gallery's URLs, not the JSON text", async () => {
+    expect(await ns(user.A, text("url", "INCLUDES", '"'))).toEqual([]);
+    expect(await ns(user.A, text("url", "INCLUDES", "]"))).toEqual([]);
+    expect(await ns(user.A, text("url", "INCLUDES", "example.com"))).toEqual([
+      10,
+    ]);
+    expect(
+      await ns(user.A, text("url", "INCLUDES", "nothing.test"), GY)
+    ).toEqual([10]);
+    expect(await ns(user.A, text("url", "INCLUDES", "nothing.test"))).toEqual(
+      []
+    );
+    expect(
+      await ns(user.A, text("url", "EQUALS", "https://other.test/"))
+    ).toEqual([11]);
+    expect(await ns(user.A, text("url", "IS_NULL"))).toEqual(
+      expect.arrayContaining([12, 13, 14])
+    );
+    expect(await ns(user.A, text("url", "IS_NULL"))).not.toContain(10);
+    expect(await ns(user.A, text("url", "NOT_NULL"))).toEqual(
+      expect.arrayContaining([10, 11])
+    );
+    expect(
+      await ns(user.A, text("url", "EXCLUDES", "example.com"))
+    ).not.toContain(10);
+  });
+
+  it("organized false matches the default and true the marked", async () => {
+    expect(await ns(user.A, { organized: true })).toEqual([20]);
+    expect(await ns(user.A, { organized: false })).toEqual(
+      expect.arrayContaining([21])
+    );
+    expect(await ns(user.A, { organized: false })).not.toContain(20);
+    expect(await ns(user.A, { organized: true }, GY)).toEqual([]);
+    expect(await ns(user.A, { organized: false }, GY)).toContain(20);
+  });
+
+  it("a gallery the viewer hid is never listed under a new field", async () => {
+    for (const filter of [
+      text("details", "INCLUDES", "hidden"),
+      text("code", "EQUALS", "HID"),
+      text("photographer", "INCLUDES", "hidden"),
+      text("path", "STARTS_WITH", "/hidden/"),
+      text("url", "INCLUDES", "hidden.test"),
+      { organized: false },
+      { is_zip: false },
+      { is_zip: true },
+    ]) {
+      const seen = await ns(user.A, filter);
+      expect(
+        seen.includes(60) || seen.includes(61),
+        JSON.stringify(filter)
+      ).toBe(true);
+      const hidden = await ns(user.B, filter);
+      expect(hidden, JSON.stringify(filter)).not.toContain(60);
+      expect(hidden, JSON.stringify(filter)).not.toContain(61);
+    }
+    // The negative forms never list them either
+    for (const filter of [
+      text("path", "EXCLUDES", "zzz"),
+      text("path", "NOT_EQUALS", "zzz"),
+      text("url", "EXCLUDES", "zzz"),
+      text("url", "NOT_NULL"),
+      text("code", "NOT_NULL"),
+      { is_zip: false },
+      { is_zip: true },
+      { organized: false },
+    ]) {
+      const hidden = await ns(user.B, filter);
+      expect(hidden, JSON.stringify(filter)).not.toContain(60);
+      expect(hidden, JSON.stringify(filter)).not.toContain(61);
+    }
   });
 });
