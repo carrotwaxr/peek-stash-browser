@@ -61,7 +61,7 @@ const ROUND_TRIPS: Record<
     state: { rating: { min: 60, max: 90 } },
   },
   oCount: {
-    rules: { o_counter: { modifier: "GREATER_THAN", value: 2 } },
+    rules: { o_counter: { modifier: "BETWEEN", value: 3 } },
     state: { oCount: { min: 3 } },
   },
   duration: {
@@ -85,11 +85,11 @@ const ROUND_TRIPS: Record<
     state: { date: { start: "2020-01-01", end: "2020-12-31" } },
   },
   createdAt: {
-    rules: { created_at: { modifier: "GREATER_THAN", value: "2024-01-01" } },
+    rules: { created_at: { modifier: "BETWEEN", value: "2024-01-01" } },
     state: { createdAt: { start: "2024-01-01" } },
   },
   updatedAt: {
-    rules: { updated_at: { modifier: "LESS_THAN", value: "2025-06-30" } },
+    rules: { updated_at: { modifier: "BETWEEN", value2: "2025-06-30" } },
     state: { updatedAt: { end: "2025-06-30" } },
   },
   lastPlayedAt: {
@@ -113,7 +113,7 @@ const ROUND_TRIPS: Record<
     state: { bitrate: { min: 2, max: 8 } },
   },
   framerate: {
-    rules: { framerate: { modifier: "LESS_THAN", value: 31 } },
+    rules: { framerate: { modifier: "BETWEEN", value2: 30 } },
     state: { framerate: { max: 30 } },
   },
   orientation: {
@@ -133,7 +133,7 @@ const ROUND_TRIPS: Record<
     state: { director: "Smith" },
   },
   playDuration: {
-    rules: { play_duration: { modifier: "GREATER_THAN", value: 299 } },
+    rules: { play_duration: { modifier: "BETWEEN", value: 300 } },
     state: { playDuration: { min: 5 } },
   },
   playCount: {
@@ -141,7 +141,7 @@ const ROUND_TRIPS: Record<
     state: { playCount: { min: 1, max: 4 } },
   },
   performerCount: {
-    rules: { performer_count: { modifier: "LESS_THAN", value: 3 } },
+    rules: { performer_count: { modifier: "BETWEEN", value2: 2 } },
     state: { performerCount: { max: 2 } },
   },
   performerAge: {
@@ -149,7 +149,7 @@ const ROUND_TRIPS: Record<
     state: { performerAge: { min: 20, max: 30 } },
   },
   tagCount: {
-    rules: { tag_count: { modifier: "GREATER_THAN", value: 4 } },
+    rules: { tag_count: { modifier: "BETWEEN", value: 5 } },
     state: { tagCount: { min: 5 } },
   },
 };
@@ -252,6 +252,66 @@ describe("carousel rules", () => {
       performerIdsModifier: "INCLUDES",
     });
     expect(kept).toEqual({});
+  });
+
+  it("reads a one-sided BETWEEN back as a min or a max, decimals kept", () => {
+    const { state, kept } = carouselRulesToFilterState({
+      framerate: { modifier: "BETWEEN", value: 29.97 },
+      o_counter: { modifier: "BETWEEN", value2: 9 },
+      created_at: { modifier: "BETWEEN", value: "2024-05-15" },
+      updated_at: { modifier: "BETWEEN", value2: "2024-05-20" },
+    });
+
+    expect(state).toEqual({
+      framerate: { min: 29.97 },
+      oCount: { max: 9 },
+      createdAt: { start: "2024-05-15" },
+      updatedAt: { end: "2024-05-20" },
+    });
+    expect(kept).toEqual({});
+  });
+
+  it("a decimal bound survives an edit", () => {
+    const stored = { framerate: { modifier: "BETWEEN", value: 29.97 } };
+
+    const { state } = carouselRulesToFilterState(stored);
+
+    expect(buildSceneFilter(state)).toEqual(stored);
+  });
+
+  it("reads an old lone number bound back: GREATER_THAN 14 is a min of 15", () => {
+    const { state, kept } = carouselRulesToFilterState({
+      o_counter: { modifier: "GREATER_THAN", value: 14 },
+      tag_count: { modifier: "LESS_THAN", value: 9 },
+    });
+
+    expect(state).toEqual({ oCount: { min: 15 }, tagCount: { max: 8 } });
+    expect(kept).toEqual({});
+  });
+
+  it("reads an old calendar-date GREATER_THAN as the next day, a timestamp one as that day", () => {
+    const { state, kept } = carouselRulesToFilterState({
+      date: { modifier: "GREATER_THAN", value: "2024-05-15" },
+      created_at: { modifier: "GREATER_THAN", value: "2024-05-15" },
+      updated_at: { modifier: "GREATER_THAN", value: "2024-05-15" },
+      last_played_at: { modifier: "GREATER_THAN", value: "2024-05-15" },
+    });
+
+    expect(state).toEqual({
+      date: { start: "2024-05-16" },
+      createdAt: { start: "2024-05-15" },
+      updatedAt: { start: "2024-05-15" },
+      lastPlayedAt: { start: "2024-05-15" },
+    });
+    expect(kept).toEqual({});
+  });
+
+  it("reads an old date LESS_THAN as the end day", () => {
+    const { state } = carouselRulesToFilterState({
+      date: { modifier: "LESS_THAN", value: "2024-05-20" },
+    });
+
+    expect(state).toEqual({ date: { end: "2024-05-20" } });
   });
 
   it("reads nothing from no rules", () => {

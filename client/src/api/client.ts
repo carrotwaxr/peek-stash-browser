@@ -116,9 +116,12 @@ export function getErrorMessage(
   return fallback;
 }
 
-/** The request's headers: JSON by default, and the caller's on top. */
+/** The request's headers: JSON by default, the browser's time zone, and the caller's on top. */
 function requestHeaders(callerHeaders: HeadersInit | undefined): Headers {
   const headers = new Headers({ "Content-Type": "application/json" });
+  // The server reads a date filter's day in the viewer's zone
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (timeZone) headers.set("X-Peek-Time-Zone", timeZone);
   new Headers(callerHeaders).forEach((value, name) => {
     headers.set(name, value);
   });

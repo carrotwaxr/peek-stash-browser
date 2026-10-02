@@ -635,7 +635,7 @@ describe("SearchControls", () => {
       const user = userEvent.setup();
       const list = renderSearchControls({}, { url: "/scenes?rating_min=40" });
       expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
-        rating100: { modifier: "GREATER_THAN", value: 39 },
+        rating100: { modifier: "BETWEEN", value: 40 },
       });
 
       await user.click(must(screen.getByText("Filters").closest("button")));

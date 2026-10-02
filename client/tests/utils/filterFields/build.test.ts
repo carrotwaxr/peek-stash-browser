@@ -101,6 +101,55 @@ describe("buildPanelFilter", () => {
     });
   });
 
+  it("a lone minimum is an inclusive one-sided BETWEEN and keeps its decimals", () => {
+    expect(
+      buildPanelFilter("performer", { penisLength: { min: "14.5" } })
+    ).toEqual({ penis_length: { modifier: "BETWEEN", value: 14.5 } });
+    expect(
+      buildPanelFilter("performer", { penisLength: { min: 15.24 } })
+    ).toEqual({ penis_length: { modifier: "BETWEEN", value: 15.24 } });
+  });
+
+  it("a lone maximum is an inclusive one-sided BETWEEN with value2 only", () => {
+    expect(buildPanelFilter("scene", { oCount: { max: "60" } })).toEqual({
+      o_counter: { modifier: "BETWEEN", value2: 60 },
+    });
+  });
+
+  it("both bounds BETWEEN them, decimals kept", () => {
+    expect(
+      buildPanelFilter("performer", { penisLength: { min: "14.5", max: "20" } })
+    ).toEqual({
+      penis_length: { modifier: "BETWEEN", value: 14.5, value2: 20 },
+    });
+  });
+
+  it("a scaled bound carries no float noise", () => {
+    expect(buildPanelFilter("scene", { bitrate: { min: "1.1" } })).toEqual({
+      bitrate: { modifier: "BETWEEN", value: 1_100_000 },
+    });
+  });
+
+  it("a date From alone is a one-sided BETWEEN, To alone value2", () => {
+    expect(
+      buildPanelFilter("scene", { createdAt: { start: "2024-05-15" } })
+    ).toEqual({ created_at: { modifier: "BETWEEN", value: "2024-05-15" } });
+    expect(buildPanelFilter("scene", { date: { end: "2024-05-20" } })).toEqual({
+      date: { modifier: "BETWEEN", value2: "2024-05-20" },
+    });
+    expect(
+      buildPanelFilter("scene", {
+        updatedAt: { start: "2024-05-15", end: "2024-05-20" },
+      })
+    ).toEqual({
+      updated_at: {
+        modifier: "BETWEEN",
+        value: "2024-05-15",
+        value2: "2024-05-20",
+      },
+    });
+  });
+
   it("a permanent undefined locks without sending", () => {
     const request = buildPanelFilter("scene", {
       tagged: false,

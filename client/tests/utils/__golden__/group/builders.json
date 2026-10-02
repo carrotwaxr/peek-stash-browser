@@ -344,8 +344,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       }
     },
@@ -359,8 +359,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       }
     },
@@ -476,8 +476,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       }
     },
@@ -490,8 +490,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       }
     },
@@ -520,8 +520,8 @@
       },
       "request": {
         "scene_count": {
-          "modifier": "GREATER_THAN",
-          "value": 249
+          "modifier": "BETWEEN",
+          "value": 250
         }
       }
     },
@@ -534,8 +534,8 @@
       },
       "request": {
         "scene_count": {
-          "modifier": "LESS_THAN",
-          "value": 751
+          "modifier": "BETWEEN",
+          "value2": 750
         }
       }
     },
@@ -565,8 +565,8 @@
       },
       "request": {
         "duration": {
-          "modifier": "GREATER_THAN",
-          "value": 4559
+          "modifier": "BETWEEN",
+          "value": 4560
         }
       }
     },
@@ -580,8 +580,8 @@
       },
       "request": {
         "duration": {
-          "modifier": "LESS_THAN",
-          "value": 13501
+          "modifier": "BETWEEN",
+          "value2": 13500
         }
       }
     },
@@ -697,8 +697,8 @@
       },
       "request": {
         "duration": {
-          "modifier": "GREATER_THAN",
-          "value": 4559
+          "modifier": "BETWEEN",
+          "value": 4560
         }
       }
     },
@@ -711,8 +711,8 @@
       },
       "request": {
         "duration": {
-          "modifier": "LESS_THAN",
-          "value": 13501
+          "modifier": "BETWEEN",
+          "value2": 13500
         }
       }
     },
@@ -750,7 +750,7 @@
       },
       "request": {
         "date": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -764,8 +764,8 @@
       },
       "request": {
         "date": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -794,7 +794,7 @@
       },
       "request": {
         "created_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -808,8 +808,8 @@
       },
       "request": {
         "created_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -838,7 +838,7 @@
       },
       "request": {
         "updated_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -852,8 +852,8 @@
       },
       "request": {
         "updated_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },

@@ -18,7 +18,7 @@ const CAROUSEL = {
   userId: 1,
   title: "Highly rated",
   icon: "Film",
-  rules: { rating100: { value: 79, modifier: "GREATER_THAN" } },
+  rules: { rating100: { modifier: "BETWEEN", value: 80 } },
   sort: "random",
   direction: "DESC",
   createdAt: "2026-01-01T00:00:00.000Z",

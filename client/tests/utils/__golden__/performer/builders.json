@@ -394,8 +394,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       }
     },
@@ -409,8 +409,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       }
     },
@@ -526,8 +526,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       }
     },
@@ -540,8 +540,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       }
     },
@@ -570,8 +570,8 @@
       },
       "request": {
         "o_counter": {
-          "modifier": "GREATER_THAN",
-          "value": 249
+          "modifier": "BETWEEN",
+          "value": 250
         }
       }
     },
@@ -584,8 +584,8 @@
       },
       "request": {
         "o_counter": {
-          "modifier": "LESS_THAN",
-          "value": 751
+          "modifier": "BETWEEN",
+          "value2": 750
         }
       }
     },
@@ -614,8 +614,8 @@
       },
       "request": {
         "scene_count": {
-          "modifier": "GREATER_THAN",
-          "value": 249
+          "modifier": "BETWEEN",
+          "value": 250
         }
       }
     },
@@ -628,8 +628,8 @@
       },
       "request": {
         "scene_count": {
-          "modifier": "LESS_THAN",
-          "value": 751
+          "modifier": "BETWEEN",
+          "value2": 750
         }
       }
     },
@@ -667,8 +667,8 @@
       },
       "request": {
         "age": {
-          "modifier": "GREATER_THAN",
-          "value": 38
+          "modifier": "BETWEEN",
+          "value": 39
         }
       }
     },
@@ -681,8 +681,8 @@
       },
       "request": {
         "age": {
-          "modifier": "LESS_THAN",
-          "value": 81
+          "modifier": "BETWEEN",
+          "value2": 80
         }
       }
     },
@@ -711,8 +711,8 @@
       },
       "request": {
         "birth_year": {
-          "modifier": "GREATER_THAN",
-          "value": 1927
+          "modifier": "BETWEEN",
+          "value": 1928
         }
       }
     },
@@ -725,8 +725,8 @@
       },
       "request": {
         "birth_year": {
-          "modifier": "LESS_THAN",
-          "value": 1984
+          "modifier": "BETWEEN",
+          "value2": 1983
         }
       }
     },
@@ -755,8 +755,8 @@
       },
       "request": {
         "death_year": {
-          "modifier": "GREATER_THAN",
-          "value": 1949
+          "modifier": "BETWEEN",
+          "value": 1950
         }
       }
     },
@@ -769,8 +769,8 @@
       },
       "request": {
         "death_year": {
-          "modifier": "LESS_THAN",
-          "value": 2051
+          "modifier": "BETWEEN",
+          "value2": 2050
         }
       }
     },
@@ -800,8 +800,8 @@
       },
       "request": {
         "career_length": {
-          "modifier": "GREATER_THAN",
-          "value": 12
+          "modifier": "BETWEEN",
+          "value": 13
         }
       }
     },
@@ -815,8 +815,8 @@
       },
       "request": {
         "career_length": {
-          "modifier": "LESS_THAN",
-          "value": 39
+          "modifier": "BETWEEN",
+          "value2": 38
         }
       }
     },
@@ -932,8 +932,8 @@
       },
       "request": {
         "career_length": {
-          "modifier": "GREATER_THAN",
-          "value": 12
+          "modifier": "BETWEEN",
+          "value": 13
         }
       }
     },
@@ -946,8 +946,8 @@
       },
       "request": {
         "career_length": {
-          "modifier": "LESS_THAN",
-          "value": 39
+          "modifier": "BETWEEN",
+          "value2": 38
         }
       }
     },
@@ -976,7 +976,7 @@
       },
       "request": {
         "birthdate": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -990,8 +990,8 @@
       },
       "request": {
         "birthdate": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -1020,7 +1020,7 @@
       },
       "request": {
         "death_date": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -1034,8 +1034,8 @@
       },
       "request": {
         "death_date": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -1064,7 +1064,7 @@
       },
       "request": {
         "created_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -1078,8 +1078,8 @@
       },
       "request": {
         "created_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -1108,7 +1108,7 @@
       },
       "request": {
         "updated_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -1122,8 +1122,8 @@
       },
       "request": {
         "updated_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -1489,8 +1489,8 @@
       },
       "request": {
         "height": {
-          "modifier": "GREATER_THAN",
-          "value": 137
+          "modifier": "BETWEEN",
+          "value": 138
         }
       }
     },
@@ -1504,8 +1504,8 @@
       },
       "request": {
         "height": {
-          "modifier": "LESS_THAN",
-          "value": 214
+          "modifier": "BETWEEN",
+          "value2": 213
         }
       }
     },
@@ -1621,8 +1621,8 @@
       },
       "request": {
         "height": {
-          "modifier": "GREATER_THAN",
-          "value": 137
+          "modifier": "BETWEEN",
+          "value": 138
         }
       }
     },
@@ -1635,8 +1635,8 @@
       },
       "request": {
         "height": {
-          "modifier": "LESS_THAN",
-          "value": 214
+          "modifier": "BETWEEN",
+          "value2": 213
         }
       }
     },
@@ -1666,8 +1666,8 @@
       },
       "request": {
         "weight": {
-          "modifier": "GREATER_THAN",
-          "value": 72
+          "modifier": "BETWEEN",
+          "value": 73
         }
       }
     },
@@ -1681,8 +1681,8 @@
       },
       "request": {
         "weight": {
-          "modifier": "LESS_THAN",
-          "value": 159
+          "modifier": "BETWEEN",
+          "value2": 158
         }
       }
     },
@@ -1798,8 +1798,8 @@
       },
       "request": {
         "weight": {
-          "modifier": "GREATER_THAN",
-          "value": 72
+          "modifier": "BETWEEN",
+          "value": 73
         }
       }
     },
@@ -1812,8 +1812,8 @@
       },
       "request": {
         "weight": {
-          "modifier": "LESS_THAN",
-          "value": 159
+          "modifier": "BETWEEN",
+          "value2": 158
         }
       }
     },
@@ -1843,8 +1843,8 @@
       },
       "request": {
         "penis_length": {
-          "modifier": "GREATER_THAN",
-          "value": 9
+          "modifier": "BETWEEN",
+          "value": 10
         }
       }
     },
@@ -1858,8 +1858,8 @@
       },
       "request": {
         "penis_length": {
-          "modifier": "LESS_THAN",
-          "value": 31
+          "modifier": "BETWEEN",
+          "value2": 30
         }
       }
     },
@@ -1975,8 +1975,8 @@
       },
       "request": {
         "penis_length": {
-          "modifier": "GREATER_THAN",
-          "value": 9
+          "modifier": "BETWEEN",
+          "value": 10
         }
       }
     },
@@ -1989,8 +1989,8 @@
       },
       "request": {
         "penis_length": {
-          "modifier": "LESS_THAN",
-          "value": 31
+          "modifier": "BETWEEN",
+          "value2": 30
         }
       }
     },
@@ -2019,8 +2019,8 @@
       },
       "request": {
         "play_count": {
-          "modifier": "GREATER_THAN",
-          "value": 249
+          "modifier": "BETWEEN",
+          "value": 250
         }
       }
     },
@@ -2033,8 +2033,8 @@
       },
       "request": {
         "play_count": {
-          "modifier": "LESS_THAN",
-          "value": 751
+          "modifier": "BETWEEN",
+          "value2": 750
         }
       }
     },
@@ -2080,8 +2080,8 @@
         },
         "request": {
           "height": {
-            "modifier": "GREATER_THAN",
-            "value": 166
+            "modifier": "BETWEEN",
+            "value": 167
           }
         }
       },
@@ -2095,8 +2095,8 @@
         },
         "request": {
           "height": {
-            "modifier": "LESS_THAN",
-            "value": 190
+            "modifier": "BETWEEN",
+            "value2": 189
           }
         }
       },
@@ -2212,8 +2212,8 @@
         },
         "request": {
           "height": {
-            "modifier": "GREATER_THAN",
-            "value": 166
+            "modifier": "BETWEEN",
+            "value": 167
           }
         }
       },
@@ -2226,8 +2226,8 @@
         },
         "request": {
           "height": {
-            "modifier": "LESS_THAN",
-            "value": 190
+            "modifier": "BETWEEN",
+            "value2": 189
           }
         }
       },
@@ -2257,8 +2257,8 @@
         },
         "request": {
           "weight": {
-            "modifier": "GREATER_THAN",
-            "value": 162
+            "modifier": "BETWEEN",
+            "value": 163
           }
         }
       },
@@ -2272,8 +2272,8 @@
         },
         "request": {
           "weight": {
-            "modifier": "LESS_THAN",
-            "value": 389
+            "modifier": "BETWEEN",
+            "value2": 388
           }
         }
       },
@@ -2389,8 +2389,8 @@
         },
         "request": {
           "weight": {
-            "modifier": "GREATER_THAN",
-            "value": 162
+            "modifier": "BETWEEN",
+            "value": 163
           }
         }
       },
@@ -2403,8 +2403,8 @@
         },
         "request": {
           "weight": {
-            "modifier": "LESS_THAN",
-            "value": 389
+            "modifier": "BETWEEN",
+            "value2": 388
           }
         }
       },
@@ -2434,8 +2434,8 @@
         },
         "request": {
           "penis_length": {
-            "modifier": "GREATER_THAN",
-            "value": 4
+            "modifier": "BETWEEN",
+            "value": 5
           }
         }
       },
@@ -2449,8 +2449,8 @@
         },
         "request": {
           "penis_length": {
-            "modifier": "LESS_THAN",
-            "value": 13
+            "modifier": "BETWEEN",
+            "value2": 12
           }
         }
       },
@@ -2566,8 +2566,8 @@
         },
         "request": {
           "penis_length": {
-            "modifier": "GREATER_THAN",
-            "value": 4
+            "modifier": "BETWEEN",
+            "value": 5
           }
         }
       },
@@ -2580,8 +2580,8 @@
         },
         "request": {
           "penis_length": {
-            "modifier": "LESS_THAN",
-            "value": 13
+            "modifier": "BETWEEN",
+            "value2": 12
           }
         }
       },
@@ -2613,8 +2613,8 @@
         },
         "request": {
           "height": {
-            "modifier": "GREATER_THAN",
-            "value": 137
+            "modifier": "BETWEEN",
+            "value": 138
           }
         }
       },
@@ -2628,8 +2628,8 @@
         },
         "request": {
           "height": {
-            "modifier": "LESS_THAN",
-            "value": 214
+            "modifier": "BETWEEN",
+            "value2": 213
           }
         }
       },
@@ -2745,8 +2745,8 @@
         },
         "request": {
           "height": {
-            "modifier": "GREATER_THAN",
-            "value": 137
+            "modifier": "BETWEEN",
+            "value": 138
           }
         }
       },
@@ -2759,8 +2759,8 @@
         },
         "request": {
           "height": {
-            "modifier": "LESS_THAN",
-            "value": 214
+            "modifier": "BETWEEN",
+            "value2": 213
           }
         }
       },
@@ -2790,8 +2790,8 @@
         },
         "request": {
           "weight": {
-            "modifier": "GREATER_THAN",
-            "value": 72
+            "modifier": "BETWEEN",
+            "value": 73
           }
         }
       },
@@ -2805,8 +2805,8 @@
         },
         "request": {
           "weight": {
-            "modifier": "LESS_THAN",
-            "value": 159
+            "modifier": "BETWEEN",
+            "value2": 158
           }
         }
       },
@@ -2922,8 +2922,8 @@
         },
         "request": {
           "weight": {
-            "modifier": "GREATER_THAN",
-            "value": 72
+            "modifier": "BETWEEN",
+            "value": 73
           }
         }
       },
@@ -2936,8 +2936,8 @@
         },
         "request": {
           "weight": {
-            "modifier": "LESS_THAN",
-            "value": 159
+            "modifier": "BETWEEN",
+            "value2": 158
           }
         }
       },
@@ -2967,8 +2967,8 @@
         },
         "request": {
           "penis_length": {
-            "modifier": "GREATER_THAN",
-            "value": 9
+            "modifier": "BETWEEN",
+            "value": 10
           }
         }
       },
@@ -2982,8 +2982,8 @@
         },
         "request": {
           "penis_length": {
-            "modifier": "LESS_THAN",
-            "value": 31
+            "modifier": "BETWEEN",
+            "value2": 30
           }
         }
       },
@@ -3099,8 +3099,8 @@
         },
         "request": {
           "penis_length": {
-            "modifier": "GREATER_THAN",
-            "value": 9
+            "modifier": "BETWEEN",
+            "value": 10
           }
         }
       },
@@ -3113,8 +3113,8 @@
         },
         "request": {
           "penis_length": {
-            "modifier": "LESS_THAN",
-            "value": 31
+            "modifier": "BETWEEN",
+            "value2": 30
           }
         }
       },

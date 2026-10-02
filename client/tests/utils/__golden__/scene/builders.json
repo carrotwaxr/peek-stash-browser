@@ -612,8 +612,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       }
     },
@@ -627,8 +627,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       }
     },
@@ -744,8 +744,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       }
     },
@@ -758,8 +758,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       }
     },
@@ -788,8 +788,8 @@
       },
       "request": {
         "o_counter": {
-          "modifier": "GREATER_THAN",
-          "value": 74
+          "modifier": "BETWEEN",
+          "value": 75
         }
       }
     },
@@ -802,8 +802,8 @@
       },
       "request": {
         "o_counter": {
-          "modifier": "LESS_THAN",
-          "value": 226
+          "modifier": "BETWEEN",
+          "value2": 225
         }
       }
     },
@@ -832,8 +832,8 @@
       },
       "request": {
         "duration": {
-          "modifier": "GREATER_THAN",
-          "value": 4559
+          "modifier": "BETWEEN",
+          "value": 4560
         }
       }
     },
@@ -846,8 +846,8 @@
       },
       "request": {
         "duration": {
-          "modifier": "LESS_THAN",
-          "value": 13501
+          "modifier": "BETWEEN",
+          "value2": 13500
         }
       }
     },
@@ -912,7 +912,7 @@
       },
       "request": {
         "date": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -926,8 +926,8 @@
       },
       "request": {
         "date": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -956,7 +956,7 @@
       },
       "request": {
         "created_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -970,8 +970,8 @@
       },
       "request": {
         "created_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -1000,7 +1000,7 @@
       },
       "request": {
         "updated_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -1014,8 +1014,8 @@
       },
       "request": {
         "updated_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -1044,7 +1044,7 @@
       },
       "request": {
         "last_played_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -1058,8 +1058,8 @@
       },
       "request": {
         "last_played_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -1984,8 +1984,8 @@
       },
       "request": {
         "bitrate": {
-          "modifier": "GREATER_THAN",
-          "value": 24999999
+          "modifier": "BETWEEN",
+          "value": 25000000
         }
       }
     },
@@ -1998,8 +1998,8 @@
       },
       "request": {
         "bitrate": {
-          "modifier": "LESS_THAN",
-          "value": 75000001
+          "modifier": "BETWEEN",
+          "value2": 75000000
         }
       }
     },
@@ -2028,8 +2028,8 @@
       },
       "request": {
         "framerate": {
-          "modifier": "GREATER_THAN",
-          "value": 29
+          "modifier": "BETWEEN",
+          "value": 30
         }
       }
     },
@@ -2042,8 +2042,8 @@
       },
       "request": {
         "framerate": {
-          "modifier": "LESS_THAN",
-          "value": 91
+          "modifier": "BETWEEN",
+          "value2": 90
         }
       }
     },
@@ -2147,8 +2147,8 @@
       },
       "request": {
         "play_duration": {
-          "modifier": "GREATER_THAN",
-          "value": 4559
+          "modifier": "BETWEEN",
+          "value": 4560
         }
       }
     },
@@ -2161,8 +2161,8 @@
       },
       "request": {
         "play_duration": {
-          "modifier": "LESS_THAN",
-          "value": 13501
+          "modifier": "BETWEEN",
+          "value2": 13500
         }
       }
     },
@@ -2191,8 +2191,8 @@
       },
       "request": {
         "play_count": {
-          "modifier": "GREATER_THAN",
-          "value": 249
+          "modifier": "BETWEEN",
+          "value": 250
         }
       }
     },
@@ -2205,8 +2205,8 @@
       },
       "request": {
         "play_count": {
-          "modifier": "LESS_THAN",
-          "value": 751
+          "modifier": "BETWEEN",
+          "value2": 750
         }
       }
     },
@@ -2235,8 +2235,8 @@
       },
       "request": {
         "performer_count": {
-          "modifier": "GREATER_THAN",
-          "value": 4
+          "modifier": "BETWEEN",
+          "value": 5
         }
       }
     },
@@ -2249,8 +2249,8 @@
       },
       "request": {
         "performer_count": {
-          "modifier": "LESS_THAN",
-          "value": 16
+          "modifier": "BETWEEN",
+          "value2": 15
         }
       }
     },
@@ -2279,8 +2279,8 @@
       },
       "request": {
         "performer_age": {
-          "modifier": "GREATER_THAN",
-          "value": 38
+          "modifier": "BETWEEN",
+          "value": 39
         }
       }
     },
@@ -2293,8 +2293,8 @@
       },
       "request": {
         "performer_age": {
-          "modifier": "LESS_THAN",
-          "value": 81
+          "modifier": "BETWEEN",
+          "value2": 80
         }
       }
     },
@@ -2323,8 +2323,8 @@
       },
       "request": {
         "tag_count": {
-          "modifier": "GREATER_THAN",
-          "value": 12
+          "modifier": "BETWEEN",
+          "value": 13
         }
       }
     },
@@ -2337,8 +2337,8 @@
       },
       "request": {
         "tag_count": {
-          "modifier": "LESS_THAN",
-          "value": 39
+          "modifier": "BETWEEN",
+          "value2": 38
         }
       }
     },
@@ -2601,7 +2601,7 @@
       },
       "request": {
         "date": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -2615,8 +2615,8 @@
       },
       "request": {
         "date": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     }

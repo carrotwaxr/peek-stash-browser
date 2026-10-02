@@ -120,25 +120,25 @@ describe("buildGroupFilter", () => {
       });
     });
 
-    it("should build rating filter with GREATER_THAN modifier (min only)", () => {
+    it("should build rating filter with a lone minimum as BETWEEN (min only)", () => {
       const uiFilters = {
         rating: { min: 70 },
       };
       const result = buildGroupFilter(uiFilters);
       expect(result.rating100).toEqual({
-        modifier: "GREATER_THAN",
-        value: 69, // min - 1
+        modifier: "BETWEEN",
+        value: 70,
       });
     });
 
-    it("should build rating filter with LESS_THAN modifier (max only)", () => {
+    it("should build rating filter with a lone maximum as BETWEEN (max only)", () => {
       const uiFilters = {
         rating: { max: 50 },
       };
       const result = buildGroupFilter(uiFilters);
       expect(result.rating100).toEqual({
-        modifier: "LESS_THAN",
-        value: 51, // max + 1
+        modifier: "BETWEEN",
+        value2: 50,
       });
     });
 
@@ -164,25 +164,25 @@ describe("buildGroupFilter", () => {
       });
     });
 
-    it("should build scene_count filter with GREATER_THAN modifier (min only)", () => {
+    it("should build scene_count filter with a lone minimum as BETWEEN (min only)", () => {
       const uiFilters = {
         sceneCount: { min: 100 },
       };
       const result = buildGroupFilter(uiFilters);
       expect(result.scene_count).toEqual({
-        modifier: "GREATER_THAN",
-        value: 99, // min - 1
+        modifier: "BETWEEN",
+        value: 100,
       });
     });
 
-    it("should build scene_count filter with LESS_THAN modifier (max only)", () => {
+    it("should build scene_count filter with a lone maximum as BETWEEN (max only)", () => {
       const uiFilters = {
         sceneCount: { max: 75 },
       };
       const result = buildGroupFilter(uiFilters);
       expect(result.scene_count).toEqual({
-        modifier: "LESS_THAN",
-        value: 76, // max + 1
+        modifier: "BETWEEN",
+        value2: 75,
       });
     });
   });
@@ -200,38 +200,38 @@ describe("buildGroupFilter", () => {
       });
     });
 
-    it("should build duration filter with GREATER_THAN modifier (min only)", () => {
+    it("should build duration filter with a lone minimum as BETWEEN (min only)", () => {
       const uiFilters = {
         duration: { min: 45 }, // Minutes
       };
       const result = buildGroupFilter(uiFilters);
       expect(result.duration).toEqual({
-        modifier: "GREATER_THAN",
-        value: 2699, // 45 * 60 - 1
+        modifier: "BETWEEN",
+        value: 2700, // 45 * 60 - 1
       });
     });
 
-    it("should build duration filter with LESS_THAN modifier (max only)", () => {
+    it("should build duration filter with a lone maximum as BETWEEN (max only)", () => {
       const uiFilters = {
         duration: { max: 60 }, // Minutes
       };
       const result = buildGroupFilter(uiFilters);
       expect(result.duration).toEqual({
-        modifier: "LESS_THAN",
-        value: 3601, // 60 * 60 + 1
+        modifier: "BETWEEN",
+        value2: 3600, // 60 * 60 + 1
       });
     });
   });
 
   describe("Date Range Filters", () => {
-    it("should build date filter with GREATER_THAN modifier (start only)", () => {
+    it("should build date filter with a lone minimum as BETWEEN (start only)", () => {
       const uiFilters = {
         date: { start: "2023-01-01" },
       };
       const result = buildGroupFilter(uiFilters);
       expect(result.date).toEqual({
         value: "2023-01-01",
-        modifier: "GREATER_THAN",
+        modifier: "BETWEEN",
       });
     });
 
@@ -247,14 +247,14 @@ describe("buildGroupFilter", () => {
       });
     });
 
-    it("should build created_at filter with GREATER_THAN modifier (start only)", () => {
+    it("should build created_at filter with a lone minimum as BETWEEN (start only)", () => {
       const uiFilters = {
         createdAt: { start: "2023-01-01" },
       };
       const result = buildGroupFilter(uiFilters);
       expect(result.created_at).toEqual({
         value: "2023-01-01",
-        modifier: "GREATER_THAN",
+        modifier: "BETWEEN",
       });
     });
 
@@ -270,14 +270,14 @@ describe("buildGroupFilter", () => {
       });
     });
 
-    it("should build updated_at filter with GREATER_THAN modifier (start only)", () => {
+    it("should build updated_at filter with a lone minimum as BETWEEN (start only)", () => {
       const uiFilters = {
         updatedAt: { start: "2024-01-01" },
       };
       const result = buildGroupFilter(uiFilters);
       expect(result.updated_at).toEqual({
         value: "2024-01-01",
-        modifier: "GREATER_THAN",
+        modifier: "BETWEEN",
       });
     });
 
@@ -352,8 +352,8 @@ describe("buildGroupFilter", () => {
         value2: 100,
       });
       expect(result.scene_count).toEqual({
-        modifier: "GREATER_THAN",
-        value: 49,
+        modifier: "BETWEEN",
+        value: 50,
       });
     });
 
@@ -378,8 +378,8 @@ describe("buildGroupFilter", () => {
         modifier: "INCLUDES_ALL",
       });
       expect(result.rating100).toEqual({
-        modifier: "GREATER_THAN",
-        value: 79,
+        modifier: "BETWEEN",
+        value: 80,
       });
       expect(result.scene_count).toEqual({
         modifier: "BETWEEN",
@@ -447,8 +447,8 @@ describe("buildGroupFilter", () => {
         value2: 50,
       });
       expect(result.duration).toEqual({
-        modifier: "GREATER_THAN",
-        value: -1, // 0 * 60 - 1
+        modifier: "BETWEEN",
+        value: 0, // 0 * 60 - 1
       });
     });
   });

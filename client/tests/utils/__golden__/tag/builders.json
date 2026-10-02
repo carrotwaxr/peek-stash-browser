@@ -34,8 +34,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       }
     },
@@ -49,8 +49,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       }
     },
@@ -166,8 +166,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       }
     },
@@ -180,8 +180,8 @@
       },
       "request": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       }
     },
@@ -210,8 +210,8 @@
       },
       "request": {
         "scene_count": {
-          "modifier": "GREATER_THAN",
-          "value": 249
+          "modifier": "BETWEEN",
+          "value": 250
         }
       }
     },
@@ -224,8 +224,8 @@
       },
       "request": {
         "scene_count": {
-          "modifier": "LESS_THAN",
-          "value": 751
+          "modifier": "BETWEEN",
+          "value2": 750
         }
       }
     },
@@ -254,8 +254,8 @@
       },
       "request": {
         "o_counter": {
-          "modifier": "GREATER_THAN",
-          "value": 249
+          "modifier": "BETWEEN",
+          "value": 250
         }
       }
     },
@@ -268,8 +268,8 @@
       },
       "request": {
         "o_counter": {
-          "modifier": "LESS_THAN",
-          "value": 751
+          "modifier": "BETWEEN",
+          "value2": 750
         }
       }
     },
@@ -298,8 +298,8 @@
       },
       "request": {
         "play_count": {
-          "modifier": "GREATER_THAN",
-          "value": 249
+          "modifier": "BETWEEN",
+          "value": 250
         }
       }
     },
@@ -312,8 +312,8 @@
       },
       "request": {
         "play_count": {
-          "modifier": "LESS_THAN",
-          "value": 751
+          "modifier": "BETWEEN",
+          "value2": 750
         }
       }
     },
@@ -437,7 +437,7 @@
       },
       "request": {
         "created_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -451,8 +451,8 @@
       },
       "request": {
         "created_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },
@@ -481,7 +481,7 @@
       },
       "request": {
         "updated_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       }
@@ -495,8 +495,8 @@
       },
       "request": {
         "updated_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       }
     },

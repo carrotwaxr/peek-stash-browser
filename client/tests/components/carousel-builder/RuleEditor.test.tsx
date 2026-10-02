@@ -152,16 +152,16 @@ describe("RuleEditor", () => {
 
     expect(buildSceneFilter(state)).toEqual(stored);
     expect(buildSceneFilter({ lastPlayedAt: { end: "2024-06-30" } })).toEqual({
-      last_played_at: { modifier: "LESS_THAN", value: "2024-06-30" },
+      last_played_at: { modifier: "BETWEEN", value2: "2024-06-30" },
     });
     expect(
       buildSceneFilter(
         carouselRulesToFilterState({
-          last_played_at: { modifier: "LESS_THAN", value: "2024-06-30" },
+          last_played_at: { modifier: "BETWEEN", value2: "2024-06-30" },
         }).state
       )
     ).toEqual({
-      last_played_at: { modifier: "LESS_THAN", value: "2024-06-30" },
+      last_played_at: { modifier: "BETWEEN", value2: "2024-06-30" },
     });
   });
 });
