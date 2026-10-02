@@ -37,6 +37,7 @@ const CTX: LeafContext = {
   specificInstanceId: undefined,
   sortField: "created_at",
   timeZone: "UTC",
+  hasExclusionsOf: () => Promise.resolve(false),
   name: "tags",
   underAny: false,
 };

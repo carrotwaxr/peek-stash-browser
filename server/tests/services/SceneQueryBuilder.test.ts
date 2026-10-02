@@ -1234,6 +1234,7 @@ describe("the scene field table", () => {
       specificInstanceId: undefined,
       sortField: "created_at",
       timeZone: "UTC",
+      hasExclusionsOf: () => Promise.resolve(false),
       name: "tags",
       underAny,
     });
@@ -1262,6 +1263,7 @@ describe("the playlist filters and Playlist order", () => {
     specificInstanceId: undefined,
     sortField: "created_at",
     timeZone: "UTC",
+    hasExclusionsOf: () => Promise.resolve(false),
     name,
     underAny: false,
   });
@@ -1421,6 +1423,7 @@ describe("the path, URL, code, caption, marker and duplicate filters", () => {
     specificInstanceId: undefined,
     sortField: "created_at",
     timeZone: "UTC",
+    hasExclusionsOf: () => Promise.resolve(false),
     name,
     underAny: false,
   });

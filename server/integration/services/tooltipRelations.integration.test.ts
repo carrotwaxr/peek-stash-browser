@@ -592,6 +592,7 @@ describeWithDb("Tooltip relations (integration)", () => {
       specificInstanceId: FX.A,
       sortField: "name",
       timeZone: "UTC",
+      hasExclusionsOf: () => Promise.resolve(false),
     };
     const { items: studios } = await studioQueryBuilder.execute({
       userId: v,

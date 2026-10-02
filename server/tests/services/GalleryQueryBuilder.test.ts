@@ -826,3 +826,31 @@ describe("every gallery field clause", () => {
     }
   );
 });
+
+describe("performer_count and the viewer's performer exclusions", () => {
+  const PCE = "LEFT JOIN UserExcludedEntity pce";
+  const COUNT_ONE = { performer_count: { modifier: "EQUALS", value: 1 } };
+
+  /** The page statement of the count filter, the lookup answering `excluded` */
+  async function pageFor(excluded: boolean): Promise<string> {
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.findFirst.mockResolvedValue(
+      excluded ? partialRow({ id: 1 }) : null
+    );
+    await run({
+      filter: untrusted<ParsedListRequest<"gallery">["filter"]>(COUNT_ONE),
+    });
+    return pageStatement().sql;
+  }
+
+  it("anti-joins them only when the viewer has a performer exclusion row", async () => {
+    const without = await pageFor(false);
+    expect(without).toContain("(SELECT COUNT(*) FROM GalleryPerformer pc");
+    expect(without).not.toContain(PCE);
+
+    expect(await pageFor(true)).toContain(
+      `${PCE} ON pce.userId = ? AND pce.entityType = 'performer'`
+    );
+  });
+});

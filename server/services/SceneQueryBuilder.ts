@@ -78,6 +78,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  exclusionLookup,
   favoriteRefs,
   hierarchicalRefClause,
   refFieldClause,
@@ -300,8 +301,9 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       allowedInstanceIds: [],
       specificInstanceId: undefined,
       sortField: sort.field,
-      // No sort reads it
+      // No sort reads it, nor the lookup, which asks only when called
       timeZone: "UTC",
+      hasExclusionsOf: exclusionLookup(userId, true),
     };
     const expr = this.sortExpr(sort.field, sort.direction, sort.seed, {}, ctx);
     return {

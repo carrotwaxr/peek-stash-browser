@@ -56,6 +56,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  exclusionViewer,
   favoriteRefs,
   hierarchicalRefClause,
   refFieldClause,
@@ -232,11 +233,11 @@ class ImageQueryBuilder extends EntityQueryBuilder<
 
     // The image's performers the viewer can see: how many, and their age
     // on the image's date
-    performer_count: (c, ctx) =>
+    performer_count: async (c, ctx) =>
       performerCountClause(
         c,
         IMAGE_PERFORMERS,
-        ctx.applyExclusions ? ctx.userId : null
+        await exclusionViewer(ctx, "performer")
       ),
     performer_age: (c, ctx) =>
       performerAgeExists(
