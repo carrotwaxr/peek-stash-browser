@@ -555,7 +555,7 @@ describe("SceneQueryBuilder", () => {
       expect(params).toEqual([1, 1, 1, ...ALLOWED, bound, 10, 0]);
     });
 
-    it("resolution compares the file height; orientation matches any of its values", async () => {
+    it("resolution compares the shorter side; orientation matches any of its values", async () => {
       await run({
         filter: {
           resolution: { modifier: "GREATER_THAN", value: "FULL_HD" },
@@ -563,25 +563,23 @@ describe("SceneQueryBuilder", () => {
         },
       });
 
-      const { sql, params } = pageStatement();
-      expect(sql).toContain("COALESCE(s.fileHeight, 0) > ?");
-      expect(params).toContain(1080);
+      const { sql } = pageStatement();
+      expect(sql).toContain("MIN(s.fileWidth, s.fileHeight) > 1439");
       expect(sql).toContain(
         "((s.fileWidth < s.fileHeight) OR (s.fileWidth = s.fileHeight AND s.fileWidth > 0))"
       );
     });
 
     it.each([
-      ["SEVEN_K", 3584],
-      ["HUGE", 6144],
+      ["SEVEN_K", "BETWEEN 3584 AND 3839"],
+      ["HUGE", "BETWEEN 6144 AND 9999"],
     ] as const)(
-      "%s compares with Stash's range minimum, %i",
-      async (value, height) => {
+      "%s is Stash's range on the shorter side",
+      async (value, range) => {
         await run({ filter: { resolution: { modifier: "EQUALS", value } } });
 
-        const { sql, params } = pageStatement();
-        expect(sql).toContain("COALESCE(s.fileHeight, 0) = ?");
-        expect(params).toContain(height);
+        const { sql } = pageStatement();
+        expect(sql).toContain(`MIN(s.fileWidth, s.fileHeight) ${range}`);
       }
     );
 

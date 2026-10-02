@@ -420,14 +420,15 @@ describe("Scene Video Filters", () => {
 });
 
 /**
- * The scene director filter and the 7K and Huge resolutions, on seeded
- * scenes. A resolution compares the file's height with the one height each
- * value names (Stash's range minimums for 7K and Huge: 3584 and 6144; PR 9
- * moves to ranges).
+ * The scene director filter and the resolution ranges, on seeded scenes. A
+ * resolution is Stash's range on the file's shorter side, so a portrait
+ * 1080 by 1920 file is 1080p, and a file with no size never matches.
  *
  * Two made-up instances reuse the same ids, as two Stash servers do:
  * - sv-a: 7893001 3584p directed by "Jane Smith", 7893002 6144p by
- *   "SMITHERS", 7893003 4320p by "Bob Jones", 7893004 2160p with no director
+ *   "SMITHERS", 7893003 4320p by "Bob Jones", 7893004 2160p with no director,
+ *   7893005 a portrait 1080 by 1920 file and 7893006 a file with no size,
+ *   both directed by "Zed Quinn"
  * - sv-b: 7893001 1080p directed by "Ann Smith"
  * Every seeded row is deleted before the file ends.
  */
@@ -438,13 +439,14 @@ describeWithDb("Scene director and 7K / Huge resolutions (seeded)", () => {
   const scene = (
     id: string,
     instance: string,
-    fileHeight: number,
-    director: string | null
+    fileHeight: number | null,
+    director: string | null,
+    fileWidth: number | null = fileHeight === null ? null : fileHeight * 2
   ) => ({
     id,
     stashInstanceId: instance,
     title: `SV ${id} ${instance}`,
-    fileWidth: fileHeight * 2,
+    fileWidth,
     fileHeight,
     director,
   });
@@ -483,6 +485,8 @@ describeWithDb("Scene director and 7K / Huge resolutions (seeded)", () => {
         scene("7893003", A, 4320, "Bob Jones"),
         scene("7893004", A, 2160, null),
         scene("7893001", B, 1080, "Ann Smith"),
+        scene("7893005", A, 1920, "Zed Quinn", 1080),
+        scene("7893006", A, null, "Zed Quinn"),
       ],
     });
   });
@@ -499,7 +503,20 @@ describeWithDb("Scene director and 7K / Huge resolutions (seeded)", () => {
     expect(await resolution("EQUALS", "HUGE")).toEqual(["7893002:sv-a"]);
   });
 
-  it("7K and Huge compare with the other heights", async () => {
+  it("a 1080x1920 portrait file is 1080p, not VR_HD", async () => {
+    expect(await resolution("EQUALS", "FULL_HD")).toEqual([
+      "7893001:sv-b",
+      "7893005:sv-a",
+    ]);
+    expect(await resolution("EQUALS", "VR_HD")).toEqual([]);
+  });
+
+  it("an overlapping range matches as Stash does", async () => {
+    // 2160p is inside FOUR_K (1920 to 2559) but past VR_HD (1920 to 2159)
+    expect(await resolution("EQUALS", "FOUR_K")).toEqual(["7893004:sv-a"]);
+  });
+
+  it("the resolutions compare with the other ranges", async () => {
     expect(await resolution("GREATER_THAN", "SEVEN_K")).toEqual([
       "7893002:sv-a",
       "7893003:sv-a",
@@ -509,12 +526,17 @@ describeWithDb("Scene director and 7K / Huge resolutions (seeded)", () => {
       "7893001:sv-b",
       "7893003:sv-a",
       "7893004:sv-a",
+      "7893005:sv-a",
     ]);
+  });
+
+  it("NOT_EQUALS lists the files outside the range, never one with no size", async () => {
     expect(await resolution("NOT_EQUALS", "SEVEN_K")).toEqual([
       "7893001:sv-b",
       "7893002:sv-a",
       "7893003:sv-a",
       "7893004:sv-a",
+      "7893005:sv-a",
     ]);
   });
 
@@ -530,6 +552,8 @@ describeWithDb("Scene director and 7K / Huge resolutions (seeded)", () => {
     expect(await director({ modifier: "EXCLUDES", value: "smith" })).toEqual([
       "7893003:sv-a",
       "7893004:sv-a",
+      "7893005:sv-a",
+      "7893006:sv-a",
     ]);
     expect(await director({ modifier: "EQUALS", value: "jane smith" })).toEqual(
       ["7893001:sv-a"]

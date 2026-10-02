@@ -7,11 +7,14 @@
  * a materialized set that the entity is matched against, never as a
  * `NOT IN (subquery)`.
  */
+import type { Resolution } from "@peek/shared-types/filters/index.js";
+import { RESOLUTIONS } from "@peek/shared-types/filters/index.js";
 import { describe, expect, it } from "vitest";
 import type { FilterRef } from "../../types/parsedFilters.js";
 import {
   type JunctionTarget,
   PAIR_INLINE_LIMIT,
+  RESOLUTION_RANGES,
   type ViaSceneSpec,
   ageYearsSql,
   anyOf,
@@ -31,6 +34,7 @@ import {
   performerAgeExists,
   randomOrder,
   refClause,
+  resolutionClause,
   specificInstanceClause,
   viaSceneClause,
 } from "../../utils/sqlClauses.js";
@@ -1448,5 +1452,43 @@ describe("performerAgeExists", () => {
         1
       ).sql
     ).toBe("");
+  });
+});
+
+describe("resolutionClause", () => {
+  const clause = (
+    modifier: "EQUALS" | "NOT_EQUALS" | "GREATER_THAN" | "LESS_THAN",
+    value: Resolution
+  ) => resolutionClause({ modifier, value }, "w", "h");
+
+  it("EQUALS is the range on the shorter side, with nothing bound", () => {
+    expect(clause("EQUALS", "FULL_HD")).toEqual({
+      sql: "MIN(w, h) BETWEEN 1080 AND 1439",
+      params: [],
+    });
+  });
+
+  it("NOT_EQUALS is the same range negated", () => {
+    expect(clause("NOT_EQUALS", "FULL_HD").sql).toBe(
+      "MIN(w, h) NOT BETWEEN 1080 AND 1439"
+    );
+  });
+
+  it("GREATER_THAN is past the range's top, LESS_THAN under its bottom", () => {
+    expect(clause("GREATER_THAN", "STANDARD_HD").sql).toBe("MIN(w, h) > 1079");
+    expect(clause("LESS_THAN", "STANDARD").sql).toBe("MIN(w, h) < 480");
+  });
+
+  it("copies Stash's overlapping ranges as they are", () => {
+    expect(RESOLUTION_RANGES.VR_HD).toEqual({ min: 1920, max: 2159 });
+    expect(RESOLUTION_RANGES.FOUR_K).toEqual({ min: 1920, max: 2559 });
+    expect(RESOLUTION_RANGES.HUGE).toEqual({ min: 6144, max: 9999 });
+    expect(Object.keys(RESOLUTION_RANGES)).toEqual([...RESOLUTIONS]);
+  });
+
+  it("has no COALESCE: a file with no size never matches", () => {
+    for (const modifier of ["EQUALS", "NOT_EQUALS"] as const) {
+      expect(clause(modifier, "LOW").sql).not.toContain("COALESCE");
+    }
   });
 });
