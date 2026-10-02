@@ -134,6 +134,11 @@ export interface ExtraView {
    * with its own data (the hierarchy's whole tree) sets false
    */
   paged: boolean;
+  /**
+   * The view takes the list's filters; false hides the Filters button, the
+   * panel and the chips (the tag tree is not a filtered list)
+   */
+  filterable: boolean;
 }
 
 export interface ListPageConfig {
@@ -254,6 +259,7 @@ export const TAG_LIST: ListPageConfig = {
     hierarchy: {
       render: ({ listState }) => <TagHierarchyPanel listState={listState} />,
       paged: false,
+      filterable: false,
     },
   },
   emptyMessage: "No tags found",

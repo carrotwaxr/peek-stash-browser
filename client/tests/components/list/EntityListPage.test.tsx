@@ -445,4 +445,47 @@ describe("EntityListPage", () => {
     // The tree is the whole list: no page of tags is asked for
     expect(api.findTags).not.toHaveBeenCalled();
   });
+
+  it("the Tags hierarchy view shows no Filters button, no panel and no chips, and says when filters are set", async () => {
+    api.findTagTree.mockResolvedValue({ tags: [] });
+    api.findTags.mockResolvedValue({ findTags: { count: 0, tags: [] } });
+
+    renderListPage(<Tags />, {
+      initialEntries: ["/tags?view=hierarchy&favorite=true"],
+    });
+
+    await screen.findByTestId("hierarchy-view");
+    expect(
+      screen.queryByRole("button", { name: /^Filters/ })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Edit filter/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Filters don't apply to the hierarchy view. Switch to Grid or Table to use them."
+      )
+    ).toBeInTheDocument();
+
+    // Filters stay in the URL: back in the grid they show again
+    fireEvent.click(screen.getByRole("button", { name: /^View mode/ }));
+    fireEvent.click(screen.getByRole("option", { name: /Grid/ }));
+    expect(
+      await screen.findByRole("button", { name: /^Filters/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Edit filter/ })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Filters don't apply/)).not.toBeInTheDocument();
+  });
+
+  it("the Tags hierarchy view with no filters set shows no note", async () => {
+    api.findTagTree.mockResolvedValue({ tags: [] });
+
+    renderListPage(<Tags />, { initialEntries: ["/tags?view=hierarchy"] });
+
+    await screen.findByTestId("hierarchy-view");
+    expect(screen.queryByText(/Filters don't apply/)).not.toBeInTheDocument();
+  });
 });
