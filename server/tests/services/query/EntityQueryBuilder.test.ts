@@ -1145,3 +1145,117 @@ describe("the field clause table", () => {
     ]);
   });
 });
+
+describe("leavesOf: excludes beside a ref's values", () => {
+  const a = (id: string) => ({ id, instanceId: "a" });
+  const leaves = (filter: ParsedListRequest<"scene">["filter"]) =>
+    sceneQueryBuilder["leavesOf"](filter);
+
+  it("leavesOf splits a ref criterion with excludes into the field and its _not leaf", () => {
+    expect(
+      leaves({
+        tags: {
+          refs: [a("1")],
+          modifier: "INCLUDES",
+          depth: -1,
+          excludes: [a("2")],
+        },
+      })
+    ).toEqual([
+      {
+        field: "tags",
+        name: "tags",
+        criterion: { refs: [a("1")], modifier: "INCLUDES", depth: -1 },
+      },
+      {
+        field: "tags",
+        name: "tags_not",
+        criterion: { refs: [a("2")], modifier: "EXCLUDES", depth: -1 },
+      },
+    ]);
+  });
+
+  it("excludes alone give the _not leaf only", () => {
+    expect(
+      leaves({
+        performers: {
+          refs: [],
+          modifier: "INCLUDES",
+          depth: 0,
+          excludes: [a("2")],
+        },
+      })
+    ).toEqual([
+      {
+        field: "performers",
+        name: "performers_not",
+        criterion: { refs: [a("2")], modifier: "EXCLUDES", depth: 0 },
+      },
+    ]);
+  });
+
+  it("a presence criterion keeps its leaf with no refs; a plain one is named by its field", () => {
+    expect(
+      leaves({
+        studios: {
+          refs: [],
+          modifier: "NOT_NULL",
+          depth: 0,
+          excludes: [a("3")],
+        },
+        groups: { refs: [a("4")], modifier: "INCLUDES_ALL", depth: 0 },
+      })
+    ).toEqual([
+      {
+        field: "studios",
+        name: "studios",
+        criterion: { refs: [], modifier: "NOT_NULL", depth: 0 },
+      },
+      {
+        field: "studios",
+        name: "studios_not",
+        criterion: { refs: [a("3")], modifier: "EXCLUDES", depth: 0 },
+      },
+      {
+        field: "groups",
+        name: "groups",
+        criterion: { refs: [a("4")], modifier: "INCLUDES_ALL", depth: 0 },
+      },
+    ]);
+  });
+
+  it("the two leaves name their CTEs apart in one statement", async () => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ total: 0n }]);
+    const refs = (from: number) =>
+      Array.from({ length: 70 }, (_, i) => a(String(from + i)));
+
+    await sceneQueryBuilder.execute({
+      userId: 1,
+      allowedInstanceIds: ["a"],
+      request: parsedListRequest("scene", {
+        filter: {
+          performers: {
+            refs: refs(1),
+            modifier: "INCLUDES",
+            depth: 0,
+            excludes: refs(100),
+          },
+        },
+        sort: { field: "rating", direction: "DESC", seed: undefined },
+      }),
+    });
+
+    const page = must(statements()[0]).sql;
+    for (const name of [
+      "performers_refs",
+      "performers_matched",
+      "performers_not_refs",
+      "performers_not_matched",
+    ]) {
+      expect(page).toContain(`${name}(id, inst) AS MATERIALIZED`);
+    }
+  });
+});

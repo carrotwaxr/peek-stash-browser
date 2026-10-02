@@ -13,7 +13,7 @@ import type { PerformerQueryRow } from "../types/internal/queryRows.js";
 import type {
   NumberCriterion,
   ParsedFilter,
-  RefCriterion,
+  RefFieldCriterion,
 } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
@@ -324,11 +324,13 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
 
   /** The tag filter, with the tags' descendants to the depth */
   private async tagClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
+    // "Has any" and "has none" count only tags the viewer can see
     return hierarchicalRefClause("tag", PERFORMER_TAGS, criterion, ctx, {
       name: ctx.name,
+      related: { table: "StashTag", entityType: "tag" },
     });
   }
 

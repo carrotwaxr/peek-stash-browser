@@ -36,6 +36,7 @@ import {
   performerAgeExists,
   randomOrder,
   refClause,
+  refPresenceClause,
   resolutionClause,
   searchAll,
   specificInstanceClause,
@@ -728,6 +729,98 @@ describe("refClause", () => {
   it("is empty with no refs", () => {
     expect(refClause(SCENE_TAGS, [], "INCLUDES", OPTS)).toEqual({
       sql: "",
+      params: [],
+    });
+  });
+});
+
+describe("refPresenceClause", () => {
+  const SCENE_PERFORMERS: JunctionTarget = {
+    kind: "junction",
+    table: "ScenePerformer",
+    alias: "sp",
+    parentAlias: "s",
+    parentIdCol: "sceneId",
+    parentInstanceCol: "sceneInstanceId",
+    refIdCol: "performerId",
+    refInstanceCol: "performerInstanceId",
+  };
+  const SP_KEYED =
+    "sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId";
+
+  it("presence on a junction: IS_NULL is a keyed NOT EXISTS, NOT_NULL its EXISTS", () => {
+    const exists = `EXISTS (SELECT 1 FROM ScenePerformer sp WHERE ${SP_KEYED})`;
+
+    expect(refPresenceClause(SCENE_PERFORMERS, false)).toEqual({
+      sql: `NOT ${exists}`,
+      params: [],
+    });
+    expect(refPresenceClause(SCENE_PERFORMERS, true)).toEqual({
+      sql: exists,
+      params: [],
+    });
+  });
+
+  it("presence on a column is the column's IS NULL or IS NOT NULL", () => {
+    const studio = {
+      kind: "column",
+      parentTable: "StashScene",
+      parentAlias: "s",
+      idCol: "studioId",
+      instanceCol: "stashInstanceId",
+    } as const;
+
+    expect(refPresenceClause(studio, false)).toEqual({
+      sql: "(s.studioId IS NULL)",
+      params: [],
+    });
+    expect(refPresenceClause(studio, true)).toEqual({
+      sql: "(s.studioId IS NOT NULL)",
+      params: [],
+    });
+  });
+
+  it("with an inherited junction both arms: none in either, or any in one", () => {
+    const own =
+      "EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId)";
+    const inherited =
+      "EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = s.id AND sit.sceneInstanceId = s.stashInstanceId)";
+    const opts = { inheritedJunction: SCENE_INHERITED_TAGS };
+
+    expect(refPresenceClause(SCENE_TAGS, false, opts)).toEqual({
+      sql: `(NOT ${own} AND NOT ${inherited})`,
+      params: [],
+    });
+    expect(refPresenceClause(SCENE_TAGS, true, opts)).toEqual({
+      sql: `(${own} OR ${inherited})`,
+      params: [],
+    });
+  });
+
+  it("a live ref counts only live related rows the viewer has not excluded, on the row's instance or every one", () => {
+    const clause = refPresenceClause(SCENE_PERFORMERS, true, {
+      liveRef: { table: "StashPerformer", entityType: "performer", userId: 9 },
+    });
+
+    expect(clause).toEqual({
+      sql: `EXISTS (SELECT 1 FROM ScenePerformer sp JOIN StashPerformer sp_ref ON sp_ref.id = sp.performerId AND sp_ref.stashInstanceId = sp.performerInstanceId ${exclusionJoin("sp_x", "performer", "sp.performerId", "sp.performerInstanceId")} WHERE ${SP_KEYED} AND sp_ref.deletedAt IS NULL AND sp_x.id IS NULL)`,
+      params: [9],
+    });
+    expect(clause.sql).toContain("sp_x.instanceId = ''");
+    expect(clause.sql).not.toMatch(/\be\./);
+  });
+
+  it("a live ref without exclusions (null user) checks only deletedAt", () => {
+    expect(
+      refPresenceClause(SCENE_PERFORMERS, false, {
+        liveRef: {
+          table: "StashPerformer",
+          entityType: "performer",
+          userId: null,
+        },
+      })
+    ).toEqual({
+      sql: `NOT EXISTS (SELECT 1 FROM ScenePerformer sp JOIN StashPerformer sp_ref ON sp_ref.id = sp.performerId AND sp_ref.stashInstanceId = sp.performerInstanceId WHERE ${SP_KEYED} AND sp_ref.deletedAt IS NULL)`,
       params: [],
     });
   });

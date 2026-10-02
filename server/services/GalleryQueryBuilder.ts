@@ -20,7 +20,10 @@ import type {
   GalleryQueryRow,
   TooltipTotalRow,
 } from "../types/internal/queryRows.js";
-import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
+import type {
+  ParsedFilter,
+  RefFieldCriterion,
+} from "../types/parsedFilters.js";
 import { type EntityRef, entityKey, pairsJson } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -36,7 +39,6 @@ import {
   exclusionJoin,
   galleryNameSql,
   noClause,
-  refClause,
   searchAll,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
@@ -54,6 +56,8 @@ import {
   type QueryContext,
   type SortExpr,
   hierarchicalRefClause,
+  refFieldClause,
+  refPresence,
 } from "./query/EntityQueryBuilder.js";
 import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
 import {
@@ -140,6 +144,18 @@ const GALLERY_PERFORMERS: JunctionTarget = {
   refInstanceCol: "performerInstanceId",
 };
 
+/** A gallery's scenes, for "has any" and "has none" */
+const GALLERY_SCENES: JunctionTarget = {
+  kind: "junction",
+  table: "SceneGallery",
+  alias: "gsc",
+  parentAlias: "g",
+  parentIdCol: "galleryId",
+  parentInstanceCol: "galleryInstanceId",
+  refIdCol: "sceneId",
+  refInstanceCol: "sceneInstanceId",
+};
+
 /** Galleries holding one of the scenes (a scene's Galleries tab) */
 const GALLERIES_BY_SCENE: ViaSceneSpec = {
   alias: "g",
@@ -202,11 +218,17 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
 
     // Related entities
     studios: (c, ctx) => this.studioClause(c, ctx),
-    scenes: (c) => viaSceneClause(GALLERIES_BY_SCENE, c.refs, c.modifier),
+    // "Has any" and "has none" count only related rows the viewer can see
+    scenes: (c, ctx) =>
+      c.modifier === "IS_NULL" || c.modifier === "NOT_NULL"
+        ? refPresence(GALLERY_SCENES, c.modifier, ctx, {
+            related: { table: "StashScene", entityType: "scene" },
+          })
+        : viaSceneClause(GALLERIES_BY_SCENE, c.refs, c.modifier),
     performers: (c, ctx) =>
-      refClause(GALLERY_PERFORMERS, c.refs, c.modifier, {
-        name: ctx.name,
-        allowedInstanceIds: ctx.allowedInstanceIds,
+      refFieldClause(GALLERY_PERFORMERS, c, ctx, {
+        table: "StashPerformer",
+        entityType: "performer",
       }),
     tags: (c, ctx) => this.tagClause(c, ctx),
 
@@ -233,7 +255,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
    * gallery has one studio, so the parser never sends INCLUDES_ALL here.
    */
   private async studioClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", GALLERY_STUDIO, criterion, ctx, {
@@ -243,11 +265,12 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
 
   /** The tag filter, with the tags' descendants to the depth */
   private async tagClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("tag", GALLERY_TAGS, criterion, ctx, {
       name: ctx.name,
+      related: { table: "StashTag", entityType: "tag" },
     });
   }
 

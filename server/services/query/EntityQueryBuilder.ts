@@ -26,7 +26,9 @@
  * leaves, one criterion of one field each, builds each leaf's clause through
  * `clauseFor` in the table's order, and appends the search last. Every CTE a
  * clause adds is named from its leaf's name, unique in the statement
- * (`combine` refuses two of one name).
+ * (`combine` refuses two of one name). A ref criterion's `excludes` become
+ * a leaf of their own (`<field>_not`, EXCLUDES), so a field's clause never
+ * sees them.
  */
 import type {
   ListKind,
@@ -38,6 +40,7 @@ import type {
   FilterRef,
   ParsedListRequest,
   RefCriterion,
+  RefFieldCriterion,
 } from "../../types/parsedFilters.js";
 import { entityKey } from "../../utils/entityRef.js";
 import {
@@ -61,6 +64,7 @@ import {
   instanceClause,
   randomOrder,
   refClause,
+  refPresenceClause,
   specificInstanceClause,
 } from "../../utils/sqlClauses.js";
 
@@ -134,6 +138,17 @@ export type FieldOf<K extends ListKind> = keyof OwnFilterOf<K> & string;
 export interface Leaf<K extends ListKind, F extends FieldOf<K> = FieldOf<K>> {
   readonly field: F;
   readonly criterion: NonNullable<OwnFilterOf<K>[F]>;
+}
+
+/**
+ * A leaf with the name its clause's CTEs take, unique in the statement:
+ * its field's, or `<field>_not` for a ref criterion's `excludes`
+ */
+export interface NamedLeaf<
+  K extends ListKind,
+  F extends FieldOf<K> = FieldOf<K>,
+> extends Leaf<K, F> {
+  readonly name: string;
 }
 
 /** Where a leaf's clause sits in the statement */
@@ -231,10 +246,68 @@ export interface ListResult<Entity> {
 /** The seed of a random sort no request set (the parser always sets one) */
 export const DEFAULT_RANDOM_SEED = 12345;
 
+/** The entity a ref's junction names, for "has any" and "has none" */
+export interface RelatedTable {
+  /** Keyed by `id` and `stashInstanceId`, soft-deleted through `deletedAt` */
+  readonly table: string;
+  readonly entityType: ExclusionEntityType;
+}
+
+/**
+ * IS_NULL ("has none") or NOT_NULL ("has any") of a ref relation
+ * (`refPresenceClause`). With `related`, a junction row counts only when
+ * the entity it names is live and, with the viewer's exclusions applied,
+ * not excluded for them: a relation filter follows only rows the viewer
+ * can see.
+ */
+export function refPresence(
+  target: JunctionTarget | ColumnTarget,
+  modifier: "IS_NULL" | "NOT_NULL",
+  ctx: QueryContext,
+  opts: {
+    readonly related?: RelatedTable | undefined;
+    readonly inheritedJunction?: JunctionTarget | undefined;
+  } = {}
+): FilterClause {
+  return refPresenceClause(target, modifier === "NOT_NULL", {
+    ...(opts.inheritedJunction
+      ? { inheritedJunction: opts.inheritedJunction }
+      : {}),
+    ...(opts.related
+      ? {
+          liveRef: {
+            ...opts.related,
+            userId: ctx.applyExclusions ? ctx.userId : null,
+          },
+        }
+      : {}),
+  });
+}
+
+/**
+ * A plain ref field's clause: its ids through `refClause`, its CTEs named
+ * from the leaf, or "has none" and "has any" through `refPresence`
+ */
+export function refFieldClause(
+  target: JunctionTarget | ColumnTarget,
+  criterion: RefFieldCriterion,
+  ctx: LeafContext,
+  related?: RelatedTable
+): FilterClause {
+  if (criterion.modifier === "IS_NULL" || criterion.modifier === "NOT_NULL") {
+    return refPresence(target, criterion.modifier, ctx, { related });
+  }
+  return refClause(target, criterion.refs, criterion.modifier, {
+    name: ctx.name,
+    allowedInstanceIds: ctx.allowedInstanceIds,
+  });
+}
+
 /**
  * A hierarchical ref filter (tags, studios): the refs with their
  * descendants to the criterion's depth, matched as (id, instance) pairs
- * through `refClause`. Every ref keeps its instance through the expansion
+ * through `refClause`; "has none" and "has any" through `refPresence`,
+ * whatever the depth. Every ref keeps its instance through the expansion
  * (`utils/hierarchyUtils.ts`): a bare ref means every allowed instance.
  * INCLUDES_ALL is one clause per selected ref, each with its own
  * descendants, AND-ed: an entity holding any descendant of each chosen
@@ -246,15 +319,23 @@ export const DEFAULT_RANDOM_SEED = 12345;
 export async function hierarchicalRefClause(
   kind: HierarchyKind,
   target: JunctionTarget | ColumnTarget,
-  criterion: RefCriterion,
+  criterion: RefFieldCriterion,
   ctx: QueryContext,
   opts: {
     name: string;
     inheritedJunction?: JunctionTarget;
     sortedByIndex?: boolean;
+    /** For presence: the entity the junction names */
+    related?: RelatedTable;
   }
 ): Promise<FilterClause> {
-  const { sortedByIndex, ...rest } = opts;
+  const { sortedByIndex, related, ...rest } = opts;
+  if (criterion.modifier === "IS_NULL" || criterion.modifier === "NOT_NULL") {
+    return refPresence(target, criterion.modifier, ctx, {
+      related,
+      inheritedJunction: opts.inheritedJunction,
+    });
+  }
   const options = { ...rest, allowedInstanceIds: ctx.allowedInstanceIds };
   let clauseFor: (sorted: boolean | undefined) => FilterClause;
   if (criterion.modifier === "INCLUDES_ALL") {
@@ -275,6 +356,7 @@ export async function hierarchicalRefClause(
         )
       );
   } else {
+    const { modifier } = criterion;
     const refs = await expandRefs(
       kind,
       criterion.refs,
@@ -282,7 +364,7 @@ export async function hierarchicalRefClause(
       ctx.allowedInstanceIds
     );
     clauseFor = (sorted) =>
-      refClause(target, refs, criterion.modifier, {
+      refClause(target, refs, modifier, {
         ...options,
         ...(sorted === undefined ? {} : { sortedByIndex: sorted }),
       });
@@ -293,6 +375,54 @@ export async function hierarchicalRefClause(
   return JSON.stringify(count) === JSON.stringify(page)
     ? page
     : { ...page, count };
+}
+
+/** A ref criterion carrying `excludes` */
+function hasExcludes(
+  criterion: unknown
+): criterion is RefFieldCriterion & { excludes: readonly FilterRef[] } {
+  return (
+    typeof criterion === "object" &&
+    criterion !== null &&
+    "refs" in criterion &&
+    "excludes" in criterion &&
+    Array.isArray(criterion.excludes)
+  );
+}
+
+/**
+ * A leaf whose ref criterion carries `excludes`, as the leaves its clauses
+ * read (resolution 3; 9b's compiler splits each leaf of its tree the same
+ * way): the criterion without them, named as the leaf and left out when it
+ * names no id and is no presence check, then `<name>_not`, EXCLUDES of the
+ * excludes to the same depth, so a hierarchical field excludes their
+ * descendants too (Stash's CombineExcludes). Any other leaf is itself.
+ */
+export function splitExcludes<K extends ListKind>(
+  leaf: NamedLeaf<K>
+): NamedLeaf<K>[] {
+  const criterion: unknown = leaf.criterion;
+  if (!hasExcludes(criterion)) return [leaf];
+  const { excludes, ...own } = criterion;
+  const presence = own.modifier === "IS_NULL" || own.modifier === "NOT_NULL";
+  const not: RefCriterion = {
+    refs: excludes,
+    modifier: "EXCLUDES",
+    depth: own.depth,
+  };
+  // The one cast: the leaf's criterion without `excludes`, and an EXCLUDES
+  // of them, are criteria of the leaf's own ref field, which TypeScript
+  // cannot tie to the generic field
+  const ofField = (c: RefFieldCriterion) =>
+    c as unknown as Leaf<K>["criterion"];
+  return [
+    ...(own.refs.length > 0 || presence
+      ? [{ ...leaf, criterion: ofField(own) }]
+      : []),
+    ...(excludes.length > 0
+      ? [{ ...leaf, name: `${leaf.name}_not`, criterion: ofField(not) }]
+      : []),
+  ];
 }
 
 /**
@@ -426,9 +556,10 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
 
   /**
    * The filter's leaves: one per field it carries, in the table's key
-   * order (a field left undefined carries none)
+   * order (a field left undefined carries none), named by the field; a ref
+   * criterion with `excludes` gives two (`splitExcludes`)
    */
-  protected leavesOf(filter: ListFilterOf<K>): Leaf<K>[] {
+  protected leavesOf(filter: ListFilterOf<K>): NamedLeaf<K>[] {
     const own: OwnFilterOf<K> = filter;
     const fields = Object.keys(this.fieldClauses) as FieldOf<K>[];
     return fields.flatMap((field) => {
@@ -436,7 +567,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
       // The parser sends no null; a field left undefined carries no leaf
       return criterion === undefined || criterion === null
         ? []
-        : [{ field, criterion }];
+        : splitExcludes<K>({ field, name: field, criterion });
     });
   }
 
@@ -468,7 +599,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     for (const leaf of this.leavesOf(filter)) {
       const leafCtx = this.leafContextFor(filter, {
         ...ctx,
-        name: leaf.field,
+        name: leaf.name,
         underAny: false,
       });
       clauses.push(await this.clauseFor(leaf, leafCtx));

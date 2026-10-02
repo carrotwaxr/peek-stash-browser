@@ -11,7 +11,10 @@
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type { NormalizedStudio, TagRef } from "../types/index.js";
 import type { StudioQueryRow } from "../types/internal/queryRows.js";
-import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
+import type {
+  ParsedFilter,
+  RefFieldCriterion,
+} from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -181,11 +184,13 @@ class StudioQueryBuilder extends EntityQueryBuilder<
 
   /** The tag filter, with the tags' descendants to the depth */
   private async tagClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
+    // "Has any" and "has none" count only tags the viewer can see
     return hierarchicalRefClause("tag", STUDIO_TAGS, criterion, ctx, {
       name: ctx.name,
+      related: { table: "StashTag", entityType: "tag" },
     });
   }
 

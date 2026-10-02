@@ -16,7 +16,11 @@ import {
 } from "vitest";
 import { ValidationError } from "../../middleware/errorHandler.js";
 import type { ApiErrorIssue } from "../../types/api/index.js";
-import type { ParsedFilter, RefCriterion } from "../../types/parsedFilters.js";
+import type {
+  ParsedFilter,
+  RefCriterion,
+  RefPresenceCriterion,
+} from "../../types/parsedFilters.js";
 import {
   logIgnoredStoredRule,
   parseCarouselRequest,
@@ -1273,6 +1277,117 @@ describe("parseListRequest: an empty value", () => {
   });
 });
 
+describe("parseListRequest: ref presence and excludes", () => {
+  const scene = (scene_filter: Record<string, unknown>) =>
+    parseListRequest("scene", { scene_filter }, opts());
+  const sceneIssues = (scene_filter: Record<string, unknown>) =>
+    paths(issuesOf(() => scene(scene_filter)));
+
+  it("a ref takes IS_NULL with no value", () => {
+    expect(scene({ performers: { modifier: "IS_NULL" } }).filter).toEqual({
+      performers: { modifier: "IS_NULL", refs: [], depth: 0 },
+    });
+    expect(
+      scene({ studios: { modifier: "NOT_NULL", value: [] } }).filter
+    ).toEqual({
+      studios: { modifier: "NOT_NULL", refs: [], depth: 0 },
+    });
+  });
+
+  it("presence on a field without it is a 400 at its modifier", () => {
+    expect(sceneIssues({ ids: { modifier: "IS_NULL" } })).toEqual([
+      "scene_filter.ids.modifier",
+    ]);
+    expect(
+      paths(
+        issuesOf(() =>
+          parseListRequest(
+            "performer",
+            { performer_filter: { scenes: { modifier: "NOT_NULL" } } },
+            opts()
+          )
+        )
+      )
+    ).toEqual(["performer_filter.scenes.modifier"]);
+  });
+
+  it("excludes beside values stay on the one criterion", () => {
+    expect(
+      scene({
+        tags: {
+          value: ["1:a"],
+          excludes: ["2:a"],
+          modifier: "INCLUDES",
+          depth: -1,
+        },
+      }).filter
+    ).toEqual({
+      tags: {
+        refs: [{ id: "1", instanceId: "a" }],
+        modifier: "INCLUDES",
+        depth: -1,
+        excludes: [{ id: "2", instanceId: "a" }],
+      },
+    });
+  });
+
+  it("excludes alone keep an empty value", () => {
+    expect(
+      scene({ performers: { value: [], excludes: ["2:a"] } }).filter
+    ).toEqual({
+      performers: {
+        refs: [],
+        modifier: "INCLUDES",
+        depth: 0,
+        excludes: [{ id: "2", instanceId: "a" }],
+      },
+    });
+  });
+
+  it("an EXCLUDES modifier with excludes merges both lists into one EXCLUDES", () => {
+    expect(
+      scene({
+        tags: { value: ["1:a"], excludes: ["2:a"], modifier: "EXCLUDES" },
+      }).filter
+    ).toEqual({
+      tags: {
+        refs: [
+          { id: "1", instanceId: "a" },
+          { id: "2", instanceId: "a" },
+        ],
+        modifier: "EXCLUDES",
+        depth: 0,
+      },
+    });
+  });
+
+  it("excludes on a field without them is a 400", () => {
+    expect(
+      sceneIssues({ groups: { value: ["1:a"], excludes: ["2:a"] } })
+    ).toEqual(["scene_filter.groups.excludes"]);
+  });
+
+  it("more than MAX_REF_VALUES across value and excludes is a 400", () => {
+    const ids = (n: number, from: number) =>
+      Array.from({ length: n }, (_, i) => `${from + i}:a`);
+    expect(
+      sceneIssues({ tags: { value: ids(600, 1), excludes: ids(401, 1000) } })
+    ).toEqual(["scene_filter.tags.excludes"]);
+    expect(
+      scene({ tags: { value: ids(600, 1), excludes: ids(400, 1000) } }).filter
+        .tags?.refs
+    ).toHaveLength(600);
+  });
+
+  it("isEmptyCriterion: empty value and excludes are omitted; excludes alone are not", () => {
+    const empty = scene({ tags: { value: [], excludes: [] } });
+    expect(empty.filter).toEqual({});
+    expect(
+      scene({ tags: { value: [], excludes: ["2:a"] } }).filter.tags
+    ).toBeDefined();
+  });
+});
+
 describe("parseSceneClipsRequest", () => {
   it("reads the scene id, includeUngenerated and instanceId", () => {
     expect(
@@ -1842,9 +1957,12 @@ describe("logIgnoredStoredRule", () => {
 });
 
 describe("parsed types", () => {
-  it("a ref field parses to a RefCriterion", () => {
-    expectTypeOf<ParsedFilter<"scene">["performers"]>().toEqualTypeOf<
+  it("a ref field parses to a RefCriterion, and one with presence to a RefPresenceCriterion too", () => {
+    expectTypeOf<ParsedFilter<"performer">["scenes"]>().toEqualTypeOf<
       RefCriterion | undefined
+    >();
+    expectTypeOf<ParsedFilter<"scene">["performers"]>().toEqualTypeOf<
+      RefCriterion | RefPresenceCriterion | undefined
     >();
     expectTypeOf<ParsedFilter<"scene">["favorite"]>().toEqualTypeOf<
       boolean | undefined

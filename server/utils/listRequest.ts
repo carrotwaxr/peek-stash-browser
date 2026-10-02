@@ -69,6 +69,7 @@ import type {
   ParsedSimilarScenesQuery,
   ParsedSort,
   RefCriterion,
+  RefFieldCriterion,
   TextCriterion,
 } from "../types/parsedFilters.js";
 import { shouldLogOnce } from "./logThrottle.js";
@@ -342,8 +343,15 @@ function requireCollectionForSceneIndex(
   problems: Problems
 ): SortField<"scene"> | undefined {
   if (field?.field !== "scene_index") return field;
-  const groups = criteria.groups as RefCriterion | undefined;
-  if (groups !== undefined && groups.modifier !== "EXCLUDES") return field;
+  // An including criterion names the collection; EXCLUDES, "has none" and
+  // "has any" name none
+  const groups = criteria.groups as RefFieldCriterion | undefined;
+  if (
+    (groups?.modifier === "INCLUDES" || groups?.modifier === "INCLUDES_ALL") &&
+    groups.refs.length > 0
+  ) {
+    return field;
+  }
   problems.add(path, "Scene Number needs a collection filter");
   return undefined;
 }
@@ -406,23 +414,53 @@ function isRange(modifier: string): modifier is RangeModifier {
   return RANGE_MODIFIERS.some((m) => m === modifier);
 }
 
-function refSchema(spec: RefSpec): z.ZodType<RefCriterion> {
+/**
+ * A ref criterion. IS_NULL and NOT_NULL (where the field offers them) need
+ * no value and ignore one. `excludes` (where the field is excludable) stay
+ * beside the values on the one criterion, which the base builder splits; an
+ * EXCLUDES modifier takes them into its own list. Otherwise value or
+ * excludes must name an id, and together at most MAX_REF_VALUES.
+ */
+function refSchema(spec: RefSpec): z.ZodType<RefFieldCriterion> {
   return z
     .strictObject({
-      value: refList.min(1, "Required"),
+      value: refList.nullish(),
       modifier: z.enum(spec.modifiers).nullish(),
       // Kept on hierarchical fields, ignored elsewhere
       depth: spec.hierarchical
         ? z.number().int().min(-1).nullish()
         : z.unknown().optional(),
+      excludes: spec.excludable
+        ? refList.nullish()
+        : z.never("Not taken by this field").optional(),
     })
-    .transform(
-      ({ value, modifier, depth }): RefCriterion => ({
-        refs: value,
-        modifier: modifier ?? spec.defaultModifier,
-        depth: spec.hierarchical && typeof depth === "number" ? depth : 0,
-      })
-    );
+    .transform((c, ctx): RefFieldCriterion => {
+      const modifier = c.modifier ?? spec.defaultModifier;
+      const depth =
+        spec.hierarchical && typeof c.depth === "number" ? c.depth : 0;
+      const value = c.value ?? [];
+      const excludes = c.excludes ?? [];
+      const withExcludes = excludes.length > 0 ? { excludes } : {};
+      if (isPresence(modifier)) {
+        return { refs: [], modifier, depth, ...withExcludes };
+      }
+      if (value.length === 0 && excludes.length === 0) {
+        ctx.addIssue({ code: "custom", path: ["value"], message: "Required" });
+        return z.NEVER;
+      }
+      if (value.length + excludes.length > MAX_REF_VALUES) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["excludes"],
+          message: `At most ${MAX_REF_VALUES} values with value`,
+        });
+        return z.NEVER;
+      }
+      if (modifier === "EXCLUDES") {
+        return { refs: [...value, ...excludes], modifier, depth };
+      }
+      return { refs: value, modifier, depth, ...withExcludes };
+    });
 }
 
 type RangeCriterion<V> =
@@ -595,8 +633,9 @@ function isEmptyValue(value: unknown): boolean {
 }
 
 /**
- * A criterion that carries nothing (an unset panel option): no value, and no
- * presence modifier, which needs none. Omitted without a record.
+ * A criterion that carries nothing (an unset panel option): no value, no
+ * excludes, and no presence modifier, which needs none. Omitted without a
+ * record.
  */
 function isEmptyCriterion(raw: unknown): boolean {
   if (raw === undefined || raw === null) return true;
@@ -604,7 +643,11 @@ function isEmptyCriterion(raw: unknown): boolean {
   if (typeof raw.modifier === "string" && isPresence(raw.modifier)) {
     return false;
   }
-  return isEmptyValue(raw.value) && isEmptyValue(raw.value2);
+  return (
+    isEmptyValue(raw.value) &&
+    isEmptyValue(raw.value2) &&
+    isEmptyValue(raw.excludes)
+  );
 }
 
 // =============================================================================
@@ -1042,7 +1085,8 @@ function parseClipRefs(
     const rawModifier = query[modifierKey];
     if (rawModifier !== undefined && rawModifier !== null) {
       const chosen = spec.modifiers.find((m) => m === rawModifier);
-      if (chosen === undefined) {
+      // No clip parameter offers presence
+      if (chosen === undefined || isPresence(chosen)) {
         // An invalid modifier drops the whole criterion
         problems.add(modifierKey, "Invalid modifier");
         return undefined;

@@ -20,7 +20,10 @@ import type {
   GroupQueryRow,
   GroupRelationQueryRow,
 } from "../types/internal/queryRows.js";
-import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
+import type {
+  ParsedFilter,
+  RefFieldCriterion,
+} from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -258,7 +261,7 @@ class GroupQueryBuilder extends EntityQueryBuilder<
    * has one studio, so the parser never sends INCLUDES_ALL here.
    */
   private async studioClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", GROUP_STUDIO, criterion, ctx, {
@@ -268,11 +271,13 @@ class GroupQueryBuilder extends EntityQueryBuilder<
 
   /** The tag filter, with the tags' descendants to the depth */
   private async tagClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
+    // "Has any" and "has none" count only tags the viewer can see
     return hierarchicalRefClause("tag", GROUP_TAGS, criterion, ctx, {
       name: ctx.name,
+      related: { table: "StashTag", entityType: "tag" },
     });
   }
 

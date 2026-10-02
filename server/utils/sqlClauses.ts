@@ -491,6 +491,92 @@ export function refClause(
     : { sql: `NOT ${includes.sql}`, params: includes.params };
 }
 
+/**
+ * The related entity a junction's ref columns name, for a presence check
+ * that counts only related rows the viewer can see (a relation filter never
+ * follows a deleted or hidden row): its table, keyed by `id` and
+ * `stashInstanceId` and soft-deleted through `deletedAt`, its
+ * `UserExcludedEntity` type, and the viewer whose exclusions apply (null
+ * when none do).
+ */
+export interface LiveRef {
+  readonly table: string;
+  readonly entityType: string;
+  readonly userId: number | null;
+}
+
+export interface RefPresenceOptions {
+  /** A second junction of the listed row's inherited refs: either counts */
+  readonly inheritedJunction?: JunctionTarget;
+  /** Count a junction row only when its related row is live and not excluded */
+  readonly liveRef?: LiveRef;
+}
+
+/**
+ * "Has any" (`present`) or "has none" of a ref relation, whatever the ids:
+ * on a column its IS NOT NULL or IS NULL; on a junction a keyed EXISTS or
+ * NOT EXISTS, one per junction with an inherited one (any in either, none
+ * in both). With `liveRef` a junction row counts only when its related row
+ * is live and, for a viewer, has no exclusion row on its own instance or on
+ * every one (`exclusionJoin` under the junction's alias plus `_x`, never
+ * `e`, the list's own).
+ */
+export function refPresenceClause(
+  target: JunctionTarget | ColumnTarget,
+  present: boolean,
+  opts: RefPresenceOptions = {}
+): FilterClause {
+  if (target.kind === "column") {
+    const col = `${target.parentAlias}.${target.idCol}`;
+    return {
+      sql: `(${col} ${present ? "IS NOT NULL" : "IS NULL"})`,
+      params: [],
+    };
+  }
+  const { liveRef } = opts;
+  const exists = (t: JunctionTarget): FilterClause => {
+    const j = t.alias;
+    const [id, instance] = parentKeyOf(t);
+    const keyed = `${j}.${t.parentIdCol} = ${id} AND ${j}.${t.parentInstanceCol} = ${instance}`;
+    if (liveRef === undefined) {
+      return {
+        sql: `EXISTS (SELECT 1 FROM ${t.table} ${j} WHERE ${keyed})`,
+        params: [],
+      };
+    }
+    const r = `${j}_ref`;
+    const refId = `${j}.${t.refIdCol}`;
+    const refInstance = `${j}.${t.refInstanceCol}`;
+    const live = `JOIN ${liveRef.table} ${r} ON ${r}.id = ${refId} AND ${r}.stashInstanceId = ${refInstance}`;
+    if (liveRef.userId === null) {
+      return {
+        sql: `EXISTS (SELECT 1 FROM ${t.table} ${j} ${live} WHERE ${keyed} AND ${r}.deletedAt IS NULL)`,
+        params: [],
+      };
+    }
+    const x = `${j}_x`;
+    return {
+      sql: `EXISTS (SELECT 1 FROM ${t.table} ${j} ${live} ${exclusionJoin(x, liveRef.entityType, refId, refInstance)} WHERE ${keyed} AND ${r}.deletedAt IS NULL AND ${x}.id IS NULL)`,
+      params: [liveRef.userId],
+    };
+  };
+  const arms = [
+    target,
+    ...(opts.inheritedJunction ? [opts.inheritedJunction] : []),
+  ].map(exists);
+  const params = arms.flatMap((a) => a.params);
+  if (arms.length === 1) {
+    const sql = arms.map((a) => a.sql).join("");
+    return present ? { sql, params } : { sql: `NOT ${sql}`, params };
+  }
+  return present
+    ? { sql: `(${arms.map((a) => a.sql).join(" OR ")})`, params }
+    : {
+        sql: `(${arms.map((a) => `NOT ${a.sql}`).join(" AND ")})`,
+        params,
+      };
+}
+
 // =============================================================================
 // THE LISTED ENTITY'S OWN ID
 // =============================================================================

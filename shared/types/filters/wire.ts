@@ -15,7 +15,7 @@ import type {
   NumberModifier,
   NumberSpec,
   PresenceModifier,
-  RefModifier,
+  RefFieldModifier,
   RefSpec,
   TextModifier,
   TextSpec,
@@ -40,15 +40,23 @@ import type {
 // CRITERIA
 // =============================================================================
 
-/** Ids as `"id:instanceId"`; a bare id matches that id on every instance */
-export interface RefInput<M extends RefModifier = RefModifier> {
+/**
+ * Ids as `"id:instanceId"`; a bare id matches that id on every instance.
+ * IS_NULL ("has none") and NOT_NULL ("has any"), where the field offers
+ * them, take an empty value. `excludes`, where the field takes them, are
+ * ids none of which a row may have, beside the value's (an EXCLUDES
+ * modifier adds them to its own); value and excludes hold at most
+ * MAX_REF_VALUES together.
+ */
+export interface RefInput<M extends RefFieldModifier = RefFieldModifier> {
   value: string[];
   modifier?: M | null;
+  excludes?: string[];
 }
 
-/** A hierarchical ref: depth -1 adds every descendant, n that many levels */
+/** A hierarchical ref: depth -1 adds every descendant, n that many levels (the excludes' too) */
 export interface HierarchicalRefInput<
-  M extends RefModifier = RefModifier,
+  M extends RefFieldModifier = RefFieldModifier,
 > extends RefInput<M> {
   depth?: number | null;
 }

@@ -49,6 +49,26 @@ export type RangeModifier = (typeof RANGE_MODIFIERS)[number];
 export const PRESENCE_MODIFIERS = ["IS_NULL", "NOT_NULL"] as const;
 export type PresenceModifier = (typeof PRESENCE_MODIFIERS)[number];
 
+/**
+ * A ref field whose row can have none of the relation (a scene's
+ * performers): the ref modifiers, and IS_NULL ("has none") and NOT_NULL
+ * ("has any"), which take no value. Only live related rows the viewer can
+ * see count.
+ */
+export const REF_PRESENCE_MODIFIERS = [
+  ...REF_MODIFIERS,
+  ...PRESENCE_MODIFIERS,
+] as const;
+
+/** A single-valued ref with presence (a scene's studio): no INCLUDES_ALL */
+export const SINGLE_REF_PRESENCE_MODIFIERS = [
+  ...SINGLE_REF_MODIFIERS,
+  ...PRESENCE_MODIFIERS,
+] as const;
+
+/** What a ref field's criterion may say: which ids, or none or any at all */
+export type RefFieldModifier = RefModifier | PresenceModifier;
+
 export const NUMBER_MODIFIERS = [
   ...COMPARISON_MODIFIERS,
   ...RANGE_MODIFIERS,
@@ -186,7 +206,7 @@ export type FieldKind = (typeof FIELD_KINDS)[number];
 /** Ids of another entity, sent as `"id:instanceId"` (a bare id matches every instance) */
 export interface RefSpec<
   T extends EntityKind = EntityKind,
-  M extends RefModifier = RefModifier,
+  M extends RefFieldModifier = RefFieldModifier,
   H extends boolean = boolean,
   S extends boolean = boolean,
 > {
@@ -194,12 +214,18 @@ export interface RefSpec<
   /** The entity the ids name */
   readonly target: T;
   readonly modifiers: readonly M[];
-  /** What a missing or null modifier means */
-  readonly defaultModifier: M;
+  /** What a missing or null modifier means: never a presence check */
+  readonly defaultModifier: Extract<M, RefModifier>;
   /** Takes a depth: -1 adds every descendant, n that many levels */
   readonly hierarchical: H;
   /** The row has at most one (a scene's studio), so no INCLUDES_ALL */
   readonly single: S;
+  /**
+   * Takes `excludes`, ids none of which a row may have, beside the values
+   * (Stash's include/exclude picker): "tag 1 but not tag 2". With a depth
+   * the excluded ids' descendants are excluded too.
+   */
+  readonly excludable: boolean;
   /**
    * Where the request carries it when that is not `<entity>_filter.<field>`:
    * `["scenes_filter", "id"]` is `tag_filter.scenes_filter.id`
@@ -280,21 +306,26 @@ type Flag<O, K extends string> = O extends { readonly [P in K]: true }
   : false;
 
 interface RefOptions {
-  readonly modifiers?: readonly RefModifier[];
+  readonly modifiers?: readonly RefFieldModifier[];
   readonly defaultModifier?: RefModifier;
   readonly hierarchical?: boolean;
   readonly single?: boolean;
+  /** Adds IS_NULL ("has none") and NOT_NULL ("has any") to the default modifiers */
+  readonly presence?: boolean;
+  /** Takes `excludes` beside the values */
+  readonly excludable?: boolean;
   readonly path?: readonly [string, string];
 }
 
 type RefModifiersOf<O> = Extract<
   ModifiersOf<
     O,
-    O extends { readonly single: true }
-      ? (typeof SINGLE_REF_MODIFIERS)[number]
-      : RefModifier
+    | (O extends { readonly single: true }
+        ? (typeof SINGLE_REF_MODIFIERS)[number]
+        : RefModifier)
+    | (O extends { readonly presence: true } ? PresenceModifier : never)
   >,
-  RefModifier
+  RefFieldModifier
 >;
 
 type RefSpecOf<T extends EntityKind, O> = RefSpec<
@@ -309,21 +340,30 @@ type RefSpecOf<T extends EntityKind, O> = RefSpec<
 
 /**
  * A ref field. By default any of INCLUDES, INCLUDES_ALL and EXCLUDES
- * (INCLUDES and EXCLUDES when single), INCLUDES when the modifier is missing.
+ * (INCLUDES and EXCLUDES when single), with IS_NULL and NOT_NULL when it
+ * has `presence`; INCLUDES when the modifier is missing.
  */
 export function ref<
   const T extends EntityKind,
   const O extends RefOptions = NoOptions,
 >(target: T, options?: O): RefSpecOf<T, O> {
   const single = options?.single ?? false;
+  const presence = options?.presence ?? false;
+  const defaults = single
+    ? presence
+      ? SINGLE_REF_PRESENCE_MODIFIERS
+      : SINGLE_REF_MODIFIERS
+    : presence
+      ? REF_PRESENCE_MODIFIERS
+      : REF_MODIFIERS;
   const spec: RefSpec = {
     kind: "ref",
     target,
-    modifiers:
-      options?.modifiers ?? (single ? SINGLE_REF_MODIFIERS : REF_MODIFIERS),
+    modifiers: options?.modifiers ?? defaults,
     defaultModifier: options?.defaultModifier ?? "INCLUDES",
     hierarchical: options?.hierarchical ?? false,
     single,
+    excludable: options?.excludable ?? false,
     ...(options?.path ? { path: options.path } : {}),
   };
   return spec as RefSpecOf<T, O>;
