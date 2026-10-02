@@ -1,5 +1,6 @@
 /**
- * The hierarchy expansion behind the tag and studio filters (item 34b): a
+ * The hierarchy expansion behind the tag, studio and collection filters
+ * (item 34b), down to descendants and up to ancestors: a
  * ref with an instance expands within that instance's tree, a bare ref on
  * every allowed instance, and each descendant carries the instance it was
  * found on. One slim load per request covers every involved instance.
@@ -54,6 +55,41 @@ const TAGS = [
   tag("284", B),
   tag("290", B, "284"),
   partialRow<TagRow>({ id: "299", stashInstanceId: B, parentIds: "not json" }),
+];
+
+type GroupLinkRow = Awaited<
+  ReturnType<typeof prisma.groupRelation.findMany>
+>[number];
+
+/** A collection link; `gone` marks a deleted end ("containing" or "sub") */
+const link = (
+  containingId: string,
+  subId: string,
+  instanceId: string,
+  gone?: "containing" | "sub"
+) => ({
+  row: partialRow<GroupLinkRow>({
+    containingId,
+    containingInstanceId: instanceId,
+    subId,
+    subInstanceId: instanceId,
+  }),
+  gone,
+});
+
+/**
+ * xi-a: 10 contains 11, 11 contains 12, 20 contains 21 (21 deleted), 30
+ * contains 31 (31 contains 30, a cycle), 40 (deleted) contains 41;
+ * xi-b: 10 contains 13 (the same id, another tree)
+ */
+const GROUP_LINKS = [
+  link("10", "11", A),
+  link("11", "12", A),
+  link("20", "21", A, "sub"),
+  link("30", "31", A),
+  link("31", "30", A),
+  link("40", "41", A, "containing"),
+  link("10", "13", B),
 ];
 
 /** xi-a: 40 > 41 > 42; xi-b: 40 > 43 */
@@ -185,6 +221,151 @@ describe("expandRefs", () => {
   it("a parent list that is not JSON makes the tag a root", async () => {
     expect(await expandRefs("tag", [ref("299", B)], -1, [B])).toEqual([
       ref("299", B),
+    ]);
+  });
+});
+
+describe("expandRefs upwards", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.stashTag.findMany.mockImplementation(((args: {
+      where: { stashInstanceId: { in: string[] } };
+    }) =>
+      Promise.resolve(
+        TAGS.filter((row) =>
+          args.where.stashInstanceId.in.includes(row.stashInstanceId)
+        )
+      )) as never);
+  });
+
+  it("expands a tag's ancestors to the depth", async () => {
+    const tags = [tag("1", A), tag("2", A, "1"), tag("3", A, "2")];
+    mockPrisma.stashTag.findMany.mockResolvedValue(tags);
+
+    expect(await expandRefs("tag", [ref("3", A)], 1, [A], "up")).toEqual([
+      ref("3", A),
+      ref("2", A),
+    ]);
+    expect(await expandRefs("tag", [ref("3", A)], -1, [A], "up")).toEqual([
+      ref("3", A),
+      ref("2", A),
+      ref("1", A),
+    ]);
+  });
+
+  it("walks a tag with two parents to both", async () => {
+    expect(await expandRefs("tag", [ref("293", A)], -1, [A], "up")).toEqual([
+      ref("293", A),
+      ref("285", A),
+      ref("291", A),
+      ref("284", A),
+      ref("290", A),
+    ]);
+  });
+
+  it("walks a studio up to its parent", async () => {
+    mockPrisma.stashStudio.findMany.mockResolvedValue([
+      studio("40", A),
+      studio("41", A, "40"),
+      studio("42", A, "41"),
+    ]);
+
+    expect(await expandRefs("studio", [ref("42", A)], -1, [A], "up")).toEqual([
+      ref("42", A),
+      ref("41", A),
+      ref("40", A),
+    ]);
+  });
+});
+
+describe("expandRefs over collections", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.groupRelation.findMany.mockImplementation(((args: {
+      where: {
+        containingInstanceId: { in: string[] };
+        subInstanceId: { in: string[] };
+        containing: { deletedAt: null };
+        sub: { deletedAt: null };
+      };
+    }) =>
+      Promise.resolve(
+        GROUP_LINKS.filter(
+          ({ row, gone }) =>
+            args.where.containingInstanceId.in.includes(
+              row.containingInstanceId
+            ) &&
+            args.where.subInstanceId.in.includes(row.subInstanceId) &&
+            gone === undefined
+        ).map(({ row }) => row)
+      )) as never);
+  });
+
+  it("expands a collection's sub-collections from GroupRelation", async () => {
+    expect(await expandRefs("group", [ref("10", A)], -1, [A])).toEqual([
+      ref("10", A),
+      ref("11", A),
+      ref("12", A),
+    ]);
+    expect(await expandRefs("group", [ref("12", A)], -1, [A], "up")).toEqual([
+      ref("12", A),
+      ref("11", A),
+      ref("10", A),
+    ]);
+    expect(await expandRefs("group", [ref("10", A)], 1, [A])).toEqual([
+      ref("10", A),
+      ref("11", A),
+    ]);
+  });
+
+  it("loads the links in one statement over the live collections of the instances", async () => {
+    await expandRefs("group", [ref("10", A), bare("10")], -1, [A, B]);
+
+    expect(mockPrisma.groupRelation.findMany).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.groupRelation.findMany.mock.calls[0]?.[0]).toMatchObject({
+      where: {
+        containingInstanceId: { in: [A, B] },
+        subInstanceId: { in: [A, B] },
+        containing: { deletedAt: null },
+        sub: { deletedAt: null },
+      },
+    });
+  });
+
+  it("keeps each instance's tree apart", async () => {
+    expect(await expandRefs("group", [ref("10", B)], -1, [A, B])).toEqual([
+      ref("10", B),
+      ref("13", B),
+    ]);
+    expect(await expandRefs("group", [bare("10")], -1, [A, B])).toEqual([
+      ref("10", A),
+      ref("11", A),
+      ref("12", A),
+      ref("10", B),
+      ref("13", B),
+    ]);
+    expect(await expandRefs("group", [ref("13", A)], -1, [A, B], "up")).toEqual(
+      [ref("13", A)]
+    );
+  });
+
+  it("ends a cycle, listing each collection once", async () => {
+    expect(await expandRefs("group", [ref("30", A)], -1, [A])).toEqual([
+      ref("30", A),
+      ref("31", A),
+    ]);
+    expect(await expandRefs("group", [ref("31", A)], -1, [A], "up")).toEqual([
+      ref("31", A),
+      ref("30", A),
+    ]);
+  });
+
+  it("skips a deleted collection's links", async () => {
+    expect(await expandRefs("group", [ref("20", A)], -1, [A])).toEqual([
+      ref("20", A),
+    ]);
+    expect(await expandRefs("group", [ref("40", A)], -1, [A])).toEqual([
+      ref("40", A),
     ]);
   });
 });

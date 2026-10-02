@@ -3,7 +3,7 @@
  * `vi.mock("../../utils/hierarchyUtils.js", () => import("../helpers/hierarchyMock.js"))`.
  *
  * With a depth, each ref expands to itself and one descendant, "99", on the
- * ref's own instance; a bare ref does so on every allowed instance. Depth 0
+ * ref's own instance (the direction is ignored); a bare ref does so on every allowed instance. Depth 0
  * leaves the refs as they are, as the real expansion does.
  */
 import { vi } from "vitest";
@@ -28,10 +28,11 @@ function expandOne(
 
 export const expandRefsEach = vi.fn(
   (
-    _kind: "tag" | "studio",
+    _kind: "tag" | "studio" | "group",
     refs: readonly FilterRef[],
     depth: number,
-    allowedInstanceIds: readonly string[]
+    allowedInstanceIds: readonly string[],
+    _direction: "down" | "up" = "down"
   ): Promise<readonly (readonly FilterRef[])[]> =>
     Promise.resolve(
       refs.map((ref) => expandOne(ref, depth, allowedInstanceIds))
@@ -53,12 +54,15 @@ function distinct(groups: readonly (readonly FilterRef[])[]): FilterRef[] {
 
 export const expandRefs = vi.fn(
   (
-    kind: "tag" | "studio",
+    kind: "tag" | "studio" | "group",
     refs: readonly FilterRef[],
     depth: number,
-    allowedInstanceIds: readonly string[]
+    allowedInstanceIds: readonly string[],
+    direction: "down" | "up" = "down"
   ): Promise<readonly FilterRef[]> =>
     depth === 0
       ? Promise.resolve(refs)
-      : expandRefsEach(kind, refs, depth, allowedInstanceIds).then(distinct)
+      : expandRefsEach(kind, refs, depth, allowedInstanceIds, direction).then(
+          distinct
+        )
 );
