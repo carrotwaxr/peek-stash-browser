@@ -44,12 +44,13 @@ export const findGroups = async (
   // Exclusions apply to every user; an admin's rows hold only their own hides
   const applyExclusions = true;
 
-  const { allowedInstanceIds } = req;
+  const { allowedInstanceIds, timeZone } = req;
 
   // Use SQL-native query builder
   const { items: groups, total } = await groupQueryBuilder.execute({
     userId,
     allowedInstanceIds,
+    timeZone,
     request,
     applyExclusions,
   });

@@ -39,8 +39,8 @@ export const COMPARISON_MODIFIERS = [
 ] as const;
 
 /**
- * A range: a number's BETWEEN takes either side alone (at least, at most);
- * NOT_BETWEEN, and a date's BETWEEN, need both `value` and `value2`
+ * A range: BETWEEN takes either side alone (at least, at most; a date's side
+ * includes its own day); NOT_BETWEEN needs both `value` and `value2`
  */
 export const RANGE_MODIFIERS = ["BETWEEN", "NOT_BETWEEN"] as const;
 export type RangeModifier = (typeof RANGE_MODIFIERS)[number];
@@ -67,7 +67,15 @@ export const NULLABLE_NUMBER_MODIFIERS = [
   ...PRESENCE_MODIFIERS,
 ] as const;
 
-/** Values are YYYY-MM-DD dates or ISO date-times */
+/**
+ * Values are YYYY-MM-DD dates or ISO date-times. A day is a whole day:
+ * EQUALS is in it, GREATER_THAN after it, LESS_THAN before it, BETWEEN
+ * includes both ends and takes one side alone. Stash's text dates compare
+ * as days (a year or month is its first day); its created and updated times
+ * and the viewer's last play read the day in the viewer's time zone (the
+ * `X-Peek-Time-Zone` header, UTC without one). A row without a date
+ * matches only IS_NULL.
+ */
 export const DATE_MODIFIERS = NUMBER_MODIFIERS;
 export type DateModifier = NumberModifier;
 

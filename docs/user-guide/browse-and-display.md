@@ -230,7 +230,9 @@ A number range (rating, height, weight, duration and the like) never matches an 
 
 ### Date Ranges
 
-Set a start date, an end date, or both. A start alone matches later dates, an end alone earlier dates, and both the dates in between.
+Set a start date, an end date, or both. Both ends are included: a start alone matches that day and later, an end alone that day and earlier, and both the days in between, so the same day as start and end lists that one day. An item with no date never matches a range.
+
+Created, updated and last-played dates follow your device's time zone: a scene you played at 8 pm is under that day, wherever the server is. A release date or birthdate is a plain calendar day; one Stash holds as a year or a month alone counts as its first day.
 
 ### Studio and Tag Pages
 

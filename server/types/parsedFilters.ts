@@ -66,14 +66,25 @@ export type NumberCriterion =
     }
   | { readonly modifier: "IS_NULL" | "NOT_NULL" };
 
-/** Values are validated YYYY-MM-DD or ISO date-times, not reinterpreted: column kinds are item 43's (PR 9). */
+/**
+ * Values are validated YYYY-MM-DD dates or ISO date-times. BETWEEN has at
+ * least one side: value alone is from that day on, value2 alone up to the
+ * end of its day. NOT_BETWEEN has both. A builder reads a day in the
+ * column's kind (`buildDayFilter`, `buildInstantFilter` in
+ * `utils/sqlClauses.ts`).
+ */
 export type DateCriterion =
   | {
       readonly modifier: "EQUALS" | "NOT_EQUALS" | "GREATER_THAN" | "LESS_THAN";
       readonly value: string;
     }
   | {
-      readonly modifier: "BETWEEN" | "NOT_BETWEEN";
+      readonly modifier: "BETWEEN";
+      readonly value: string | undefined;
+      readonly value2: string | undefined;
+    }
+  | {
+      readonly modifier: "NOT_BETWEEN";
       readonly value: string;
       readonly value2: string;
     }

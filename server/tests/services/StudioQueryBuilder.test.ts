@@ -314,7 +314,7 @@ describe("StudioQueryBuilder", () => {
         "MAX(s.sceneCount - COALESCE(d.scenes, 0), 0) != ?",
         "LOWER(s.name) = LOWER(?)",
         "(s.details LIKE ? ESCAPE '\\')",
-        "s.stashCreatedAt BETWEEN ? AND ?",
+        "(s.stashCreatedAt >= ? AND s.stashCreatedAt < ?)",
         "s.stashUpdatedAt IS NULL",
       ]) {
         expect(sql).toContain(fragment);

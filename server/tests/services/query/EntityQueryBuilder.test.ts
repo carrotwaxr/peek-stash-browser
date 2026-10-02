@@ -1121,6 +1121,7 @@ describe("the field clause table", () => {
       allowedInstanceIds: ["inst-a"],
       specificInstanceId: undefined,
       sortField: "rating",
+      timeZone: "UTC",
       name,
       underAny: false,
     });

@@ -44,6 +44,9 @@ export interface TypedAuthRequest<
  * and the instances the user sees content from, resolved once for the
  * request by `requireCacheReady`, `requirePickerReady` or
  * `withAllowedInstances`. An empty list matches nothing in every reader.
+ * `timeZone` is the viewer's IANA zone (`middleware/requestTimeZone.ts`,
+ * "UTC" without a valid header), which the list builders read date
+ * filters in.
  */
 export type TypedLibraryRequest<
   TBody = unknown,
@@ -54,6 +57,7 @@ export type TypedLibraryRequest<
   >,
 > = TypedAuthRequest<TBody, TParams, TQuery> & {
   readonly allowedInstanceIds: readonly string[];
+  readonly timeZone: string;
 };
 
 /**

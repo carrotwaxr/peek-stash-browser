@@ -16,7 +16,7 @@ import type {
   FilterRef,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
-import { galleryNameSql } from "../../utils/sqlClauses.js";
+import { fullDateSql, galleryNameSql } from "../../utils/sqlClauses.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -423,8 +423,8 @@ describe("GalleryQueryBuilder", () => {
         "r.rating > ?",
         "MAX(g.imageCount - COALESCE(d.images, 0), 0) BETWEEN ? AND ?",
         `(${galleryNameSql("g")} LIKE ? ESCAPE '\\')`,
-        "g.date < ?",
-        "g.stashCreatedAt > ?",
+        `substr(${fullDateSql("g.date")}, 1, 10) < ?`,
+        "g.stashCreatedAt >= ?",
         "g.stashUpdatedAt IS NOT NULL",
       ]) {
         expect(sql).toContain(fragment);

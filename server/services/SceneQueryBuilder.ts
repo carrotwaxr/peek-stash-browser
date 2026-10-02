@@ -34,9 +34,9 @@ import {
   type JunctionTarget,
   type PerformerAgeSource,
   type SqlFragment,
-  buildDateFilter,
-  buildEpochDateFilter,
+  buildDayFilter,
   buildFavoriteFilter,
+  buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
   noClause,
@@ -230,6 +230,8 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       allowedInstanceIds: [],
       specificInstanceId: undefined,
       sortField: sort.field,
+      // No sort reads it
+      timeZone: "UTC",
     };
     const expr = this.sortExpr(sort.field, sort.direction, sort.seed, {}, ctx);
     return {
@@ -370,10 +372,13 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     director: (c) => buildTextFilter(c, "s.director"),
 
     // Dates
-    date: (c) => buildDateFilter(c, "s.date"),
-    created_at: (c) => buildDateFilter(c, "s.stashCreatedAt"),
-    updated_at: (c) => buildDateFilter(c, "s.stashUpdatedAt"),
-    last_played_at: (c) => buildEpochDateFilter(c, "w.lastPlayedAt"),
+    date: (c) => buildDayFilter(c, "s.date"),
+    created_at: (c, ctx) =>
+      buildInstantFilter(c, "s.stashCreatedAt", ctx.timeZone),
+    updated_at: (c, ctx) =>
+      buildInstantFilter(c, "s.stashUpdatedAt", ctx.timeZone),
+    last_played_at: (c, ctx) =>
+      buildInstantFilter(c, "w.lastPlayedAt", ctx.timeZone),
 
     // Numbers
     bitrate: (c) => buildNumericFilter(c, "s.fileBitRate"),

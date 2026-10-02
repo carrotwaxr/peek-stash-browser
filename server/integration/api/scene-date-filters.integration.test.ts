@@ -1,6 +1,32 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
+import { must } from "../../tests/helpers/must.js";
+import type { DateCriterion, ParsedFilter } from "../../types/parsedFilters.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
-import { adminClient } from "../helpers/testClient.js";
+import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
+
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
+
+const CHICAGO = "America/Chicago";
+const IN_CHICAGO = { headers: { "X-Peek-Time-Zone": CHICAGO } };
+
+/** The calendar day an instant falls on in a zone, as YYYY-MM-DD */
+function localDay(iso: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(iso));
+  const part = (type: string) =>
+    must(
+      parts.find((p) => p.type === type),
+      type
+    ).value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
 
 /**
  * Scene Date Filters Integration Tests
@@ -16,6 +42,7 @@ interface FindScenesResponse {
   findScenes: {
     scenes: Array<{
       id: string;
+      instanceId: string;
       title?: string;
       date?: string;
       created_at?: string;
@@ -439,5 +466,372 @@ describe("Scene Date Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
+  });
+});
+
+/**
+ * One day rule (item 43): a `YYYY-MM-DD` bound is a whole day, BETWEEN
+ * includes both ends, and created, updated and last-played days are the
+ * viewer's, in the zone the request names (`X-Peek-Time-Zone`), UTC without
+ * one.
+ */
+describe("Scene date filters: the viewer's day", () => {
+  /** The newest created scene on the test instance, as "id:instance" */
+  let scene: { ref: string; createdAt: string; date: string | null };
+
+  beforeAll(async () => {
+    await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    const instanceId = await findTestInstanceId();
+    const response = await adminClient.post<FindScenesResponse>(
+      "/api/library/scenes",
+      {
+        filter: { per_page: 250, sort: "created_at", direction: "DESC" },
+        scene_filter: { date: { modifier: "NOT_NULL" } },
+      }
+    );
+    expect(response.ok, JSON.stringify(response.data)).toBe(true);
+    const found = must(
+      response.data.findScenes.scenes.find(
+        (s) => s.instanceId === instanceId && s.created_at
+      ),
+      "a dated scene with a created time on the test instance"
+    );
+    scene = {
+      ref: `${found.id}:${found.instanceId}`,
+      createdAt: must(found.created_at, "created_at"),
+      date: found.date ?? null,
+    };
+  });
+
+  async function listsScene(
+    sceneFilter: Record<string, unknown>,
+    options?: { headers: Record<string, string> }
+  ): Promise<boolean> {
+    const response = await adminClient.post<FindScenesResponse>(
+      "/api/library/scenes",
+      {
+        filter: { per_page: 10 },
+        scene_filter: {
+          ids: { value: [scene.ref], modifier: "INCLUDES" },
+          ...sceneFilter,
+        },
+      },
+      options
+    );
+    expect(response.ok, JSON.stringify(response.data)).toBe(true);
+    return response.data.findScenes.scenes.some(
+      (s) => `${s.id}:${s.instanceId}` === scene.ref
+    );
+  }
+
+  it("a same-day created range lists the scenes created that local day", async () => {
+    const day = localDay(scene.createdAt, CHICAGO);
+    expect(
+      await listsScene(
+        { created_at: { modifier: "BETWEEN", value: day, value2: day } },
+        IN_CHICAGO
+      )
+    ).toBe(true);
+    expect(
+      await listsScene(
+        { created_at: { modifier: "EQUALS", value: day } },
+        IN_CHICAGO
+      )
+    ).toBe(true);
+  });
+
+  it("a request without a time zone reads the day in UTC", async () => {
+    const day = localDay(scene.createdAt, "UTC");
+    expect(
+      await listsScene({
+        created_at: { modifier: "BETWEEN", value: day, value2: day },
+      })
+    ).toBe(true);
+  });
+
+  it("one-sided created ranges include their own day, and After leaves it out", async () => {
+    const day = localDay(scene.createdAt, CHICAGO);
+    expect(
+      await listsScene(
+        { created_at: { modifier: "BETWEEN", value: day } },
+        IN_CHICAGO
+      )
+    ).toBe(true);
+    expect(
+      await listsScene(
+        { created_at: { modifier: "BETWEEN", value2: day } },
+        IN_CHICAGO
+      )
+    ).toBe(true);
+    expect(
+      await listsScene(
+        { created_at: { modifier: "GREATER_THAN", value: day } },
+        IN_CHICAGO
+      )
+    ).toBe(false);
+  });
+
+  it("a From date alone includes its own day", async () => {
+    const date = must(scene.date, "the scene's date");
+    // A full date, or a year or month Stash keeps, read as its first day
+    const first = `${date}-01-01`.slice(0, 10);
+    expect(
+      await listsScene({ date: { modifier: "BETWEEN", value: first } })
+    ).toBe(true);
+    expect(
+      await listsScene({ date: { modifier: "BETWEEN", value2: first } })
+    ).toBe(true);
+    expect(
+      await listsScene({
+        date: { modifier: "BETWEEN", value: first, value2: first },
+      })
+    ).toBe(true);
+  });
+
+  it("a carousel answers a same-day created range like the scene list", async () => {
+    const day = localDay(scene.createdAt, CHICAGO);
+    const preview = await adminClient.post<{
+      scenes: Array<{ id: string; instanceId: string }>;
+    }>(
+      "/api/carousels/preview",
+      {
+        rules: {
+          ids: { value: [scene.ref], modifier: "INCLUDES" },
+          created_at: { modifier: "BETWEEN", value: day, value2: day },
+        },
+        sort: "created_at",
+        direction: "DESC",
+      },
+      IN_CHICAGO
+    );
+    expect(preview.ok, JSON.stringify(preview.data)).toBe(true);
+    expect(preview.data.scenes.map((s) => `${s.id}:${s.instanceId}`)).toEqual([
+      scene.ref,
+    ]);
+  });
+});
+
+/**
+ * Seeded scenes on two made-up instances that reuse ids, read through the
+ * builder in process:
+ * - sdf-a 7896001: created 2021-10-13T03:00Z (22:00 on 12 Oct in Chicago,
+ *   13 Oct in UTC), dated 2021-10-12
+ * - sdf-a 7896002: created 2021-10-12T12:00Z, dated `2021` (its 1 January);
+ *   the viewer last played it 2021-10-13T02:00Z (12 Oct in Chicago)
+ * - sdf-a 7896003: no created time, no date
+ * - sdf-a 7896004: created 2021-10-12T15:00Z, dated 2021-10-12, hidden by
+ *   the viewer
+ * - sdf-b 7896001: created 2021-10-20T12:00Z, dated 2021-10-20
+ * Another user played sdf-a 7896001 on 12 Oct. Every seeded row and both
+ * users are deleted before the file ends.
+ */
+describeWithDb("Scene date filters (seeded)", () => {
+  const A = "sdf-a";
+  const B = "sdf-b";
+  const VIEWER = "scene-date-filters-viewer";
+  const OTHER = "scene-date-filters-other";
+  let viewerId = 0;
+
+  const scene = (
+    id: string,
+    instance: string,
+    createdAt: string | null,
+    date: string | null
+  ) => ({
+    id,
+    stashInstanceId: instance,
+    title: `SDF ${id} ${instance}`,
+    stashCreatedAt: createdAt === null ? null : new Date(createdAt),
+    stashUpdatedAt: createdAt === null ? null : new Date(createdAt),
+    date,
+  });
+
+  async function removeRows(): Promise<void> {
+    await prisma.user.deleteMany({
+      where: { username: { in: [VIEWER, OTHER] } },
+    });
+    await prisma.stashScene.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+  }
+
+  /** The scenes a filter lists for the viewer, as sorted "id:instance" keys */
+  async function listed(
+    filter: ParsedFilter<"scene">,
+    options: { timeZone?: string; applyExclusions?: boolean } = {}
+  ): Promise<string[]> {
+    const { items, total } = await sceneQueryBuilder.execute({
+      userId: viewerId,
+      allowedInstanceIds: [A, B],
+      request: parsedListRequest("scene", { perPage: 50, filter }),
+      ...options,
+    });
+    expect(total).toBe(items.length);
+    return items.map((s) => `${s.id}:${s.instanceId}`).sort();
+  }
+
+  const created = (criterion: DateCriterion, timeZone = CHICAGO) =>
+    listed({ created_at: criterion }, { timeZone });
+
+  beforeAll(async () => {
+    await removeRows();
+    await prisma.stashScene.createMany({
+      data: [
+        scene("7896001", A, "2021-10-13T03:00:00Z", "2021-10-12"),
+        scene("7896002", A, "2021-10-12T12:00:00Z", "2021"),
+        scene("7896003", A, null, null),
+        scene("7896004", A, "2021-10-12T15:00:00Z", "2021-10-12"),
+        scene("7896001", B, "2021-10-20T12:00:00Z", "2021-10-20"),
+      ],
+    });
+    const viewer = await prisma.user.create({
+      data: { username: VIEWER, password: "x", role: "USER" },
+    });
+    viewerId = viewer.id;
+    const other = await prisma.user.create({
+      data: { username: OTHER, password: "x", role: "USER" },
+    });
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: viewerId,
+        entityType: "scene",
+        entityId: "7896004",
+        instanceId: A,
+        reason: "hidden",
+      },
+    });
+    await prisma.watchHistory.createMany({
+      data: [
+        {
+          userId: viewerId,
+          instanceId: A,
+          sceneId: "7896002",
+          playCount: 1,
+          lastPlayedAt: new Date("2021-10-13T02:00:00Z"),
+        },
+        {
+          userId: other.id,
+          instanceId: A,
+          sceneId: "7896001",
+          playCount: 1,
+          lastPlayedAt: new Date("2021-10-12T18:00:00Z"),
+        },
+      ],
+    });
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  const OCT_12: DateCriterion = {
+    modifier: "BETWEEN",
+    value: "2021-10-12",
+    value2: "2021-10-12",
+  };
+
+  it("a same-day created range is the viewer's local day", async () => {
+    expect(await created(OCT_12)).toEqual(["7896001:sdf-a", "7896002:sdf-a"]);
+    // 7896001 was created on 13 Oct in UTC
+    expect(await created(OCT_12, "UTC")).toEqual(["7896002:sdf-a"]);
+    expect(
+      await created({ modifier: "EQUALS", value: "2021-10-13" }, "UTC")
+    ).toEqual(["7896001:sdf-a"]);
+  });
+
+  it("a request with no time zone reads the day in UTC", async () => {
+    expect(await listed({ created_at: OCT_12 })).toEqual(["7896002:sdf-a"]);
+  });
+
+  it("a match on one instance never pulls the other's row of the same id", async () => {
+    expect(await created({ modifier: "EQUALS", value: "2021-10-20" })).toEqual([
+      "7896001:sdf-b",
+    ]);
+    expect(
+      await listed({ date: { modifier: "EQUALS", value: "2021-10-12" } })
+    ).toEqual(["7896001:sdf-a"]);
+  });
+
+  it("a scene the viewer hid is never listed under a created-date range", async () => {
+    // Without the viewer's exclusions it would match
+    expect(
+      await listed(
+        { created_at: OCT_12 },
+        { timeZone: CHICAGO, applyExclusions: false }
+      )
+    ).toContain("7896004:sdf-a");
+    const forms: DateCriterion[] = [
+      OCT_12,
+      { modifier: "BETWEEN", value: "2021-10-01", value2: undefined },
+      { modifier: "BETWEEN", value: undefined, value2: "2021-10-31" },
+      { modifier: "EQUALS", value: "2021-10-12" },
+      { modifier: "NOT_EQUALS", value: "2021-10-20" },
+      { modifier: "NOT_BETWEEN", value: "2021-10-20", value2: "2021-10-21" },
+      { modifier: "LESS_THAN", value: "2021-10-20" },
+      { modifier: "GREATER_THAN", value: "2021-10-01" },
+      { modifier: "NOT_NULL" },
+    ];
+    for (const form of forms) {
+      expect(await created(form), form.modifier).not.toContain("7896004:sdf-a");
+    }
+    expect(
+      await listed({ date: { modifier: "NOT_NULL" } }, { timeZone: CHICAGO })
+    ).not.toContain("7896004:sdf-a");
+  });
+
+  it("a scene without a created time matches no comparison, negatives included", async () => {
+    expect(
+      await created({ modifier: "NOT_EQUALS", value: "2021-10-12" })
+    ).toEqual(["7896001:sdf-b"]);
+    expect(
+      await created({
+        modifier: "NOT_BETWEEN",
+        value: "2021-10-12",
+        value2: "2021-10-12",
+      })
+    ).toEqual(["7896001:sdf-b"]);
+    expect(await created({ modifier: "IS_NULL" })).toEqual(["7896003:sdf-a"]);
+  });
+
+  it("one-sided ranges include their own day", async () => {
+    expect(
+      await created({
+        modifier: "BETWEEN",
+        value: "2021-10-20",
+        value2: undefined,
+      })
+    ).toEqual(["7896001:sdf-b"]);
+    expect(
+      await created({
+        modifier: "BETWEEN",
+        value: undefined,
+        value2: "2021-10-12",
+      })
+    ).toEqual(["7896001:sdf-a", "7896002:sdf-a"]);
+  });
+
+  it("a scene date range covers a `YYYY` date's 1 January, and From alone its own day", async () => {
+    expect(
+      await listed({
+        date: {
+          modifier: "BETWEEN",
+          value: "2021-01-01",
+          value2: "2021-01-01",
+        },
+      })
+    ).toEqual(["7896002:sdf-a"]);
+    expect(
+      await listed({
+        date: { modifier: "BETWEEN", value: "2021-10-12", value2: undefined },
+      })
+    ).toEqual(["7896001:sdf-a", "7896001:sdf-b"]);
+  });
+
+  it("last played is the viewer's own play, on the viewer's local day", async () => {
+    expect(
+      await listed({ last_played_at: OCT_12 }, { timeZone: CHICAGO })
+    ).toEqual(["7896002:sdf-a"]);
+    // In UTC the play was on 13 Oct; the other user's play on 12 Oct never counts
+    expect(await listed({ last_played_at: OCT_12 })).toEqual([]);
   });
 });

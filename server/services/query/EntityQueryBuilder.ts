@@ -118,6 +118,12 @@ export interface QueryContext {
    * clause may take the shape that suits it (the scene tag filter, L8).
    */
   readonly sortField: string;
+  /**
+   * The viewer's IANA zone, which date filters on stored instants read
+   * their days in (`buildInstantFilter`): the request's
+   * (`X-Peek-Time-Zone`), "UTC" for a caller that passes none
+   */
+  readonly timeZone: string;
 }
 
 /** The fields a builder's own table covers: the parsed filter without the base's `ids` */
@@ -203,6 +209,8 @@ export interface ListQueryOptions<K extends ListKind> {
   readonly request: ListRequests[K];
   /** Default true: the viewer's precomputed exclusions apply */
   readonly applyExclusions?: boolean;
+  /** The viewer's IANA zone (`req.timeZone`); default "UTC" */
+  readonly timeZone?: string;
 }
 
 export interface ByRefsOptions {
@@ -603,6 +611,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
       userId: number;
       allowedInstanceIds: readonly string[];
       applyExclusions?: boolean;
+      timeZone?: string;
     },
     request: ListRequests[K]
   ): QueryContext {
@@ -614,6 +623,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
       allowedInstanceIds: options.allowedInstanceIds,
       specificInstanceId: request.specificInstanceId,
       sortField: this.spec.defaultSort,
+      timeZone: options.timeZone ?? "UTC",
     };
     return { ...ctx, sortField: this.sortKey(request, ctx) };
   }

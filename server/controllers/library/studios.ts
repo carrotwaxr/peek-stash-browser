@@ -43,11 +43,12 @@ export const findStudios = async (
   // Exclusions apply to every user; an admin's rows hold only their own hides
   const applyExclusions = true;
 
-  const { allowedInstanceIds } = req;
+  const { allowedInstanceIds, timeZone } = req;
 
   const { items: studios, total } = await studioQueryBuilder.execute({
     userId,
     allowedInstanceIds,
+    timeZone,
     request,
     applyExclusions,
   });

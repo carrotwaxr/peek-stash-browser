@@ -79,6 +79,7 @@ interface CountOptions<E extends EntityKind> {
   readonly userId: number;
   readonly allowedInstanceIds: readonly string[];
   readonly request: ParsedListRequest<E>;
+  readonly timeZone: string;
 }
 
 /** Each list's builder, as far as a count needs it */
@@ -104,6 +105,8 @@ export interface RelationCountOptions {
    * tabs whose field takes a depth count the descendants' content too
    */
   readonly depth: number | undefined;
+  /** The viewer's IANA zone (`req.timeZone`), as their lists read dates in */
+  readonly timeZone: string;
 }
 
 /** Whether a list's filter field takes a depth in the shared contract */
@@ -137,6 +140,7 @@ async function countTab<E extends EntityKind>(
     userId: options.userId,
     allowedInstanceIds: options.allowedInstanceIds,
     request,
+    timeZone: options.timeZone,
   });
 }
 
@@ -159,6 +163,7 @@ async function countClips(
     userId: options.userId,
     allowedInstanceIds: options.allowedInstanceIds,
     request,
+    timeZone: options.timeZone,
   });
 }
 

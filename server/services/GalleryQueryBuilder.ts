@@ -28,8 +28,9 @@ import {
   type FilterClause,
   type JunctionTarget,
   type ViaSceneSpec,
-  buildDateFilter,
+  buildDayFilter,
   buildFavoriteFilter,
+  buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
   exclusionJoin,
@@ -220,9 +221,11 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     title: (c) => buildTextFilter(c, galleryNameSql("g")),
 
     // Dates
-    date: (c) => buildDateFilter(c, "g.date"),
-    created_at: (c) => buildDateFilter(c, "g.stashCreatedAt"),
-    updated_at: (c) => buildDateFilter(c, "g.stashUpdatedAt"),
+    date: (c) => buildDayFilter(c, "g.date"),
+    created_at: (c, ctx) =>
+      buildInstantFilter(c, "g.stashCreatedAt", ctx.timeZone),
+    updated_at: (c, ctx) =>
+      buildInstantFilter(c, "g.stashUpdatedAt", ctx.timeZone),
   };
 
   /**

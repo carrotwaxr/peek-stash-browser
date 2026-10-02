@@ -16,6 +16,7 @@ import {
   requireCacheReady,
 } from "../middleware/auth.js";
 import { errorHandler } from "../middleware/errorHandler.js";
+import { requestTimeZone } from "../middleware/requestTimeZone.js";
 import authRoutes from "../routes/auth.js";
 import carouselRoutes from "../routes/carousel.js";
 import clipsRoutes from "../routes/clips.js";
@@ -63,6 +64,8 @@ export const setupAPI = () => {
   );
   app.use(express.json()); // Add JSON body parsing for POST/PUT requests
   app.use(cookieParser()); // Parse cookies for JWT
+  // The viewer's time zone (X-Peek-Time-Zone, else UTC) on every API request
+  app.use("/api", requestTimeZone);
 
   // Health check (no auth). Proves Node answers through nginx and nothing
   // more: no database query, per the homelab health-check convention.

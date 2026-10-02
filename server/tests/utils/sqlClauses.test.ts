@@ -11,7 +11,7 @@ import type { Resolution } from "@peek/shared-types/filters/index.js";
 import { RESOLUTIONS } from "@peek/shared-types/filters/index.js";
 import { afterAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import type { FilterRef } from "../../types/parsedFilters.js";
+import type { DateCriterion, FilterRef } from "../../types/parsedFilters.js";
 import {
   type JunctionTarget,
   PAIR_INLINE_LIMIT,
@@ -19,9 +19,9 @@ import {
   type ViaSceneSpec,
   ageYearsSql,
   anyOf,
-  buildDateFilter,
-  buildEpochDateFilter,
+  buildDayFilter,
   buildFavoriteFilter,
+  buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
   combine,
@@ -947,124 +947,150 @@ describe("buildNumericFilter", () => {
   });
 });
 
-describe("buildDateFilter", () => {
+describe("buildDayFilter", () => {
   const col = "s.date";
+  const d = `substr(${fullDateSql(col)}, 1, 10)`;
 
-  it("returns empty for undefined filter", () => {
-    expect(buildDateFilter(undefined, col)).toEqual({ sql: "", params: [] });
+  it("IS_NULL and NOT_NULL read the column and bind nothing", () => {
+    expect(buildDayFilter({ modifier: "IS_NULL" }, col)).toEqual({
+      sql: "s.date IS NULL",
+      params: [],
+    });
+    expect(buildDayFilter({ modifier: "NOT_NULL" }, col)).toEqual({
+      sql: "s.date IS NOT NULL",
+      params: [],
+    });
   });
 
-  it("returns empty for null filter", () => {
-    expect(buildDateFilter(null, col)).toEqual({ sql: "", params: [] });
+  it("EQUALS is the day, GREATER_THAN after it, LESS_THAN before it", () => {
+    expect(
+      buildDayFilter({ modifier: "EQUALS", value: "2024-01-15" }, col)
+    ).toEqual({ sql: `${d} = ?`, params: ["2024-01-15"] });
+    expect(
+      buildDayFilter({ modifier: "GREATER_THAN", value: "2024-01-15" }, col)
+    ).toEqual({ sql: `${d} > ?`, params: ["2024-01-15"] });
+    expect(
+      buildDayFilter({ modifier: "LESS_THAN", value: "2024-01-15" }, col)
+    ).toEqual({ sql: `${d} < ?`, params: ["2024-01-15"] });
   });
 
-  it("handles IS_NULL (no value needed)", () => {
-    const result = buildDateFilter({ modifier: "IS_NULL" }, col);
-    expect(result.sql).toBe("s.date IS NULL");
-    expect(result.params).toEqual([]);
-  });
-
-  it("handles NOT_NULL (no value needed)", () => {
-    const result = buildDateFilter({ modifier: "NOT_NULL" }, col);
-    expect(result.sql).toBe("s.date IS NOT NULL");
-    expect(result.params).toEqual([]);
-  });
-
-  it("handles IS_NULL even when value is null", () => {
-    const result = buildDateFilter({ value: null, modifier: "IS_NULL" }, col);
-    expect(result.sql).toBe("s.date IS NULL");
-    expect(result.params).toEqual([]);
-  });
-
-  it("returns empty for non-null modifier without value", () => {
-    const result = buildDateFilter({ modifier: "EQUALS" }, col);
-    expect(result).toEqual({ sql: "", params: [] });
-  });
-
-  it("handles EQUALS", () => {
-    const result = buildDateFilter(
-      { value: "2024-01-15", modifier: "EQUALS" },
+  it("NOT_EQUALS has no IS NULL arm: a row without a date never matches", () => {
+    const clause = buildDayFilter(
+      { modifier: "NOT_EQUALS", value: "2024-01-15" },
       col
     );
-    expect(result.sql).toBe("date(s.date) = date(?)");
-    expect(result.params).toEqual(["2024-01-15"]);
+    expect(clause).toEqual({ sql: `${d} != ?`, params: ["2024-01-15"] });
+    expect(clause.sql).not.toContain("IS NULL");
   });
 
-  it("handles NOT_EQUALS", () => {
-    const result = buildDateFilter(
-      { value: "2024-01-15", modifier: "NOT_EQUALS" },
-      col
-    );
-    expect(result.sql).toBe("(s.date IS NULL OR date(s.date) != date(?))");
-    expect(result.params).toEqual(["2024-01-15"]);
+  it("BETWEEN includes both days, and either side alone is open-ended", () => {
+    expect(
+      buildDayFilter(
+        { modifier: "BETWEEN", value: "2024-01-01", value2: "2024-12-31" },
+        col
+      )
+    ).toEqual({
+      sql: `(${d} >= ? AND ${d} <= ?)`,
+      params: ["2024-01-01", "2024-12-31"],
+    });
+    expect(
+      buildDayFilter(
+        { modifier: "BETWEEN", value: "2024-01-01", value2: undefined },
+        col
+      )
+    ).toEqual({ sql: `${d} >= ?`, params: ["2024-01-01"] });
+    expect(
+      buildDayFilter(
+        { modifier: "BETWEEN", value: undefined, value2: "2024-12-31" },
+        col
+      )
+    ).toEqual({ sql: `${d} <= ?`, params: ["2024-12-31"] });
   });
 
-  it("handles GREATER_THAN", () => {
-    const result = buildDateFilter(
-      { value: "2024-01-15", modifier: "GREATER_THAN" },
-      col
-    );
-    expect(result.sql).toBe("s.date > ?");
-    expect(result.params).toEqual(["2024-01-15"]);
+  it("NOT_BETWEEN is outside both days, with no IS NULL arm", () => {
+    expect(
+      buildDayFilter(
+        { modifier: "NOT_BETWEEN", value: "2024-01-01", value2: "2024-12-31" },
+        col
+      )
+    ).toEqual({
+      sql: `(${d} < ? OR ${d} > ?)`,
+      params: ["2024-01-01", "2024-12-31"],
+    });
   });
 
-  it("handles LESS_THAN", () => {
-    const result = buildDateFilter(
-      { value: "2024-01-15", modifier: "LESS_THAN" },
-      col
-    );
-    expect(result.sql).toBe("s.date < ?");
-    expect(result.params).toEqual(["2024-01-15"]);
+  it("a date-time value is its day as written", () => {
+    expect(
+      buildDayFilter(
+        { modifier: "EQUALS", value: "2024-01-15T23:30:00-06:00" },
+        col
+      ).params
+    ).toEqual(["2024-01-15"]);
+  });
+});
+
+/** Whether a text date column holding `date` matches the criterion, on SQLite */
+async function dayFilterMatches(
+  criterion: DateCriterion,
+  date: string | null
+): Promise<boolean> {
+  const clause = buildDayFilter(criterion, "x.date");
+  const rows = await prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
+    `SELECT count(*) AS n FROM (SELECT ? AS date) x WHERE ${clause.sql}`,
+    date,
+    ...clause.params
+  );
+  return Number(must(rows[0]).n) === 1;
+}
+
+describe("buildDayFilter on partial dates, run on SQLite", () => {
+  afterAll(async () => {
+    await prisma.$disconnect();
   });
 
-  it("handles BETWEEN with value2", () => {
-    const result = buildDateFilter(
-      { value: "2024-01-01", value2: "2024-12-31", modifier: "BETWEEN" },
-      col
-    );
-    expect(result.sql).toBe("s.date BETWEEN ? AND ?");
-    expect(result.params).toEqual(["2024-01-01", "2024-12-31"]);
+  it("a `YYYY` or `YYYY-MM` date is its first day", async () => {
+    const jan1: DateCriterion = {
+      modifier: "BETWEEN",
+      value: "1995-01-01",
+      value2: "1995-01-01",
+    };
+    expect(await dayFilterMatches(jan1, "1995")).toBe(true);
+    expect(await dayFilterMatches(jan1, "1995-06")).toBe(false);
+    expect(
+      await dayFilterMatches(
+        { modifier: "EQUALS", value: "1995-06-01" },
+        "1995-06"
+      )
+    ).toBe(true);
+    expect(
+      await dayFilterMatches(
+        { modifier: "GREATER_THAN", value: "1994-12-31" },
+        "1995"
+      )
+    ).toBe(true);
   });
 
-  it("handles BETWEEN without value2 (fallback to >=)", () => {
-    const result = buildDateFilter(
-      { value: "2024-01-01", modifier: "BETWEEN" },
-      col
-    );
-    expect(result.sql).toBe("s.date >= ?");
-    expect(result.params).toEqual(["2024-01-01"]);
-  });
-
-  it("handles NOT_BETWEEN with value2", () => {
-    const result = buildDateFilter(
-      { value: "2024-01-01", value2: "2024-12-31", modifier: "NOT_BETWEEN" },
-      col
-    );
-    expect(result.sql).toBe("(s.date IS NULL OR s.date < ? OR s.date > ?)");
-    expect(result.params).toEqual(["2024-01-01", "2024-12-31"]);
-  });
-
-  it("handles NOT_BETWEEN without value2 (fallback to <)", () => {
-    const result = buildDateFilter(
-      { value: "2024-01-01", modifier: "NOT_BETWEEN" },
-      col
-    );
-    expect(result.sql).toBe("s.date < ?");
-    expect(result.params).toEqual(["2024-01-01"]);
-  });
-
-  it("defaults to GREATER_THAN when no modifier", () => {
-    const result = buildDateFilter({ value: "2024-01-15" }, col);
-    expect(result.sql).toBe("s.date > ?");
-    expect(result.params).toEqual(["2024-01-15"]);
-  });
-
-  it("returns empty for unknown modifier", () => {
-    const result = buildDateFilter(
-      { value: "2024-01-15", modifier: "UNKNOWN" },
-      col
-    );
-    expect(result).toEqual({ sql: "", params: [] });
+  it("a range includes its last day; a row without a date matches no comparison", async () => {
+    const range: DateCriterion = {
+      modifier: "BETWEEN",
+      value: "2024-01-01",
+      value2: "2024-01-31",
+    };
+    expect(await dayFilterMatches(range, "2024-01-31")).toBe(true);
+    expect(await dayFilterMatches(range, "2024-02-01")).toBe(false);
+    expect(await dayFilterMatches(range, null)).toBe(false);
+    expect(
+      await dayFilterMatches(
+        { modifier: "NOT_EQUALS", value: "2024-01-01" },
+        null
+      )
+    ).toBe(false);
+    expect(
+      await dayFilterMatches(
+        { modifier: "NOT_BETWEEN", value: "2024-01-01", value2: "2024-01-31" },
+        null
+      )
+    ).toBe(false);
   });
 });
 
@@ -1415,185 +1441,124 @@ describe("buildFavoriteFilter", () => {
   });
 });
 
-describe("buildEpochDateFilter", () => {
-  const col = "w.lastPlayedAt";
-  const day = Date.UTC(2026, 8, 25);
-  const next = day + 86_400_000;
+describe("buildInstantFilter", () => {
+  const col = "s.stashCreatedAt";
+  const CHICAGO = "America/Chicago";
+  // 2021-10-12 in Chicago (UTC-5): [05:00Z, the next day's 05:00Z)
+  const start = 1634014800000;
+  const end = 1634101200000;
 
-  it("binds GREATER_THAN and LESS_THAN as epoch milliseconds", () => {
+  it("a same-day BETWEEN is that local day, both ends included", () => {
     expect(
-      buildEpochDateFilter(
-        { modifier: "GREATER_THAN", value: "2026-09-25" },
-        col
+      buildInstantFilter(
+        { modifier: "BETWEEN", value: "2021-10-12", value2: "2021-10-12" },
+        col,
+        CHICAGO
       )
-    ).toEqual({ sql: "w.lastPlayedAt > ?", params: [day] });
-    expect(
-      buildEpochDateFilter({ modifier: "LESS_THAN", value: "2026-09-25" }, col)
-    ).toEqual({ sql: "w.lastPlayedAt < ?", params: [day] });
+    ).toEqual({ sql: `(${col} >= ? AND ${col} < ?)`, params: [start, end] });
   });
 
-  it("EQUALS is the UTC day, NOT_EQUALS its complement", () => {
+  it("BETWEEN with one side is from its day on, or up to the end of its day", () => {
     expect(
-      buildEpochDateFilter({ modifier: "EQUALS", value: "2026-09-25" }, col)
-        .params
-    ).toEqual([day, next]);
-    const not = buildEpochDateFilter(
-      { modifier: "NOT_EQUALS", value: "2026-09-25" },
-      col
+      buildInstantFilter(
+        { modifier: "BETWEEN", value: "2021-10-12", value2: undefined },
+        col,
+        CHICAGO
+      )
+    ).toEqual({ sql: `${col} >= ?`, params: [start] });
+    expect(
+      buildInstantFilter(
+        { modifier: "BETWEEN", value: undefined, value2: "2021-10-12" },
+        col,
+        CHICAGO
+      )
+    ).toEqual({ sql: `${col} < ?`, params: [end] });
+  });
+
+  it("GREATER_THAN binds the next day's start with >=, LESS_THAN the day's start", () => {
+    expect(
+      buildInstantFilter(
+        { modifier: "GREATER_THAN", value: "2021-10-12" },
+        col,
+        CHICAGO
+      )
+    ).toEqual({ sql: `${col} >= ?`, params: [end] });
+    expect(
+      buildInstantFilter(
+        { modifier: "LESS_THAN", value: "2021-10-12" },
+        col,
+        CHICAGO
+      )
+    ).toEqual({ sql: `${col} < ?`, params: [start] });
+  });
+
+  it("EQUALS is the day; NOT_EQUALS outside it, with no IS NULL arm", () => {
+    expect(
+      buildInstantFilter(
+        { modifier: "EQUALS", value: "2021-10-12" },
+        col,
+        CHICAGO
+      )
+    ).toEqual({ sql: `(${col} >= ? AND ${col} < ?)`, params: [start, end] });
+    const not = buildInstantFilter(
+      { modifier: "NOT_EQUALS", value: "2021-10-12" },
+      col,
+      CHICAGO
     );
-    expect(not.sql).toContain("IS NULL");
-    expect(not.params).toEqual([day, next]);
-  });
-
-  it("BETWEEN includes the last day", () => {
-    expect(
-      buildEpochDateFilter(
-        { modifier: "BETWEEN", value: "2026-09-20", value2: "2026-09-25" },
-        col
-      ).params
-    ).toEqual([Date.UTC(2026, 8, 20), next]);
-    expect(
-      buildEpochDateFilter(
-        { modifier: "NOT_BETWEEN", value: "2026-09-20", value2: "2026-09-25" },
-        col
-      ).params
-    ).toEqual([Date.UTC(2026, 8, 20), next]);
-  });
-
-  it("an ISO date-time is the instant", () => {
-    const at = Date.parse("2026-09-25T12:00:00Z");
-    expect(
-      buildEpochDateFilter(
-        { modifier: "GREATER_THAN", value: "2026-09-25T12:00:00Z" },
-        col
-      ).params
-    ).toEqual([at]);
-  });
-
-  it("IS_NULL and NOT_NULL bind nothing; an unparsable value is no clause", () => {
-    expect(buildEpochDateFilter({ modifier: "IS_NULL" }, col)).toEqual({
-      sql: "w.lastPlayedAt IS NULL",
-      params: [],
+    expect(not).toEqual({
+      sql: `(${col} < ? OR ${col} >= ?)`,
+      params: [start, end],
     });
-    expect(buildEpochDateFilter({ modifier: "NOT_NULL" }, col).params).toEqual(
-      []
-    );
-    expect(
-      buildEpochDateFilter({ modifier: "EQUALS", value: "nope" }, col)
-    ).toEqual({ sql: "", params: [] });
-  });
-});
-
-describe("buildEpochDateFilter edge values", () => {
-  const COL = "w.lastPlayedAt";
-  const DAY = 86_400_000;
-  const day1 = Date.parse("2026-03-01");
-  const day2 = Date.parse("2026-03-05");
-
-  it("an EQUALS date-only value binds its whole UTC day as epoch milliseconds", () => {
-    expect(
-      buildEpochDateFilter({ value: "2026-03-01", modifier: "EQUALS" }, COL)
-    ).toEqual({
-      sql: `(${COL} >= ? AND ${COL} < ?)`,
-      params: [day1, day1 + DAY],
-    });
+    expect(not.sql).not.toContain("IS NULL");
   });
 
-  it("a NOT_EQUALS date-only value keeps unplayed rows and rows outside the day", () => {
+  it("NOT_BETWEEN is outside the range, with no IS NULL arm", () => {
     expect(
-      buildEpochDateFilter({ value: "2026-03-01", modifier: "NOT_EQUALS" }, COL)
-    ).toEqual({
-      sql: `(${COL} IS NULL OR ${COL} < ? OR ${COL} >= ?)`,
-      params: [day1, day1 + DAY],
-    });
-  });
-
-  it("a BETWEEN last-played filter binds both bounds as epoch milliseconds, the end day included", () => {
-    expect(
-      buildEpochDateFilter(
-        { value: "2026-03-01", value2: "2026-03-05", modifier: "BETWEEN" },
-        COL
+      buildInstantFilter(
+        { modifier: "NOT_BETWEEN", value: "2021-10-12", value2: "2021-10-12" },
+        col,
+        CHICAGO
       )
-    ).toEqual({
-      sql: `(${COL} >= ? AND ${COL} < ?)`,
-      params: [day1, day2 + DAY],
-    });
+    ).toEqual({ sql: `(${col} < ? OR ${col} >= ?)`, params: [start, end] });
   });
 
-  it("a BETWEEN without a second date is a lower bound only", () => {
+  it("UTC, the zone of a request without one, reads the calendar day", () => {
     expect(
-      buildEpochDateFilter({ value: "2026-03-01", modifier: "BETWEEN" }, COL)
-    ).toEqual({ sql: `${COL} >= ?`, params: [day1] });
+      buildInstantFilter(
+        { modifier: "EQUALS", value: "2026-09-25" },
+        "w.lastPlayedAt",
+        "UTC"
+      ).params
+    ).toEqual([Date.UTC(2026, 8, 25), Date.UTC(2026, 8, 26)]);
   });
 
-  it("a NOT_BETWEEN filter keeps unplayed rows and rows outside both bounds", () => {
-    expect(
-      buildEpochDateFilter(
-        { value: "2026-03-01", value2: "2026-03-05", modifier: "NOT_BETWEEN" },
-        COL
-      )
-    ).toEqual({
-      sql: `(${COL} IS NULL OR ${COL} < ? OR ${COL} >= ?)`,
-      params: [day1, day2 + DAY],
-    });
-  });
-
-  it("a NOT_BETWEEN without a second date is an upper bound only", () => {
-    expect(
-      buildEpochDateFilter(
-        { value: "2026-03-01", modifier: "NOT_BETWEEN" },
-        COL
-      )
-    ).toEqual({ sql: `${COL} < ?`, params: [day1] });
-  });
-
-  it("an ISO date-time is the instant, not a day", () => {
+  it("a date-time value is its instant", () => {
     const at = Date.parse("2026-03-01T10:00:00Z");
     expect(
-      buildEpochDateFilter(
-        { value: "2026-03-01T10:00:00Z", modifier: "EQUALS" },
-        COL
+      buildInstantFilter(
+        { modifier: "EQUALS", value: "2026-03-01T10:00:00Z" },
+        col,
+        CHICAGO
       ).params
     ).toEqual([at, at + 1]);
+    expect(
+      buildInstantFilter(
+        { modifier: "GREATER_THAN", value: "2026-03-01T10:00:00Z" },
+        col,
+        CHICAGO
+      ).params
+    ).toEqual([at + 1]);
   });
 
-  it("an unparsable date, an unknown modifier or a null modifier adds no clause", () => {
-    expect(
-      buildEpochDateFilter({ value: "not a date", modifier: "EQUALS" }, COL)
-    ).toEqual({ sql: "", params: [] });
-    expect(
-      buildEpochDateFilter({ value: "2026-03-01", modifier: "WHATEVER" }, COL)
-    ).toEqual({ sql: "", params: [] });
-    expect(
-      buildEpochDateFilter({ value: "2026-03-01", modifier: null }, COL)
-    ).toEqual({ sql: "", params: [] });
-  });
-
-  it("no filter adds no clause, and a filter without a modifier is a GREATER_THAN", () => {
-    expect(buildEpochDateFilter(undefined, COL)).toEqual({
-      sql: "",
+  it("IS_NULL and NOT_NULL bind nothing", () => {
+    expect(buildInstantFilter({ modifier: "IS_NULL" }, col, CHICAGO)).toEqual({
+      sql: `${col} IS NULL`,
       params: [],
     });
-    expect(buildEpochDateFilter(null, COL)).toEqual({ sql: "", params: [] });
-    expect(buildEpochDateFilter({ value: "2026-03-01" }, COL)).toEqual({
-      sql: `${COL} > ?`,
-      params: [day1],
+    expect(buildInstantFilter({ modifier: "NOT_NULL" }, col, CHICAGO)).toEqual({
+      sql: `${col} IS NOT NULL`,
+      params: [],
     });
-  });
-
-  it("a LESS_THAN date binds the start of its day", () => {
-    expect(
-      buildEpochDateFilter({ value: "2026-03-01", modifier: "LESS_THAN" }, COL)
-    ).toEqual({ sql: `${COL} < ?`, params: [day1] });
-  });
-
-  it("an IS_NULL or NOT_NULL modifier needs no date", () => {
-    expect(buildEpochDateFilter({ modifier: "IS_NULL" }, COL).sql).toBe(
-      `${COL} IS NULL`
-    );
-    expect(buildEpochDateFilter({ modifier: "NOT_NULL" }, COL).sql).toBe(
-      `${COL} IS NOT NULL`
-    );
   });
 });
 

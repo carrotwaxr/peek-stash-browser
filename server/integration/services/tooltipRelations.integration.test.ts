@@ -591,6 +591,7 @@ describeWithDb("Tooltip relations (integration)", () => {
       allowedInstanceIds: [FX.A, FX.B],
       specificInstanceId: FX.A,
       sortField: "name",
+      timeZone: "UTC",
     };
     const { items: studios } = await studioQueryBuilder.execute({
       userId: v,

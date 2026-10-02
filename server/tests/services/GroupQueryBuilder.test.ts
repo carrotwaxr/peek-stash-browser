@@ -363,7 +363,7 @@ describe("GroupQueryBuilder", () => {
         "(g.director IS NOT NULL AND g.director != '')",
         "g.date IS NULL",
         "g.stashCreatedAt",
-        "g.stashUpdatedAt BETWEEN ? AND ?",
+        "(g.stashUpdatedAt >= ? AND g.stashUpdatedAt < ?)",
       ]) {
         expect(sql).toContain(fragment);
       }

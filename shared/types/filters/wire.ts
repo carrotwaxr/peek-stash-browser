@@ -89,13 +89,21 @@ export type NumberInput<M extends NumberModifier = NumberModifier> =
       }
     >;
 
-/** Values are YYYY-MM-DD dates or ISO date-times */
+/**
+ * Values are YYYY-MM-DD dates or ISO date-times. NOT_BETWEEN also needs
+ * value2; BETWEEN takes either side alone (value alone is from that day on,
+ * value2 alone up to the end of its day); IS_NULL and NOT_NULL no value
+ */
 export type DateInput<M extends DateModifier = DateModifier> =
   | {
       modifier?: Exclude<M, PresenceModifier> | null;
       value: string;
       value2?: string | null;
     }
+  | WithBetween<
+      M,
+      { modifier: "BETWEEN"; value?: string | null; value2?: string | null }
+    >
   | WithPresence<
       M,
       {

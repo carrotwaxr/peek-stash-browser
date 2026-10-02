@@ -24,8 +24,9 @@ import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
-  buildDateFilter,
+  buildDayFilter,
   buildFavoriteFilter,
+  buildInstantFilter,
   buildNumericFilter,
   refClause,
   searchAll,
@@ -181,9 +182,11 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     galleries: (c, ctx) => this.galleryClause(c, ctx),
 
     // Dates
-    date: (c) => buildDateFilter(c, "i.date"),
-    created_at: (c) => buildDateFilter(c, "i.stashCreatedAt"),
-    updated_at: (c) => buildDateFilter(c, "i.stashUpdatedAt"),
+    date: (c) => buildDayFilter(c, "i.date"),
+    created_at: (c, ctx) =>
+      buildInstantFilter(c, "i.stashCreatedAt", ctx.timeZone),
+    updated_at: (c, ctx) =>
+      buildInstantFilter(c, "i.stashUpdatedAt", ctx.timeZone),
   };
 
   /**

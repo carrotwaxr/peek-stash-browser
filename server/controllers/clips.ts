@@ -39,11 +39,12 @@ export const getClips = async (
 
   const userId = req.user.id;
   const { page, perPage } = request;
-  const { allowedInstanceIds } = req;
+  const { allowedInstanceIds, timeZone } = req;
 
   const result = await clipService.getClips({
     userId,
     allowedInstanceIds,
+    timeZone,
     request,
   });
 

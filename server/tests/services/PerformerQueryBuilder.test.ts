@@ -451,7 +451,7 @@ describe("PerformerQueryBuilder", () => {
         "(p.piercings IS NOT NULL AND p.piercings != '')",
         "LOWER(p.measurements) = LOWER(?)",
         `${careerYearsSql("p.careerLength")} BETWEEN ? AND ?`,
-        "p.birthdate > ?",
+        `substr(${fullDateSql("p.birthdate")}, 1, 10) > ?`,
         "p.deathDate IS NULL",
         "p.stashCreatedAt < ?",
         "p.stashUpdatedAt IS NOT NULL",

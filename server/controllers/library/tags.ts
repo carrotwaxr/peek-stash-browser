@@ -48,11 +48,12 @@ export const findTags = async (
   // A detail page asks for its tag by id
   const lookup = singleIdRef(request.filter.ids);
 
-  const { allowedInstanceIds } = req;
+  const { allowedInstanceIds, timeZone } = req;
 
   const { items: tags, total } = await tagQueryBuilder.execute({
     userId,
     allowedInstanceIds,
+    timeZone,
     request,
     // Exclusions apply to every user, by id too; an admin's rows hold only their own hides.
     // Parent tags stay visible because the empty phase exempts tags with a child tag on the same instance.

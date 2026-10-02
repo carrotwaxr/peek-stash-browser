@@ -17,8 +17,8 @@ import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
   type JunctionTarget,
-  buildDateFilter,
   buildFavoriteFilter,
+  buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
   searchAll,
@@ -172,8 +172,10 @@ class StudioQueryBuilder extends EntityQueryBuilder<
     details: (c) => buildTextFilter(c, "s.details"),
 
     // Dates
-    created_at: (c) => buildDateFilter(c, "s.stashCreatedAt"),
-    updated_at: (c) => buildDateFilter(c, "s.stashUpdatedAt"),
+    created_at: (c, ctx) =>
+      buildInstantFilter(c, "s.stashCreatedAt", ctx.timeZone),
+    updated_at: (c, ctx) =>
+      buildInstantFilter(c, "s.stashUpdatedAt", ctx.timeZone),
   };
 
   /** The tag filter, with the tags' descendants to the depth */

@@ -51,7 +51,11 @@ const builders = {
 
 const clips = vi.mocked(clipQueryBuilder);
 
-const options = { userId: 4, allowedInstanceIds: ["inst-a"] };
+const options = {
+  userId: 4,
+  allowedInstanceIds: ["inst-a"],
+  timeZone: "UTC",
+};
 const ref = { id: "12", instanceId: "inst-a" };
 
 /** The parsed filter each builder's count was asked for, by list */
@@ -103,6 +107,7 @@ describe("countRelations", () => {
       builder.count.mock.calls.map(([sent]) => ({
         userId: sent.userId,
         allowedInstanceIds: sent.allowedInstanceIds,
+        timeZone: sent.timeZone,
       }))
     );
     expect(asked).toEqual(Array.from({ length: 6 }, () => options));
