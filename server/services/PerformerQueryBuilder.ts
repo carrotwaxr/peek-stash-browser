@@ -225,6 +225,7 @@ function stashIdClause(criterion: TextCriterion): FilterClause {
     case "INCLUDES":
     case "EXCLUDES":
     case "NOT_EQUALS":
+    case "STARTS_WITH":
       return noClause();
   }
 }

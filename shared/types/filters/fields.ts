@@ -25,6 +25,7 @@ import {
   enumOf,
   instance,
   num,
+  path,
   playlistRef,
   ref,
   text,
@@ -84,6 +85,27 @@ export const SCENE_FIELDS = {
   director: text(),
   video_codec: text(),
   audio_codec: text(),
+  /** The primary file's path, as Peek stores it (a scene's other files are not read) */
+  path: path(),
+  /** Any one of the scene's URLs, each matched on its own text */
+  url: text(),
+  code: text(),
+  /** The language codes of the scene's captions, compared whole */
+  captions: text({
+    modifiers: ["EQUALS", "NOT_EQUALS", "IS_NULL", "NOT_NULL"],
+    defaultModifier: "EQUALS",
+  }),
+  /**
+   * Scenes with (true) or without (false) a live marker the viewer can see,
+   * generated or not
+   */
+  has_markers: bool(),
+  /**
+   * Scenes with (true) or without (false) another live scene the viewer can
+   * see on the same instance with the same perceptual hash; a scene without
+   * a hash is never a duplicate
+   */
+  duplicated: bool(),
   performers: ref("performer", { presence: true, excludable: true }),
   tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
   studios: ref("studio", {
@@ -92,7 +114,8 @@ export const SCENE_FIELDS = {
     presence: true,
     excludable: true,
   }),
-  groups: ref("group", { presence: true }),
+  /** With a depth, the collections' sub-collections too */
+  groups: ref("group", { hierarchical: true, presence: true }),
   galleries: ref("gallery", { presence: true }),
   /**
    * Scenes in these Peek playlists: the viewer's own and those shared with

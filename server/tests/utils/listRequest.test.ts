@@ -691,6 +691,43 @@ describe("parseListRequest: filter fields", () => {
     ]);
   });
 
+  it("scene path takes STARTS_WITH, no other text field does; groups keep a depth", () => {
+    const parsed = parseListRequest(
+      "scene",
+      {
+        scene_filter: {
+          path: { value: " /a/ ", modifier: "STARTS_WITH" },
+          groups: { value: ["4:x"], depth: -1 },
+        },
+      },
+      opts()
+    );
+    expect(parsed.filter.path).toEqual({
+      modifier: "STARTS_WITH",
+      value: "/a/",
+    });
+    expect(parsed.filter.groups?.depth).toBe(-1);
+
+    const issues = issuesOf(() =>
+      parseListRequest(
+        "scene",
+        {
+          scene_filter: {
+            path: { modifier: "IS_NULL" },
+            title: { value: "x", modifier: "STARTS_WITH" },
+            captions: { value: "en", modifier: "INCLUDES" },
+          },
+        },
+        opts()
+      )
+    );
+    expect(paths(issues)).toEqual([
+      "scene_filter.path.modifier",
+      "scene_filter.title.modifier",
+      "scene_filter.captions.modifier",
+    ]);
+  });
+
   it("enum values must be members; a multi-valued enum takes a list", () => {
     const parsed = parseListRequest(
       "scene",

@@ -54,6 +54,14 @@ export function likeContains(text: string): string {
   return `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 }
 
+/**
+ * A LIKE pattern matching text that begins with `text`, for
+ * `LIKE ? ESCAPE '\'`: escaped as `likeContains` does.
+ */
+export function likeStartsWith(text: string): string {
+  return `${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
 /** The most words one search matches (the rest are dropped) */
 export const SEARCH_TERM_LIMIT = 10;
 

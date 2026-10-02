@@ -107,7 +107,20 @@ export const TEXT_MODIFIERS = [
   "NOT_EQUALS",
   ...PRESENCE_MODIFIERS,
 ] as const;
-export type TextModifier = (typeof TEXT_MODIFIERS)[number];
+type BaseTextModifier = (typeof TEXT_MODIFIERS)[number];
+
+/**
+ * A file path's modifiers: the text ones that need a value, and STARTS_WITH
+ * (the path begins with the text). A path is always set, so no presence.
+ */
+export const PATH_MODIFIERS = [
+  "INCLUDES",
+  "EXCLUDES",
+  "EQUALS",
+  "NOT_EQUALS",
+  "STARTS_WITH",
+] as const;
+export type TextModifier = BaseTextModifier | (typeof PATH_MODIFIERS)[number];
 
 /**
  * An enum's value compared (GREATER_THAN and LESS_THAN only where the values
@@ -464,14 +477,29 @@ interface TextOptions extends ScalarOptions<TextModifier> {
  */
 export function text<const O extends TextOptions = NoOptions>(
   options?: O
-): TextSpec<Extract<ModifiersOf<O, TextModifier>, TextModifier>> {
+): TextSpec<Extract<ModifiersOf<O, BaseTextModifier>, TextModifier>> {
   const spec: TextSpec = {
     kind: "text",
     modifiers: options?.modifiers ?? TEXT_MODIFIERS,
     defaultModifier: options?.defaultModifier ?? "INCLUDES",
     maxLength: options?.maxLength ?? TEXT_MAX_LENGTH,
   };
-  return spec as TextSpec<Extract<ModifiersOf<O, TextModifier>, TextModifier>>;
+  return spec as TextSpec<
+    Extract<ModifiersOf<O, BaseTextModifier>, TextModifier>
+  >;
+}
+
+/**
+ * A file path field: INCLUDES, EXCLUDES, EQUALS, NOT_EQUALS and STARTS_WITH,
+ * INCLUDES when the modifier is missing
+ */
+export function path(): TextSpec<(typeof PATH_MODIFIERS)[number]> {
+  return {
+    kind: "text",
+    modifiers: PATH_MODIFIERS,
+    defaultModifier: "INCLUDES",
+    maxLength: TEXT_MAX_LENGTH,
+  };
 }
 
 interface EnumOptions extends ScalarOptions<EnumModifier> {
