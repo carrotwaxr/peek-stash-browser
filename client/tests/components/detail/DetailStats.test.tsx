@@ -53,11 +53,6 @@ describe("DetailStats", () => {
       { url: "/tag/5?page=4&instance=inst-a" }
     );
 
-    // The open tab's count is not a link to itself
-    expect(
-      within(row("Scenes:")).getByRole("button", { name: "3" })
-    ).toBeDisabled();
-
     fireEvent.click(
       within(row("Galleries:")).getByRole("button", { name: "4" })
     );
@@ -114,6 +109,45 @@ describe("DetailStats", () => {
     expect(scrolls).toEqual([
       { tabs: ["Scenes3", "Galleries4"], content: "galleries" },
     ]);
+  });
+
+  it("the open tab's count scrolls to the tab bar at once", () => {
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    const scrolled = vi
+      .spyOn(Element.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+    const tabs = [
+      { id: "scenes", label: "Scenes", count: 3 },
+      { id: "galleries", label: "Galleries", count: 4 },
+    ];
+    // The default tab has no `tab` param; an explicit one has it
+    for (const [open, url] of [
+      ["scenes", "/tag/5"],
+      ["galleries", "/tag/5?tab=galleries"],
+    ] as const) {
+      scrolled.mockClear();
+      const { unmount } = renderDetailPart(
+        <DetailTabContext.Provider
+          value={{ activeTab: open, defaultTab: "scenes" }}
+        >
+          <DetailStats stats={STATS} />
+          <TabNavigation tabs={tabs} defaultTab="scenes" />
+        </DetailTabContext.Provider>,
+        { url }
+      );
+
+      fireEvent.click(
+        within(row(open === "scenes" ? "Scenes:" : "Galleries:")).getByRole(
+          "button",
+          { name: open === "scenes" ? "3" : "4" }
+        )
+      );
+
+      expect(scrolled).toHaveBeenCalledTimes(1);
+      expect(scrollTo).not.toHaveBeenCalled();
+      unmount();
+    }
   });
 
   it("a statistic with a path opens it", () => {
