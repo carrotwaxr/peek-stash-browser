@@ -135,6 +135,7 @@ function galleryRow(overrides: Partial<GalleryQueryRow> = {}): GalleryQueryRow {
     code: "",
     photographer: null,
     urls: '["https://example.test/g/1"]',
+    organized: false,
     folderPath: "/images/Beach",
     fileBasename: null,
     coverPath: null,
@@ -485,6 +486,18 @@ describe("GalleryQueryBuilder", () => {
   });
 
   describe("rows", () => {
+    it("returns organized", async () => {
+      answerPage([
+        galleryRow({ organized: true }),
+        galleryRow({ id: "2", organized: false }),
+      ]);
+
+      const { items } = await run();
+
+      expect(pageStatement().sql).toContain("g.organized");
+      expect(items.map((row) => row.organized)).toEqual([true, false]);
+    });
+
     it("a row reads as the viewer's gallery: Peek's own rating, absent text as null, the title's fallback", async () => {
       answerPage([galleryRow()]); // no visible scenes, no relations
 

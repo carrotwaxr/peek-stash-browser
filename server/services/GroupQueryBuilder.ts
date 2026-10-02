@@ -70,7 +70,7 @@ const selectColumns = (ctx: QueryContext) =>
     g.duration,
     ${visibleCount(ctx, "g.sceneCount", "scenes")} AS sceneCount,
     ${visibleCount(ctx, "g.performerCount", "performers")} AS performerCount,
-    g.director, g.synopsis, g.urls,
+    g.director, g.synopsis, g.urls, g.aliases,
     g.frontImagePath, g.backImagePath,
     g.stashCreatedAt, g.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite
@@ -299,6 +299,7 @@ class GroupQueryBuilder extends EntityQueryBuilder<
       director: emptyToNull(row.director),
       synopsis: emptyToNull(row.synopsis),
       urls: parseJsonArray(row.urls),
+      aliases: emptyToNull(row.aliases),
 
       // Counts
       scene_count: Number(row.sceneCount ?? 0),

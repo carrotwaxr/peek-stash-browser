@@ -127,6 +127,7 @@ function studioRow(overrides: Partial<StudioQueryRow> = {}): StudioQueryRow {
     groupCount: 1,
     details: "",
     url: null,
+    aliases: null,
     imagePath: "/studio/1/image",
     stashCreatedAt: null,
     stashUpdatedAt: new Date("2026-01-02T03:04:05.000Z"),
@@ -353,6 +354,22 @@ describe("StudioQueryBuilder", () => {
   });
 
   describe("rows", () => {
+    it("returns aliases: a stored list as a list, a malformed or absent one as none", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([
+          studioRow({ aliases: '["A"]' }),
+          studioRow({ id: "2", aliases: "not json" }),
+          studioRow({ id: "3", aliases: null }),
+        ])
+        .mockResolvedValueOnce([{ total: 3n }]);
+
+      const { items } = await run();
+
+      expect(pageStatement().sql).toContain("s.aliases");
+      expect(items.map((row) => row.aliases)).toEqual([["A"], [], []]);
+    });
+
     it("a row carries its stash ids as a list; an unreadable stored list reads as none", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe

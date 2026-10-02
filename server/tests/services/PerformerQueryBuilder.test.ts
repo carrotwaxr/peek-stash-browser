@@ -121,6 +121,7 @@ function performerRow(
     careerLength: null,
     deathDate: null,
     url: null,
+    urls: null,
     imagePath: "/performer/1/image",
     stashCreatedAt: new Date("2026-01-02T03:04:05.000Z"),
     stashUpdatedAt: null,
@@ -501,6 +502,22 @@ describe("PerformerQueryBuilder", () => {
   });
 
   describe("rows", () => {
+    it("returns urls: a stored list as a list, a malformed or absent one as none", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([
+          performerRow({ urls: '["u1","u2"]' }),
+          performerRow({ id: "2", urls: "not json" }),
+          performerRow({ id: "3", urls: null }),
+        ])
+        .mockResolvedValueOnce([{ total: 3n }]);
+
+      const { items } = await run();
+
+      expect(pageStatement().sql).toContain("p.urls");
+      expect(items.map((row) => row.urls)).toEqual([["u1", "u2"], [], []]);
+    });
+
     it("a row carries its stash ids as a list; an unreadable stored list reads as none", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe

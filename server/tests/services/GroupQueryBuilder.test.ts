@@ -100,6 +100,7 @@ function groupRow(overrides: Partial<GroupQueryRow> = {}): GroupQueryRow {
     director: "",
     synopsis: "Three parts",
     urls: null,
+    aliases: null,
     frontImagePath: "/group/1/frontimage",
     backImagePath: null,
     stashCreatedAt: null,
@@ -401,6 +402,23 @@ describe("GroupQueryBuilder", () => {
   });
 
   describe("rows and relations", () => {
+    it("returns aliases: Stash's free text as it is, an empty or absent one as null", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([
+          groupRow({ aliases: "A, B" }),
+          groupRow({ id: "2", aliases: "" }),
+          groupRow({ id: "3", aliases: null }),
+        ])
+        .mockResolvedValueOnce([{ total: 3n }])
+        .mockResolvedValue([]);
+
+      const { items } = await run();
+
+      expect(pageStatement().sql).toContain("g.aliases");
+      expect(items.map((row) => row.aliases)).toEqual(["A, B", null, null]);
+    });
+
     it("a row reads as the viewer's group, with its tooltip relations and its visible studio", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe

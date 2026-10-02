@@ -210,6 +210,8 @@ export interface NormalizedPerformer {
   career_length: string | null;
   death_date: string | null;
   url: string | null;
+  /** Every link, as stored at the last sync (`url` is the first) */
+  urls: string[];
   /** Its stash-box entries, as stored at the last sync */
   stash_ids: StashId[];
   tags: Array<{ id: string; name: string; image_path: string | null }>;
@@ -250,6 +252,7 @@ export interface NormalizedStudio {
   group_count: number;
   details: string | null;
   url: string | null;
+  aliases: string[];
   /** Its stash-box entries, as stored at the last sync */
   stash_ids: StashId[];
   tags: Array<{ id: string; name: string; image_path: string | null }>;
@@ -335,6 +338,8 @@ export interface NormalizedGroup {
   director: string | null;
   synopsis: string | null;
   urls: string[];
+  /** Stash's free text, as it is */
+  aliases: string | null;
   tags: Array<{ id: string; name: string; image_path: string | null }>;
   front_image_path: string | null;
   back_image_path: string | null;
@@ -377,6 +382,7 @@ export interface NormalizedGallery {
   photographer?: string | null;
   url: string | null;
   urls?: string[];
+  organized: boolean;
   code: string | null;
   folder: { path: string } | null;
   files: Array<{ basename: string }>;

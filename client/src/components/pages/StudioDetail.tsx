@@ -158,6 +158,11 @@ const StudioPage = ({ detail }: { detail: FoundEntityDetail<"studio"> }) => {
       type="studio"
       detail={detail}
       title={name}
+      subtitle={
+        studio.aliases.length
+          ? `Also known as: ${studio.aliases.join(", ")}`
+          : null
+      }
       hero={
         <EntityHeroImage
           src={studio.image_path}
