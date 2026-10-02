@@ -18,6 +18,7 @@ import type {
   ListKind,
   NumberSpec,
   PlaylistItemSort,
+  PlaylistSpec,
   PresenceModifier,
   RefModifier,
   RefSpec,
@@ -69,6 +70,16 @@ export interface RefPresenceCriterion {
 
 /** A ref field's criterion: ids, or presence where the field offers it */
 export type RefFieldCriterion = RefCriterion | RefPresenceCriterion;
+
+/**
+ * Peek playlist ids: positive integers, distinct, 1 to the field's
+ * maxValues. Only the playlists the viewer may read count; any other id
+ * holds no scenes (never refused, so a count reveals nothing about it).
+ */
+export interface PlaylistCriterion {
+  readonly ids: readonly number[];
+  readonly modifier: RefModifier;
+}
 
 /**
  * BETWEEN has at least one side: value alone is at least it, value2 alone at
@@ -146,21 +157,23 @@ export type CriterionOf<S extends FieldSpec> =
     ? [Extract<M, PresenceModifier>] extends [never]
       ? RefCriterion
       : RefFieldCriterion
-    : S extends NumberSpec
-      ? NumberCriterion
-      : S extends DateSpec
-        ? DateCriterion
-        : S extends TextSpec
-          ? TextCriterion
-          : S extends EnumSpec<infer V, infer M, infer Multi>
-            ? Multi extends true
-              ? [Extract<M, PresenceModifier>] extends [never]
-                ? MultiEnumCriterion<V>
-                : MultiEnumFieldCriterion<V>
-              : EnumCriterion<V>
-            : S extends BooleanSpec
-              ? boolean
-              : never;
+    : S extends PlaylistSpec
+      ? PlaylistCriterion
+      : S extends NumberSpec
+        ? NumberCriterion
+        : S extends DateSpec
+          ? DateCriterion
+          : S extends TextSpec
+            ? TextCriterion
+            : S extends EnumSpec<infer V, infer M, infer Multi>
+              ? Multi extends true
+                ? [Extract<M, PresenceModifier>] extends [never]
+                  ? MultiEnumCriterion<V>
+                  : MultiEnumFieldCriterion<V>
+                : EnumCriterion<V>
+              : S extends BooleanSpec
+                ? boolean
+                : never;
 
 /**
  * One optional, already-valid criterion per field of a table; booleans stay

@@ -202,6 +202,7 @@ export const BREAST_TYPES = ["Fake", "Natural"] as const;
 
 export const FIELD_KINDS = [
   "ref",
+  "playlist",
   "number",
   "date",
   "text",
@@ -239,6 +240,20 @@ export interface RefSpec<
    * `["scenes_filter", "id"]` is `tag_filter.scenes_filter.id`
    */
   readonly path?: readonly [string, string];
+}
+
+/**
+ * Peek playlist ids (positive integers), not Stash entities: a scene in any
+ * (INCLUDES), every (INCLUDES_ALL) or none (EXCLUDES) of them. Only the
+ * playlists the viewer may read count (their own, and those shared with
+ * them); any other id matches as a playlist with no scenes, never refused.
+ */
+export interface PlaylistSpec {
+  readonly kind: "playlist";
+  readonly modifiers: readonly RefModifier[];
+  readonly defaultModifier: RefModifier;
+  /** Most ids one criterion may name */
+  readonly maxValues: number;
 }
 
 export interface NumberSpec<M extends NumberModifier = NumberModifier> {
@@ -289,6 +304,7 @@ export interface InstanceSpec {
 
 export type FieldSpec =
   | RefSpec
+  | PlaylistSpec
   | NumberSpec
   | DateSpec
   | TextSpec
@@ -375,6 +391,19 @@ export function ref<
     ...(options?.path ? { path: options.path } : {}),
   };
   return spec as RefSpecOf<T, O>;
+}
+
+/** Most playlist ids one criterion may name */
+export const MAX_PLAYLIST_VALUES = 100;
+
+/** Peek playlist ids, with the ref modifiers; INCLUDES when the modifier is missing */
+export function playlistRef(): PlaylistSpec {
+  return {
+    kind: "playlist",
+    modifiers: REF_MODIFIERS,
+    defaultModifier: "INCLUDES",
+    maxValues: MAX_PLAYLIST_VALUES,
+  };
 }
 
 interface ScalarOptions<M extends string> {

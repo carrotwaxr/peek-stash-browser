@@ -152,8 +152,9 @@ function refsCte(
  * 200k scenes), where a row-value NOT IN scans the set per row (78 s) and
  * a LEFT JOIN anti-join gets no automatic index on a `json_each`-fed CTE
  * (5.3 s). The key's separator cannot occur in an id or an instance id.
+ * Any set of (id, inst) works, a playlist's scenes included (F6).
  */
-function matchedSetClause(
+export function matchedSetClause(
   key: ParentKey,
   setName: string,
   modifier: "INCLUDES" | "EXCLUDES",

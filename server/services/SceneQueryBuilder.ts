@@ -24,22 +24,30 @@ import type {
 import type {
   MultiEnumCriterion,
   ParsedFilter,
+  PlaylistCriterion,
   RefCriterion,
   RefFieldCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
+import {
+  ownPlaylistSql,
+  viewablePlaylistSql,
+} from "../utils/playlistAccessSql.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
+  type ParentKey,
   type PerformerAgeSource,
   type SqlFragment,
+  allOf,
   buildDayFilter,
   buildFavoriteFilter,
   buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
+  matchedSetClause,
   noClause,
   performerAgeExists,
   refClause,
@@ -198,6 +206,56 @@ const SCENE_PERFORMER_AGE: PerformerAgeSource = {
   item: { id: "s.id", instance: "s.stashInstanceId", date: "s.date" },
 };
 
+/** The scene's key, as a playlist item names it (`PlaylistItem.sceneId`, `instanceId`) */
+const SCENE_KEY: ParentKey = ["s.id", "s.stashInstanceId"];
+
+/**
+ * The items of the playlists `access` lets through (a condition on `p`),
+ * of these playlists only when `ids` is given: the FROM and WHERE of a
+ * statement selecting `pi.sceneId, pi.instanceId`. With ids, SQLite reads
+ * each playlist's items from PlaylistItem's unique key (playlistId,
+ * instanceId, sceneId).
+ */
+function playlistItems(
+  access: SqlFragment,
+  ids?: readonly number[]
+): SqlFragment {
+  const only =
+    ids === undefined
+      ? ""
+      : `pi.playlistId IN (${ids.map(() => "?").join(", ")}) AND `;
+  return {
+    sql: `FROM PlaylistItem pi JOIN Playlist p ON p.id = pi.playlistId WHERE ${only}${access.sql}`,
+    params: [...(ids ?? []), ...access.params],
+  };
+}
+
+/** Scenes among the items: a row-value IN on the scene's key, read once */
+function inPlaylists(items: SqlFragment): FilterClause {
+  return {
+    sql: `(${SCENE_KEY[0]}, ${SCENE_KEY[1]}) IN (SELECT pi.sceneId, pi.instanceId ${items.sql})`,
+    params: items.params,
+  };
+}
+
+/**
+ * Scenes in none of the items: the items' distinct scenes as a materialized
+ * set, matched by the scene's key (`matchedSetClause`). At 215k scenes "in
+ * none of my playlists" (2,549 items) adds about 40 ms to the count (150
+ * against 112 ms unfiltered), where a correlated NOT EXISTS took 850 ms and
+ * a row-value NOT IN 6 s (PlaylistItem has no scene index).
+ */
+function notInPlaylists(items: SqlFragment, name: string): FilterClause {
+  const setName = `${name}_set`;
+  return matchedSetClause(SCENE_KEY, setName, "EXCLUDES", [
+    {
+      name: setName,
+      sql: `${setName}(id, inst) AS MATERIALIZED (SELECT DISTINCT pi.sceneId, pi.instanceId ${items.sql})`,
+      params: items.params,
+    },
+  ]);
+}
+
 /**
  * Builds and executes SQL queries for scene filtering
  */
@@ -254,7 +312,8 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * either direction; it scans the viewer's history rows, like o_counter.
    * scene_index is the scene's number in the collection the request filters
    * by, and has an expression only with one (INCLUDES or INCLUDES_ALL):
-   * without it the key falls back to the default sort.
+   * without it the key falls back to the default sort. playlist_position is
+   * the same for the one playlist the request filters by.
    */
   protected sortMap(
     dir: SortDirection,
@@ -293,6 +352,44 @@ class SceneQueryBuilder extends EntityQueryBuilder<
         params: [],
       },
       ...this.sceneIndexSort(dir, filter),
+      ...this.playlistPositionSort(dir, filter),
+    };
+  }
+
+  /**
+   * Playlist order: the scene's position in the one playlist the filter
+   * includes. The filter already keeps only that playlist's scenes, and only
+   * when the viewer may read it, so the INNER JOIN keeps the count; it
+   * matches at most one row (PlaylistItem's key is playlist, instance and
+   * scene). Without exactly one included playlist the key has no expression
+   * and the default sort applies (the parser refuses it first).
+   */
+  private playlistPositionSort(
+    dir: SortDirection,
+    filter: ParsedFilter<"scene">
+  ): Record<string, SortExpr> {
+    const criterion = filter.playlists;
+    const id = criterion?.ids[0];
+    if (
+      criterion === undefined ||
+      id === undefined ||
+      criterion.ids.length !== 1 ||
+      (criterion.modifier !== "INCLUDES" &&
+        criterion.modifier !== "INCLUDES_ALL")
+    ) {
+      return {};
+    }
+    return {
+      playlist_position: {
+        sql: `pip.position ${dir}`,
+        params: [],
+        joins: [
+          {
+            sql: "JOIN PlaylistItem pip ON pip.playlistId = ? AND pip.sceneId = s.id AND pip.instanceId = s.stashInstanceId",
+            params: [id],
+          },
+        ],
+      },
     };
   }
 
@@ -376,6 +473,13 @@ class SceneQueryBuilder extends EntityQueryBuilder<
         table: "StashGallery",
         entityType: "gallery",
       }),
+    // Peek's playlists: the viewer's own and shared ones by id, "any of my
+    // playlists" their own only (owner answer 13)
+    playlists: (c, ctx) => this.playlistClause(c, ctx),
+    in_any_playlist: (inAny, ctx) => {
+      const items = playlistItems(ownPlaylistSql("p", ctx.userId));
+      return inAny ? inPlaylists(items) : notInPlaylists(items, ctx.name);
+    },
 
     // The viewer's own data
     favorite: (favorite) => buildFavoriteFilter(favorite),
@@ -423,6 +527,31 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     studio_favorite: (on, ctx) => this.favoriteClause("studio", on, ctx),
     tag_favorite: (on, ctx) => this.favoriteClause("tag", on, ctx),
   };
+
+  /**
+   * Scenes by playlist: INCLUDES any of the playlists, INCLUDES_ALL each
+   * (one INCLUDES per id, AND-ed), EXCLUDES none. Only playlists the viewer
+   * may read count (`viewablePlaylistSql`); any other id holds no scenes,
+   * so it is never refused and a count reveals nothing about it (INCLUDES
+   * matches nothing, EXCLUDES the whole list, as for an id that does not
+   * exist). The viewer's exclusions apply to the scenes as on every list.
+   */
+  private playlistClause(
+    criterion: PlaylistCriterion,
+    ctx: LeafContext
+  ): FilterClause {
+    const viewable = viewablePlaylistSql("p", ctx.userId);
+    switch (criterion.modifier) {
+      case "INCLUDES":
+        return inPlaylists(playlistItems(viewable, criterion.ids));
+      case "INCLUDES_ALL":
+        return allOf(
+          criterion.ids.map((id) => inPlaylists(playlistItems(viewable, [id])))
+        );
+      case "EXCLUDES":
+        return notInPlaylists(playlistItems(viewable, criterion.ids), ctx.name);
+    }
+  }
 
   /** A ref filter on one of the scene's junctions, its CTEs named from the leaf */
   private refs(
