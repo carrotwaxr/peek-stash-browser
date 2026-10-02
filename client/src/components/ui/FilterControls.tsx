@@ -47,6 +47,7 @@ export const SortControl = ({
         </label>
       )}
       <select
+        aria-label="Sort by"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={inputClasses}
@@ -181,6 +182,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               {modifierOptions && modifierOptions.length > 0 && (
                 <select
                   id={controlId}
+                  aria-label={`${label} condition`}
                   value={modifierValue}
                   onChange={(e) => onModifierChange?.(e.target.value)}
                   className={inputClasses}
@@ -217,6 +219,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               {modifierOptions && modifierOptions.length > 0 && (
                 <select
                   id={controlId}
+                  aria-label={`${label} condition`}
                   value={modifierValue}
                   onChange={(e) => onModifierChange?.(e.target.value)}
                   className={inputClasses}
@@ -232,6 +235,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               {/* Main select */}
               <SearchableSelect
                 id={modifierOptions?.length ? undefined : controlId}
+                label={label}
                 entityType={
                   entityType as
                     | "performers"
@@ -461,6 +465,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
         className={`flex flex-col ${isHighlighted ? "filter-highlight" : ""}`}
       >
         <label
+          htmlFor={controlId}
           className="text-sm font-medium mb-2"
           style={{ color: "var(--text-primary)" }}
         >

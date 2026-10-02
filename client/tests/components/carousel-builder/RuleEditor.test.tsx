@@ -68,13 +68,34 @@ describe("RuleEditor", () => {
       filter: { per_page: 100 },
     });
 
-    fireEvent.click(screen.getByText("Rule Tag"));
+    fireEvent.click(screen.getByRole("button", { name: /^Tags/ }));
     await waitFor(() => {
       expect(mockFindTagsMinimal).toHaveBeenCalledTimes(2);
     });
     expect(must(mockFindTagsMinimal.mock.calls[1])[0]).toEqual({
       filter: { per_page: 50 },
     });
+  });
+
+  it("the carousel picker is a button named by its rule's label", async () => {
+    mockFindTagsMinimal.mockResolvedValue([]);
+
+    render(
+      <RuleEditor
+        rule={{ id: "rule-1", filterKey: "tagIds", value: [] }}
+        usedFilterKeys={new Set(["tagIds"])}
+        onChange={vi.fn()}
+        onRemove={vi.fn()}
+      />
+    );
+
+    const picker = screen.getByRole("button", { name: /^Tags/ });
+    expect(picker).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(picker);
+    expect(picker).toHaveAttribute("aria-expanded", "true");
+    expect(
+      await screen.findByPlaceholderText("Type to search...")
+    ).toBeInTheDocument();
   });
 
   it("a decimal bound is kept", () => {
