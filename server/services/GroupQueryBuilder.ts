@@ -212,7 +212,7 @@ class GroupQueryBuilder extends EntityQueryBuilder<
   }
 
   /** The group filter's clauses, one per criterion the request carried */
-  protected async filterClauses(
+  protected override async legacyFilterClauses(
     filter: ParsedFilter<"group">,
     q: string | undefined,
     ctx: QueryContext
@@ -306,7 +306,7 @@ class GroupQueryBuilder extends EntityQueryBuilder<
    * The search across the name and synopsis: `likeContains` with
    * `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
    */
-  private searchClause(q: string): FilterClause {
+  protected override searchClause(q: string): FilterClause {
     const pattern = likeContains(q.toLowerCase());
     return {
       sql: "(LOWER(g.name) LIKE ? ESCAPE '\\' OR LOWER(g.synopsis) LIKE ? ESCAPE '\\')",

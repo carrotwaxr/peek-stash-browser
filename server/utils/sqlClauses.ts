@@ -606,13 +606,26 @@ export function countForms(clauses: readonly FilterClause[]): FilterClause[] {
   return clauses.map((c) => c.count ?? c);
 }
 
-/** The clauses as one WHERE, with their CTEs and joins gathered in order */
+/**
+ * The clauses as one WHERE, with their CTEs and joins gathered in order.
+ * Two CTEs with one name throw: the statement would fail to prepare, or one
+ * clause would read the other's set. A clause names its CTEs from its leaf's
+ * name, unique in the statement.
+ */
 export function combine(clauses: readonly FilterClause[]): CombinedClauses {
   const active = clauses.filter((c) => c.sql !== "");
+  const ctes = clauses.flatMap((c) => c.ctes ?? []);
+  const names = new Set<string>();
+  for (const cte of ctes) {
+    if (names.has(cte.name)) {
+      throw new Error(`Duplicate CTE name ${cte.name}`);
+    }
+    names.add(cte.name);
+  }
   return {
     where: active.map((c) => c.sql).join(" AND "),
     params: active.flatMap((c) => c.params),
-    ctes: clauses.flatMap((c) => c.ctes ?? []),
+    ctes,
     joins: clauses.flatMap((c) => c.joins ?? []),
   };
 }

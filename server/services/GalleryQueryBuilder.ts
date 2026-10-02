@@ -185,7 +185,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
   }
 
   /** The gallery filter's clauses, one per criterion the request carried */
-  protected async filterClauses(
+  protected override async legacyFilterClauses(
     filter: ParsedFilter<"gallery">,
     q: string | undefined,
     ctx: QueryContext
@@ -304,7 +304,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
    * The search across the title, details and photographer: `likeContains`
    * with `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
    */
-  private searchClause(q: string): FilterClause {
+  protected override searchClause(q: string): FilterClause {
     const pattern = likeContains(q.toLowerCase());
     return {
       sql: "(LOWER(g.title) LIKE ? ESCAPE '\\' OR LOWER(g.details) LIKE ? ESCAPE '\\' OR LOWER(g.photographer) LIKE ? ESCAPE '\\')",

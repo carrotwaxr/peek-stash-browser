@@ -25,6 +25,8 @@ import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  type FieldClauses,
+  type LeafContext,
   type QueryContext,
   type SortExpr,
 } from "../../../services/query/EntityQueryBuilder.js";
@@ -33,7 +35,7 @@ import type {
   ParsedFilter,
   ParsedListRequest,
 } from "../../../types/parsedFilters.js";
-import type { FilterClause } from "../../../utils/sqlClauses.js";
+import { type FilterClause, combine } from "../../../utils/sqlClauses.js";
 import {
   parsedClipRequest,
   parsedListRequest,
@@ -93,7 +95,7 @@ class FakeBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "scene"> {
     };
   }
 
-  protected filterClauses(
+  protected override legacyFilterClauses(
     filter: ParsedFilter<"scene">,
     q: string | undefined,
     ctx: QueryContext
@@ -212,7 +214,7 @@ class NestedBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "clip"> {
     };
   }
 
-  protected filterClauses(
+  protected override legacyFilterClauses(
     filter: ClipListRequest["filter"]
   ): Promise<FilterClause[]> {
     return Promise.resolve(
@@ -1002,5 +1004,142 @@ describe("EntityQueryBuilder", () => {
 
       expect(order()).toBe("c.seconds ASC, c.id ASC, c.stashInstanceId ASC");
     });
+  });
+});
+
+/**
+ * A clip-shaped builder on a field table (the smallest list, six fields):
+ * each field's clause records its call, so the order the base builds them
+ * in shows
+ */
+class TableBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "clip"> {
+  protected readonly spec: EntitySpec = {
+    table: "StashClip",
+    alias: "c",
+    entityType: "clip",
+    userJoins: [],
+    selectColumns: () => ({ sql: "c.id, c.stashInstanceId", params: [] }),
+    defaultSort: "stashCreatedAt",
+  };
+
+  /** Each call: the field (or "search") with the context's name and underAny */
+  readonly calls: string[] = [];
+
+  private recorder =
+    (field: string) =>
+    (_criterion: unknown, ctx: LeafContext): FilterClause => {
+      this.calls.push(`${field}:${ctx.name}:${String(ctx.underAny)}`);
+      return { sql: `c.${field} = ?`, params: [field] };
+    };
+
+  protected override readonly fieldClauses: FieldClauses<"clip"> = {
+    sceneId: this.recorder("sceneId"),
+    tagIds: this.recorder("tagIds"),
+    sceneTagIds: this.recorder("sceneTagIds"),
+    performerIds: this.recorder("performerIds"),
+    studioId: this.recorder("studioId"),
+    isGenerated: this.recorder("isGenerated"),
+  };
+
+  protected override searchClause(q: string): FilterClause {
+    this.calls.push("search");
+    return { sql: "c.title LIKE ?", params: [q] };
+  }
+
+  protected sortMap(dir: "ASC" | "DESC"): Record<string, SortExpr> {
+    return { stashCreatedAt: { sql: `c.stashCreatedAt ${dir}`, params: [] } };
+  }
+
+  protected transformRow(row: FakeRow): FakeEntity {
+    return { id: row.id, instanceId: row.stashInstanceId };
+  }
+
+  protected populateRelations(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
+describe("the field clause table", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ total: 0n }]);
+  });
+
+  it("builds one clause per field the filter carries, in the table's order, then the search", async () => {
+    const table = new TableBuilder();
+    const refs = { refs: [{ id: "1", instanceId: "inst-a" }], depth: 0 };
+
+    await table.execute({
+      userId: 5,
+      allowedInstanceIds: ["inst-a"],
+      request: clipRequest({
+        q: "kiss",
+        filter: {
+          sceneTagIds: { ...refs, modifier: "INCLUDES" },
+          sceneId: { ...refs, modifier: "INCLUDES" },
+        },
+      }),
+    });
+
+    expect(table.calls).toEqual([
+      "sceneId:sceneId:false",
+      "sceneTagIds:sceneTagIds:false",
+      "search",
+    ]);
+    const page = must(statements()[0]);
+    positions(page.sql, [
+      "c.sceneId = ?",
+      "c.sceneTagIds = ?",
+      "c.title LIKE ?",
+    ]);
+    expect(page.params.slice(-5)).toEqual([
+      "sceneId",
+      "sceneTagIds",
+      "kiss",
+      10,
+      10,
+    ]);
+  });
+
+  it("clauseFor names a leaf's CTEs from its name", async () => {
+    // Under the rating sort (no index) the 70 refs take the matched set, a
+    // refs CTE and a matched CTE each
+    const refs = Array.from({ length: 70 }, (_, i) => ({
+      id: String(i + 1),
+      instanceId: "inst-a",
+    }));
+    const leaf = {
+      field: "tags",
+      criterion: { refs, modifier: "INCLUDES", depth: 0 },
+    } as const;
+    const ctx = (name: string): LeafContext => ({
+      userId: 1,
+      applyExclusions: true,
+      allowedInstanceIds: ["inst-a"],
+      specificInstanceId: undefined,
+      sortField: "rating",
+      name,
+      underAny: false,
+    });
+
+    const a = await sceneQueryBuilder.clauseFor(leaf, ctx("tags_a"));
+    const b = await sceneQueryBuilder.clauseFor(leaf, ctx("tags_b"));
+
+    expect((a.ctes ?? []).map((c) => c.name)).toEqual([
+      "tags_a_refs",
+      "tags_a_matched",
+    ]);
+    expect((b.ctes ?? []).map((c) => c.name)).toEqual([
+      "tags_b_refs",
+      "tags_b_matched",
+    ]);
+    expect(combine([a, b]).ctes.map((c) => c.name)).toEqual([
+      "tags_a_refs",
+      "tags_a_matched",
+      "tags_b_refs",
+      "tags_b_matched",
+    ]);
   });
 });

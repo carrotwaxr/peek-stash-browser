@@ -20,6 +20,14 @@
  * subclass declares its spec (table, alias,
  * user joins, columns, tiebreak), its filter clauses, its sort map, its row
  * transform and its relations.
+ *
+ * A builder's filter clauses are a table with one function per field
+ * (`fieldClauses`) and a `searchClause`: the base reads the filter as
+ * leaves, one criterion of one field each, builds each leaf's clause through
+ * `clauseFor` in the table's order, and appends the search last. Every CTE a
+ * clause adds is named from its leaf's name, unique in the statement
+ * (`combine` refuses two of one name). Until every builder is on the table,
+ * one that is not declares `legacyFilterClauses` instead.
  */
 import type {
   ListKind,
@@ -111,6 +119,35 @@ export interface QueryContext {
    */
   readonly sortField: string;
 }
+
+/** The fields a builder's own table covers: the parsed filter without the base's `ids` */
+export type OwnFilterOf<K extends ListKind> = Omit<ListFilterOf<K>, "ids">;
+export type FieldOf<K extends ListKind> = keyof OwnFilterOf<K> & string;
+
+/** One criterion of one field: 9a has one per field the filter carries; 9b's tree has many */
+export interface Leaf<K extends ListKind, F extends FieldOf<K> = FieldOf<K>> {
+  readonly field: F;
+  readonly criterion: NonNullable<OwnFilterOf<K>[F]>;
+}
+
+/** Where a leaf's clause sits in the statement */
+export interface LeafContext extends QueryContext {
+  /** Unique in the statement; every CTE the clause adds is named from it (`tags`, `tags_refs`) */
+  readonly name: string;
+  /** Under an "any" group (9b): take the read-once shape whatever the sort. Always false in 9a. */
+  readonly underAny: boolean;
+}
+
+/** One field's clause: the criterion's WHERE fragment, named from the leaf */
+export type FieldClause<C> = (
+  criterion: C,
+  ctx: LeafContext
+) => FilterClause | Promise<FilterClause>;
+
+/** A builder's clause per field of its filter, every field but the base's `ids` */
+export type FieldClauses<K extends ListKind> = {
+  readonly [F in FieldOf<K>]-?: FieldClause<NonNullable<OwnFilterOf<K>[F]>>;
+};
 
 export interface EntitySpec {
   readonly table: string;
@@ -292,14 +329,105 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     ctx: QueryContext
   ): Record<string, SortExpr>;
 
-  /** The entity's own filter clauses; `ids` is the base's */
-  protected abstract filterClauses(
+  /**
+   * The entity's own filter clauses, one function per field in the order
+   * the statement ANDs them; `ids` is the base's. Optional until every
+   * builder declares one (PR 9a, S3); a builder without it declares
+   * `legacyFilterClauses`.
+   */
+  protected readonly fieldClauses?: FieldClauses<K>;
+
+  /** The search text's clause (`q`), after the field clauses */
+  protected searchClause?(q: string, ctx: QueryContext): FilterClause;
+
+  /** A builder not yet on the table: its filter clauses and search, in one */
+  protected legacyFilterClauses?(
     filter: ListFilterOf<K>,
     q: string | undefined,
     ctx: QueryContext
   ): Promise<FilterClause[]>;
 
   protected abstract transformRow(row: Row): Entity;
+
+  /**
+   * The filter's leaves: one per field it carries, in the table's key
+   * order (a field left undefined carries none)
+   */
+  protected leavesOf(filter: ListFilterOf<K>): Leaf<K>[] {
+    const own: OwnFilterOf<K> = filter;
+    const fields = Object.keys(this.table()) as FieldOf<K>[];
+    return fields.flatMap((field) => {
+      const criterion = own[field];
+      // The parser sends no null; a field left undefined carries no leaf
+      return criterion === undefined || criterion === null
+        ? []
+        : [{ field, criterion }];
+    });
+  }
+
+  /**
+   * A leaf's clause, from its field's function in the table (looked up as
+   * own data, never through the prototype, as `sortExpr` does)
+   */
+  async clauseFor(leaf: Leaf<K>, ctx: LeafContext): Promise<FilterClause> {
+    const table = this.table();
+    if (!Object.prototype.hasOwnProperty.call(table, leaf.field)) {
+      throw new Error(`No filter clause for ${leaf.field}`);
+    }
+    // The one cast of the correlated union: a leaf's criterion is its own
+    // field's, which TypeScript cannot tie to `table[leaf.field]`
+    const clause = table[leaf.field] as FieldClause<Leaf<K>["criterion"]>;
+    return clause(leaf.criterion, ctx);
+  }
+
+  /** The field table, which a builder on it declares */
+  private table(): FieldClauses<K> {
+    if (this.fieldClauses === undefined) {
+      throw new Error(`The ${this.spec.entityType} builder has no field table`);
+    }
+    return this.fieldClauses;
+  }
+
+  /**
+   * The filter's clauses: each leaf's, named from its field, in the table's
+   * order, then the search's
+   */
+  private async clausesOf(
+    filter: ListFilterOf<K>,
+    q: string | undefined,
+    ctx: QueryContext
+  ): Promise<FilterClause[]> {
+    const clauses: FilterClause[] = [];
+    for (const leaf of this.leavesOf(filter)) {
+      clauses.push(
+        await this.clauseFor(leaf, {
+          ...ctx,
+          name: leaf.field,
+          underAny: false,
+        })
+      );
+    }
+    if (q !== undefined) {
+      if (this.searchClause === undefined) {
+        throw new Error(`The ${this.spec.entityType} builder has no search`);
+      }
+      clauses.push(this.searchClause(q, ctx));
+    }
+    return clauses;
+  }
+
+  /** The table's clauses when the builder has one, else its legacy clauses */
+  private async ownClauses(
+    filter: ListFilterOf<K>,
+    q: string | undefined,
+    ctx: QueryContext
+  ): Promise<FilterClause[]> {
+    if (this.fieldClauses !== undefined) return this.clausesOf(filter, q, ctx);
+    if (this.legacyFilterClauses === undefined) {
+      throw new Error(`The ${this.spec.entityType} builder has no clauses`);
+    }
+    return this.legacyFilterClauses(filter, q, ctx);
+  }
 
   protected abstract populateRelations(
     entities: Entity[],
@@ -525,7 +653,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
             }),
           ]
         : []),
-      ...(await this.filterClauses(request.filter, request.q, ctx)),
+      ...(await this.ownClauses(request.filter, request.q, ctx)),
     ];
 
     const { field, seed } = request.sort;

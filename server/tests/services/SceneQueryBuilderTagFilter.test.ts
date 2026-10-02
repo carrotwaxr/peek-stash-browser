@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 // Import after mocks
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
-import type { QueryContext } from "../../services/query/EntityQueryBuilder.js";
+import type { LeafContext } from "../../services/query/EntityQueryBuilder.js";
 import type { RefCriterion } from "../../types/parsedFilters.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -30,12 +30,14 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 
-const CTX: QueryContext = {
+const CTX: LeafContext = {
   userId: 1,
   applyExclusions: true,
   allowedInstanceIds: ["instance-1", "instance-2"],
   specificInstanceId: undefined,
   sortField: "created_at",
+  name: "tags",
+  underAny: false,
 };
 
 const ref = (id: string, instanceId = "instance-1") => ({ id, instanceId });

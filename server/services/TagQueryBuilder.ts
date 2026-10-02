@@ -215,7 +215,7 @@ class TagQueryBuilder extends EntityQueryBuilder<
   }
 
   /** The tag filter's clauses, one per criterion the request carried */
-  protected async filterClauses(
+  protected override async legacyFilterClauses(
     filter: ParsedFilter<"tag">,
     q: string | undefined,
     ctx: QueryContext
@@ -342,7 +342,7 @@ class TagQueryBuilder extends EntityQueryBuilder<
    * The search across the name, description and aliases: `likeContains`
    * with `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
    */
-  private searchClause(q: string): FilterClause {
+  protected override searchClause(q: string): FilterClause {
     const pattern = likeContains(q.toLowerCase());
     return {
       sql: "(LOWER(t.name) LIKE ? ESCAPE '\\' OR LOWER(t.description) LIKE ? ESCAPE '\\' OR LOWER(t.aliases) LIKE ? ESCAPE '\\')",
