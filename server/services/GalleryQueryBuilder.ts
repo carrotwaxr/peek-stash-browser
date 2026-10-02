@@ -70,7 +70,7 @@ const selectColumns = (ctx: QueryContext) =>
   `
     g.id, g.stashInstanceId, g.title, g.date, g.studioId, g.rating100 AS stashRating100,
     ${visibleCount(ctx, "g.imageCount", "images")} AS imageCount, g.coverImageId,
-    g.details, g.url, g.code, g.photographer, g.urls,
+    g.details, g.url, g.code, g.photographer, g.urls, g.organized,
     g.folderPath, g.fileBasename, g.coverPath,
     g.stashCreatedAt, g.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
@@ -300,6 +300,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
       photographer: emptyToNull(row.photographer),
       url: emptyToNull(row.url),
       urls: parseJsonArray(row.urls),
+      organized: row.organized,
 
       // Counts
       image_count: Number(row.imageCount ?? 0),

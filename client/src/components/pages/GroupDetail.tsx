@@ -90,6 +90,7 @@ const GroupPage = ({ detail }: { detail: FoundEntityDetail<"group"> }) => {
       type="group"
       detail={detail}
       title={name}
+      subtitle={group.aliases ? `Also known as: ${group.aliases}` : null}
       hero={<GroupImageFlipper group={group} />}
       description={group.synopsis}
       sections={

@@ -128,6 +128,7 @@ export interface PerformerQueryRow {
   groupCount: number | bigint | null;
   details: string | null;
   aliasList: string | null; // JSON-encoded string[]
+  urls: string | null; // JSON-encoded string[]
   stashIds: string | null; // JSON-encoded { endpoint, stash_id }[]
   country: string | null;
   ethnicity: string | null;
@@ -185,6 +186,7 @@ export interface StudioQueryRow {
   groupCount: number | bigint | null;
   details: string | null;
   url: string | null;
+  aliases: string | null; // JSON-encoded string[]
   imagePath: string | null;
   stashCreatedAt: Date | null;
   stashUpdatedAt: Date | null;
@@ -292,6 +294,7 @@ export interface GalleryQueryRow {
   code: string | null;
   photographer: string | null;
   urls: string | null; // JSON-encoded string[]
+  organized: boolean;
   folderPath: string | null;
   fileBasename: string | null;
   coverPath: string | null;
@@ -331,6 +334,7 @@ export interface GroupQueryRow {
   director: string | null;
   synopsis: string | null;
   urls: string | null; // JSON-encoded string[]
+  aliases: string | null; // Stash's free text
   frontImagePath: string | null;
   backImagePath: string | null;
   stashCreatedAt: Date | null;

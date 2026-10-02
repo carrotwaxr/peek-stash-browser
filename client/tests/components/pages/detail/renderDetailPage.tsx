@@ -139,6 +139,7 @@ const ROW_DEFAULTS: Partial<Record<DetailType, Record<string, unknown>>> = {
     tags: [],
     details: null,
     url: null,
+    aliases: [],
     image_path: null,
     stash_ids: [],
   },
@@ -147,12 +148,14 @@ const ROW_DEFAULTS: Partial<Record<DetailType, Record<string, unknown>>> = {
     alias_list: [],
     details: null,
     url: null,
+    urls: [],
     image_path: null,
     stash_ids: [],
   },
   group: {
     tags: [],
     urls: [],
+    aliases: null,
     synopsis: null,
     front_image_path: null,
     back_image_path: null,
@@ -166,6 +169,7 @@ const ROW_DEFAULTS: Partial<Record<DetailType, Record<string, unknown>>> = {
     photographer: null,
     files: [],
     folder: null,
+    organized: false,
   },
 };
 

@@ -282,6 +282,12 @@ const PerformerPage = ({
     { label: "Collections:", value: totals?.groups, tab: "groups" },
   ];
   const scenes = totals?.scenes ?? 0;
+  // Every link; a row from before the re-fetch holds only the first
+  const links = performer.urls.length
+    ? performer.urls
+    : performer.url
+      ? [performer.url]
+      : [];
 
   return (
     <EntityDetailLayout
@@ -318,10 +324,12 @@ const PerformerPage = ({
               <OCountRate oCount={performer.o_counter} scenes={scenes} />
             )}
           </DetailStats>
-          {performer.url && (
+          {links.length > 0 && (
             <DetailCard title="Links">
               <div className="flex flex-wrap gap-2">
-                <SectionLink url={performer.url} />
+                {links.map((url) => (
+                  <SectionLink key={url} url={url} />
+                ))}
               </div>
             </DetailCard>
           )}

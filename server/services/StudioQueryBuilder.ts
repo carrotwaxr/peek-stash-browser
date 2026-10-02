@@ -25,6 +25,7 @@ import {
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
+  parseJsonArray,
   parseStashIds,
   searchTerms,
 } from "../utils/sqlHelpers.js";
@@ -57,7 +58,7 @@ const selectColumns = (ctx: QueryContext) =>
     ${visibleCount(ctx, "s.galleryCount", "galleries")} AS galleryCount,
     ${visibleCount(ctx, "s.performerCount", "performers")} AS performerCount,
     ${visibleCount(ctx, "s.groupCount", "groups")} AS groupCount,
-    s.details, s.url, s.stashIds, s.imagePath,
+    s.details, s.url, s.aliases, s.stashIds, s.imagePath,
     s.stashCreatedAt, s.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
     us.oCounter AS userOCounter, us.playCount AS userPlayCount
@@ -211,6 +212,7 @@ class StudioQueryBuilder extends EntityQueryBuilder<
       parent_studio: row.parentId ? { id: row.parentId } : null,
       details: emptyToNull(row.details),
       url: emptyToNull(row.url),
+      aliases: parseJsonArray(row.aliases),
       stash_ids: parseStashIds(row.stashIds),
 
       // Image path - transform to proxy URL with instanceId for multi-instance routing
