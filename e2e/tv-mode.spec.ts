@@ -355,6 +355,83 @@ test.describe("TV mode", () => {
     expect(page.url()).toBe(url);
   });
 
+  test("with the D-pad, open Filters, open Tags, pick a tag and apply", async ({
+    page,
+  }) => {
+    const { list } = await openScenes(page, "/scenes");
+    const tagCondition = page.locator("#filter-tagIds");
+    const tagPicker = page.getByRole("button", { name: /^Tags/ });
+
+    // Enter on the Filters button opens the panel
+    await list.filtersButton.locator("button").focus();
+    await page.keyboard.press("Enter");
+    await expect(tagCondition).toBeVisible();
+
+    // Down walks the panel to the Collections picker; Left from it is the
+    // Tags picker, the control the arrows reach by position
+    const collectionsPicker = page.getByRole("button", {
+      name: /^Collections/,
+    });
+    const reachedCollections = await pressUntil(
+      page,
+      "ArrowDown",
+      () => collectionsPicker.evaluate((el) => el === document.activeElement),
+      20
+    );
+    expect(reachedCollections, "arrows reach the Collections picker").toBe(
+      true
+    );
+    await page.keyboard.press("ArrowLeft");
+    await expect(tagPicker).toBeFocused();
+
+    // Enter opens the list with focus in its search box; Down reaches an option
+    await page.keyboard.press("Enter");
+    await expect(page.getByPlaceholder("Type to search...")).toBeFocused();
+    await expect(tagPicker).toHaveAttribute("aria-expanded", "true");
+    const dropdown = page
+      .getByPlaceholder("Type to search...")
+      .locator("xpath=ancestor::div[contains(@class, 'absolute')]");
+    await expect(dropdown.getByRole("button").first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.keyboard.press("ArrowDown");
+    const option = focused(page);
+    await expect(option).toHaveAttribute("aria-pressed", "false");
+    const tagName = (await option.innerText()).trim();
+    await page.keyboard.press("Enter");
+    await expect(option).toHaveAttribute("aria-pressed", "true");
+
+    // Escape closes the list, not the panel, and returns focus to the picker
+    await page.keyboard.press("Escape");
+    await expect(page.getByPlaceholder("Type to search...")).toHaveCount(0);
+    await expect(tagPicker).toBeFocused();
+    await expect(tagCondition).toBeVisible();
+
+    // Down to the panel's buttons, then Apply
+    const apply = page.getByRole("button", { name: "Apply Filters" });
+    const reachedButtons = await pressUntil(
+      page,
+      "ArrowDown",
+      async () =>
+        ["Cancel", "Apply Filters"].includes(
+          await focused(page).evaluate((el) => el.textContent?.trim() ?? "")
+        ),
+      40
+    );
+    expect(reachedButtons, "arrows reach the panel's buttons").toBe(true);
+    if (!(await apply.evaluate((el) => el === document.activeElement))) {
+      await page.keyboard.press("ArrowRight");
+    }
+    await expect(apply).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    // The filter is applied, and its chip names the tag
+    await expect(page).toHaveURL(/[?&]tagIds=/);
+    await expect(
+      page.getByRole("button", { name: /^Edit filter: Tags/ })
+    ).toContainText(tagName);
+  });
+
   test("Up and Down leave a range slider; Left and Right change it", async ({
     page,
   }) => {

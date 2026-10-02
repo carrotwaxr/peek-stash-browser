@@ -8,6 +8,7 @@
  */
 import type { MinimalEntity, MinimalRequest } from "@peek/shared-types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as api from "../../../src/api";
@@ -39,7 +40,7 @@ vi.mock("../../../src/api", async (importOriginal) => ({
   libraryApi: finders,
 }));
 
-const user = { id: 1, username: "restricted" };
+const restrictedUser = { id: 1, username: "restricted" };
 
 describe("ContentRestrictionsModal pickers", () => {
   beforeEach(() => {
@@ -67,7 +68,9 @@ describe("ContentRestrictionsModal pickers", () => {
       )
     );
 
-    render(<ContentRestrictionsModal user={user} onClose={vi.fn()} />);
+    render(
+      <ContentRestrictionsModal user={restrictedUser} onClose={vi.fn()} />
+    );
 
     // The stored id on another server resolves to its name
     expect(await screen.findByText("Other Tag")).toBeInTheDocument();
@@ -87,5 +90,50 @@ describe("ContentRestrictionsModal pickers", () => {
       filter: { per_page: 50 },
       scope: "allEnabled",
     });
+  });
+
+  it("the restriction pickers open from the keyboard, and Escape closes the picker, not the dialog", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    mockApiGet.mockResolvedValue({ restrictions: [] });
+    render(
+      <ContentRestrictionsModal user={restrictedUser} onClose={onClose} />
+    );
+
+    const picker = await screen.findByRole("button", {
+      name: /^Show only tags/,
+    });
+    expect(
+      screen.getByRole("button", { name: /^Always hide tags/ })
+    ).toBeInTheDocument();
+    picker.focus();
+    await user.keyboard("{Enter}");
+    const search = await screen.findByPlaceholderText("Type to search...");
+    expect(search).toHaveFocus();
+    expect(picker).toHaveAttribute("aria-expanded", "true");
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByPlaceholderText("Type to search...")).toBeNull();
+    expect(picker).toHaveFocus();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("Escape on a closed picker inside the dialog closes the dialog", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    mockApiGet.mockResolvedValue({ restrictions: [] });
+    render(
+      <ContentRestrictionsModal user={restrictedUser} onClose={onClose} />
+    );
+
+    const picker = await screen.findByRole("button", {
+      name: /^Show only tags/,
+    });
+    picker.focus();
+    await user.keyboard("{Escape}");
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

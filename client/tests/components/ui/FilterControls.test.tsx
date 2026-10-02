@@ -7,8 +7,15 @@
 import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FilterControl } from "@/components/ui/FilterControls";
+
+vi.mock("@/api", () => ({
+  libraryApi: {
+    findPerformersMinimal: vi.fn().mockResolvedValue([]),
+    findTagsMinimal: vi.fn().mockResolvedValue([]),
+  },
+}));
 
 type Measure = "height" | "weight" | "length";
 
@@ -247,5 +254,73 @@ describe("Height in feet and inches", () => {
     );
 
     expect(stateOf()).toEqual({ min: "" });
+  });
+});
+
+describe("A field's label and its controls", () => {
+  it("the label names the field's first control", () => {
+    render(
+      <FilterControl
+        type="text"
+        label="Title"
+        controlId="filter-title"
+        value=""
+        onChange={() => {}}
+      />
+    );
+
+    expect(screen.getByLabelText("Title")).toHaveAttribute(
+      "id",
+      "filter-title"
+    );
+  });
+
+  it("a picker with no condition select is named by the field, and its label points at it", () => {
+    render(
+      <FilterControl
+        type="searchable-select"
+        entityType="tags"
+        label="Tags"
+        controlId="filter-tagIds"
+        multi
+        value={[]}
+        onChange={() => {}}
+      />
+    );
+
+    const trigger = screen.getByRole("button", { name: /^Tags/ });
+    expect(trigger).toHaveAttribute("id", "filter-tagIds");
+    expect(screen.getByText("Tags", { selector: "label" })).toHaveAttribute(
+      "for",
+      "filter-tagIds"
+    );
+  });
+
+  it("the condition select is named `<label> condition`, and the picker after it is the field's button", () => {
+    render(
+      <FilterControl
+        type="searchable-select"
+        entityType="performers"
+        label="Performers"
+        controlId="filter-performerIds"
+        multi
+        modifierOptions={[
+          { value: "INCLUDES", label: "Has ANY" },
+          { value: "EXCLUDES", label: "Has NONE" },
+        ]}
+        modifierValue="INCLUDES"
+        onModifierChange={() => {}}
+        value={[]}
+        onChange={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole("combobox", { name: "Performers condition" })
+    ).toHaveAttribute("id", "filter-performerIds");
+    expect(screen.getByRole("button", { name: /^Performers/ })).toHaveAttribute(
+      "aria-expanded",
+      "false"
+    );
   });
 });

@@ -179,6 +179,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
     case "searchable-select":
       return (
         <SearchableSelect
+          label={filterDef.label ?? filterDef.key}
           entityType={
             filterDef.entityType as
               | "performers"

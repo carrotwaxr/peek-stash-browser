@@ -381,6 +381,7 @@ const SearchControls = ({
                   <div data-tv-search-item="sort-direction">
                     <Button
                       onClick={() => handleSortChange(sortField)}
+                      aria-label={`Sort direction: ${sortDirection === "ASC" ? "ascending" : "descending"}`}
                       variant="secondary"
                       size="sm"
                       className="py-1"

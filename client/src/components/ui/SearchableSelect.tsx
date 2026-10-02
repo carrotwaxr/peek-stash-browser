@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   type MinimalEntity,
   type MinimalRequest,
@@ -24,12 +24,19 @@ import Button from "./Button";
  * sends "allEnabled" to list every enabled server's entities, including
  * what the admin hid for themselves (admins only).
  *
+ * The trigger is a button (Enter or Space opens the list, focus moves to the
+ * search box, Escape closes it and returns focus to the trigger, a focus that
+ * leaves the picker closes it). The selected values' remove buttons and Clear
+ * all sit beside the trigger, never inside it. In TV mode the trigger is an
+ * ordinary focusable element, so the D-pad reaches it.
+ *
  * @param {Object} props
  * @param {"performers"|"studios"|"tags"|"groups"|"galleries"} props.entityType - Type of entity to search
  * @param {Array|string} props.value - Selected value(s) - array for multi, string for single
  * @param {Function} props.onChange - Callback when selection changes
  * @param {boolean} props.multi - Enable multi-select mode
  * @param {string} props.placeholder - Placeholder text
+ * @param {string} [props.label] - The field's name, which names the trigger ("Tags: Tag A, Tag B"); without it the placeholder does
  * @param {"scenes"|"galleries"|"images"|"performers"|"groups"|null} props.countFilterContext - Filter entities to only those with content in this context
  * @param {"allEnabled"} [props.scope] - Every enabled server, not only the user's own, hidden items included (admins only)
  */
@@ -81,11 +88,10 @@ const storedValueIs = (stored: string, optionId: string): boolean =>
   stored === optionId || stored === parseCompositeKey(optionId).id;
 
 interface Props {
-  /**
-   * The trigger's id, where a filter chip moves focus. The trigger takes
-   * focus from a script (it is no tab stop until it becomes a button).
-   */
+  /** The trigger's id, where a filter chip moves focus and a label points */
   id?: string | undefined;
+  /** The field's name, which names the trigger button */
+  label?: string | undefined;
   entityType: EntityType;
   value: string | string[];
   onChange: (value: string | string[]) => void;
@@ -104,6 +110,7 @@ interface Props {
 
 const SearchableSelect = ({
   id,
+  label,
   entityType,
   value,
   onChange,
@@ -126,6 +133,8 @@ const SearchableSelect = ({
   }, [selectedItems]);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listId = useId();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const prevEntityTypeRef = useRef(entityType);
   const prevCountFilterContextRef = useRef(countFilterContext);
@@ -317,6 +326,11 @@ const SearchableSelect = ({
     }
   }, [isOpen]);
 
+  const closeList = () => {
+    setIsOpen(false);
+    setSearchTerm("");
+  };
+
   const handleSelect = (option: SelectOption) => {
     if (multi) {
       const currentValue = (value || []) as string[];
@@ -332,14 +346,22 @@ const SearchableSelect = ({
         onChange([...currentValue, option.id]);
       }
     } else {
+      // Focus moves before the option that has it unmounts
+      triggerRef.current?.focus();
       onChange(option.id);
-      setIsOpen(false);
-      setSearchTerm("");
+      closeList();
     }
   };
 
   const handleRemove = (optionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Focus moves before the button that has it unmounts: to the next
+    // value's remove button, else the trigger
+    const removeButtons = Array.from(
+      dropdownRef.current?.querySelectorAll<HTMLElement>("[data-remove]") ?? []
+    );
+    const index = removeButtons.indexOf(e.currentTarget as HTMLElement);
+    (removeButtons[index + 1] ?? triggerRef.current)?.focus();
     if (multi) {
       onChange(
         ((value || []) as string[]).filter(
@@ -353,7 +375,38 @@ const SearchableSelect = ({
 
   const handleClearAll = (e: React.MouseEvent) => {
     e.stopPropagation(); // Don't toggle dropdown
+    triggerRef.current?.focus();
     onChange(multi ? [] : "");
+  };
+
+  // Escape while the list is open closes it and is handled: the dialog around
+  // the picker stays. On a closed list it is nobody's here, so the dialog's.
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "Escape" || !isOpen) return;
+    e.preventDefault();
+    closeList();
+    triggerRef.current?.focus();
+  };
+
+  // Focus moving to something outside the picker (Tab, a TV arrow) closes
+  // the list, which would otherwise cover the fields below it. A blur to
+  // nothing (a press on a non-focusable spot) is the outside-press listener's.
+  const handleBlur = (e: React.FocusEvent) => {
+    const next = e.relatedTarget;
+    if (
+      isOpen &&
+      next instanceof Node &&
+      !dropdownRef.current?.contains(next)
+    ) {
+      closeList();
+    }
+  };
+
+  // A press on a chip's name toggles the list like the trigger; the buttons
+  // act for themselves
+  const handleRowClick = (e: React.MouseEvent) => {
+    if (e.target instanceof Element && e.target.closest("button")) return;
+    setIsOpen((open) => !open);
   };
 
   const isSelected = (optionId: string) => {
@@ -365,90 +418,118 @@ const SearchableSelect = ({
     return typeof value === "string" && storedValueIs(value, optionId);
   };
 
+  // The trigger's name: the field, then what is picked (or the placeholder)
+  const pickedNames = selectedItems.map((item) => item.name).join(", ");
+  const triggerName = label
+    ? `${label}: ${pickedNames || placeholder}`
+    : pickedNames
+      ? `${placeholder}: ${pickedNames}`
+      : placeholder;
+
   return (
-    <div ref={dropdownRef} className="relative w-full">
-      {/* Selected items display / Trigger button */}
+    <div
+      ref={dropdownRef}
+      className="relative w-full"
+      onKeyDown={handleKeyDown}
+      onBlur={handleBlur}
+    >
+      {/* The row: the trigger button, with the values' remove buttons beside it */}
       <div
-        id={id}
-        tabIndex={id === undefined ? undefined : -1}
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full pl-3 pr-[2px] py-2 rounded-md cursor-pointer border text-sm flex items-center justify-between gap-2"
+        onClick={handleRowClick}
+        className="w-full pl-3 pr-[2px] py-2 rounded-md cursor-pointer border text-sm flex flex-wrap items-center gap-1"
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
           color: "var(--text-primary)",
         }}
       >
-        <div className="flex flex-wrap gap-1 flex-1">
-          {selectedItems.length === 0 ? (
-            isLoadingInitial ? (
-              <span style={{ color: "var(--text-muted)" }}>Loading...</span>
-            ) : (
-              <span style={{ color: "var(--text-muted)" }}>{placeholder}</span>
-            )
-          ) : multi ? (
-            selectedItems.map((item) => (
-              <span
-                key={item.id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm"
-                style={{
-                  backgroundColor: "var(--accent-primary)",
-                  color: "white",
-                }}
-              >
-                {item.name}
-                <Button
-                  onClick={(e) => handleRemove(item.id, e)}
-                  variant="tertiary"
-                  className="hover:opacity-70 !p-0 !border-0"
-                  aria-label={`Remove ${item.name}`}
-                  icon={<LucideX size={14} />}
-                />
-              </span>
-            ))
-          ) : (
-            <div className="flex items-center justify-between w-full">
-              <span>{selectedItems[0]?.name}</span>
+        {multi &&
+          selectedItems.map((item) => (
+            <span
+              key={item.id}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm"
+              style={{
+                backgroundColor: "var(--accent-primary)",
+                color: "white",
+              }}
+            >
+              {item.name}
               <Button
-                onClick={(e) => {
-                  const selected = selectedItems[0];
-                  if (selected) handleRemove(selected.id, e);
-                }}
+                data-remove
+                onClick={(e) => handleRemove(item.id, e)}
                 variant="tertiary"
-                className="hover:opacity-70 !p-1 !border-0"
-                aria-label={`Remove ${selectedItems[0]?.name}`}
-                icon={<LucideX size={16} />}
+                className="hover:opacity-70 !p-0 !border-0"
+                aria-label={`Remove ${item.name}`}
+                icon={<LucideX size={14} />}
               />
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {selectedItems.length > 0 && (
-            <Button
-              onClick={handleClearAll}
-              variant="tertiary"
-              className="hover:opacity-70 !p-1 !border-0"
-              aria-label="Clear all selections"
-              title="Clear all"
-              icon={
-                <LucideX size={16} style={{ color: "var(--text-muted)" }} />
-              }
-            />
-          )}
+            </span>
+          ))}
+        <button
+          ref={triggerRef}
+          id={id}
+          type="button"
+          aria-expanded={isOpen}
+          aria-controls={listId}
+          aria-label={triggerName}
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex flex-1 items-center justify-between gap-2 min-w-[6rem] py-0.5 text-left bg-transparent border-0 cursor-pointer rounded focus-visible:outline focus-visible:outline-2"
+          style={{ color: "var(--text-primary)" }}
+        >
+          <span
+            className="flex-1 min-w-0"
+            style={
+              selectedItems.length === 0 || multi
+                ? { color: "var(--text-muted)" }
+                : undefined
+            }
+          >
+            {selectedItems.length === 0
+              ? isLoadingInitial
+                ? "Loading..."
+                : placeholder
+              : multi
+                ? "Add more..."
+                : selectedItems[0]?.name}
+          </span>
           <LucideChevronDown
             size={14}
+            className="flex-shrink-0"
             style={{
               transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
               transition: "transform 0.2s",
               color: "var(--text-muted)",
             }}
           />
-        </div>
+        </button>
+        {!multi && selectedItems[0] && (
+          <Button
+            data-remove
+            onClick={(e) => {
+              const selected = selectedItems[0];
+              if (selected) handleRemove(selected.id, e);
+            }}
+            variant="tertiary"
+            className="hover:opacity-70 !p-1 !border-0"
+            aria-label={`Remove ${selectedItems[0].name}`}
+            icon={<LucideX size={16} />}
+          />
+        )}
+        {selectedItems.length > 0 && (
+          <Button
+            onClick={handleClearAll}
+            variant="tertiary"
+            className="hover:opacity-70 !p-1 !border-0"
+            aria-label="Clear all selections"
+            title="Clear all"
+            icon={<LucideX size={16} style={{ color: "var(--text-muted)" }} />}
+          />
+        )}
       </div>
 
       {/* Dropdown */}
       {isOpen && (
         <div
+          id={listId}
           className="absolute z-50 w-full mt-1 rounded-md shadow-lg border overflow-hidden"
           style={{
             backgroundColor: "var(--bg-card)",
@@ -505,6 +586,7 @@ const SearchableSelect = ({
                 <Button
                   key={option.id}
                   onClick={() => handleSelect(option)}
+                  aria-pressed={isSelected(option.id)}
                   variant="tertiary"
                   fullWidth
                   className="text-left px-4 py-2 flex items-center justify-between"

@@ -727,6 +727,27 @@ describe("SearchControls", () => {
   });
 
   describe("Sort Controls", () => {
+    it("the sort select and the direction button are named", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls();
+      await firstQuery(list.onQueryChange);
+
+      expect(screen.getByRole("combobox", { name: "Sort by" })).toBe(
+        sortSelect()
+      );
+      const direction = screen.getByRole("button", {
+        name: "Sort direction: descending",
+      });
+
+      await user.click(direction);
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "Sort direction: ascending" })
+        ).toBeInTheDocument()
+      );
+    });
+
     it("changes sort field when dropdown selection changes", async () => {
       const user = userEvent.setup();
       const list = renderSearchControls();

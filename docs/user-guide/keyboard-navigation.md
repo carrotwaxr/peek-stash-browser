@@ -172,8 +172,12 @@ In fullscreen, your browser's own `Escape` exits it.
 |-----|--------|
 | `Tab` | Move between filter options |
 | `Space` | Toggle checkbox filters |
-| `Enter` | Apply filters |
-| `Escape` | Close filter panel |
+| `Enter` | Apply filters; on a performer, tag, studio or collection picker, open its list |
+| `Escape` | Close an open picker list (focus returns to the picker); otherwise close the filter panel |
+
+A picker's list opens with the cursor in its search box. `Tab` or an arrow that leaves the picker closes the list. The same pickers work in the carousel builder and the Content Restrictions editor.
+
+In TV mode the D-pad reaches every picker: arrows move between the fields, `Enter` opens a picker, `Down` goes from the search box to the options, `Enter` picks one, and `Escape` closes the list.
 
 ## Playlists
 

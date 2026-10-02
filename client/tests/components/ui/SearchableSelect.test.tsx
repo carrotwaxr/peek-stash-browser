@@ -9,8 +9,10 @@
  * are resolved with one minimal request carrying their ids, at most 100 per
  * request.
  */
+import { useState } from "react";
 import type { MinimalEntity, MinimalRequest } from "@peek/shared-types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { untrusted } from "@tests/helpers/untrusted";
 import { actAsync, flushPromises, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -96,10 +98,12 @@ const row = (id: string, instanceId: string, name: string): MinimalEntity => ({
   name,
 });
 
-/** The trigger that opens the dropdown */
-const trigger = (container: HTMLElement) =>
+/** The trigger that opens the dropdown: the one button that says whether it is expanded */
+const trigger = () =>
   must(
-    container.querySelector<HTMLElement>("[class*='cursor-pointer']"),
+    screen
+      .getAllByRole("button")
+      .find((button) => button.hasAttribute("aria-expanded")),
     "the trigger"
   );
 
@@ -223,7 +227,7 @@ describe("SearchableSelect selected names", () => {
 
 describe("SearchableSelect options", () => {
   it("requests nothing until opened", async () => {
-    const { container } = render(
+    render(
       <SearchableSelect
         entityType="performers"
         value={[]}
@@ -237,7 +241,7 @@ describe("SearchableSelect options", () => {
     await flushPromises();
     expect(mockFindPerformersMinimal).not.toHaveBeenCalled();
 
-    fireEvent.click(trigger(container));
+    fireEvent.click(trigger());
 
     await waitFor(() => {
       expect(mockFindPerformersMinimal).toHaveBeenCalledTimes(1);
@@ -263,7 +267,7 @@ describe("SearchableSelect options", () => {
       row("1", "inst-1", "Fresh Name"),
     ]);
     try {
-      const { container } = render(
+      render(
         <SearchableSelect
           entityType="performers"
           value={[]}
@@ -272,13 +276,13 @@ describe("SearchableSelect options", () => {
         />
       );
 
-      fireEvent.click(trigger(container));
+      fireEvent.click(trigger());
       expect(await screen.findByText("Fresh Name")).toBeTruthy();
       expect(screen.queryByText("Kept Name")).toBeNull();
 
       // Closed and opened again: asked again
-      fireEvent.click(trigger(container));
-      fireEvent.click(trigger(container));
+      fireEvent.click(trigger());
+      fireEvent.click(trigger());
       await waitFor(() => {
         expect(mockFindPerformersMinimal).toHaveBeenCalledTimes(2);
       });
@@ -289,7 +293,7 @@ describe("SearchableSelect options", () => {
 
   it("a slower earlier response never replaces a later one", async () => {
     const calls = holdCalls(mockFindPerformersMinimal);
-    const { container } = render(
+    render(
       <SearchableSelect
         entityType="performers"
         value={[]}
@@ -298,7 +302,7 @@ describe("SearchableSelect options", () => {
       />
     );
 
-    fireEvent.click(trigger(container));
+    fireEvent.click(trigger());
     const input = await screen.findByPlaceholderText("Type to search...");
     fireEvent.change(input, { target: { value: "ann" } });
     await waitFor(() => {
@@ -327,7 +331,7 @@ describe("SearchableSelect options", () => {
 
   it("aborts the previous request when the search changes", async () => {
     const calls = holdCalls(mockFindPerformersMinimal);
-    const { container } = render(
+    render(
       <SearchableSelect
         entityType="performers"
         value={[]}
@@ -336,7 +340,7 @@ describe("SearchableSelect options", () => {
       />
     );
 
-    fireEvent.click(trigger(container));
+    fireEvent.click(trigger());
     const input = await screen.findByPlaceholderText("Type to search...");
     await waitFor(() => {
       expect(calls.length).toBeGreaterThan(0);
@@ -358,7 +362,7 @@ describe("SearchableSelect options", () => {
   it("does not throw and returns empty results for unsupported entity type", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const { container } = render(
+    render(
       <SearchableSelect
         entityType={untrusted("unsupported")}
         value={[]}
@@ -368,12 +372,12 @@ describe("SearchableSelect options", () => {
     );
 
     // Open the dropdown to trigger loadOptions
-    fireEvent.click(trigger(container));
+    fireEvent.click(trigger());
 
     // Wait for component to settle - loadOptions should bail out gracefully
     await waitFor(() => {
       // Should show "No unsupported found" (the empty state message)
-      expect(container.textContent).toContain("No unsupported found");
+      expect(document.body.textContent).toContain("No unsupported found");
     });
 
     // None of the minimal API methods should have been called
@@ -411,7 +415,7 @@ describe("SearchableSelect stored bare values", () => {
     mockFindTagsMinimal.mockResolvedValue([row("466", "inst", "Tag 466")]);
     const onChange = vi.fn();
 
-    const { container } = render(
+    render(
       <SearchableSelect
         entityType="tags"
         value={["466", "7:inst"]}
@@ -421,7 +425,7 @@ describe("SearchableSelect stored bare values", () => {
     );
     await screen.findByLabelText("Remove Tag 466");
 
-    fireEvent.click(trigger(container));
+    fireEvent.click(trigger());
     await waitFor(() => {
       expect(screen.getByText("✓")).toBeTruthy();
     });
@@ -466,7 +470,7 @@ describe("SearchableSelect inside a Modal", () => {
       </div>
     );
 
-    fireEvent.click(trigger(document.body));
+    fireEvent.click(trigger());
     expect(
       await screen.findByPlaceholderText("Type to search...")
     ).toBeTruthy();
@@ -478,5 +482,212 @@ describe("SearchableSelect inside a Modal", () => {
     await waitFor(() => {
       expect(screen.queryByPlaceholderText("Type to search...")).toBeNull();
     });
+  });
+});
+
+describe("SearchableSelect as a keyboard control", () => {
+  /** A picker that keeps its own value, as a filter panel does */
+  function Harness({
+    multi = false,
+    initial,
+    label = "Tags",
+  }: {
+    multi?: boolean;
+    initial: string | string[];
+    label?: string;
+  }) {
+    const [value, setValue] = useState<string | string[]>(initial);
+    return (
+      <>
+        <SearchableSelect
+          entityType="tags"
+          label={label}
+          value={value}
+          onChange={setValue}
+          multi={multi}
+          placeholder="Select Tags..."
+        />
+        <button type="button">Next field</button>
+      </>
+    );
+  }
+
+  beforeEach(() => {
+    mockFindTagsMinimal.mockImplementation((params) =>
+      Promise.resolve(
+        params.ids
+          ? params.ids.map((ref) =>
+              row(ref.split(":")[0] ?? ref, "i", `Tag ${ref.split(":")[0]}`)
+            )
+          : [
+              row("1", "i", "Tag 1"),
+              row("2", "i", "Tag 2"),
+              row("3", "i", "Tag 3"),
+            ]
+      )
+    );
+  });
+
+  it("the trigger is a button named by the field", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[]} multi />);
+
+    const button = screen.getByRole("button", { name: /^Tags/ });
+    expect(button.tagName).toBe("BUTTON");
+    expect(button).toHaveAttribute("type", "button");
+    expect(button).toHaveAttribute("aria-expanded", "false");
+
+    button.focus();
+    await user.keyboard("{Enter}");
+
+    const search = await screen.findByPlaceholderText("Type to search...");
+    expect(search).toHaveFocus();
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    expect(button.getAttribute("aria-controls")).toBeTruthy();
+    expect(
+      document.getElementById(must(button.getAttribute("aria-controls")))
+    ).toContainElement(search);
+  });
+
+  it("the trigger's name carries the selected names", async () => {
+    render(<Harness initial={["1:i", "2:i"]} multi />);
+
+    expect(
+      await screen.findByRole("button", { name: "Tags: Tag 1, Tag 2" })
+    ).toBeInTheDocument();
+  });
+
+  it("without a label the placeholder names the button", () => {
+    render(
+      <SearchableSelect
+        entityType="tags"
+        value={[]}
+        onChange={vi.fn()}
+        multi
+        placeholder="Show only these tags..."
+      />
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Show only these tags..." })
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("Escape closes the dropdown and returns focus to the trigger, and is marked handled", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[]} multi />);
+    await user.click(trigger());
+    const search = await screen.findByPlaceholderText("Type to search...");
+    await user.type(search, "ta");
+
+    const notCancelled = fireEvent.keyDown(search, { key: "Escape" });
+
+    expect(notCancelled).toBe(false);
+    expect(screen.queryByPlaceholderText("Type to search...")).toBeNull();
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    expect(trigger()).toHaveFocus();
+
+    // The search text is gone with the list
+    await user.click(trigger());
+    expect(await screen.findByPlaceholderText("Type to search...")).toHaveValue(
+      ""
+    );
+  });
+
+  it("Escape on a closed picker is left alone", () => {
+    render(<Harness initial={[]} multi />);
+
+    const notCancelled = fireEvent.keyDown(trigger(), { key: "Escape" });
+
+    expect(notCancelled).toBe(true);
+  });
+
+  it("a selected value's remove button is not inside the trigger", async () => {
+    render(<Harness initial={["1:i", "2:i"]} multi />);
+
+    const remove = await screen.findByRole("button", { name: "Remove Tag 1" });
+    expect(trigger()).not.toContainElement(remove);
+    expect(
+      screen.getByRole("button", { name: "Clear all selections" })
+    ).toBeInTheDocument();
+    expect(trigger().querySelector("button")).toBeNull();
+  });
+
+  it("an option shows whether it is picked", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={["2:i"]} multi />);
+    await screen.findByRole("button", { name: "Remove Tag 2" });
+    await user.click(trigger());
+
+    const picked = await screen.findByRole("button", {
+      name: /^Tag 2 ✓$/,
+      pressed: true,
+    });
+    expect(picked).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Tag 1", pressed: false })
+    ).toBeInTheDocument();
+  });
+
+  it("picking in a single picker returns focus to the trigger", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="" />);
+    await user.click(trigger());
+    await screen.findByRole("button", { name: "Tag 2", pressed: false });
+
+    await user.click(screen.getByRole("button", { name: "Tag 2" }));
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText("Type to search...")).toBeNull();
+    });
+    expect(trigger()).toHaveFocus();
+    expect(trigger()).toHaveAttribute("aria-label", "Tags: Tag 2");
+  });
+
+  it("removing a value focuses the next value's remove button, else the trigger", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={["1:i", "2:i"]} multi />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Remove Tag 1" })
+    );
+    expect(screen.getByRole("button", { name: "Remove Tag 2" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Remove Tag 2" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Remove Tag 2" })).toBeNull();
+    });
+    expect(trigger()).toHaveFocus();
+  });
+
+  it("focus leaving the picker closes its list", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[]} multi />);
+    await user.click(trigger());
+    await screen.findByPlaceholderText("Type to search...");
+
+    // Tab walks the search box and the options, then leaves for the next field
+    const nextField = screen.getByRole("button", { name: "Next field" });
+    for (let i = 0; i < 8 && document.activeElement !== nextField; i++) {
+      await user.tab();
+    }
+    expect(nextField).toHaveFocus();
+
+    expect(screen.queryByPlaceholderText("Type to search...")).toBeNull();
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("moving focus between the search box and an option keeps the list open", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[]} multi />);
+    await user.click(trigger());
+    const option = await screen.findByRole("button", { name: "Tag 1" });
+
+    option.focus();
+
+    expect(
+      screen.getByPlaceholderText("Type to search...")
+    ).toBeInTheDocument();
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
   });
 });

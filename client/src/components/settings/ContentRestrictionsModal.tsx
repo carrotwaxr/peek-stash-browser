@@ -297,6 +297,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
 
         <div className="mb-3">
           <label
+            htmlFor={`restrictions-${entityType}-include`}
             className="block text-sm font-medium mb-1"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -307,6 +308,8 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
             of them. Child tags and studios count.
           </p>
           <SearchableSelect
+            id={`restrictions-${entityType}-include`}
+            label={`Show only ${lower}`}
             entityType={entityType}
             value={state.include}
             onChange={(ids) =>
@@ -343,6 +346,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
 
         <div className="mb-3">
           <label
+            htmlFor={`restrictions-${entityType}-exclude`}
             className="block text-sm font-medium mb-1"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -352,6 +356,8 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
             Hidden even if it is also in Show only. Children are hidden too.
           </p>
           <SearchableSelect
+            id={`restrictions-${entityType}-exclude`}
+            label={`Always hide ${lower}`}
             entityType={entityType}
             value={state.exclude}
             onChange={(ids) =>

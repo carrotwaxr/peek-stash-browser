@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FilterControl } from "@/components/ui/FilterControls";
 import GlobalLayout from "@/components/ui/GlobalLayout";
 import TVNavigator from "@/components/ui/TVNavigator";
 import { AuthContext } from "@/contexts/AuthContextProvider";
@@ -14,6 +15,9 @@ import { createAuthValue, must } from "../../testUtils";
 
 vi.mock("@/api", () => ({
   apiGet: vi.fn().mockResolvedValue({ settings: {} }),
+  libraryApi: {
+    findPerformersMinimal: vi.fn().mockResolvedValue([]),
+  },
 }));
 vi.mock("@/components/ui/TopBar", () => ({ default: () => null }));
 // The sidebar's icons and logo read the theme
@@ -265,6 +269,51 @@ describe("TVNavigator on selects and sliders", () => {
     expect(document.activeElement).toBe(range);
 
     expect(fireEvent.keyDown(range, { key: "ArrowDown" })).toBe(false);
+    expect(document.activeElement?.id).toBe("below");
+  });
+});
+
+describe("TVNavigator on a filter field's picker", () => {
+  beforeEach(() => {
+    document.documentElement.classList.add("tv-mode");
+  });
+  afterEach(() => {
+    document.documentElement.classList.remove("tv-mode");
+  });
+
+  it("in TV mode Down from the Performers modifier lands on the Performers picker", () => {
+    renderWithNavigator(
+      <main>
+        <FilterControl
+          type="searchable-select"
+          entityType="performers"
+          label="Performers"
+          controlId="filter-performerIds"
+          multi
+          modifierOptions={[
+            { value: "INCLUDES", label: "Has ANY" },
+            { value: "EXCLUDES", label: "Has NONE" },
+          ]}
+          modifierValue="INCLUDES"
+          onModifierChange={() => {}}
+          value={[]}
+          onChange={() => {}}
+        />
+        <button id="below">Below</button>
+      </main>
+    );
+    const condition = byId("filter-performerIds");
+    const picker = screen.getByRole("button", { name: /^Performers/ });
+    place(condition, { left: 0, top: 0, width: 200, height: 40 });
+    place(picker, { left: 0, top: 50, width: 200, height: 40 });
+    placeById("below", { left: 0, top: 200, width: 200, height: 40 });
+    act(() => condition.focus());
+
+    fireEvent.keyDown(condition, { key: "ArrowDown" });
+
+    expect(document.activeElement).toBe(picker);
+
+    fireEvent.keyDown(picker, { key: "ArrowDown" });
     expect(document.activeElement?.id).toBe("below");
   });
 });
