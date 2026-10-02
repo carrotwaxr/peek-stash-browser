@@ -19,18 +19,19 @@ import SceneSearch from "@/components/scene-search/SceneSearch";
 
 type Find = (params: Record<string, unknown>) => Promise<unknown>;
 
-const { api, apiGet } = vi.hoisted(() => ({
+const { api, apiGet, apiPost } = vi.hoisted(() => ({
   api: {
     findScenes: vi.fn<Find>(),
     findTagTree: vi.fn<(scope?: unknown) => Promise<unknown>>(),
   },
   apiGet: vi.fn<(url: string) => Promise<unknown>>(),
+  apiPost: vi.fn<(url: string, body?: unknown) => Promise<unknown>>(),
 }));
 
 vi.mock("@/api/library", () => ({ libraryApi: api }));
 vi.mock("@/api", () => ({
   apiGet,
-  apiPost: vi.fn().mockResolvedValue({}),
+  apiPost,
   apiPut: vi.fn().mockResolvedValue({}),
   apiDelete: vi.fn().mockResolvedValue({}),
   libraryApi: {
@@ -118,7 +119,14 @@ beforeEach(() => {
   api.findScenes.mockResolvedValue(scenes([]));
   api.findTagTree.mockResolvedValue({ tags: [] });
   apiGet.mockResolvedValue({ distribution: [] });
+  apiPost.mockResolvedValue({ distribution: [] });
 });
+
+/** The bodies posted to the timeline's distribution, oldest first */
+const distributionBodies = () =>
+  apiPost.mock.calls
+    .filter(([url]) => url === "/timeline/scene/distribution")
+    .map(([, body]) => body as Record<string, unknown>);
 
 describe("SceneSearch", () => {
   it("renders the controls and a card per scene", async () => {
@@ -338,7 +346,7 @@ describe("SceneSearch", () => {
     });
 
     it("a timeline period survives a sort change on a performer page", async () => {
-      apiGet.mockResolvedValue({
+      apiPost.mockResolvedValue({
         distribution: [{ period: "2024-05", count: 3 }],
       });
       const { router } = renderListPage(<PerformerScenes />, {
@@ -355,14 +363,11 @@ describe("SceneSearch", () => {
       await waitFor(() => expect(lastSent().scene_filter?.date).toEqual(may));
       expect(lastSent().scene_filter?.performers).toEqual(PERFORMER);
       // The timeline counts the performer's scenes only
-      expect(
-        apiGet.mock.calls.some(([url]) =>
-          url.startsWith("/timeline/scene/distribution?")
-            ? new URLSearchParams(url.split("?")[1]).get("performerId") ===
-              "1:a"
-            : false
-        )
-      ).toBe(true);
+      await waitFor(() =>
+        expect(distributionBodies().at(-1)?.scene_filter).toEqual({
+          performers: PERFORMER,
+        })
+      );
 
       // The sort's direction button
       fireEvent.click(
@@ -495,6 +500,34 @@ describe("SceneSearch", () => {
         { scope: { tag: "9:a" }, untagged: "scene" },
         expect.anything()
       );
+    });
+
+    it("the bars' request is the list's request without the period's date and without paging", async () => {
+      apiPost.mockResolvedValue({
+        distribution: [{ period: "2024-05", count: 3 }],
+      });
+      renderListPage(<TagScenes includeSubTags={true} />, {
+        initialEntries: [
+          "/tag/9?tab=scenes&view=timeline&timeline_period=2024-05&rating_min=60&q=beach",
+        ],
+      });
+
+      // The grid asks for the period's scenes
+      await waitFor(() => expect(lastSent().scene_filter?.date).toBeDefined());
+      const listed = lastSent();
+      expect(listed.scene_filter?.rating100).toBeDefined();
+
+      await waitFor(() => expect(distributionBodies()).not.toEqual([]));
+      const bars = must(distributionBodies().at(-1), "the bars' request");
+      const { date: _date, ...withoutDate } = listed.scene_filter ?? {};
+      expect(bars).toEqual({
+        filter: { q: "beach" },
+        scene_filter: withoutDate,
+        granularity: "months",
+      });
+      expect(bars.scene_filter).toMatchObject({
+        tags: { value: ["9:a"], modifier: "INCLUDES", depth: -1 },
+      });
     });
 
     it("on a tag page with Include sub-tags on, no folder view is offered", async () => {

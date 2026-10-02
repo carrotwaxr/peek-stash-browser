@@ -15,14 +15,6 @@ interface RenderItemOptions {
   } | null;
 }
 
-interface TimelineFilters {
-  performerId?: string;
-  tagId?: string;
-  studioId?: string;
-  groupId?: string;
-  galleryId?: string;
-}
-
 interface VisibleRange {
   firstPeriod: string;
   lastPeriod: string;
@@ -53,7 +45,11 @@ interface Props {
   emptyMessage?: string;
   gridDensity?: string;
   className?: string;
-  filters?: TimelineFilters | null;
+  /**
+   * The list's own request without its page, sort and period (`null` before
+   * it has one): the bars count what the list shows
+   */
+  request?: Record<string, unknown> | null;
 }
 
 function TimelineView({
@@ -67,7 +63,7 @@ function TimelineView({
   emptyMessage = "No items found",
   gridDensity = "medium",
   className = "",
-  filters = null,
+  request,
 }: Props) {
   // Mounted without a period, the latest one is chosen once the timeline
   // loads; read once, so the chosen period does not refetch the timeline
@@ -84,7 +80,7 @@ function TimelineView({
   } = useTimelineState({
     entityType,
     autoSelectRecent,
-    filters,
+    request,
     period,
     onPeriodChange,
   });

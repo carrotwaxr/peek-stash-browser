@@ -28,20 +28,20 @@ interface CardProps {
   onOCounterChange?: (id: string, count: number, instanceId: string) => void;
 }
 
-const { api, apiGet, cardProps } = vi.hoisted(() => ({
+const { api, apiPost, cardProps } = vi.hoisted(() => ({
   api: {
     findImages: vi.fn<Find>(),
     findTagTree: vi.fn<() => Promise<unknown>>(),
   },
-  apiGet: vi.fn<(url: string) => Promise<unknown>>(),
+  apiPost: vi.fn<(url: string, body?: unknown) => Promise<unknown>>(),
   cardProps: vi.fn<(props: CardProps) => void>(),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
 vi.mock("@/api/library", () => ({ libraryApi: api }));
 vi.mock("@/api", () => ({
-  apiGet,
-  apiPost: vi.fn().mockResolvedValue({}),
+  apiGet: vi.fn().mockResolvedValue({}),
+  apiPost,
   apiPut: vi.fn().mockResolvedValue({}),
   apiDelete: vi.fn().mockResolvedValue({}),
   libraryApi: {
@@ -180,7 +180,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.findImages.mockResolvedValue(images([]));
   api.findTagTree.mockResolvedValue({ tags: [] });
-  apiGet.mockResolvedValue({ distribution: [] });
+  apiPost.mockResolvedValue({ distribution: [] });
 });
 
 describe("Images", () => {
@@ -292,7 +292,7 @@ describe("Images", () => {
 
     it("timeline view renders a card per image of the period", async () => {
       twoImages();
-      apiGet.mockResolvedValue({
+      apiPost.mockResolvedValue({
         distribution: [{ period: "2024-05", count: 2 }],
       });
       renderPage("/images?view=timeline&timeline_period=2024-05");

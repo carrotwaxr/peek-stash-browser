@@ -91,7 +91,7 @@ export interface ListEmbed {
   lightboxRef?: Ref<ListLightbox>;
 }
 
-/** The detail page a timeline or folder view sits on: its counts and folders are that page's */
+/** The detail page a folder view sits on: its folders are that page's */
 interface PageScope {
   performerId?: string;
   tagId?: string;
@@ -282,6 +282,30 @@ const EntityListPage = ({
     permanentFilters,
   ]);
 
+  // The timeline's bars count what the list shows: its search and filter
+  // (the page's permanent filters, not the period's own `date`), no page or sort
+  const timelineRequest = useMemo(() => {
+    if (viewMode !== "timeline") return undefined;
+    const query = buildListQuery(
+      entityType,
+      { ready, filters, sort, page, perPage, q },
+      pagePermanentFilters
+    );
+    if (!query) return null;
+    const { filter, ...rest } = query;
+    return { filter: { q: filter.q }, ...rest };
+  }, [
+    viewMode,
+    entityType,
+    ready,
+    filters,
+    sort,
+    page,
+    perPage,
+    q,
+    pagePermanentFilters,
+  ]);
+
   const { data, error, isPending, isPlaceholderData } = source.useList(request);
   const { items, count } = pickPage(source, data);
   // The library is on its first sync: loading, not the error page
@@ -420,7 +444,7 @@ const EntityListPage = ({
           loading={!awaitingPeriod && isLoading}
           emptyMessage={`${emptyMessage} for this time period`}
           gridDensity={gridDensity}
-          filters={scope}
+          request={timelineRequest}
         />
       );
     }

@@ -244,11 +244,17 @@ describe("gallery page", () => {
       expect(requestsTo(api, "/timeline/image/distribution")).not.toEqual([])
     );
     const asked = must(
-      requestsTo(api, "/timeline/image/distribution").at(-1),
+      api.mock.calls
+        .filter(
+          ([url]) =>
+            url.replace(/^\/api/, "") === "/timeline/image/distribution"
+        )
+        .at(-1),
       "the timeline request"
     );
-    expect(new URLSearchParams(asked.split("?")[1]).get("galleryId")).toBe(
-      `5:${INSTANCE}`
-    );
+    expect(asked[1]?.method).toBe("POST");
+    expect(jsonBody(asked[1]).image_filter).toMatchObject({
+      galleries: { value: [`5:${INSTANCE}`], modifier: "INCLUDES" },
+    });
   });
 });
