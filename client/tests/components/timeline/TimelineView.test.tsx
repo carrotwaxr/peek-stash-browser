@@ -111,6 +111,21 @@ describe("TimelineView", () => {
     mockUseMediaQuery.mockReturnValue(false); // Default to desktop
   });
 
+  describe("The bars' request", () => {
+    it("hands the list's request to the timeline state, which posts it", () => {
+      const request = {
+        filter: { q: "beach" },
+        scene_filter: { rating100: { value: 60, modifier: "GREATER_THAN" } },
+      };
+
+      render(<TimelineView {...defaultProps} request={request} />);
+
+      expect(mockUseTimelineState).toHaveBeenCalledWith(
+        expect.objectContaining({ entityType: "scene", request })
+      );
+    });
+  });
+
   describe("Rendering", () => {
     it("renders TimelineControls component", () => {
       render(<TimelineView {...defaultProps} />);
@@ -153,7 +168,7 @@ describe("TimelineView", () => {
       expect(mockUseTimelineState).toHaveBeenCalledWith({
         entityType: "gallery",
         autoSelectRecent: true,
-        filters: null,
+        request: undefined,
         period: null,
         onPeriodChange: defaultProps.onPeriodChange,
       });
@@ -167,7 +182,7 @@ describe("TimelineView", () => {
       expect(mockUseTimelineState).toHaveBeenCalledWith({
         entityType: "scene",
         autoSelectRecent: false,
-        filters: null,
+        request: undefined,
         period: "2024-03",
         onPeriodChange: defaultProps.onPeriodChange,
       });

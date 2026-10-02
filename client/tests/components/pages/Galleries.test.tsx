@@ -20,12 +20,12 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 
 type Find = (params: Record<string, unknown>) => Promise<unknown>;
 
-const { api, apiGet, listParams } = vi.hoisted(() => ({
+const { api, apiPost, listParams } = vi.hoisted(() => ({
   api: {
     findGalleries: vi.fn<Find>(),
     findTagTree: vi.fn<() => Promise<unknown>>(),
   },
-  apiGet: vi.fn<(url: string) => Promise<unknown>>(),
+  apiPost: vi.fn<(url: string, body?: unknown) => Promise<unknown>>(),
   /** Every request the page's list hook was given, render by render */
   listParams: vi.fn<(params: unknown) => void>(),
 }));
@@ -33,8 +33,8 @@ const { api, apiGet, listParams } = vi.hoisted(() => ({
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
 vi.mock("@/api/library", () => ({ libraryApi: api }));
 vi.mock("@/api", () => ({
-  apiGet,
-  apiPost: vi.fn().mockResolvedValue({}),
+  apiGet: vi.fn().mockResolvedValue({}),
+  apiPost,
   apiPut: vi.fn().mockResolvedValue({}),
   apiDelete: vi.fn().mockResolvedValue({}),
   libraryApi: {
@@ -90,7 +90,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.findGalleries.mockResolvedValue(galleries([]));
   api.findTagTree.mockResolvedValue({ tags: [] });
-  apiGet.mockResolvedValue({ distribution: [] });
+  apiPost.mockResolvedValue({ distribution: [] });
 });
 
 describe("Galleries", () => {
@@ -216,7 +216,7 @@ describe("Galleries", () => {
 
   describe("Timeline view", () => {
     it("the timeline's period survives a sort change and reaches the request as a date filter", async () => {
-      apiGet.mockResolvedValue({
+      apiPost.mockResolvedValue({
         distribution: [{ period: "2024-05", count: 3 }],
       });
       const { router } = renderPage(
@@ -253,7 +253,7 @@ describe("Galleries", () => {
 
     it("the timeline sends no list request until its period is chosen", async () => {
       let answer: (value: unknown) => void = () => {};
-      apiGet.mockReturnValue(
+      apiPost.mockReturnValue(
         new Promise((resolve) => {
           answer = resolve;
         })

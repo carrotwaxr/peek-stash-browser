@@ -11,7 +11,7 @@ import {
   startOfWeek,
   startOfYear,
 } from "date-fns";
-import { apiGet } from "../../api";
+import { apiPost } from "../../api";
 
 interface DistributionItem {
   period: string;
@@ -23,14 +23,6 @@ interface DateRange {
   start: string;
   end: string;
   label: string;
-}
-
-interface TimelineFilters {
-  performerId?: string;
-  tagId?: string;
-  studioId?: string;
-  groupId?: string;
-  galleryId?: string;
 }
 
 interface DistributionResponse {
@@ -117,7 +109,12 @@ interface UseTimelineStateOptions {
   entityType: string;
   autoSelectRecent?: boolean;
   initialPeriod?: string | null;
-  filters?: TimelineFilters | null;
+  /**
+   * The list's own request (its search and `<entity>_filter`, no page, sort
+   * or period): the bars count what the list shows. `null` is a list with no
+   * request yet (its presets load): nothing is asked for until it has one.
+   */
+  request?: Record<string, unknown> | null;
   /**
    * The selected period, held by the owner (the list's URL): the selection
    * is this period, and a choice, a deselection, a zoom change and the
@@ -132,7 +129,7 @@ export function useTimelineState({
   entityType,
   autoSelectRecent = false,
   initialPeriod = null,
-  filters = null,
+  request,
   period,
   onPeriodChange,
 }: UseTimelineStateOptions) {
@@ -173,11 +170,10 @@ export function useTimelineState({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Memoize filter key to prevent unnecessary refetches
-  const filterKey = useMemo(() => {
-    if (!filters) return null;
-    return JSON.stringify(filters);
-  }, [filters]);
+  // The request by value, so a request rebuilt equal does not refetch
+  const requestKey = JSON.stringify(request ?? null);
+  const requestRef = useRef(request);
+  requestRef.current = request;
 
   // Track whether we've done the initial load (for autoSelectRecent)
   const hasInitiallyLoaded = useRef(!!firstPeriod); // Skip auto-select if we have a period
@@ -201,26 +197,19 @@ export function useTimelineState({
     [controlled, zoomLevel]
   );
 
-  // Fetch distribution when entityType or zoomLevel changes
+  // Fetch distribution when entityType, zoomLevel or the list's request changes
   useEffect(() => {
     let cancelled = false;
+    const listRequest = requestRef.current;
 
     async function fetchDistribution() {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Build query params
-        const params = new URLSearchParams({ granularity: zoomLevel });
-        if (filters?.performerId)
-          params.set("performerId", filters.performerId);
-        if (filters?.tagId) params.set("tagId", filters.tagId);
-        if (filters?.studioId) params.set("studioId", filters.studioId);
-        if (filters?.groupId) params.set("groupId", filters.groupId);
-        if (filters?.galleryId) params.set("galleryId", filters.galleryId);
-
-        const response = await apiGet<DistributionResponse>(
-          `/timeline/${entityType}/distribution?${params.toString()}`
+        const response = await apiPost<DistributionResponse>(
+          `/timeline/${entityType}/distribution`,
+          { ...listRequest, granularity: zoomLevel }
         );
 
         if (!cancelled) {
@@ -259,13 +248,18 @@ export function useTimelineState({
       }
     }
 
-    void fetchDistribution();
+    // A list with no request yet asks for nothing
+    if (listRequest === null) {
+      setIsLoading(true);
+    } else {
+      void fetchDistribution();
+    }
 
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterKey = JSON.stringify(filters) captures all filter property changes
-  }, [entityType, zoomLevel, autoSelectRecent, filterKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey = JSON.stringify(request) captures every change of the request (read through requestRef)
+  }, [entityType, zoomLevel, autoSelectRecent, requestKey]);
 
   const selectPeriod = useCallback(
     (next: string) => {
