@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
+import { refreshImageDerivedColumns } from "../../services/StashSyncService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { must } from "../../tests/helpers/must.js";
 import { parseListRequest } from "../../utils/listRequest.js";
@@ -1025,6 +1026,19 @@ describeWithDb("Image own fields (seeded)", () => {
         image(32, IX, { width: 2000, height: 2000 }),
         image(33, IX, { width: null, height: null }),
         image(30, IY, { width: 640, height: 480 }),
+        // Names: 40 untitled (the card shows its file name without the
+        // extension), 41 titled and also named by its file, 42 an empty
+        // title, 43 no title and no path, 44 an untitled image in a folder
+        // named like 41's file
+        image(40, IX, { title: null, filePath: "/pics/sunset_beach.jpg" }),
+        image(41, IX, {
+          title: "Card title",
+          filePath: "/pics/other_name.jpg",
+        }),
+        image(42, IX, { title: "", filePath: "C:\\pics\\win_name.png" }),
+        image(43, IX, { title: null, filePath: null }),
+        image(44, IX, { title: null, filePath: "/other_name/plain.gif" }),
+        image(40, IY, { title: null, filePath: "/pics/other_instance.jpg" }),
         // Hidden by B, with every field set
         image(60, IX, {
           title: "hidden title",
@@ -1039,6 +1053,20 @@ describeWithDb("Image own fields (seeded)", () => {
         }),
       ],
     });
+
+    // Sync stores each image's name as the card shows it (titleSort) after
+    // every batch; the filters and the search read it
+    for (const instanceId of IMAGE_INSTANCES) {
+      const rows = await prisma.stashImage.findMany({
+        where: { stashInstanceId: instanceId },
+        select: { id: true },
+      });
+      await refreshImageDerivedColumns(
+        prisma,
+        rows.map((row) => row.id),
+        instanceId
+      );
+    }
 
     await prisma.userHiddenEntity.create({
       data: {
@@ -1092,6 +1120,66 @@ describeWithDb("Image own fields (seeded)", () => {
     expect(
       await ns(user.A, text("photographer", "NOT_EQUALS", "p_1"))
     ).not.toContain(1);
+  });
+
+  it("title is the name the card shows: the title, else the file name without its extension", async () => {
+    // An untitled image by its file name, as the card shows it
+    expect(await ns(user.A, text("title", "INCLUDES", "sunset_beach"))).toEqual(
+      [40]
+    );
+    expect(await ns(user.A, text("title", "EQUALS", "sunset_beach"))).toEqual([
+      40,
+    ]);
+    // Neither the extension nor the directory is part of the name
+    expect(await ns(user.A, text("title", "INCLUDES", ".jpg"))).toEqual([]);
+    expect(await ns(user.A, text("title", "INCLUDES", "pics"))).toEqual([]);
+    // An empty title falls back too, and a backslash path has its own name
+    expect(await ns(user.A, text("title", "EQUALS", "win_name"))).toEqual([42]);
+    // A titled image is named by its title, not its file
+    expect(await ns(user.A, text("title", "INCLUDES", "other_name"))).toEqual(
+      []
+    );
+    expect(await ns(user.A, text("title", "EQUALS", "Card title"))).toEqual([
+      41,
+    ]);
+    // No title and no path: no name at all, which a negative still passes
+    expect(await ns(user.A, text("title", "IS_NULL"))).toContain(43);
+    expect(await ns(user.A, text("title", "IS_NULL"))).not.toContain(40);
+    expect(await ns(user.A, text("title", "NOT_EQUALS", "zzz"))).toContain(43);
+    // The same id on the other instance is another image
+    expect(
+      await ns(user.A, text("title", "INCLUDES", "other_instance"), IY)
+    ).toEqual([40]);
+  });
+
+  it("the search box matches the name the card shows, the details and the photographer", async () => {
+    const q = async (search: string, instance = IX) => {
+      const request = parseListRequest(
+        "image",
+        { filter: { per_page: 250, q: search } },
+        { userId: user.A }
+      );
+      const { items, total } = await imageQueryBuilder.execute({
+        userId: user.A,
+        allowedInstanceIds: await getUserAllowedInstanceIds(user.A),
+        request,
+      });
+      expect(total).toBe(items.length);
+      return items
+        .filter((image) => image.instanceId === instance)
+        .map((image) => Number(image.id) - 7898000)
+        .sort((a, b) => a - b);
+    };
+    // An untitled image by its file name, a titled one by its title only
+    expect(await q("sunset_beach")).toEqual([40]);
+    expect(await q("Card title")).toEqual([41]);
+    expect(await q("other_name")).toEqual([]);
+    expect(await q("win_name")).toEqual([42]);
+    // Details and photographer still count
+    expect(await q("d_1")).toEqual([1]);
+    expect(await q("p_1")).toEqual([1]);
+    expect(await q("other_instance", IY)).toEqual([40]);
+    expect(await q("other_instance")).toEqual([]);
   });
 
   it("path STARTS_WITH matches the start only, literally", async () => {

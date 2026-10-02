@@ -18,6 +18,7 @@ import {
 } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
+import { refreshImageDerivedColumns } from "../../services/StashSyncService.js";
 import type { StudioRef } from "../../types/index.js";
 import type {
   FilterRef,
@@ -119,6 +120,8 @@ describe("ImageQueryBuilder", () => {
         },
       ],
     });
+    // Sync stores the name the card shows (titleSort); the search reads it
+    await refreshImageDerivedColumns(prisma, testImageIds.slice(0, 3), A);
   });
 
   afterEach(async () => {

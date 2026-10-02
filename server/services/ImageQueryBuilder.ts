@@ -29,6 +29,7 @@ import {
   buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
+  imageNameSql,
   orientationClause,
   refClause,
   resolutionClause,
@@ -188,7 +189,7 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     galleries: (c, ctx) => this.galleryClause(c, ctx),
 
     // Text; the URL is matched one element of the list at a time
-    title: (c) => buildTextFilter(c, "i.title"),
+    title: (c) => buildTextFilter(c, imageNameSql("i")),
     details: (c) => buildTextFilter(c, "i.details"),
     code: (c) => buildTextFilter(c, "i.code"),
     photographer: (c) => buildTextFilter(c, "i.photographer"),
@@ -272,13 +273,14 @@ class ImageQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search across the title, details, photographer and file path: every
-   * word must match (`searchAll`), each as `likeContains` with `ESCAPE '\'`
+   * The search across the name the card shows (the title, else the file's
+   * name without its extension), details and photographer: every word must
+   * match (`searchAll`), each as `likeContains` with `ESCAPE '\'`
    */
   protected override searchClause(q: string): FilterClause {
     return searchAll(searchTerms(q), (pattern) => ({
-      sql: "(i.title LIKE ? ESCAPE '\\' OR i.details LIKE ? ESCAPE '\\' OR i.photographer LIKE ? ESCAPE '\\' OR i.filePath LIKE ? ESCAPE '\\')",
-      params: [pattern, pattern, pattern, pattern],
+      sql: `(${imageNameSql("i")} LIKE ? ESCAPE '\\' OR i.details LIKE ? ESCAPE '\\' OR i.photographer LIKE ? ESCAPE '\\')`,
+      params: [pattern, pattern, pattern],
     }));
   }
 

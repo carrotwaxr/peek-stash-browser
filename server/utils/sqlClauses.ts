@@ -1341,6 +1341,21 @@ export function galleryNameSql(alias: string): string {
 }
 
 /**
+ * SQL: an image's name as its card shows it: its title, else its file's name
+ * without the extension (`getImageFallbackTitle`), NULL with neither. That is
+ * the stored `titleSort` (`IMAGE_DERIVED_COLUMNS_SQL`, written by every sync
+ * batch), ASCII lower-cased: LIKE and the text filter's `LOWER()` fold ASCII
+ * case only, so a lower-cased name matches exactly what the name would. It
+ * is read as a column because the expression over `filePath` costs 2.7 s per
+ * list (page and count) over 142k images, against 30 ms. `alias` is the
+ * image table's alias, a code constant. The image search and the Title filter
+ * read it.
+ */
+export function imageNameSql(alias: string): string {
+  return `${alias}.titleSort`;
+}
+
+/**
  * Build a text comparison filter clause.
  * Handles INCLUDES, EXCLUDES, EQUALS, NOT_EQUALS, STARTS_WITH, IS_NULL,
  * NOT_NULL.
