@@ -12,6 +12,13 @@ edit_uri: edit/main/docs/
 # Copyright
 copyright: Copyright &copy; 2025 carrotwaxr
 
+# Internal files kept off the public site
+exclude_docs: |
+  plans/
+  audits/
+  icon-inventory.html
+  icon.svg
+
 # Theme configuration
 theme:
   name: material
