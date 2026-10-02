@@ -46,6 +46,8 @@ import { likeContains } from "../utils/sqlHelpers.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  type FieldClauses,
+  type LeafContext,
   type QueryContext,
   type SortExpr,
 } from "./query/EntityQueryBuilder.js";
@@ -203,6 +205,15 @@ const SCENE_STUDIO: ColumnTarget = {
   instanceCol: "stashInstanceId",
 };
 
+/** A clip ref clause's options: the CTE name, and the index shape when the list drives */
+function refOptions(ctx: LeafContext, name: string): RefClauseOptions {
+  return {
+    name,
+    allowedInstanceIds: ctx.allowedInstanceIds,
+    ...(ctx.lists === true ? { sortedByIndex: false } : {}),
+  };
+}
+
 /**
  * A tag on the clip itself: its primary tag or one of its tag list. Has ANY
  * is either holding any of the refs; Has ALL each ref held by one or the
@@ -290,7 +301,8 @@ class ClipQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search and the filter parameters. The clip's tags, its scene's tags
+   * The filter parameters, one clause per field in the order the statement
+   * ANDs them, and the search. The clip's tags, its scene's tags
    * and its scene's performers take Has ANY, Has ALL and Has NONE; the scene
    * and the studio are single-valued (INCLUDES only). A scene tag is one the
    * scene holds (SceneTag) or inherits (SceneInheritedTag), in every
@@ -306,64 +318,51 @@ class ClipQueryBuilder extends EntityQueryBuilder<
    * beside one each other filter probes those clips (EXISTS), which is
    * cheaper than reading a common tag's whole list first (a studio and a
    * clip tag: 10 ms, against 13 with the list). Has NONE keeps its NOT
-   * EXISTS per clip.
+   * EXISTS per clip. Whether a studio or a scene is present is a fact of
+   * the whole filter, which `leafContextFor` hands each clause as `lists`.
+   * The CTE names stay the ones the statement always had (a clip filter has
+   * one leaf per field, so they are unique).
    */
-  protected override legacyFilterClauses(
+  protected override readonly fieldClauses: FieldClauses<"clip"> = {
+    isGenerated: (isGenerated) => ({
+      sql: "c.isGenerated = ?",
+      params: [isGenerated ? 1 : 0],
+    }),
+    sceneId: (c, ctx) =>
+      refClause(CLIP_SCENE, c.refs, "INCLUDES", refOptions(ctx, "scene")),
+    tagIds: (c, ctx) => clipTagClause(c, (name) => refOptions(ctx, name)),
+    sceneTagIds: (c, ctx) =>
+      refClause(SCENE_TAGS, c.refs, c.modifier, {
+        ...refOptions(ctx, "scene_tags"),
+        inheritedJunction: SCENE_INHERITED_TAGS,
+      }),
+    performerIds: (c, ctx) =>
+      refClause(
+        SCENE_PERFORMERS,
+        c.refs,
+        c.modifier,
+        refOptions(ctx, "performers")
+      ),
+    studioId: (c, ctx) =>
+      refClause(SCENE_STUDIO, c.refs, "INCLUDES", refOptions(ctx, "studio")),
+  };
+
+  /** No studio and no scene criterion: the filter's clauses list by their junctions' indexes */
+  protected override leafContextFor(
     filter: ClipListRequest["filter"],
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    const lists = filter.studioId === undefined && filter.sceneId === undefined;
-    const opts = (name: string): RefClauseOptions => ({
-      name,
-      allowedInstanceIds: ctx.allowedInstanceIds,
-      ...(lists ? { sortedByIndex: false } : {}),
-    });
-    const clauses: FilterClause[] = [];
-    if (q !== undefined) {
-      clauses.push({
-        sql: "c.title LIKE ? ESCAPE '\\'",
-        params: [likeContains(q)],
-      });
-    }
-    if (filter.isGenerated !== undefined) {
-      clauses.push({
-        sql: "c.isGenerated = ?",
-        params: [filter.isGenerated ? 1 : 0],
-      });
-    }
-    if (filter.sceneId) {
-      clauses.push(
-        refClause(CLIP_SCENE, filter.sceneId.refs, "INCLUDES", opts("scene"))
-      );
-    }
-    if (filter.tagIds) clauses.push(clipTagClause(filter.tagIds, opts));
-    if (filter.sceneTagIds) {
-      const { refs, modifier } = filter.sceneTagIds;
-      clauses.push(
-        refClause(SCENE_TAGS, refs, modifier, {
-          ...opts("scene_tags"),
-          inheritedJunction: SCENE_INHERITED_TAGS,
-        })
-      );
-    }
-    if (filter.performerIds) {
-      const { refs, modifier } = filter.performerIds;
-      clauses.push(
-        refClause(SCENE_PERFORMERS, refs, modifier, opts("performers"))
-      );
-    }
-    if (filter.studioId) {
-      clauses.push(
-        refClause(
-          SCENE_STUDIO,
-          filter.studioId.refs,
-          "INCLUDES",
-          opts("studio")
-        )
-      );
-    }
-    return Promise.resolve(clauses);
+    ctx: LeafContext
+  ): LeafContext {
+    return {
+      ...ctx,
+      lists: filter.studioId === undefined && filter.sceneId === undefined,
+    };
+  }
+
+  protected override searchClause(q: string): FilterClause {
+    return {
+      sql: "c.title LIKE ? ESCAPE '\\'",
+      params: [likeContains(q)],
+    };
   }
 
   protected transformRow(row: ClipRow): ClipWithRelations {

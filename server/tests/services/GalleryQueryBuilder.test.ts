@@ -7,6 +7,7 @@
  * search), that the base's clauses reach its statements, and each row's
  * count of the scenes the viewer can see.
  */
+import { GALLERY_FIELDS } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
@@ -450,6 +451,17 @@ describe("GalleryQueryBuilder", () => {
       );
       expect(params.filter((p) => p === "%100\\% real%")).toHaveLength(3);
     });
+
+    it("the search clause sits after the field clauses", async () => {
+      await run({
+        q: "sea",
+        filter: { rating100: { modifier: "EQUALS", value: 4242 } },
+      });
+
+      const { params } = pageStatement();
+      expect(params.indexOf(4242)).toBeGreaterThan(-1);
+      expect(params.indexOf(4242)).toBeLessThan(params.indexOf("%sea%"));
+    });
   });
 
   describe("rows", () => {
@@ -631,5 +643,17 @@ describe("GalleryQueryBuilder", () => {
         "CROSS JOIN StashStudio x ON x.id = r.rid AND x.stashInstanceId = r.rinst"
       );
     });
+  });
+});
+
+describe("the gallery field table", () => {
+  it("has a clause for every field but the base's", () => {
+    const fields = Object.keys(GALLERY_FIELDS).filter(
+      (field) => field !== "ids" && field !== "instance_id"
+    );
+
+    expect(Object.keys(galleryQueryBuilder["fieldClauses"]).sort()).toEqual(
+      fields.sort()
+    );
   });
 });

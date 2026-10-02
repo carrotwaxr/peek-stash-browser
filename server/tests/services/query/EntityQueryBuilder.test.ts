@@ -32,7 +32,6 @@ import {
 } from "../../../services/query/EntityQueryBuilder.js";
 import type {
   ClipListRequest,
-  ParsedFilter,
   ParsedListRequest,
 } from "../../../types/parsedFilters.js";
 import { type FilterClause, combine } from "../../../utils/sqlClauses.js";
@@ -95,54 +94,52 @@ class FakeBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "scene"> {
     };
   }
 
-  protected override legacyFilterClauses(
-    filter: ParsedFilter<"scene">,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    this.lastContext = ctx;
-    const clauses: FilterClause[] = [];
-    if (filter.title) {
-      clauses.push({
-        sql: "s.title = ?",
-        params: ["where-param"],
+  /**
+   * The two fields the tests filter on; the rest of the scene's table is
+   * left out, so a filter carrying them builds no clause
+   */
+  protected override readonly fieldClauses = {
+    title: () => ({
+      sql: "s.title = ?",
+      params: ["where-param"],
+      ctes: [
+        {
+          name: "c",
+          sql: "c(id) AS MATERIALIZED (SELECT ?)",
+          params: ["cte-param"],
+        },
+      ],
+      joins: [
+        {
+          sql: "JOIN c ON c.id = s.id AND ? = 1",
+          params: ["clause-join-param"],
+        },
+      ],
+    }),
+    // A clause whose count reads the same rows in another shape (L9)
+    details: () => ({
+      sql: "s.details = ?",
+      params: ["page-form"],
+      count: {
+        sql: "s.id IN (SELECT id FROM cc WHERE ? = 1)",
+        params: ["count-form"],
         ctes: [
           {
-            name: "c",
-            sql: "c(id) AS MATERIALIZED (SELECT ?)",
-            params: ["cte-param"],
+            name: "cc",
+            sql: "cc(id) AS MATERIALIZED (SELECT ?)",
+            params: ["count-cte"],
           },
         ],
-        joins: [
-          {
-            sql: "JOIN c ON c.id = s.id AND ? = 1",
-            params: ["clause-join-param"],
-          },
-        ],
-      });
-    }
-    if (filter.details) {
-      // A clause whose count reads the same rows in another shape (L9)
-      clauses.push({
-        sql: "s.details = ?",
-        params: ["page-form"],
-        count: {
-          sql: "s.id IN (SELECT id FROM cc WHERE ? = 1)",
-          params: ["count-form"],
-          ctes: [
-            {
-              name: "cc",
-              sql: "cc(id) AS MATERIALIZED (SELECT ?)",
-              params: ["count-cte"],
-            },
-          ],
-        },
-      });
-    }
-    if (q !== undefined) {
-      clauses.push({ sql: "s.title LIKE ?", params: [`%${q}%`] });
-    }
-    return Promise.resolve(clauses);
+      },
+    }),
+  } as Pick<
+    FieldClauses<"scene">,
+    "title" | "details"
+  > as FieldClauses<"scene">;
+
+  protected override searchClause(q: string, ctx: QueryContext): FilterClause {
+    this.lastContext = ctx;
+    return { sql: "s.title LIKE ?", params: [`%${q}%`] };
   }
 
   protected transformRow(row: FakeRow): FakeEntity {
@@ -214,14 +211,16 @@ class NestedBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "clip"> {
     };
   }
 
-  protected override legacyFilterClauses(
-    filter: ClipListRequest["filter"]
-  ): Promise<FilterClause[]> {
-    return Promise.resolve(
-      filter.isGenerated === undefined
-        ? []
-        : [{ sql: "c.isGenerated = ?", params: [filter.isGenerated ? 1 : 0] }]
-    );
+  /** One field of the clip's table; the rest build no clause */
+  protected override readonly fieldClauses = {
+    isGenerated: (isGenerated: boolean): FilterClause => ({
+      sql: "c.isGenerated = ?",
+      params: [isGenerated ? 1 : 0],
+    }),
+  } as Pick<FieldClauses<"clip">, "isGenerated"> as FieldClauses<"clip">;
+
+  protected override searchClause(q: string): FilterClause {
+    return { sql: "c.title LIKE ?", params: [q] };
   }
 
   protected transformRow(row: FakeRow): FakeEntity {
@@ -595,6 +594,8 @@ describe("EntityQueryBuilder", () => {
         userId: 1,
         allowedInstanceIds: ["inst-a"],
         request: request({
+          // The search clause is the hook that records the context
+          q: "kiss",
           sort: { field, direction: "DESC", seed: 7 },
         } as Partial<ParsedListRequest<"scene">>),
       });
