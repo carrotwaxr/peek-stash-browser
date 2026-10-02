@@ -602,7 +602,7 @@ describe("SceneQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain("(r.favorite = 0 OR r.favorite IS NULL)");
-      expect(sql).toContain("COALESCE(r.rating, 0) > ?");
+      expect(sql).toContain("r.rating > ?");
       expect(sql).toContain("COALESCE(w.playCount, 0) = ?");
       expect(sql).toContain("COALESCE(w.oCount, 0) BETWEEN ? AND ?");
       expect(sql).toContain("w.lastPlayedAt IS NULL");

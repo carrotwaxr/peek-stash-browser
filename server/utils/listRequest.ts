@@ -431,6 +431,11 @@ type RangeCriterion<V> =
       readonly value: V;
     }
   | { readonly modifier: RangeModifier; readonly value: V; readonly value2: V }
+  | {
+      readonly modifier: "BETWEEN";
+      readonly value: V | undefined;
+      readonly value2: V | undefined;
+    }
   | { readonly modifier: PresenceModifier };
 
 /** Stash's criterion inputs require a value, so its callers send "" for none */
@@ -438,11 +443,17 @@ function blankAsNull(value: unknown): unknown {
   return value === "" ? null : value;
 }
 
-/** A number or date criterion: BETWEEN and NOT_BETWEEN need value2, IS_NULL and NOT_NULL no value */
+/**
+ * A number or date criterion. IS_NULL and NOT_NULL need no value;
+ * NOT_BETWEEN needs value and value2; a number's BETWEEN needs either side
+ * (value alone is at least it, value2 alone at most it), a date's both
+ * (until dates take open-ended ranges).
+ */
 function rangeSchema<V extends number | string>(
   spec: NumberSpec | DateSpec,
   valueSchema: z.ZodType<V>
 ): z.ZodType<RangeCriterion<V>> {
+  const openBetween = spec.kind === "number";
   return z
     .strictObject({
       modifier: z.enum(spec.modifiers).nullish(),
@@ -452,22 +463,38 @@ function rangeSchema<V extends number | string>(
     .transform((c, ctx): RangeCriterion<V> => {
       const modifier = c.modifier ?? spec.defaultModifier;
       if (isPresence(modifier)) return { modifier };
-      if (c.value === undefined || c.value === null) {
+      const value = c.value ?? undefined;
+      const value2 = c.value2 ?? undefined;
+      if (modifier === "BETWEEN" && openBetween) {
+        if (value === undefined && value2 === undefined) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["value"],
+            message: "Required: value, value2 or both with BETWEEN",
+          });
+          return z.NEVER;
+        }
+        return { modifier, value, value2 };
+      }
+      if (value === undefined) {
         ctx.addIssue({ code: "custom", path: ["value"], message: "Required" });
         return z.NEVER;
       }
       if (isRange(modifier)) {
-        if (c.value2 === undefined || c.value2 === null) {
+        if (value2 === undefined) {
           ctx.addIssue({
             code: "custom",
             path: ["value2"],
-            message: "Required with BETWEEN and NOT_BETWEEN",
+            message:
+              modifier === "BETWEEN"
+                ? "Required with BETWEEN on a date"
+                : "Required with NOT_BETWEEN",
           });
           return z.NEVER;
         }
-        return { modifier, value: c.value, value2: c.value2 };
+        return { modifier, value, value2 };
       }
-      return { modifier, value: c.value };
+      return { modifier, value };
     });
 }
 

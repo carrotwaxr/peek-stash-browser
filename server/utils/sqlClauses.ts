@@ -24,7 +24,7 @@
  * here too.
  */
 import type { RefModifier } from "@peek/shared-types/filters/index.js";
-import type { FilterRef } from "../types/parsedFilters.js";
+import type { FilterRef, NumberCriterion } from "../types/parsedFilters.js";
 import { type EntityRef, distinctRefs, pairsJson } from "./entityRef.js";
 
 export type SqlParam = string | number | boolean;
@@ -752,57 +752,52 @@ export function viaSceneClause(
 // =============================================================================
 
 /**
- * Build a numeric comparison filter clause.
- * Handles EQUALS, NOT_EQUALS, GREATER_THAN, LESS_THAN, BETWEEN, NOT_BETWEEN.
+ * A number criterion's clause on a column or expression. A row without a
+ * value (NULL) matches only IS_NULL: every comparison, NOT_EQUALS and
+ * NOT_BETWEEN included, leaves it out, as Stash does. BETWEEN with one side
+ * is at least or at most it.
  *
- * @param filter - Filter with value, optional value2, and modifier
- * @param columnExpr - Full SQL column expression (e.g. "COALESCE(r.rating, 0)", "s.height")
+ * @param criterion - The parsed criterion
+ * @param columnExpr - The SQL column or expression (e.g. "r.rating", "s.performerCount")
  */
 export function buildNumericFilter(
-  filter:
-    | {
-        value?: number | null | undefined;
-        value2?: number | null | undefined;
-        modifier?: string | null | undefined;
-      }
-    | undefined
-    | null,
+  criterion: NumberCriterion,
   columnExpr: string
 ): FilterClause {
-  if (!filter || filter.value === undefined || filter.value === null) {
-    return { sql: "", params: [] };
-  }
-
-  const { value, value2, modifier = "GREATER_THAN" } = filter;
-
-  switch (modifier) {
+  switch (criterion.modifier) {
+    case "IS_NULL":
+      return { sql: `${columnExpr} IS NULL`, params: [] };
+    case "NOT_NULL":
+      return { sql: `${columnExpr} IS NOT NULL`, params: [] };
     case "EQUALS":
-      return { sql: `${columnExpr} = ?`, params: [value] };
+      return { sql: `${columnExpr} = ?`, params: [criterion.value] };
     case "NOT_EQUALS":
-      return { sql: `${columnExpr} != ?`, params: [value] };
+      return { sql: `${columnExpr} != ?`, params: [criterion.value] };
     case "GREATER_THAN":
-      return { sql: `${columnExpr} > ?`, params: [value] };
+      return { sql: `${columnExpr} > ?`, params: [criterion.value] };
     case "LESS_THAN":
-      return { sql: `${columnExpr} < ?`, params: [value] };
-    case "BETWEEN":
-      if (value2 !== undefined && value2 !== null) {
+      return { sql: `${columnExpr} < ?`, params: [criterion.value] };
+    case "BETWEEN": {
+      const { value, value2 } = criterion;
+      if (value !== undefined && value2 !== undefined) {
         return {
           sql: `${columnExpr} BETWEEN ? AND ?`,
           params: [value, value2],
         };
       }
-      return { sql: `${columnExpr} >= ?`, params: [value] };
-    case "NOT_BETWEEN":
-      if (value2 !== undefined && value2 !== null) {
-        return {
-          sql: `(${columnExpr} < ? OR ${columnExpr} > ?)`,
-          params: [value, value2],
-        };
+      if (value !== undefined) {
+        return { sql: `${columnExpr} >= ?`, params: [value] };
       }
-      return { sql: `${columnExpr} < ?`, params: [value] };
-    case null:
-    default:
-      return { sql: "", params: [] };
+      if (value2 !== undefined) {
+        return { sql: `${columnExpr} <= ?`, params: [value2] };
+      }
+      return noClause();
+    }
+    case "NOT_BETWEEN":
+      return {
+        sql: `${columnExpr} NOT BETWEEN ? AND ?`,
+        params: [criterion.value, criterion.value2],
+      };
   }
 }
 

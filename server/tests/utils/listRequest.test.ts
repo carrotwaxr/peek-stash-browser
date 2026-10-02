@@ -547,13 +547,17 @@ describe("parseListRequest: filter fields", () => {
     ).toEqual(["scene_filter.tags.depth"]);
   });
 
-  it("BETWEEN with one bound is invalid; IS_NULL needs no value; an all-empty criterion is omitted with no record", () => {
+  it("NOT_BETWEEN with one bound is invalid; IS_NULL needs no value; an all-empty criterion is omitted with no record", () => {
     expect(
       paths(
         issuesOf(() =>
           parseListRequest(
             "scene",
-            { scene_filter: { rating100: { modifier: "BETWEEN", value: 10 } } },
+            {
+              scene_filter: {
+                rating100: { modifier: "NOT_BETWEEN", value: 10 },
+              },
+            },
             opts()
           )
         )
@@ -1087,6 +1091,102 @@ describe("parseMinimalRequest", () => {
         issuesOf(() => parseMinimalRequest("tag", { scope }, opts()))
       ).toEqual([{ path: "scope", message: 'Expected "allEnabled"' }]);
     }
+  });
+});
+
+describe("parseListRequest: open-ended ranges and presence on numbers", () => {
+  it("BETWEEN takes one side alone", () => {
+    const parsed = parseListRequest(
+      "performer",
+      {
+        performer_filter: {
+          weight: { modifier: "BETWEEN", value2: 40 },
+          height: { modifier: "BETWEEN", value: 160, value2: null },
+        },
+      },
+      opts()
+    );
+    expect(parsed.filter).toEqual({
+      weight: { modifier: "BETWEEN", value: undefined, value2: 40 },
+      height: { modifier: "BETWEEN", value: 160, value2: undefined },
+    });
+  });
+
+  it("BETWEEN with neither side is an unset option: omitted, no problem recorded", () => {
+    const parsed = parseListRequest(
+      "scene",
+      { scene_filter: { rating100: { modifier: "BETWEEN" } } },
+      opts()
+    );
+    expect(parsed.filter).toEqual({});
+  });
+
+  it("NOT_BETWEEN with one side present is refused", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseListRequest(
+            "scene",
+            {
+              scene_filter: {
+                rating100: { modifier: "NOT_BETWEEN", value: 10 },
+                duration: { modifier: "NOT_BETWEEN", value2: 600 },
+              },
+            },
+            opts()
+          )
+        )
+      )
+    ).toEqual(["scene_filter.rating100.value2", "scene_filter.duration.value"]);
+  });
+
+  it("IS_NULL and NOT_NULL on a nullable number need no value", () => {
+    const parsed = parseListRequest(
+      "performer",
+      {
+        performer_filter: {
+          rating100: { modifier: "IS_NULL" },
+          height: { modifier: "NOT_NULL", value: null },
+        },
+      },
+      opts()
+    );
+    expect(parsed.filter).toEqual({
+      rating100: { modifier: "IS_NULL" },
+      height: { modifier: "NOT_NULL" },
+    });
+  });
+
+  it("IS_NULL on o_counter is refused (not nullable)", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseListRequest(
+            "scene",
+            { scene_filter: { o_counter: { modifier: "IS_NULL" } } },
+            opts()
+          )
+        )
+      )
+    ).toEqual(["scene_filter.o_counter.modifier"]);
+  });
+
+  it("a date BETWEEN still needs both sides", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseListRequest(
+            "scene",
+            {
+              scene_filter: {
+                date: { modifier: "BETWEEN", value2: "2024-01-01" },
+              },
+            },
+            opts()
+          )
+        )
+      )
+    ).toEqual(["scene_filter.date.value"]);
   });
 });
 

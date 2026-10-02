@@ -615,8 +615,10 @@ describe("Performer Filters", () => {
  *   7892003 "- <Y-6>" (none), 7892004 "<Y-11>-present" (11), 7892005 with
  *   no career text
  * - cl-b: 7892001 "<Y-9> -" (9)
- * Each carries a weight and measurements for the two sorts. Every seeded row
- * is deleted before the file ends.
+ * Each carries a weight and measurements for the two sorts; 7892001 and
+ * 7892004 on cl-a have a height. A number filter never matches a performer
+ * without a value, only IS_NULL does. Every seeded row is deleted before the
+ * file ends.
  */
 describeWithDb(
   "Performer career length, weight and measurements (seeded)",
@@ -630,7 +632,8 @@ describeWithDb(
       instance: string,
       careerLength: string | null,
       weightKg: number | null,
-      measurements: string | null
+      measurements: string | null,
+      heightCm: number | null = null
     ) => ({
       id,
       stashInstanceId: instance,
@@ -638,6 +641,7 @@ describeWithDb(
       careerLength,
       weightKg,
       measurements,
+      heightCm,
     });
 
     async function removeRows(): Promise<void> {
@@ -663,6 +667,11 @@ describeWithDb(
     const careerFilter = async (criterion: NumberCriterion) =>
       (await listed({ filter: { career_length: criterion } })).sort();
 
+    const numberFilter = async (
+      field: "weight" | "height",
+      criterion: NumberCriterion
+    ) => (await listed({ filter: { [field]: criterion } })).sort();
+
     const sortedBy = (
       field: "career_length" | "weight" | "measurements",
       direction: "ASC" | "DESC"
@@ -672,10 +681,10 @@ describeWithDb(
       await removeRows();
       await prisma.stashPerformer.createMany({
         data: [
-          performer("7892001", A, `${Y - 10} -`, 60, "34b-24-34"),
+          performer("7892001", A, `${Y - 10} -`, 60, "34b-24-34", 170),
           performer("7892002", A, `${Y - 16} - ${Y - 8}`, 80, "36D-26-36"),
           performer("7892003", A, `- ${Y - 6}`, null, null),
-          performer("7892004", A, `${Y - 11}-present`, 70, "34C-24-34"),
+          performer("7892004", A, `${Y - 11}-present`, 70, "34C-24-34", 160),
           performer("7892005", A, null, null, null),
           performer("7892001", B, `${Y - 9} -`, 65, "30A-20-30"),
         ],
@@ -703,6 +712,57 @@ describeWithDb(
       expect(await careerFilter({ modifier: "NOT_EQUALS", value: 10 })).toEqual(
         ["7892001:cl-b", "7892002:cl-a", "7892004:cl-a"]
       );
+    });
+
+    it("career_length IS_NULL lists the performers without a value", async () => {
+      expect(await careerFilter({ modifier: "IS_NULL" })).toEqual([
+        "7892003:cl-a",
+        "7892005:cl-a",
+      ]);
+    });
+
+    it("weight at most 60 leaves out performers with no weight", async () => {
+      expect(
+        await numberFilter("weight", {
+          modifier: "BETWEEN",
+          value: undefined,
+          value2: 60,
+        })
+      ).toEqual(["7892001:cl-a"]);
+      expect(
+        await numberFilter("weight", { modifier: "LESS_THAN", value: 66 })
+      ).toEqual(["7892001:cl-a", "7892001:cl-b"]);
+      expect(
+        await numberFilter("weight", {
+          modifier: "NOT_BETWEEN",
+          value: 61,
+          value2: 79,
+        })
+      ).toEqual(["7892001:cl-a", "7892002:cl-a"]);
+      expect(
+        await numberFilter("weight", {
+          modifier: "BETWEEN",
+          value: 70,
+          value2: undefined,
+        })
+      ).toEqual(["7892002:cl-a", "7892004:cl-a"]);
+    });
+
+    it("height NOT_NULL lists only performers with a height", async () => {
+      expect(await numberFilter("height", { modifier: "NOT_NULL" })).toEqual([
+        "7892001:cl-a",
+        "7892004:cl-a",
+      ]);
+      // The same id on cl-b has none
+      expect(await numberFilter("height", { modifier: "IS_NULL" })).toEqual([
+        "7892001:cl-b",
+        "7892002:cl-a",
+        "7892003:cl-a",
+        "7892005:cl-a",
+      ]);
+      expect(
+        await numberFilter("height", { modifier: "NOT_EQUALS", value: 170 })
+      ).toEqual(["7892004:cl-a"]);
     });
 
     it("sort career_length ASC puts unknown last, and DESC too", async () => {

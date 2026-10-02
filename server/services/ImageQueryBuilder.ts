@@ -65,7 +65,10 @@ const SELECT_COLUMNS = `
     v.lastViewedAt AS userLastViewedAt
   `.trim();
 
-/** The viewer's rating and O count; none is 0 */
+/**
+ * The viewer's rating and O count as the sorts read them, none as 0; the
+ * rating filter reads `r.rating`, so an unrated image matches only IS_NULL
+ */
 const USER_RATING = "COALESCE(r.rating, 0)";
 const USER_O_COUNT = "COALESCE(v.oCount, 0)";
 
@@ -160,7 +163,7 @@ class ImageQueryBuilder extends EntityQueryBuilder<
   protected override readonly fieldClauses: FieldClauses<"image"> = {
     // The viewer's own data
     favorite: (favorite) => buildFavoriteFilter(favorite),
-    rating100: (c) => buildNumericFilter(c, USER_RATING),
+    rating100: (c) => buildNumericFilter(c, "r.rating"),
     o_counter: (c) => buildNumericFilter(c, USER_O_COUNT),
 
     // The image's tag rows; EQUALS 0 is the folder view's Untagged

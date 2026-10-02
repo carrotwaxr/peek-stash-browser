@@ -233,10 +233,10 @@ class GroupQueryBuilder extends EntityQueryBuilder<
       }),
 
     // The viewer's rating and the counts
-    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    rating100: (c) => buildNumericFilter(c, "r.rating"),
     scene_count: (c, ctx) =>
       buildNumericFilter(c, visibleCount(ctx, "g.sceneCount", "scenes")),
-    duration: (c) => buildNumericFilter(c, "COALESCE(g.duration, 0)"),
+    duration: (c) => buildNumericFilter(c, "g.duration"),
 
     // Text
     name: (c) => buildTextFilter(c, "g.name"),

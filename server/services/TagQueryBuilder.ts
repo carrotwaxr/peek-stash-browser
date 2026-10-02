@@ -224,7 +224,7 @@ class TagQueryBuilder extends EntityQueryBuilder<
   protected override readonly fieldClauses: FieldClauses<"tag"> = {
     // The viewer's own data
     favorite: (favorite) => buildFavoriteFilter(favorite),
-    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    rating100: (c) => buildNumericFilter(c, "r.rating"),
     o_counter: (c) => buildNumericFilter(c, "COALESCE(us.oCounter, 0)"),
     play_count: (c) => buildNumericFilter(c, "COALESCE(us.playCount, 0)"),
 

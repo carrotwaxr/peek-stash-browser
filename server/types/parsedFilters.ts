@@ -44,13 +44,23 @@ export interface RefCriterion {
   readonly depth: number;
 }
 
+/**
+ * BETWEEN has at least one side: value alone is at least it, value2 alone at
+ * most it. NOT_BETWEEN has both. IS_NULL and NOT_NULL only on the fields
+ * that declare them (a number a row may lack).
+ */
 export type NumberCriterion =
   | {
       readonly modifier: "EQUALS" | "NOT_EQUALS" | "GREATER_THAN" | "LESS_THAN";
       readonly value: number;
     }
   | {
-      readonly modifier: "BETWEEN" | "NOT_BETWEEN";
+      readonly modifier: "BETWEEN";
+      readonly value: number | undefined;
+      readonly value2: number | undefined;
+    }
+  | {
+      readonly modifier: "NOT_BETWEEN";
       readonly value: number;
       readonly value2: number;
     }

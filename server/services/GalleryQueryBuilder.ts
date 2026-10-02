@@ -208,7 +208,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     tags: (c, ctx) => this.tagClause(c, ctx),
 
     // The viewer's rating and the counts
-    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    rating100: (c) => buildNumericFilter(c, "r.rating"),
     image_count: (c, ctx) =>
       buildNumericFilter(c, visibleCount(ctx, "g.imageCount", "images")),
     // The gallery's own tag rows; EQUALS 0 is the folder view's Untagged

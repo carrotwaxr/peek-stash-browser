@@ -308,7 +308,7 @@ describe("StudioQueryBuilder", () => {
       const { sql } = pageStatement();
       for (const fragment of [
         "(r.favorite = 0 OR r.favorite IS NULL)",
-        "COALESCE(r.rating, 0) BETWEEN ? AND ?",
+        "r.rating BETWEEN ? AND ?",
         "COALESCE(us.oCounter, 0) > ?",
         "COALESCE(us.playCount, 0) = ?",
         "MAX(s.sceneCount - COALESCE(d.scenes, 0), 0) != ?",

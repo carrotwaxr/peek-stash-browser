@@ -824,45 +824,23 @@ describe("exclusionJoin", () => {
   });
 });
 
-// The per-field clauses, moved from utils/sqlFilterBuilders.ts unchanged
+// The per-field clauses
 
 describe("buildNumericFilter", () => {
-  const col = "COALESCE(r.rating, 0)";
-
-  it("returns empty for undefined filter", () => {
-    expect(buildNumericFilter(undefined, col)).toEqual({ sql: "", params: [] });
-  });
-
-  it("returns empty for null filter", () => {
-    expect(buildNumericFilter(null, col)).toEqual({ sql: "", params: [] });
-  });
-
-  it("returns empty for filter with null value", () => {
-    expect(buildNumericFilter({ value: null }, col)).toEqual({
-      sql: "",
-      params: [],
-    });
-  });
-
-  it("returns empty for filter with undefined value", () => {
-    expect(buildNumericFilter({ value: undefined }, col)).toEqual({
-      sql: "",
-      params: [],
-    });
-  });
+  const col = "r.rating";
 
   it("handles EQUALS", () => {
     const result = buildNumericFilter({ value: 80, modifier: "EQUALS" }, col);
-    expect(result.sql).toBe("COALESCE(r.rating, 0) = ?");
+    expect(result.sql).toBe("r.rating = ?");
     expect(result.params).toEqual([80]);
   });
 
-  it("handles NOT_EQUALS", () => {
+  it("NOT_EQUALS leaves out a row without a value (NULL != ? is not true)", () => {
     const result = buildNumericFilter(
       { value: 80, modifier: "NOT_EQUALS" },
       col
     );
-    expect(result.sql).toBe("COALESCE(r.rating, 0) != ?");
+    expect(result.sql).toBe("r.rating != ?");
     expect(result.params).toEqual([80]);
   });
 
@@ -871,7 +849,7 @@ describe("buildNumericFilter", () => {
       { value: 50, modifier: "GREATER_THAN" },
       col
     );
-    expect(result.sql).toBe("COALESCE(r.rating, 0) > ?");
+    expect(result.sql).toBe("r.rating > ?");
     expect(result.params).toEqual([50]);
   });
 
@@ -880,54 +858,35 @@ describe("buildNumericFilter", () => {
       { value: 50, modifier: "LESS_THAN" },
       col
     );
-    expect(result.sql).toBe("COALESCE(r.rating, 0) < ?");
+    expect(result.sql).toBe("r.rating < ?");
     expect(result.params).toEqual([50]);
   });
 
-  it("handles BETWEEN with value2", () => {
+  it("handles BETWEEN with both sides", () => {
     const result = buildNumericFilter(
       { value: 20, value2: 80, modifier: "BETWEEN" },
       col
     );
-    expect(result.sql).toBe("COALESCE(r.rating, 0) BETWEEN ? AND ?");
+    expect(result.sql).toBe("r.rating BETWEEN ? AND ?");
     expect(result.params).toEqual([20, 80]);
   });
 
-  it("handles BETWEEN without value2 (fallback to >=)", () => {
-    const result = buildNumericFilter({ value: 20, modifier: "BETWEEN" }, col);
-    expect(result.sql).toBe("COALESCE(r.rating, 0) >= ?");
-    expect(result.params).toEqual([20]);
-  });
-
-  it("handles NOT_BETWEEN with value2", () => {
+  it("NOT_BETWEEN is NOT BETWEEN, which leaves out a row without a value", () => {
     const result = buildNumericFilter(
       { value: 20, value2: 80, modifier: "NOT_BETWEEN" },
       col
     );
-    expect(result.sql).toBe(
-      "(COALESCE(r.rating, 0) < ? OR COALESCE(r.rating, 0) > ?)"
-    );
+    expect(result.sql).toBe("r.rating NOT BETWEEN ? AND ?");
     expect(result.params).toEqual([20, 80]);
   });
 
-  it("handles NOT_BETWEEN without value2 (fallback to <)", () => {
-    const result = buildNumericFilter(
-      { value: 20, modifier: "NOT_BETWEEN" },
-      col
-    );
-    expect(result.sql).toBe("COALESCE(r.rating, 0) < ?");
-    expect(result.params).toEqual([20]);
-  });
-
-  it("defaults to GREATER_THAN when no modifier", () => {
-    const result = buildNumericFilter({ value: 50 }, col);
-    expect(result.sql).toBe("COALESCE(r.rating, 0) > ?");
-    expect(result.params).toEqual([50]);
-  });
-
-  it("returns empty for unknown modifier", () => {
-    const result = buildNumericFilter({ value: 50, modifier: "UNKNOWN" }, col);
-    expect(result).toEqual({ sql: "", params: [] });
+  it("BETWEEN with neither side filters nothing", () => {
+    expect(
+      buildNumericFilter(
+        { modifier: "BETWEEN", value: undefined, value2: undefined },
+        col
+      )
+    ).toEqual({ sql: "", params: [] });
   });
 
   it("works with subquery expressions", () => {
@@ -943,8 +902,37 @@ describe("buildNumericFilter", () => {
 
   it("handles value of 0", () => {
     const result = buildNumericFilter({ value: 0, modifier: "EQUALS" }, col);
-    expect(result.sql).toBe("COALESCE(r.rating, 0) = ?");
+    expect(result.sql).toBe("r.rating = ?");
     expect(result.params).toEqual([0]);
+  });
+
+  it("IS_NULL and NOT_NULL need no value", () => {
+    expect(buildNumericFilter({ modifier: "IS_NULL" }, "r.rating")).toEqual({
+      sql: "r.rating IS NULL",
+      params: [],
+    });
+    expect(buildNumericFilter({ modifier: "NOT_NULL" }, "r.rating")).toEqual({
+      sql: "r.rating IS NOT NULL",
+      params: [],
+    });
+  });
+
+  it("BETWEEN with only value is at least it", () => {
+    expect(
+      buildNumericFilter(
+        { modifier: "BETWEEN", value: 20, value2: undefined },
+        "r.rating"
+      )
+    ).toEqual({ sql: "r.rating >= ?", params: [20] });
+  });
+
+  it("BETWEEN with only value2 is at most it", () => {
+    expect(
+      buildNumericFilter(
+        { modifier: "BETWEEN", value: undefined, value2: 40 },
+        "r.rating"
+      )
+    ).toEqual({ sql: "r.rating <= ?", params: [40] });
   });
 });
 

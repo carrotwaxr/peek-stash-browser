@@ -419,7 +419,7 @@ describe("GalleryQueryBuilder", () => {
       const { sql } = pageStatement();
       for (const fragment of [
         "r.favorite = 1",
-        "COALESCE(r.rating, 0) > ?",
+        "r.rating > ?",
         "MAX(g.imageCount - COALESCE(d.images, 0), 0) BETWEEN ? AND ?",
         "(LOWER(g.title) LIKE LOWER(?))",
         "g.date < ?",

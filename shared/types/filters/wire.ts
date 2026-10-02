@@ -60,13 +60,26 @@ type WithPresence<M extends string, T> = [
   ? never
   : T;
 
-/** BETWEEN and NOT_BETWEEN also need value2; IS_NULL and NOT_NULL no value */
+/** T when the field offers BETWEEN, else never */
+type WithBetween<M extends string, T> = [Extract<M, "BETWEEN">] extends [never]
+  ? never
+  : T;
+
+/**
+ * NOT_BETWEEN also needs value2; BETWEEN takes either side alone (value
+ * alone is at least it, value2 alone at most it); IS_NULL and NOT_NULL no
+ * value
+ */
 export type NumberInput<M extends NumberModifier = NumberModifier> =
   | {
       modifier?: Exclude<M, PresenceModifier> | null;
       value: number;
       value2?: number | null;
     }
+  | WithBetween<
+      M,
+      { modifier: "BETWEEN"; value?: number | null; value2?: number | null }
+    >
   | WithPresence<
       M,
       {

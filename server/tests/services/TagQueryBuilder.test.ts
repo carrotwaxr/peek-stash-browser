@@ -373,7 +373,7 @@ describe("TagQueryBuilder", () => {
       const { sql } = pageStatement();
       for (const fragment of [
         "r.favorite = 1",
-        "COALESCE(r.rating, 0) < ?",
+        "r.rating < ?",
         "COALESCE(us.oCounter, 0) > ?",
         "COALESCE(us.playCount, 0) = ?",
         "MAX(t.sceneCountAll - COALESCE(d.scenes, 0), 0) > ?",

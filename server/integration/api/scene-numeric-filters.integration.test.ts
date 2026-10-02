@@ -1,7 +1,9 @@
-import { beforeAll, describe, expect, it } from "vitest";
-import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { createApiUser } from "../helpers/accessFixture.js";
 import { expectRefused } from "../helpers/refused.js";
-import { adminClient } from "../helpers/testClient.js";
+import type { TestClient } from "../helpers/testClient.js";
+import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
 
 /**
  * Scene Numeric Filters Integration Tests
@@ -14,7 +16,10 @@ import { adminClient } from "../helpers/testClient.js";
  * - performer_count
  * - tag_count
  * - duration
- * - Stash's file_count and the rating's IS_NULL and NOT_NULL, which Peek
+ * - the viewer's rating as a throwaway user: an unrated scene matches no
+ *   comparison, only IS_NULL ("Not rated"); another user's rating never
+ *   counts
+ * - Stash's file_count and IS_NULL on o_counter (never missing), which Peek
  *   refuses (400)
  */
 
@@ -28,6 +33,7 @@ interface FindScenesResponse {
       play_count?: number | null;
       play_duration?: number | null;
       files?: Array<{ duration?: number }>;
+      instanceId?: string;
     }>;
     count: number;
   };
@@ -340,19 +346,119 @@ describe("Scene Numeric Filters", () => {
     });
   });
 
+  describe("the viewer's rating: unknown never matches a comparison", () => {
+    // The rater rates one replay scene 30 on the test instance; the other
+    // user rates nothing. The second library reuses the scene's id.
+    let rater: { id: number; client: TestClient };
+    let other: { id: number; client: TestClient };
+    let ratedKey: string;
+    /** Every scene the users see, as "id:instance", sorted */
+    let allKeys: string[];
+
+    /** The scenes a rating criterion lists for the client, as "id:instance", sorted */
+    const keysFor = async (
+      client: TestClient,
+      rating100?: Record<string, unknown>
+    ): Promise<string[]> => {
+      const keys: string[] = [];
+      let total = Infinity;
+      for (let page = 1; keys.length < total; page++) {
+        const response = await client.post<FindScenesResponse>(
+          "/api/library/scenes",
+          {
+            filter: { page, per_page: 250, sort: "title", direction: "ASC" },
+            ...(rating100 ? { scene_filter: { rating100 } } : {}),
+          }
+        );
+        expect(response.status).toBe(200);
+        const { scenes, count } = response.data.findScenes;
+        total = count;
+        keys.push(
+          ...scenes.map((scene) => `${scene.id}:${scene.instanceId ?? ""}`)
+        );
+        if (scenes.length === 0) break;
+      }
+      expect(keys).toHaveLength(total);
+      return keys.sort();
+    };
+
+    beforeAll(async () => {
+      const instanceId = await findTestInstanceId();
+      const sceneId = TEST_ENTITIES.sceneWithRelations;
+      ratedKey = `${sceneId}:${instanceId}`;
+      rater = await createApiUser("s4_rating_rater", "s4_rating_pass_1");
+      other = await createApiUser("s4_rating_other", "s4_rating_pass_2");
+      const rated = await rater.client.put(`/api/ratings/scene/${sceneId}`, {
+        rating: 30,
+        instanceId,
+      });
+      expect(rated.status).toBe(200);
+      allKeys = await keysFor(rater.client);
+      expect(allKeys).toContain(ratedKey);
+    }, 60000);
+
+    afterAll(async () => {
+      // beforeAll may have failed before it set them
+      for (const user of [rater, other] as const) {
+        const created = user as typeof user | undefined;
+        if (created) await adminClient.delete(`/api/user/${created.id}`);
+      }
+    }, 60000);
+
+    it("rating at most 40 lists only rated scenes", async () => {
+      // One-sided BETWEEN: value2 alone is at most it
+      expect(
+        await keysFor(rater.client, { modifier: "BETWEEN", value2: 40 })
+      ).toEqual([ratedKey]);
+      expect(
+        await keysFor(rater.client, { modifier: "LESS_THAN", value: 41 })
+      ).toEqual([ratedKey]);
+      expect(
+        await keysFor(rater.client, { modifier: "NOT_EQUALS", value: 80 })
+      ).toEqual([ratedKey]);
+      expect(
+        await keysFor(rater.client, {
+          modifier: "NOT_BETWEEN",
+          value: 50,
+          value2: 100,
+        })
+      ).toEqual([ratedKey]);
+    });
+
+    it("rating IS_NULL lists the unrated, not the rated", async () => {
+      // Every other scene, the same id on the other instance included
+      expect(await keysFor(rater.client, { modifier: "IS_NULL" })).toEqual(
+        allKeys.filter((key) => key !== ratedKey)
+      );
+      expect(await keysFor(rater.client, { modifier: "NOT_NULL" })).toEqual([
+        ratedKey,
+      ]);
+    });
+
+    it("another user's rating does not make a scene rated for the viewer", async () => {
+      expect(await keysFor(other.client, { modifier: "IS_NULL" })).toEqual(
+        allKeys
+      );
+      expect(await keysFor(other.client, { modifier: "NOT_NULL" })).toEqual([]);
+      expect(
+        await keysFor(other.client, { modifier: "BETWEEN", value2: 40 })
+      ).toEqual([]);
+    });
+  });
+
   describe("Stash scene filters Peek does not apply", () => {
-    // The request parser refuses them rather than ignore them: the numeric
-    // clause has no IS_NULL or NOT_NULL, and no builder counts files
+    // The request parser refuses them rather than ignore them: a play or O
+    // count is never missing (none is 0), and no builder counts files
     it.each([
       {
-        name: "rating100 IS_NULL",
-        path: "scene_filter.rating100.modifier",
-        criterion: { rating100: { value: 0, modifier: "IS_NULL" } },
+        name: "o_counter IS_NULL",
+        path: "scene_filter.o_counter.modifier",
+        criterion: { o_counter: { modifier: "IS_NULL" } },
       },
       {
-        name: "rating100 NOT_NULL",
-        path: "scene_filter.rating100.modifier",
-        criterion: { rating100: { value: 0, modifier: "NOT_NULL" } },
+        name: "play_count NOT_NULL",
+        path: "scene_filter.play_count.modifier",
+        criterion: { play_count: { value: 0, modifier: "NOT_NULL" } },
       },
       {
         name: "file_count",

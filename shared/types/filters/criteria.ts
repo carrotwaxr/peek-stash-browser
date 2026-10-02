@@ -38,7 +38,10 @@ export const COMPARISON_MODIFIERS = [
   "LESS_THAN",
 ] as const;
 
-/** Need `value2` as well as `value` */
+/**
+ * A range: a number's BETWEEN takes either side alone (at least, at most);
+ * NOT_BETWEEN, and a date's BETWEEN, need both `value` and `value2`
+ */
 export const RANGE_MODIFIERS = ["BETWEEN", "NOT_BETWEEN"] as const;
 export type RangeModifier = (typeof RANGE_MODIFIERS)[number];
 
@@ -52,6 +55,17 @@ export const NUMBER_MODIFIERS = [
   ...PRESENCE_MODIFIERS,
 ] as const;
 export type NumberModifier = (typeof NUMBER_MODIFIERS)[number];
+
+/**
+ * A number a row may lack (a rating, a height): the comparisons, the ranges,
+ * and IS_NULL and NOT_NULL for "not set" and "is set". A comparison never
+ * matches a row without a value.
+ */
+export const NULLABLE_NUMBER_MODIFIERS = [
+  ...COMPARISON_MODIFIERS,
+  ...RANGE_MODIFIERS,
+  ...PRESENCE_MODIFIERS,
+] as const;
 
 /** Values are YYYY-MM-DD dates or ISO date-times */
 export const DATE_MODIFIERS = NUMBER_MODIFIERS;
@@ -312,7 +326,7 @@ interface ScalarOptions<M extends string> {
   readonly defaultModifier?: M;
 }
 
-/** The six comparisons the shared numeric clause understands */
+/** The six comparisons every number field takes */
 const NUMBER_FIELD_MODIFIERS = [
   ...COMPARISON_MODIFIERS,
   ...RANGE_MODIFIERS,
