@@ -10,7 +10,7 @@ See [Installation - Update Procedure](installation.md#update-procedure) for step
 
 ### Automatic backup before migrations
 
-When an upgrade has database migrations to apply, Peek copies the database before it changes anything. The copy is in the data directory (`/app/data`, or `CONFIG_DIR` if you set it), beside the database, named with the time (UTC) and the version that made it:
+When an upgrade has database migrations to apply, Peek copies the database before it changes anything. The copy goes to the config directory: `/app/data`, beside the database, unless you set `CONFIG_DIR` to somewhere else (an older unRAID template may have). It is named with the time (UTC) and the version that made it:
 
 ```
 peek-stash-browser.db.backup-20260924-101112-pre-3.4.0
@@ -68,6 +68,7 @@ You can also back up the database yourself, for example before a major upgrade. 
     docker exec -u peek peek-stash-browser sqlite3 /app/data/peek-stash-browser.db ".backup '/app/data/backup.db'"
     docker cp peek-stash-browser:/app/data/backup.db ./peek-stash-browser.db.backup
     ```
+    `-u peek` is the user Peek runs as: at start the image gives it your `PUID` and `PGID` (default `99:100`), so it can write to `/app/data` whatever you set. Only with `PUID=0`, where Peek runs as root, use `-u root` instead. Delete `backup.db` from the data directory afterwards.
 
 ## Restore from Backup
 
@@ -136,6 +137,14 @@ If the message names `carrotwaxr/peek-stash-browser:3.2.2` instead, your databas
 - Scenes gain stored sort keys for title, performer count and tag count, so sorting the scene list by them no longer reads every scene. The upgrade fills them once: about 2 seconds for 26,000 scenes, 4 seconds for 200,000.
 - Saved filter presets and custom carousels are tidied once, when the first start after the upgrade has finished its startup sync: filters the app no longer has are removed, a sort the list no longer offers becomes its default, a preset's items per page is held to 250, and picks saved before multi-instance support are tied to their server when only one server has them (a pick that more than one server has keeps matching on each). The log lists each preset and carousel changed, by key name, and a summary line starting `[Migration 009]`. A preset or carousel you save again while it runs is left as you saved it.
 
+### Versions 3.2.0 to 3.3.6
+
+**Migration:** Automatic. No action: no release in this range asks anything of an administrator. There is no 3.2.3.
+
+- **3.3.0** adds user groups, recovery keys and password reset, login rate limiting and account lockout, downloads, playlist sharing, clips, support for several Stash servers, and the setup wizard.
+- **3.2.2** adds scene merge detection and the database backup page for admins. Its schema repair is also the way to upgrade a database that is missing tables (see [Databases from before v2.0.0](#databases-from-before-v200)).
+- **3.2.0, 3.2.1 and 3.3.1 to 3.3.6** are features and fixes only (wall, table, timeline and folder views, user stats, multi-server fixes, exclusion fixes, type and test work).
+
 ### Version 3.3.7
 
 **Migration:** Automatic. Peek no longer runs as root.
@@ -169,7 +178,7 @@ Major architectural change: Stash entity data is now stored in SQLite instead of
 The initial sync after upgrading may take several minutes depending on library size.
 
 !!! note "Upgrading from 3.0.0 Beta"
-    If upgrading from any v3.0.0-beta.x, run a **Full Sync** (Settings → Server Settings → Sync from Stash) to ensure all fields are populated.
+    If upgrading from any v3.0.0-beta.x, run a **Full Sync** (Settings → Server Settings → Server Configuration → Server Statistics → **Full Sync**) to ensure all fields are populated.
 
 ### Version 2.0.0
 
@@ -189,9 +198,9 @@ The initial sync after upgrading may take several minutes depending on library s
 
 ### Library empty after upgrade
 
-The sync should start automatically. If empty after several minutes:
+Peek syncs at startup: a full sync when no sync has ever completed, or when the daily full pass is due, and otherwise an incremental one that fetches only what changed. If the library is still empty after several minutes:
 1. Check logs: `docker logs peek-stash-browser`
-2. Manually trigger sync: Settings → Server Settings → Sync from Stash
+2. Force a full sync: Settings → Server Settings → Server Configuration → Server Statistics → **Full Sync** (it asks first). A full sync that runs to the end also resets the daily full pass.
 
 ### Migration failed
 
@@ -246,6 +255,6 @@ The first sync after a major upgrade fetches all data from Stash. Subsequent syn
 Found an upgrade bug? Report it:
 
 - [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-- [Stash Discourse](https://discourse.stashapp.cc/t/peek-stash-browser/4018)
+- [Peek on the Stash community forum](https://discourse.stashapp.cc/t/peek-stash-browser/4018), for questions
 
 Include: Peek version, Stash version, library size, and relevant logs.
