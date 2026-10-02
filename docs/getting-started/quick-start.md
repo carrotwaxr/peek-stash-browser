@@ -125,9 +125,11 @@ Organize your favorite scenes into custom playlists:
 
 | Key | Action |
 |-----|--------|
-| `Space` | Play/Pause |
-| `←` | Seek backward 10s |
-| `→` | Seek forward 10s |
+| `Space` or `K` | Play/Pause |
+| `←` | Seek backward 5s |
+| `→` | Seek forward 5s |
+| `J` | Seek backward 10s |
+| `L` | Seek forward 10s |
 | `↑` | Volume up |
 | `↓` | Volume down |
 | `F` | Toggle fullscreen |
