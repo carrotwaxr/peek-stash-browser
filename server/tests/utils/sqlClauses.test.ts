@@ -30,6 +30,7 @@ import {
   fullDateSql,
   galleryNameSql,
   idClause,
+  imageNameSql,
   instanceClause,
   instanceColumnClause,
   orientationClause,
@@ -2102,6 +2103,13 @@ describe("galleryNameSql", () => {
 
   it("reads the alias it is given", () => {
     expect(galleryNameSql("x")).toContain("NULLIF(x.title, '')");
+  });
+});
+
+describe("imageNameSql", () => {
+  it("is the stored, lower-cased name of the image's alias", () => {
+    expect(imageNameSql("i")).toBe("i.titleSort");
+    expect(imageNameSql("x")).toBe("x.titleSort");
   });
 });
 
