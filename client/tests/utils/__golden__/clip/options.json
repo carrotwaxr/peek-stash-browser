@@ -1,0 +1,207 @@
+{
+  "options": [
+    {
+      "type": "section-header",
+      "label": "Common Filters",
+      "key": "section-common",
+      "collapsible": true,
+      "defaultOpen": true
+    },
+    {
+      "key": "tagIds",
+      "label": "Clip Tags",
+      "type": "searchable-select",
+      "entityType": "tags",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Filter by clip tags...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "tagIdsModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "sceneTagIds",
+      "label": "Scene Tags",
+      "type": "searchable-select",
+      "entityType": "tags",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Filter by scene tags...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "sceneTagIdsModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "performerIds",
+      "label": "Performers",
+      "type": "searchable-select",
+      "entityType": "performers",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Filter by performers...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "performerIdsModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "studioId",
+      "label": "Studio",
+      "type": "searchable-select",
+      "entityType": "studios",
+      "multi": false,
+      "defaultValue": "",
+      "placeholder": "Filter by studio..."
+    },
+    {
+      "key": "isGenerated",
+      "label": "Has Preview",
+      "type": "select",
+      "defaultValue": "true",
+      "options": [
+        {
+          "value": "true",
+          "label": "With preview only"
+        },
+        {
+          "value": "false",
+          "label": "Without preview only"
+        },
+        {
+          "value": "all",
+          "label": "All clips"
+        }
+      ],
+      "placeholder": "Filter by preview status"
+    }
+  ],
+  "imperialOptions": "same as the metric options",
+  "locks": [
+    {
+      "field": "tagIds",
+      "lockedFieldsTop": [
+        "tagIds"
+      ],
+      "lockedFieldsInner": [
+        "clip_filter",
+        "tagIds"
+      ],
+      "removedStateKeys": [
+        "tagIds",
+        "tagIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:tagIds"
+      ],
+      "optionCountAfter": 5
+    },
+    {
+      "field": "sceneTagIds",
+      "lockedFieldsTop": [
+        "sceneTagIds"
+      ],
+      "lockedFieldsInner": [
+        "clip_filter",
+        "sceneTagIds"
+      ],
+      "removedStateKeys": [
+        "sceneTagIds",
+        "sceneTagIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:sceneTagIds"
+      ],
+      "optionCountAfter": 5
+    },
+    {
+      "field": "performerIds",
+      "lockedFieldsTop": [
+        "performerIds"
+      ],
+      "lockedFieldsInner": [
+        "clip_filter",
+        "performerIds"
+      ],
+      "removedStateKeys": [
+        "performerIds",
+        "performerIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:performerIds"
+      ],
+      "optionCountAfter": 5
+    },
+    {
+      "field": "studioId",
+      "lockedFieldsTop": [
+        "studioId"
+      ],
+      "lockedFieldsInner": [
+        "clip_filter",
+        "studioId"
+      ],
+      "removedStateKeys": [
+        "studioId"
+      ],
+      "removedOptions": [
+        "searchable-select:studioId"
+      ],
+      "optionCountAfter": 5
+    },
+    {
+      "field": "isGenerated",
+      "lockedFieldsTop": [
+        "isGenerated"
+      ],
+      "lockedFieldsInner": [
+        "clip_filter",
+        "isGenerated"
+      ],
+      "removedStateKeys": [
+        "isGenerated"
+      ],
+      "removedOptions": [
+        "select:isGenerated"
+      ],
+      "optionCountAfter": 5
+    }
+  ]
+}

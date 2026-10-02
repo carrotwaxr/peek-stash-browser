@@ -1,0 +1,902 @@
+{
+  "options": [
+    {
+      "type": "section-header",
+      "label": "Common Filters",
+      "key": "section-common",
+      "collapsible": true,
+      "defaultOpen": true
+    },
+    {
+      "key": "title",
+      "label": "Title Search",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search title...",
+      "maxLength": 500
+    },
+    {
+      "key": "details",
+      "label": "Details Search",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search details...",
+      "maxLength": 500
+    },
+    {
+      "key": "performerIds",
+      "label": "Performers",
+      "type": "searchable-select",
+      "entityType": "performers",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select performers...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "performerIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "countFilterContext": "scenes"
+    },
+    {
+      "key": "studioId",
+      "label": "Studio",
+      "type": "searchable-select",
+      "entityType": "studios",
+      "multi": false,
+      "defaultValue": "",
+      "placeholder": "Select studio...",
+      "supportsHierarchy": true,
+      "hierarchyKey": "studioIdDepth",
+      "hierarchyLabel": "Include sub-studios",
+      "countFilterContext": "scenes"
+    },
+    {
+      "key": "tagIds",
+      "label": "Tags",
+      "type": "searchable-select",
+      "entityType": "tags",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select tags...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "tagIdsModifier",
+      "defaultModifier": "INCLUDES_ALL",
+      "supportsHierarchy": true,
+      "hierarchyKey": "tagIdsDepth",
+      "hierarchyLabel": "Include sub-tags",
+      "countFilterContext": "scenes"
+    },
+    {
+      "key": "groupIds",
+      "label": "Collections",
+      "type": "searchable-select",
+      "entityType": "groups",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select collections...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "In ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "NOT in these"
+        }
+      ],
+      "modifierKey": "groupIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "countFilterContext": "scenes"
+    },
+    {
+      "key": "rating",
+      "label": "Rating (0-100)",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 100
+    },
+    {
+      "key": "oCount",
+      "label": "O Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 300
+    },
+    {
+      "key": "duration",
+      "label": "Duration (minutes)",
+      "type": "range",
+      "defaultValue": {},
+      "min": 1,
+      "max": 300
+    },
+    {
+      "key": "favorite",
+      "label": "Favorite Scenes",
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Favorites Only"
+    },
+    {
+      "key": "performerFavorite",
+      "label": "Favorite Performers",
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Favorite Performers Only"
+    },
+    {
+      "key": "studioFavorite",
+      "label": "Favorite Studios",
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Favorite Studios Only"
+    },
+    {
+      "key": "tagFavorite",
+      "label": "Favorite Tags",
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Favorite Tags Only"
+    },
+    {
+      "type": "section-header",
+      "label": "Date Ranges",
+      "key": "section-dates",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "date",
+      "label": "Scene Date",
+      "type": "date-range",
+      "defaultValue": {}
+    },
+    {
+      "key": "createdAt",
+      "label": "Created Date",
+      "type": "date-range",
+      "defaultValue": {}
+    },
+    {
+      "key": "updatedAt",
+      "label": "Updated Date",
+      "type": "date-range",
+      "defaultValue": {}
+    },
+    {
+      "key": "lastPlayedAt",
+      "label": "Last Played Date",
+      "type": "date-range",
+      "defaultValue": {}
+    },
+    {
+      "type": "section-header",
+      "label": "Video Properties",
+      "key": "section-video",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "resolution",
+      "label": "Resolution",
+      "type": "select",
+      "defaultValue": "",
+      "options": [
+        {
+          "value": "VERY_LOW",
+          "label": "144p"
+        },
+        {
+          "value": "LOW",
+          "label": "240p"
+        },
+        {
+          "value": "R360P",
+          "label": "360p"
+        },
+        {
+          "value": "STANDARD",
+          "label": "480p"
+        },
+        {
+          "value": "WEB_HD",
+          "label": "540p"
+        },
+        {
+          "value": "STANDARD_HD",
+          "label": "720p"
+        },
+        {
+          "value": "FULL_HD",
+          "label": "1080p"
+        },
+        {
+          "value": "QUAD_HD",
+          "label": "1440p"
+        },
+        {
+          "value": "FOUR_K",
+          "label": "4K"
+        },
+        {
+          "value": "FIVE_K",
+          "label": "5K"
+        },
+        {
+          "value": "SIX_K",
+          "label": "6K"
+        },
+        {
+          "value": "SEVEN_K",
+          "label": "7K"
+        },
+        {
+          "value": "EIGHT_K",
+          "label": "8K"
+        },
+        {
+          "value": "HUGE",
+          "label": "Huge"
+        }
+      ],
+      "placeholder": "Any resolution",
+      "modifierOptions": [
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "NOT_EQUALS",
+          "label": "Not Equals"
+        },
+        {
+          "value": "GREATER_THAN",
+          "label": "Greater Than"
+        },
+        {
+          "value": "LESS_THAN",
+          "label": "Less Than"
+        }
+      ],
+      "modifierKey": "resolutionModifier",
+      "defaultModifier": "EQUALS"
+    },
+    {
+      "key": "bitrate",
+      "label": "Bitrate (Mbps)",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 100
+    },
+    {
+      "key": "framerate",
+      "label": "Framerate (fps)",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 120
+    },
+    {
+      "key": "orientation",
+      "label": "Orientation",
+      "type": "select",
+      "defaultValue": "",
+      "options": [
+        {
+          "value": "LANDSCAPE",
+          "label": "Landscape"
+        },
+        {
+          "value": "PORTRAIT",
+          "label": "Portrait"
+        },
+        {
+          "value": "SQUARE",
+          "label": "Square"
+        }
+      ],
+      "placeholder": "Any orientation"
+    },
+    {
+      "key": "videoCodec",
+      "label": "Video Codec",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "e.g. h264, hevc",
+      "maxLength": 500
+    },
+    {
+      "key": "audioCodec",
+      "label": "Audio Codec",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "e.g. aac, mp3",
+      "maxLength": 500
+    },
+    {
+      "type": "section-header",
+      "label": "Other Filters",
+      "key": "section-other",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "director",
+      "label": "Director Search",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search director...",
+      "maxLength": 500
+    },
+    {
+      "key": "playDuration",
+      "label": "Play Duration (minutes)",
+      "type": "range",
+      "defaultValue": {},
+      "min": 1,
+      "max": 300
+    },
+    {
+      "key": "playCount",
+      "label": "Play Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "performerCount",
+      "label": "Performer Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 20
+    },
+    {
+      "key": "performerAge",
+      "label": "Performer Age",
+      "type": "range",
+      "defaultValue": {},
+      "min": 18,
+      "max": 100
+    },
+    {
+      "key": "tagCount",
+      "label": "Tag Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 50
+    }
+  ],
+  "imperialOptions": "same as the metric options",
+  "locks": [
+    {
+      "field": "title",
+      "lockedFieldsTop": [
+        "title"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "title"
+      ],
+      "removedStateKeys": [
+        "title"
+      ],
+      "removedOptions": [
+        "text:title"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "details",
+      "lockedFieldsTop": [
+        "details"
+      ],
+      "lockedFieldsInner": [
+        "details",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "details"
+      ],
+      "removedOptions": [
+        "text:details"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "performers",
+      "lockedFieldsTop": [
+        "performers"
+      ],
+      "lockedFieldsInner": [
+        "performers",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "performerIds",
+        "performerIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:performerIds"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "studios",
+      "lockedFieldsTop": [
+        "studios"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "studios"
+      ],
+      "removedStateKeys": [
+        "studioId",
+        "studioIdDepth"
+      ],
+      "removedOptions": [
+        "searchable-select:studioId"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "tags",
+      "lockedFieldsTop": [
+        "tags"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "tags"
+      ],
+      "removedStateKeys": [
+        "tagIds",
+        "tagIdsModifier",
+        "tagIdsDepth"
+      ],
+      "removedOptions": [
+        "searchable-select:tagIds"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "groups",
+      "lockedFieldsTop": [
+        "groups"
+      ],
+      "lockedFieldsInner": [
+        "groups",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "groupIds",
+        "groupIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:groupIds"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "rating100",
+      "lockedFieldsTop": [
+        "rating100"
+      ],
+      "lockedFieldsInner": [
+        "rating100",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "rating"
+      ],
+      "removedOptions": [
+        "range:rating"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "o_counter",
+      "lockedFieldsTop": [
+        "o_counter"
+      ],
+      "lockedFieldsInner": [
+        "o_counter",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "oCount"
+      ],
+      "removedOptions": [
+        "range:oCount"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "duration",
+      "lockedFieldsTop": [
+        "duration"
+      ],
+      "lockedFieldsInner": [
+        "duration",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "duration"
+      ],
+      "removedOptions": [
+        "range:duration"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "favorite",
+      "lockedFieldsTop": [
+        "favorite"
+      ],
+      "lockedFieldsInner": [
+        "favorite",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "favorite"
+      ],
+      "removedOptions": [
+        "checkbox:favorite"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "performer_favorite",
+      "lockedFieldsTop": [
+        "performer_favorite"
+      ],
+      "lockedFieldsInner": [
+        "performer_favorite",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "performerFavorite"
+      ],
+      "removedOptions": [
+        "checkbox:performerFavorite"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "studio_favorite",
+      "lockedFieldsTop": [
+        "studio_favorite"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "studio_favorite"
+      ],
+      "removedStateKeys": [
+        "studioFavorite"
+      ],
+      "removedOptions": [
+        "checkbox:studioFavorite"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "tag_favorite",
+      "lockedFieldsTop": [
+        "tag_favorite"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "tag_favorite"
+      ],
+      "removedStateKeys": [
+        "tagFavorite"
+      ],
+      "removedOptions": [
+        "checkbox:tagFavorite"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "date",
+      "lockedFieldsTop": [
+        "date"
+      ],
+      "lockedFieldsInner": [
+        "date",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "date"
+      ],
+      "removedOptions": [
+        "date-range:date"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "created_at",
+      "lockedFieldsTop": [
+        "created_at"
+      ],
+      "lockedFieldsInner": [
+        "created_at",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "createdAt"
+      ],
+      "removedOptions": [
+        "date-range:createdAt"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "updated_at",
+      "lockedFieldsTop": [
+        "updated_at"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "updated_at"
+      ],
+      "removedStateKeys": [
+        "updatedAt"
+      ],
+      "removedOptions": [
+        "date-range:updatedAt"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "last_played_at",
+      "lockedFieldsTop": [
+        "last_played_at"
+      ],
+      "lockedFieldsInner": [
+        "last_played_at",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "lastPlayedAt"
+      ],
+      "removedOptions": [
+        "date-range:lastPlayedAt"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "resolution",
+      "lockedFieldsTop": [
+        "resolution"
+      ],
+      "lockedFieldsInner": [
+        "resolution",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "resolution",
+        "resolutionModifier"
+      ],
+      "removedOptions": [
+        "select:resolution"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "bitrate",
+      "lockedFieldsTop": [
+        "bitrate"
+      ],
+      "lockedFieldsInner": [
+        "bitrate",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "bitrate"
+      ],
+      "removedOptions": [
+        "range:bitrate"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "framerate",
+      "lockedFieldsTop": [
+        "framerate"
+      ],
+      "lockedFieldsInner": [
+        "framerate",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "framerate"
+      ],
+      "removedOptions": [
+        "range:framerate"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "orientation",
+      "lockedFieldsTop": [
+        "orientation"
+      ],
+      "lockedFieldsInner": [
+        "orientation",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "orientation"
+      ],
+      "removedOptions": [
+        "select:orientation"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "video_codec",
+      "lockedFieldsTop": [
+        "video_codec"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "video_codec"
+      ],
+      "removedStateKeys": [
+        "videoCodec"
+      ],
+      "removedOptions": [
+        "text:videoCodec"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "audio_codec",
+      "lockedFieldsTop": [
+        "audio_codec"
+      ],
+      "lockedFieldsInner": [
+        "audio_codec",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "audioCodec"
+      ],
+      "removedOptions": [
+        "text:audioCodec"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "director",
+      "lockedFieldsTop": [
+        "director"
+      ],
+      "lockedFieldsInner": [
+        "director",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "director"
+      ],
+      "removedOptions": [
+        "text:director"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "play_duration",
+      "lockedFieldsTop": [
+        "play_duration"
+      ],
+      "lockedFieldsInner": [
+        "play_duration",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "playDuration"
+      ],
+      "removedOptions": [
+        "range:playDuration"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "play_count",
+      "lockedFieldsTop": [
+        "play_count"
+      ],
+      "lockedFieldsInner": [
+        "play_count",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "playCount"
+      ],
+      "removedOptions": [
+        "range:playCount"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "performer_count",
+      "lockedFieldsTop": [
+        "performer_count"
+      ],
+      "lockedFieldsInner": [
+        "performer_count",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "performerCount"
+      ],
+      "removedOptions": [
+        "range:performerCount"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "performer_age",
+      "lockedFieldsTop": [
+        "performer_age"
+      ],
+      "lockedFieldsInner": [
+        "performer_age",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "performerAge"
+      ],
+      "removedOptions": [
+        "range:performerAge"
+      ],
+      "optionCountAfter": 32
+    },
+    {
+      "field": "tag_count",
+      "lockedFieldsTop": [
+        "tag_count"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "tag_count"
+      ],
+      "removedStateKeys": [
+        "tagCount"
+      ],
+      "removedOptions": [
+        "range:tagCount"
+      ],
+      "optionCountAfter": 32
+    }
+  ]
+}

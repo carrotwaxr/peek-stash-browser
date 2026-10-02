@@ -1,0 +1,2297 @@
+{
+  "ownedKeys": [
+    "name",
+    "name_min",
+    "name_max",
+    "name_start",
+    "name_end",
+    "tagIds",
+    "tagId",
+    "tagIdsModifier",
+    "tagIdsDepth",
+    "tagIds_min",
+    "tagIds_max",
+    "tagIds_start",
+    "tagIds_end",
+    "gender",
+    "gender_min",
+    "gender_max",
+    "gender_start",
+    "gender_end",
+    "rating",
+    "rating_min",
+    "rating_max",
+    "rating_start",
+    "rating_end",
+    "oCounter",
+    "oCounter_min",
+    "oCounter_max",
+    "oCounter_start",
+    "oCounter_end",
+    "sceneCount",
+    "sceneCount_min",
+    "sceneCount_max",
+    "sceneCount_start",
+    "sceneCount_end",
+    "favorite",
+    "favorite_min",
+    "favorite_max",
+    "favorite_start",
+    "favorite_end",
+    "age",
+    "age_min",
+    "age_max",
+    "age_start",
+    "age_end",
+    "birthYear",
+    "birthYear_min",
+    "birthYear_max",
+    "birthYear_start",
+    "birthYear_end",
+    "deathYear",
+    "deathYear_min",
+    "deathYear_max",
+    "deathYear_start",
+    "deathYear_end",
+    "careerLength",
+    "careerLength_min",
+    "careerLength_max",
+    "careerLength_start",
+    "careerLength_end",
+    "birthdate",
+    "birthdate_min",
+    "birthdate_max",
+    "birthdate_start",
+    "birthdate_end",
+    "deathDate",
+    "deathDate_min",
+    "deathDate_max",
+    "deathDate_start",
+    "deathDate_end",
+    "createdAt",
+    "createdAt_min",
+    "createdAt_max",
+    "createdAt_start",
+    "createdAt_end",
+    "updatedAt",
+    "updatedAt_min",
+    "updatedAt_max",
+    "updatedAt_start",
+    "updatedAt_end",
+    "hairColor",
+    "hairColor_min",
+    "hairColor_max",
+    "hairColor_start",
+    "hairColor_end",
+    "eyeColor",
+    "eyeColor_min",
+    "eyeColor_max",
+    "eyeColor_start",
+    "eyeColor_end",
+    "ethnicity",
+    "ethnicity_min",
+    "ethnicity_max",
+    "ethnicity_start",
+    "ethnicity_end",
+    "fakeTits",
+    "fakeTits_min",
+    "fakeTits_max",
+    "fakeTits_start",
+    "fakeTits_end",
+    "measurements",
+    "measurements_min",
+    "measurements_max",
+    "measurements_start",
+    "measurements_end",
+    "tattoos",
+    "tattoos_min",
+    "tattoos_max",
+    "tattoos_start",
+    "tattoos_end",
+    "piercings",
+    "piercings_min",
+    "piercings_max",
+    "piercings_start",
+    "piercings_end",
+    "height",
+    "height_min",
+    "height_max",
+    "height_start",
+    "height_end",
+    "weight",
+    "weight_min",
+    "weight_max",
+    "weight_start",
+    "weight_end",
+    "penisLength",
+    "penisLength_min",
+    "penisLength_max",
+    "penisLength_start",
+    "penisLength_end",
+    "playCount",
+    "playCount_min",
+    "playCount_max",
+    "playCount_start",
+    "playCount_end",
+    "details",
+    "details_min",
+    "details_max",
+    "details_start",
+    "details_end",
+    "filters",
+    "q",
+    "sort",
+    "dir",
+    "page",
+    "per_page",
+    "view",
+    "zoom",
+    "grid_density",
+    "timeline_period",
+    "folderPath"
+  ],
+  "roundTrip": [
+    {
+      "label": "name: text",
+      "params": "name=contract",
+      "parsed": {
+        "name": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: one id",
+      "params": "tagIds=1%3Ainst-a",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: MALE",
+      "params": "gender=MALE",
+      "parsed": {
+        "gender": "MALE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: FEMALE",
+      "params": "gender=FEMALE",
+      "parsed": {
+        "gender": "FEMALE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: TRANSGENDER_MALE",
+      "params": "gender=TRANSGENDER_MALE",
+      "parsed": {
+        "gender": "TRANSGENDER_MALE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: TRANSGENDER_FEMALE",
+      "params": "gender=TRANSGENDER_FEMALE",
+      "parsed": {
+        "gender": "TRANSGENDER_FEMALE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: INTERSEX",
+      "params": "gender=INTERSEX",
+      "parsed": {
+        "gender": "INTERSEX"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: NON_BINARY",
+      "params": "gender=NON_BINARY",
+      "parsed": {
+        "gender": "NON_BINARY"
+      },
+      "lossless": true
+    },
+    {
+      "label": "rating: min only",
+      "params": "rating_min=25",
+      "parsed": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "rating: max only",
+      "params": "rating_max=75",
+      "parsed": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "rating: min and max",
+      "params": "rating_min=25&rating_max=75",
+      "parsed": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCounter: min only",
+      "params": "oCounter_min=250",
+      "parsed": {
+        "oCounter": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCounter: max only",
+      "params": "oCounter_max=750",
+      "parsed": {
+        "oCounter": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCounter: min and max",
+      "params": "oCounter_min=250&oCounter_max=750",
+      "parsed": {
+        "oCounter": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneCount: min only",
+      "params": "sceneCount_min=250",
+      "parsed": {
+        "sceneCount": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneCount: max only",
+      "params": "sceneCount_max=750",
+      "parsed": {
+        "sceneCount": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneCount: min and max",
+      "params": "sceneCount_min=250&sceneCount_max=750",
+      "parsed": {
+        "sceneCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "favorite: checked",
+      "params": "favorite=true",
+      "parsed": {
+        "favorite": true
+      },
+      "lossless": true
+    },
+    {
+      "label": "age: min only",
+      "params": "age_min=39",
+      "parsed": {
+        "age": {
+          "min": "39"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "age: max only",
+      "params": "age_max=80",
+      "parsed": {
+        "age": {
+          "max": "80"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "age: min and max",
+      "params": "age_min=39&age_max=80",
+      "parsed": {
+        "age": {
+          "min": "39",
+          "max": "80"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "birthYear: min only",
+      "params": "birthYear_min=1928",
+      "parsed": {
+        "birthYear": {
+          "min": "1928"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "birthYear: max only",
+      "params": "birthYear_max=1983",
+      "parsed": {
+        "birthYear": {
+          "max": "1983"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "birthYear: min and max",
+      "params": "birthYear_min=1928&birthYear_max=1983",
+      "parsed": {
+        "birthYear": {
+          "min": "1928",
+          "max": "1983"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "deathYear: min only",
+      "params": "deathYear_min=1950",
+      "parsed": {
+        "deathYear": {
+          "min": "1950"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "deathYear: max only",
+      "params": "deathYear_max=2050",
+      "parsed": {
+        "deathYear": {
+          "max": "2050"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "deathYear: min and max",
+      "params": "deathYear_min=1950&deathYear_max=2050",
+      "parsed": {
+        "deathYear": {
+          "min": "1950",
+          "max": "2050"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "careerLength: min only",
+      "params": "careerLength_min=13",
+      "parsed": {
+        "careerLength": {
+          "min": "13"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "careerLength: max only",
+      "params": "careerLength_max=38",
+      "parsed": {
+        "careerLength": {
+          "max": "38"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "careerLength: min and max",
+      "params": "careerLength_min=13&careerLength_max=38",
+      "parsed": {
+        "careerLength": {
+          "min": "13",
+          "max": "38"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "birthdate: start only",
+      "params": "birthdate_start=2020-01-01",
+      "parsed": {
+        "birthdate": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "birthdate: end only",
+      "params": "birthdate_end=2024-12-31",
+      "parsed": {
+        "birthdate": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "birthdate: start and end",
+      "params": "birthdate_start=2020-01-01&birthdate_end=2024-12-31",
+      "parsed": {
+        "birthdate": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "deathDate: start only",
+      "params": "deathDate_start=2020-01-01",
+      "parsed": {
+        "deathDate": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "deathDate: end only",
+      "params": "deathDate_end=2024-12-31",
+      "parsed": {
+        "deathDate": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "deathDate: start and end",
+      "params": "deathDate_start=2020-01-01&deathDate_end=2024-12-31",
+      "parsed": {
+        "deathDate": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start only",
+      "params": "createdAt_start=2020-01-01",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: end only",
+      "params": "createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "params": "createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "params": "updatedAt_start=2020-01-01",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "params": "updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "params": "updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "hairColor: BLONDE",
+      "params": "hairColor=BLONDE",
+      "parsed": {
+        "hairColor": "BLONDE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "hairColor: BRUNETTE",
+      "params": "hairColor=BRUNETTE",
+      "parsed": {
+        "hairColor": "BRUNETTE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "hairColor: BLACK",
+      "params": "hairColor=BLACK",
+      "parsed": {
+        "hairColor": "BLACK"
+      },
+      "lossless": true
+    },
+    {
+      "label": "hairColor: RED",
+      "params": "hairColor=RED",
+      "parsed": {
+        "hairColor": "RED"
+      },
+      "lossless": true
+    },
+    {
+      "label": "hairColor: AUBURN",
+      "params": "hairColor=AUBURN",
+      "parsed": {
+        "hairColor": "AUBURN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "hairColor: GREY",
+      "params": "hairColor=GREY",
+      "parsed": {
+        "hairColor": "GREY"
+      },
+      "lossless": true
+    },
+    {
+      "label": "hairColor: BALD",
+      "params": "hairColor=BALD",
+      "parsed": {
+        "hairColor": "BALD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "hairColor: VARIOUS",
+      "params": "hairColor=VARIOUS",
+      "parsed": {
+        "hairColor": "VARIOUS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "hairColor: OTHER",
+      "params": "hairColor=OTHER",
+      "parsed": {
+        "hairColor": "OTHER"
+      },
+      "lossless": true
+    },
+    {
+      "label": "eyeColor: BROWN",
+      "params": "eyeColor=BROWN",
+      "parsed": {
+        "eyeColor": "BROWN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "eyeColor: BLUE",
+      "params": "eyeColor=BLUE",
+      "parsed": {
+        "eyeColor": "BLUE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "eyeColor: GREEN",
+      "params": "eyeColor=GREEN",
+      "parsed": {
+        "eyeColor": "GREEN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "eyeColor: GREY",
+      "params": "eyeColor=GREY",
+      "parsed": {
+        "eyeColor": "GREY"
+      },
+      "lossless": true
+    },
+    {
+      "label": "eyeColor: HAZEL",
+      "params": "eyeColor=HAZEL",
+      "parsed": {
+        "eyeColor": "HAZEL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "eyeColor: OTHER",
+      "params": "eyeColor=OTHER",
+      "parsed": {
+        "eyeColor": "OTHER"
+      },
+      "lossless": true
+    },
+    {
+      "label": "ethnicity: CAUCASIAN",
+      "params": "ethnicity=CAUCASIAN",
+      "parsed": {
+        "ethnicity": "CAUCASIAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "ethnicity: BLACK",
+      "params": "ethnicity=BLACK",
+      "parsed": {
+        "ethnicity": "BLACK"
+      },
+      "lossless": true
+    },
+    {
+      "label": "ethnicity: ASIAN",
+      "params": "ethnicity=ASIAN",
+      "parsed": {
+        "ethnicity": "ASIAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "ethnicity: INDIAN",
+      "params": "ethnicity=INDIAN",
+      "parsed": {
+        "ethnicity": "INDIAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "ethnicity: LATIN",
+      "params": "ethnicity=LATIN",
+      "parsed": {
+        "ethnicity": "LATIN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "ethnicity: MIDDLE_EASTERN",
+      "params": "ethnicity=MIDDLE_EASTERN",
+      "parsed": {
+        "ethnicity": "MIDDLE_EASTERN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "ethnicity: MIXED",
+      "params": "ethnicity=MIXED",
+      "parsed": {
+        "ethnicity": "MIXED"
+      },
+      "lossless": true
+    },
+    {
+      "label": "ethnicity: OTHER",
+      "params": "ethnicity=OTHER",
+      "parsed": {
+        "ethnicity": "OTHER"
+      },
+      "lossless": true
+    },
+    {
+      "label": "fakeTits: Fake",
+      "params": "fakeTits=Fake",
+      "parsed": {
+        "fakeTits": "Fake"
+      },
+      "lossless": true
+    },
+    {
+      "label": "fakeTits: Natural",
+      "params": "fakeTits=Natural",
+      "parsed": {
+        "fakeTits": "Natural"
+      },
+      "lossless": true
+    },
+    {
+      "label": "measurements: text",
+      "params": "measurements=contract",
+      "parsed": {
+        "measurements": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tattoos: text",
+      "params": "tattoos=contract",
+      "parsed": {
+        "tattoos": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "piercings: text",
+      "params": "piercings=contract",
+      "parsed": {
+        "piercings": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "height: min only",
+      "params": "height_min=138",
+      "parsed": {
+        "height": {
+          "min": "138"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "height: max only",
+      "params": "height_max=213",
+      "parsed": {
+        "height": {
+          "max": "213"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "height: min and max",
+      "params": "height_min=138&height_max=213",
+      "parsed": {
+        "height": {
+          "min": "138",
+          "max": "213"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "weight: min only",
+      "params": "weight_min=73",
+      "parsed": {
+        "weight": {
+          "min": "73"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "weight: max only",
+      "params": "weight_max=158",
+      "parsed": {
+        "weight": {
+          "max": "158"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "weight: min and max",
+      "params": "weight_min=73&weight_max=158",
+      "parsed": {
+        "weight": {
+          "min": "73",
+          "max": "158"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "penisLength: min only",
+      "params": "penisLength_min=10",
+      "parsed": {
+        "penisLength": {
+          "min": "10"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "penisLength: max only",
+      "params": "penisLength_max=30",
+      "parsed": {
+        "penisLength": {
+          "max": "30"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "penisLength: min and max",
+      "params": "penisLength_min=10&penisLength_max=30",
+      "parsed": {
+        "penisLength": {
+          "min": "10",
+          "max": "30"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: min only",
+      "params": "playCount_min=250",
+      "parsed": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: max only",
+      "params": "playCount_max=750",
+      "parsed": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: min and max",
+      "params": "playCount_min=250&playCount_max=750",
+      "parsed": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "details: text",
+      "params": "details=contract",
+      "parsed": {
+        "details": "contract"
+      },
+      "lossless": true
+    }
+  ],
+  "imperialRoundTrip": [
+    {
+      "label": "height: min only",
+      "params": "",
+      "parsed": {},
+      "lossless": false
+    },
+    {
+      "label": "height: max only",
+      "params": "",
+      "parsed": {},
+      "lossless": false
+    },
+    {
+      "label": "height: min and max",
+      "params": "",
+      "parsed": {},
+      "lossless": false
+    },
+    {
+      "label": "height: feet only",
+      "params": "",
+      "parsed": {},
+      "lossless": false
+    },
+    {
+      "label": "height: inches only",
+      "params": "",
+      "parsed": {},
+      "lossless": false
+    },
+    {
+      "label": "weight: min only",
+      "params": "weight_min=163",
+      "parsed": {
+        "weight": {
+          "min": "163"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "weight: max only",
+      "params": "weight_max=388",
+      "parsed": {
+        "weight": {
+          "max": "388"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "weight: min and max",
+      "params": "weight_min=163&weight_max=388",
+      "parsed": {
+        "weight": {
+          "min": "163",
+          "max": "388"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "penisLength: min only",
+      "params": "penisLength_min=5",
+      "parsed": {
+        "penisLength": {
+          "min": "5"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "penisLength: max only",
+      "params": "penisLength_max=12",
+      "parsed": {
+        "penisLength": {
+          "max": "12"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "penisLength: min and max",
+      "params": "penisLength_min=5&penisLength_max=12",
+      "parsed": {
+        "penisLength": {
+          "min": "5",
+          "max": "12"
+        }
+      },
+      "lossless": true
+    }
+  ],
+  "listParams": [
+    {
+      "label": "name: text",
+      "written": "instance=inst-a&tab=x&name=contract",
+      "filters": {
+        "name": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: MALE",
+      "written": "instance=inst-a&tab=x&gender=MALE",
+      "filters": {
+        "gender": "MALE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: FEMALE",
+      "written": "instance=inst-a&tab=x&gender=FEMALE",
+      "filters": {
+        "gender": "FEMALE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: TRANSGENDER_MALE",
+      "written": "instance=inst-a&tab=x&gender=TRANSGENDER_MALE",
+      "filters": {
+        "gender": "TRANSGENDER_MALE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: TRANSGENDER_FEMALE",
+      "written": "instance=inst-a&tab=x&gender=TRANSGENDER_FEMALE",
+      "filters": {
+        "gender": "TRANSGENDER_FEMALE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: INTERSEX",
+      "written": "instance=inst-a&tab=x&gender=INTERSEX",
+      "filters": {
+        "gender": "INTERSEX"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: NON_BINARY",
+      "written": "instance=inst-a&tab=x&gender=NON_BINARY",
+      "filters": {
+        "gender": "NON_BINARY"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: min only",
+      "written": "instance=inst-a&tab=x&rating_min=25",
+      "filters": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: max only",
+      "written": "instance=inst-a&tab=x&rating_max=75",
+      "filters": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: min and max",
+      "written": "instance=inst-a&tab=x&rating_min=25&rating_max=75",
+      "filters": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCounter: min only",
+      "written": "instance=inst-a&tab=x&oCounter_min=250",
+      "filters": {
+        "oCounter": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCounter: max only",
+      "written": "instance=inst-a&tab=x&oCounter_max=750",
+      "filters": {
+        "oCounter": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCounter: min and max",
+      "written": "instance=inst-a&tab=x&oCounter_min=250&oCounter_max=750",
+      "filters": {
+        "oCounter": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneCount: min only",
+      "written": "instance=inst-a&tab=x&sceneCount_min=250",
+      "filters": {
+        "sceneCount": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneCount: max only",
+      "written": "instance=inst-a&tab=x&sceneCount_max=750",
+      "filters": {
+        "sceneCount": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneCount: min and max",
+      "written": "instance=inst-a&tab=x&sceneCount_min=250&sceneCount_max=750",
+      "filters": {
+        "sceneCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "favorite: checked",
+      "written": "instance=inst-a&tab=x&favorite=true",
+      "filters": {
+        "favorite": true
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "age: min only",
+      "written": "instance=inst-a&tab=x&age_min=39",
+      "filters": {
+        "age": {
+          "min": "39"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "age: max only",
+      "written": "instance=inst-a&tab=x&age_max=80",
+      "filters": {
+        "age": {
+          "max": "80"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "age: min and max",
+      "written": "instance=inst-a&tab=x&age_min=39&age_max=80",
+      "filters": {
+        "age": {
+          "min": "39",
+          "max": "80"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "birthYear: min only",
+      "written": "instance=inst-a&tab=x&birthYear_min=1928",
+      "filters": {
+        "birthYear": {
+          "min": "1928"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "birthYear: max only",
+      "written": "instance=inst-a&tab=x&birthYear_max=1983",
+      "filters": {
+        "birthYear": {
+          "max": "1983"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "birthYear: min and max",
+      "written": "instance=inst-a&tab=x&birthYear_min=1928&birthYear_max=1983",
+      "filters": {
+        "birthYear": {
+          "min": "1928",
+          "max": "1983"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "deathYear: min only",
+      "written": "instance=inst-a&tab=x&deathYear_min=1950",
+      "filters": {
+        "deathYear": {
+          "min": "1950"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "deathYear: max only",
+      "written": "instance=inst-a&tab=x&deathYear_max=2050",
+      "filters": {
+        "deathYear": {
+          "max": "2050"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "deathYear: min and max",
+      "written": "instance=inst-a&tab=x&deathYear_min=1950&deathYear_max=2050",
+      "filters": {
+        "deathYear": {
+          "min": "1950",
+          "max": "2050"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: min only",
+      "written": "instance=inst-a&tab=x&careerLength_min=13",
+      "filters": {
+        "careerLength": {
+          "min": "13"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: max only",
+      "written": "instance=inst-a&tab=x&careerLength_max=38",
+      "filters": {
+        "careerLength": {
+          "max": "38"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "careerLength: min and max",
+      "written": "instance=inst-a&tab=x&careerLength_min=13&careerLength_max=38",
+      "filters": {
+        "careerLength": {
+          "min": "13",
+          "max": "38"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "birthdate: start only",
+      "written": "instance=inst-a&tab=x&birthdate_start=2020-01-01",
+      "filters": {
+        "birthdate": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "birthdate: end only",
+      "written": "instance=inst-a&tab=x&birthdate_end=2024-12-31",
+      "filters": {
+        "birthdate": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "birthdate: start and end",
+      "written": "instance=inst-a&tab=x&birthdate_start=2020-01-01&birthdate_end=2024-12-31",
+      "filters": {
+        "birthdate": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "deathDate: start only",
+      "written": "instance=inst-a&tab=x&deathDate_start=2020-01-01",
+      "filters": {
+        "deathDate": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "deathDate: end only",
+      "written": "instance=inst-a&tab=x&deathDate_end=2024-12-31",
+      "filters": {
+        "deathDate": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "deathDate: start and end",
+      "written": "instance=inst-a&tab=x&deathDate_start=2020-01-01&deathDate_end=2024-12-31",
+      "filters": {
+        "deathDate": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start only",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: end only",
+      "written": "instance=inst-a&tab=x&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "written": "instance=inst-a&tab=x&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "hairColor: BLONDE",
+      "written": "instance=inst-a&tab=x&hairColor=BLONDE",
+      "filters": {
+        "hairColor": "BLONDE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "hairColor: BRUNETTE",
+      "written": "instance=inst-a&tab=x&hairColor=BRUNETTE",
+      "filters": {
+        "hairColor": "BRUNETTE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "hairColor: BLACK",
+      "written": "instance=inst-a&tab=x&hairColor=BLACK",
+      "filters": {
+        "hairColor": "BLACK"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "hairColor: RED",
+      "written": "instance=inst-a&tab=x&hairColor=RED",
+      "filters": {
+        "hairColor": "RED"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "hairColor: AUBURN",
+      "written": "instance=inst-a&tab=x&hairColor=AUBURN",
+      "filters": {
+        "hairColor": "AUBURN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "hairColor: GREY",
+      "written": "instance=inst-a&tab=x&hairColor=GREY",
+      "filters": {
+        "hairColor": "GREY"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "hairColor: BALD",
+      "written": "instance=inst-a&tab=x&hairColor=BALD",
+      "filters": {
+        "hairColor": "BALD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "hairColor: VARIOUS",
+      "written": "instance=inst-a&tab=x&hairColor=VARIOUS",
+      "filters": {
+        "hairColor": "VARIOUS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "hairColor: OTHER",
+      "written": "instance=inst-a&tab=x&hairColor=OTHER",
+      "filters": {
+        "hairColor": "OTHER"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "eyeColor: BROWN",
+      "written": "instance=inst-a&tab=x&eyeColor=BROWN",
+      "filters": {
+        "eyeColor": "BROWN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "eyeColor: BLUE",
+      "written": "instance=inst-a&tab=x&eyeColor=BLUE",
+      "filters": {
+        "eyeColor": "BLUE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "eyeColor: GREEN",
+      "written": "instance=inst-a&tab=x&eyeColor=GREEN",
+      "filters": {
+        "eyeColor": "GREEN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "eyeColor: GREY",
+      "written": "instance=inst-a&tab=x&eyeColor=GREY",
+      "filters": {
+        "eyeColor": "GREY"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "eyeColor: HAZEL",
+      "written": "instance=inst-a&tab=x&eyeColor=HAZEL",
+      "filters": {
+        "eyeColor": "HAZEL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "eyeColor: OTHER",
+      "written": "instance=inst-a&tab=x&eyeColor=OTHER",
+      "filters": {
+        "eyeColor": "OTHER"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "ethnicity: CAUCASIAN",
+      "written": "instance=inst-a&tab=x&ethnicity=CAUCASIAN",
+      "filters": {
+        "ethnicity": "CAUCASIAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "ethnicity: BLACK",
+      "written": "instance=inst-a&tab=x&ethnicity=BLACK",
+      "filters": {
+        "ethnicity": "BLACK"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "ethnicity: ASIAN",
+      "written": "instance=inst-a&tab=x&ethnicity=ASIAN",
+      "filters": {
+        "ethnicity": "ASIAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "ethnicity: INDIAN",
+      "written": "instance=inst-a&tab=x&ethnicity=INDIAN",
+      "filters": {
+        "ethnicity": "INDIAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "ethnicity: LATIN",
+      "written": "instance=inst-a&tab=x&ethnicity=LATIN",
+      "filters": {
+        "ethnicity": "LATIN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "ethnicity: MIDDLE_EASTERN",
+      "written": "instance=inst-a&tab=x&ethnicity=MIDDLE_EASTERN",
+      "filters": {
+        "ethnicity": "MIDDLE_EASTERN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "ethnicity: MIXED",
+      "written": "instance=inst-a&tab=x&ethnicity=MIXED",
+      "filters": {
+        "ethnicity": "MIXED"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "ethnicity: OTHER",
+      "written": "instance=inst-a&tab=x&ethnicity=OTHER",
+      "filters": {
+        "ethnicity": "OTHER"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "fakeTits: Fake",
+      "written": "instance=inst-a&tab=x&fakeTits=Fake",
+      "filters": {
+        "fakeTits": "Fake"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "fakeTits: Natural",
+      "written": "instance=inst-a&tab=x&fakeTits=Natural",
+      "filters": {
+        "fakeTits": "Natural"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "measurements: text",
+      "written": "instance=inst-a&tab=x&measurements=contract",
+      "filters": {
+        "measurements": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tattoos: text",
+      "written": "instance=inst-a&tab=x&tattoos=contract",
+      "filters": {
+        "tattoos": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "piercings: text",
+      "written": "instance=inst-a&tab=x&piercings=contract",
+      "filters": {
+        "piercings": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: min only",
+      "written": "instance=inst-a&tab=x&height_min=138",
+      "filters": {
+        "height": {
+          "min": "138"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: max only",
+      "written": "instance=inst-a&tab=x&height_max=213",
+      "filters": {
+        "height": {
+          "max": "213"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "height: min and max",
+      "written": "instance=inst-a&tab=x&height_min=138&height_max=213",
+      "filters": {
+        "height": {
+          "min": "138",
+          "max": "213"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: min only",
+      "written": "instance=inst-a&tab=x&weight_min=73",
+      "filters": {
+        "weight": {
+          "min": "73"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: max only",
+      "written": "instance=inst-a&tab=x&weight_max=158",
+      "filters": {
+        "weight": {
+          "max": "158"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: min and max",
+      "written": "instance=inst-a&tab=x&weight_min=73&weight_max=158",
+      "filters": {
+        "weight": {
+          "min": "73",
+          "max": "158"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: min only",
+      "written": "instance=inst-a&tab=x&penisLength_min=10",
+      "filters": {
+        "penisLength": {
+          "min": "10"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: max only",
+      "written": "instance=inst-a&tab=x&penisLength_max=30",
+      "filters": {
+        "penisLength": {
+          "max": "30"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: min and max",
+      "written": "instance=inst-a&tab=x&penisLength_min=10&penisLength_max=30",
+      "filters": {
+        "penisLength": {
+          "min": "10",
+          "max": "30"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: min only",
+      "written": "instance=inst-a&tab=x&playCount_min=250",
+      "filters": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: max only",
+      "written": "instance=inst-a&tab=x&playCount_max=750",
+      "filters": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: min and max",
+      "written": "instance=inst-a&tab=x&playCount_min=250&playCount_max=750",
+      "filters": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "details: text",
+      "written": "instance=inst-a&tab=x&details=contract",
+      "filters": {
+        "details": "contract"
+      },
+      "hasFilters": true
+    }
+  ],
+  "imperialListParams": [
+    {
+      "label": "height: min only",
+      "written": "instance=inst-a&tab=x&filters=none",
+      "filters": {},
+      "hasFilters": true
+    },
+    {
+      "label": "height: max only",
+      "written": "instance=inst-a&tab=x&filters=none",
+      "filters": {},
+      "hasFilters": true
+    },
+    {
+      "label": "height: min and max",
+      "written": "instance=inst-a&tab=x&filters=none",
+      "filters": {},
+      "hasFilters": true
+    },
+    {
+      "label": "height: feet only",
+      "written": "instance=inst-a&tab=x&filters=none",
+      "filters": {},
+      "hasFilters": true
+    },
+    {
+      "label": "height: inches only",
+      "written": "instance=inst-a&tab=x&filters=none",
+      "filters": {},
+      "hasFilters": true
+    },
+    {
+      "label": "weight: min only",
+      "written": "instance=inst-a&tab=x&weight_min=163",
+      "filters": {
+        "weight": {
+          "min": "163"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: max only",
+      "written": "instance=inst-a&tab=x&weight_max=388",
+      "filters": {
+        "weight": {
+          "max": "388"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "weight: min and max",
+      "written": "instance=inst-a&tab=x&weight_min=163&weight_max=388",
+      "filters": {
+        "weight": {
+          "min": "163",
+          "max": "388"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: min only",
+      "written": "instance=inst-a&tab=x&penisLength_min=5",
+      "filters": {
+        "penisLength": {
+          "min": "5"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: max only",
+      "written": "instance=inst-a&tab=x&penisLength_max=12",
+      "filters": {
+        "penisLength": {
+          "max": "12"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "penisLength: min and max",
+      "written": "instance=inst-a&tab=x&penisLength_min=5&penisLength_max=12",
+      "filters": {
+        "penisLength": {
+          "min": "5",
+          "max": "12"
+        }
+      },
+      "hasFilters": true
+    }
+  ],
+  "filteredListPath": [
+    {
+      "entityType": "scenes",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "scenes",
+      "hasMultipleInstances": false
+    },
+    {
+      "entityType": "performers",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "performers",
+      "hasMultipleInstances": false
+    },
+    {
+      "entityType": "studios",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "studios",
+      "hasMultipleInstances": false
+    },
+    {
+      "entityType": "tags",
+      "hasMultipleInstances": true,
+      "withInstance": "/performers?tagId=5&instance=inst-a",
+      "numericIdNoInstance": "/performers?tagId=7"
+    },
+    {
+      "entityType": "tags",
+      "hasMultipleInstances": false,
+      "withInstance": "/performers?tagId=5",
+      "numericIdNoInstance": "/performers?tagId=7"
+    },
+    {
+      "entityType": "groups",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "groups",
+      "hasMultipleInstances": false
+    },
+    {
+      "entityType": "galleries",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "galleries",
+      "hasMultipleInstances": false
+    }
+  ]
+}

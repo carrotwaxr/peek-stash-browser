@@ -1,0 +1,3145 @@
+{
+  "ownedKeys": [
+    "title",
+    "title_min",
+    "title_max",
+    "title_start",
+    "title_end",
+    "details",
+    "details_min",
+    "details_max",
+    "details_start",
+    "details_end",
+    "performerIds",
+    "performerId",
+    "performerIdsModifier",
+    "performerIds_min",
+    "performerIds_max",
+    "performerIds_start",
+    "performerIds_end",
+    "studioId",
+    "studioIdDepth",
+    "studioId_min",
+    "studioId_max",
+    "studioId_start",
+    "studioId_end",
+    "tagIds",
+    "tagId",
+    "tagIdsModifier",
+    "tagIdsDepth",
+    "tagIds_min",
+    "tagIds_max",
+    "tagIds_start",
+    "tagIds_end",
+    "groupIds",
+    "groupId",
+    "groupIdsModifier",
+    "groupIds_min",
+    "groupIds_max",
+    "groupIds_start",
+    "groupIds_end",
+    "rating",
+    "rating_min",
+    "rating_max",
+    "rating_start",
+    "rating_end",
+    "oCount",
+    "oCount_min",
+    "oCount_max",
+    "oCount_start",
+    "oCount_end",
+    "duration",
+    "duration_min",
+    "duration_max",
+    "duration_start",
+    "duration_end",
+    "favorite",
+    "favorite_min",
+    "favorite_max",
+    "favorite_start",
+    "favorite_end",
+    "performerFavorite",
+    "performerFavorite_min",
+    "performerFavorite_max",
+    "performerFavorite_start",
+    "performerFavorite_end",
+    "studioFavorite",
+    "studioFavorite_min",
+    "studioFavorite_max",
+    "studioFavorite_start",
+    "studioFavorite_end",
+    "tagFavorite",
+    "tagFavorite_min",
+    "tagFavorite_max",
+    "tagFavorite_start",
+    "tagFavorite_end",
+    "date",
+    "date_min",
+    "date_max",
+    "date_start",
+    "date_end",
+    "createdAt",
+    "createdAt_min",
+    "createdAt_max",
+    "createdAt_start",
+    "createdAt_end",
+    "updatedAt",
+    "updatedAt_min",
+    "updatedAt_max",
+    "updatedAt_start",
+    "updatedAt_end",
+    "lastPlayedAt",
+    "lastPlayedAt_min",
+    "lastPlayedAt_max",
+    "lastPlayedAt_start",
+    "lastPlayedAt_end",
+    "resolution",
+    "resolutionModifier",
+    "resolution_min",
+    "resolution_max",
+    "resolution_start",
+    "resolution_end",
+    "bitrate",
+    "bitrate_min",
+    "bitrate_max",
+    "bitrate_start",
+    "bitrate_end",
+    "framerate",
+    "framerate_min",
+    "framerate_max",
+    "framerate_start",
+    "framerate_end",
+    "orientation",
+    "orientation_min",
+    "orientation_max",
+    "orientation_start",
+    "orientation_end",
+    "videoCodec",
+    "videoCodec_min",
+    "videoCodec_max",
+    "videoCodec_start",
+    "videoCodec_end",
+    "audioCodec",
+    "audioCodec_min",
+    "audioCodec_max",
+    "audioCodec_start",
+    "audioCodec_end",
+    "director",
+    "director_min",
+    "director_max",
+    "director_start",
+    "director_end",
+    "playDuration",
+    "playDuration_min",
+    "playDuration_max",
+    "playDuration_start",
+    "playDuration_end",
+    "playCount",
+    "playCount_min",
+    "playCount_max",
+    "playCount_start",
+    "playCount_end",
+    "performerCount",
+    "performerCount_min",
+    "performerCount_max",
+    "performerCount_start",
+    "performerCount_end",
+    "performerAge",
+    "performerAge_min",
+    "performerAge_max",
+    "performerAge_start",
+    "performerAge_end",
+    "tagCount",
+    "tagCount_min",
+    "tagCount_max",
+    "tagCount_start",
+    "tagCount_end",
+    "filters",
+    "q",
+    "sort",
+    "dir",
+    "page",
+    "per_page",
+    "view",
+    "zoom",
+    "grid_density",
+    "timeline_period",
+    "folderPath"
+  ],
+  "roundTrip": [
+    {
+      "label": "title: text",
+      "params": "title=contract",
+      "parsed": {
+        "title": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "details: text",
+      "params": "details=contract",
+      "parsed": {
+        "details": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL one id",
+      "params": "performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL two ids",
+      "params": "performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: INCLUDES one id",
+      "params": "performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: INCLUDES two ids",
+      "params": "performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: EXCLUDES one id",
+      "params": "performerIds=1%3Ainst-a&performerIdsModifier=EXCLUDES",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: EXCLUDES two ids",
+      "params": "performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=EXCLUDES",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: one id",
+      "params": "performerIds=1%3Ainst-a",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: two ids",
+      "params": "performerIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: one id",
+      "params": "studioId=1%3Ainst-a",
+      "parsed": {
+        "studioId": "1:inst-a"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: one id, with sub-items",
+      "params": "studioId=1%3Ainst-a&studioIdDepth=-1",
+      "parsed": {
+        "studioId": "1:inst-a",
+        "studioIdDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: one id",
+      "params": "tagIds=1%3Ainst-a",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: INCLUDES one id",
+      "params": "groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: INCLUDES two ids",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: EXCLUDES one id",
+      "params": "groupIds=1%3Ainst-a&groupIdsModifier=EXCLUDES",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: EXCLUDES two ids",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=EXCLUDES",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: one id",
+      "params": "groupIds=1%3Ainst-a",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: two ids",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "rating: min only",
+      "params": "rating_min=25",
+      "parsed": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "rating: max only",
+      "params": "rating_max=75",
+      "parsed": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "rating: min and max",
+      "params": "rating_min=25&rating_max=75",
+      "parsed": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCount: min only",
+      "params": "oCount_min=75",
+      "parsed": {
+        "oCount": {
+          "min": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCount: max only",
+      "params": "oCount_max=225",
+      "parsed": {
+        "oCount": {
+          "max": "225"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCount: min and max",
+      "params": "oCount_min=75&oCount_max=225",
+      "parsed": {
+        "oCount": {
+          "min": "75",
+          "max": "225"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "duration: min only",
+      "params": "duration_min=76",
+      "parsed": {
+        "duration": {
+          "min": "76"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "duration: max only",
+      "params": "duration_max=225",
+      "parsed": {
+        "duration": {
+          "max": "225"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "duration: min and max",
+      "params": "duration_min=76&duration_max=225",
+      "parsed": {
+        "duration": {
+          "min": "76",
+          "max": "225"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "favorite: checked",
+      "params": "favorite=true",
+      "parsed": {
+        "favorite": true
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerFavorite: checked",
+      "params": "performerFavorite=true",
+      "parsed": {
+        "performerFavorite": true
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioFavorite: checked",
+      "params": "studioFavorite=true",
+      "parsed": {
+        "studioFavorite": true
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagFavorite: checked",
+      "params": "tagFavorite=true",
+      "parsed": {
+        "tagFavorite": true
+      },
+      "lossless": true
+    },
+    {
+      "label": "date: start only",
+      "params": "date_start=2020-01-01",
+      "parsed": {
+        "date": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "date: end only",
+      "params": "date_end=2024-12-31",
+      "parsed": {
+        "date": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "date: start and end",
+      "params": "date_start=2020-01-01&date_end=2024-12-31",
+      "parsed": {
+        "date": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start only",
+      "params": "createdAt_start=2020-01-01",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: end only",
+      "params": "createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "params": "createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "params": "updatedAt_start=2020-01-01",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "params": "updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "params": "updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "lastPlayedAt: start only",
+      "params": "lastPlayedAt_start=2020-01-01",
+      "parsed": {
+        "lastPlayedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "lastPlayedAt: end only",
+      "params": "lastPlayedAt_end=2024-12-31",
+      "parsed": {
+        "lastPlayedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "lastPlayedAt: start and end",
+      "params": "lastPlayedAt_start=2020-01-01&lastPlayedAt_end=2024-12-31",
+      "parsed": {
+        "lastPlayedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS VERY_LOW",
+      "params": "resolution=VERY_LOW",
+      "parsed": {
+        "resolution": "VERY_LOW"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS LOW",
+      "params": "resolution=LOW",
+      "parsed": {
+        "resolution": "LOW"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS R360P",
+      "params": "resolution=R360P",
+      "parsed": {
+        "resolution": "R360P"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS STANDARD",
+      "params": "resolution=STANDARD",
+      "parsed": {
+        "resolution": "STANDARD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS WEB_HD",
+      "params": "resolution=WEB_HD",
+      "parsed": {
+        "resolution": "WEB_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS STANDARD_HD",
+      "params": "resolution=STANDARD_HD",
+      "parsed": {
+        "resolution": "STANDARD_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS FULL_HD",
+      "params": "resolution=FULL_HD",
+      "parsed": {
+        "resolution": "FULL_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS QUAD_HD",
+      "params": "resolution=QUAD_HD",
+      "parsed": {
+        "resolution": "QUAD_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS FOUR_K",
+      "params": "resolution=FOUR_K",
+      "parsed": {
+        "resolution": "FOUR_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS FIVE_K",
+      "params": "resolution=FIVE_K",
+      "parsed": {
+        "resolution": "FIVE_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS SIX_K",
+      "params": "resolution=SIX_K",
+      "parsed": {
+        "resolution": "SIX_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS SEVEN_K",
+      "params": "resolution=SEVEN_K",
+      "parsed": {
+        "resolution": "SEVEN_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS EIGHT_K",
+      "params": "resolution=EIGHT_K",
+      "parsed": {
+        "resolution": "EIGHT_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: EQUALS HUGE",
+      "params": "resolution=HUGE",
+      "parsed": {
+        "resolution": "HUGE"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS VERY_LOW",
+      "params": "resolution=VERY_LOW",
+      "parsed": {
+        "resolution": "VERY_LOW"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS LOW",
+      "params": "resolution=LOW",
+      "parsed": {
+        "resolution": "LOW"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS R360P",
+      "params": "resolution=R360P",
+      "parsed": {
+        "resolution": "R360P"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD",
+      "params": "resolution=STANDARD",
+      "parsed": {
+        "resolution": "STANDARD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS WEB_HD",
+      "params": "resolution=WEB_HD",
+      "parsed": {
+        "resolution": "WEB_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD_HD",
+      "params": "resolution=STANDARD_HD",
+      "parsed": {
+        "resolution": "STANDARD_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS FULL_HD",
+      "params": "resolution=FULL_HD",
+      "parsed": {
+        "resolution": "FULL_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS QUAD_HD",
+      "params": "resolution=QUAD_HD",
+      "parsed": {
+        "resolution": "QUAD_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS FOUR_K",
+      "params": "resolution=FOUR_K",
+      "parsed": {
+        "resolution": "FOUR_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS FIVE_K",
+      "params": "resolution=FIVE_K",
+      "parsed": {
+        "resolution": "FIVE_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS SIX_K",
+      "params": "resolution=SIX_K",
+      "parsed": {
+        "resolution": "SIX_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS SEVEN_K",
+      "params": "resolution=SEVEN_K",
+      "parsed": {
+        "resolution": "SEVEN_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS EIGHT_K",
+      "params": "resolution=EIGHT_K",
+      "parsed": {
+        "resolution": "EIGHT_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: NOT_EQUALS HUGE",
+      "params": "resolution=HUGE",
+      "parsed": {
+        "resolution": "HUGE"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN VERY_LOW",
+      "params": "resolution=VERY_LOW",
+      "parsed": {
+        "resolution": "VERY_LOW"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN LOW",
+      "params": "resolution=LOW",
+      "parsed": {
+        "resolution": "LOW"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN R360P",
+      "params": "resolution=R360P",
+      "parsed": {
+        "resolution": "R360P"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD",
+      "params": "resolution=STANDARD",
+      "parsed": {
+        "resolution": "STANDARD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN WEB_HD",
+      "params": "resolution=WEB_HD",
+      "parsed": {
+        "resolution": "WEB_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD_HD",
+      "params": "resolution=STANDARD_HD",
+      "parsed": {
+        "resolution": "STANDARD_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN FULL_HD",
+      "params": "resolution=FULL_HD",
+      "parsed": {
+        "resolution": "FULL_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN QUAD_HD",
+      "params": "resolution=QUAD_HD",
+      "parsed": {
+        "resolution": "QUAD_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN FOUR_K",
+      "params": "resolution=FOUR_K",
+      "parsed": {
+        "resolution": "FOUR_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN FIVE_K",
+      "params": "resolution=FIVE_K",
+      "parsed": {
+        "resolution": "FIVE_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN SIX_K",
+      "params": "resolution=SIX_K",
+      "parsed": {
+        "resolution": "SIX_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN SEVEN_K",
+      "params": "resolution=SEVEN_K",
+      "parsed": {
+        "resolution": "SEVEN_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN EIGHT_K",
+      "params": "resolution=EIGHT_K",
+      "parsed": {
+        "resolution": "EIGHT_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: GREATER_THAN HUGE",
+      "params": "resolution=HUGE",
+      "parsed": {
+        "resolution": "HUGE"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN VERY_LOW",
+      "params": "resolution=VERY_LOW",
+      "parsed": {
+        "resolution": "VERY_LOW"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN LOW",
+      "params": "resolution=LOW",
+      "parsed": {
+        "resolution": "LOW"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN R360P",
+      "params": "resolution=R360P",
+      "parsed": {
+        "resolution": "R360P"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD",
+      "params": "resolution=STANDARD",
+      "parsed": {
+        "resolution": "STANDARD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN WEB_HD",
+      "params": "resolution=WEB_HD",
+      "parsed": {
+        "resolution": "WEB_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD_HD",
+      "params": "resolution=STANDARD_HD",
+      "parsed": {
+        "resolution": "STANDARD_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN FULL_HD",
+      "params": "resolution=FULL_HD",
+      "parsed": {
+        "resolution": "FULL_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN QUAD_HD",
+      "params": "resolution=QUAD_HD",
+      "parsed": {
+        "resolution": "QUAD_HD"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN FOUR_K",
+      "params": "resolution=FOUR_K",
+      "parsed": {
+        "resolution": "FOUR_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN FIVE_K",
+      "params": "resolution=FIVE_K",
+      "parsed": {
+        "resolution": "FIVE_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN SIX_K",
+      "params": "resolution=SIX_K",
+      "parsed": {
+        "resolution": "SIX_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN SEVEN_K",
+      "params": "resolution=SEVEN_K",
+      "parsed": {
+        "resolution": "SEVEN_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN EIGHT_K",
+      "params": "resolution=EIGHT_K",
+      "parsed": {
+        "resolution": "EIGHT_K"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: LESS_THAN HUGE",
+      "params": "resolution=HUGE",
+      "parsed": {
+        "resolution": "HUGE"
+      },
+      "lossless": false
+    },
+    {
+      "label": "resolution: VERY_LOW",
+      "params": "resolution=VERY_LOW",
+      "parsed": {
+        "resolution": "VERY_LOW"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LOW",
+      "params": "resolution=LOW",
+      "parsed": {
+        "resolution": "LOW"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: R360P",
+      "params": "resolution=R360P",
+      "parsed": {
+        "resolution": "R360P"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: STANDARD",
+      "params": "resolution=STANDARD",
+      "parsed": {
+        "resolution": "STANDARD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: WEB_HD",
+      "params": "resolution=WEB_HD",
+      "parsed": {
+        "resolution": "WEB_HD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: STANDARD_HD",
+      "params": "resolution=STANDARD_HD",
+      "parsed": {
+        "resolution": "STANDARD_HD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: FULL_HD",
+      "params": "resolution=FULL_HD",
+      "parsed": {
+        "resolution": "FULL_HD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: QUAD_HD",
+      "params": "resolution=QUAD_HD",
+      "parsed": {
+        "resolution": "QUAD_HD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: FOUR_K",
+      "params": "resolution=FOUR_K",
+      "parsed": {
+        "resolution": "FOUR_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: FIVE_K",
+      "params": "resolution=FIVE_K",
+      "parsed": {
+        "resolution": "FIVE_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: SIX_K",
+      "params": "resolution=SIX_K",
+      "parsed": {
+        "resolution": "SIX_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: SEVEN_K",
+      "params": "resolution=SEVEN_K",
+      "parsed": {
+        "resolution": "SEVEN_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EIGHT_K",
+      "params": "resolution=EIGHT_K",
+      "parsed": {
+        "resolution": "EIGHT_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: HUGE",
+      "params": "resolution=HUGE",
+      "parsed": {
+        "resolution": "HUGE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "bitrate: min only",
+      "params": "bitrate_min=25",
+      "parsed": {
+        "bitrate": {
+          "min": "25"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "bitrate: max only",
+      "params": "bitrate_max=75",
+      "parsed": {
+        "bitrate": {
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "bitrate: min and max",
+      "params": "bitrate_min=25&bitrate_max=75",
+      "parsed": {
+        "bitrate": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "framerate: min only",
+      "params": "framerate_min=30",
+      "parsed": {
+        "framerate": {
+          "min": "30"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "framerate: max only",
+      "params": "framerate_max=90",
+      "parsed": {
+        "framerate": {
+          "max": "90"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "framerate: min and max",
+      "params": "framerate_min=30&framerate_max=90",
+      "parsed": {
+        "framerate": {
+          "min": "30",
+          "max": "90"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "orientation: LANDSCAPE",
+      "params": "orientation=LANDSCAPE",
+      "parsed": {
+        "orientation": "LANDSCAPE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "orientation: PORTRAIT",
+      "params": "orientation=PORTRAIT",
+      "parsed": {
+        "orientation": "PORTRAIT"
+      },
+      "lossless": true
+    },
+    {
+      "label": "orientation: SQUARE",
+      "params": "orientation=SQUARE",
+      "parsed": {
+        "orientation": "SQUARE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "videoCodec: text",
+      "params": "videoCodec=contract",
+      "parsed": {
+        "videoCodec": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "audioCodec: text",
+      "params": "audioCodec=contract",
+      "parsed": {
+        "audioCodec": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "director: text",
+      "params": "director=contract",
+      "parsed": {
+        "director": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "playDuration: min only",
+      "params": "playDuration_min=76",
+      "parsed": {
+        "playDuration": {
+          "min": "76"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playDuration: max only",
+      "params": "playDuration_max=225",
+      "parsed": {
+        "playDuration": {
+          "max": "225"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playDuration: min and max",
+      "params": "playDuration_min=76&playDuration_max=225",
+      "parsed": {
+        "playDuration": {
+          "min": "76",
+          "max": "225"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: min only",
+      "params": "playCount_min=250",
+      "parsed": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: max only",
+      "params": "playCount_max=750",
+      "parsed": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: min and max",
+      "params": "playCount_min=250&playCount_max=750",
+      "parsed": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerCount: min only",
+      "params": "performerCount_min=5",
+      "parsed": {
+        "performerCount": {
+          "min": "5"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerCount: max only",
+      "params": "performerCount_max=15",
+      "parsed": {
+        "performerCount": {
+          "max": "15"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerCount: min and max",
+      "params": "performerCount_min=5&performerCount_max=15",
+      "parsed": {
+        "performerCount": {
+          "min": "5",
+          "max": "15"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerAge: min only",
+      "params": "performerAge_min=39",
+      "parsed": {
+        "performerAge": {
+          "min": "39"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerAge: max only",
+      "params": "performerAge_max=80",
+      "parsed": {
+        "performerAge": {
+          "max": "80"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerAge: min and max",
+      "params": "performerAge_min=39&performerAge_max=80",
+      "parsed": {
+        "performerAge": {
+          "min": "39",
+          "max": "80"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagCount: min only",
+      "params": "tagCount_min=13",
+      "parsed": {
+        "tagCount": {
+          "min": "13"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagCount: max only",
+      "params": "tagCount_max=38",
+      "parsed": {
+        "tagCount": {
+          "max": "38"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagCount: min and max",
+      "params": "tagCount_min=13&tagCount_max=38",
+      "parsed": {
+        "tagCount": {
+          "min": "13",
+          "max": "38"
+        }
+      },
+      "lossless": true
+    }
+  ],
+  "imperialRoundTrip": [],
+  "listParams": [
+    {
+      "label": "title: text",
+      "written": "instance=inst-a&tab=x&title=contract",
+      "filters": {
+        "title": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "details: text",
+      "written": "instance=inst-a&tab=x&details=contract",
+      "filters": {
+        "details": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL one id",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL two ids",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES",
+      "filters": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES",
+      "filters": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a&performerIdsModifier=EXCLUDES",
+      "filters": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=EXCLUDES",
+      "filters": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: one id",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a",
+      "filters": {
+        "performerIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: two ids",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: one id",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a",
+      "filters": {
+        "studioId": "1:inst-a"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdDepth=-1",
+      "filters": {
+        "studioId": "1:inst-a",
+        "studioIdDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a&groupIdsModifier=EXCLUDES",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=EXCLUDES",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: one id",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: two ids",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: min only",
+      "written": "instance=inst-a&tab=x&rating_min=25",
+      "filters": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: max only",
+      "written": "instance=inst-a&tab=x&rating_max=75",
+      "filters": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: min and max",
+      "written": "instance=inst-a&tab=x&rating_min=25&rating_max=75",
+      "filters": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCount: min only",
+      "written": "instance=inst-a&tab=x&oCount_min=75",
+      "filters": {
+        "oCount": {
+          "min": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCount: max only",
+      "written": "instance=inst-a&tab=x&oCount_max=225",
+      "filters": {
+        "oCount": {
+          "max": "225"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCount: min and max",
+      "written": "instance=inst-a&tab=x&oCount_min=75&oCount_max=225",
+      "filters": {
+        "oCount": {
+          "min": "75",
+          "max": "225"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: min only",
+      "written": "instance=inst-a&tab=x&duration_min=76",
+      "filters": {
+        "duration": {
+          "min": "76"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: max only",
+      "written": "instance=inst-a&tab=x&duration_max=225",
+      "filters": {
+        "duration": {
+          "max": "225"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: min and max",
+      "written": "instance=inst-a&tab=x&duration_min=76&duration_max=225",
+      "filters": {
+        "duration": {
+          "min": "76",
+          "max": "225"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "favorite: checked",
+      "written": "instance=inst-a&tab=x&favorite=true",
+      "filters": {
+        "favorite": true
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerFavorite: checked",
+      "written": "instance=inst-a&tab=x&performerFavorite=true",
+      "filters": {
+        "performerFavorite": true
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioFavorite: checked",
+      "written": "instance=inst-a&tab=x&studioFavorite=true",
+      "filters": {
+        "studioFavorite": true
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagFavorite: checked",
+      "written": "instance=inst-a&tab=x&tagFavorite=true",
+      "filters": {
+        "tagFavorite": true
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "date: start only",
+      "written": "instance=inst-a&tab=x&date_start=2020-01-01",
+      "filters": {
+        "date": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "date: end only",
+      "written": "instance=inst-a&tab=x&date_end=2024-12-31",
+      "filters": {
+        "date": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "date: start and end",
+      "written": "instance=inst-a&tab=x&date_start=2020-01-01&date_end=2024-12-31",
+      "filters": {
+        "date": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start only",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: end only",
+      "written": "instance=inst-a&tab=x&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "written": "instance=inst-a&tab=x&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "lastPlayedAt: start only",
+      "written": "instance=inst-a&tab=x&lastPlayedAt_start=2020-01-01",
+      "filters": {
+        "lastPlayedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "lastPlayedAt: end only",
+      "written": "instance=inst-a&tab=x&lastPlayedAt_end=2024-12-31",
+      "filters": {
+        "lastPlayedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "lastPlayedAt: start and end",
+      "written": "instance=inst-a&tab=x&lastPlayedAt_start=2020-01-01&lastPlayedAt_end=2024-12-31",
+      "filters": {
+        "lastPlayedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "filters": {
+        "resolution": "VERY_LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "filters": {
+        "resolution": "LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "filters": {
+        "resolution": "R360P"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "filters": {
+        "resolution": "STANDARD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "filters": {
+        "resolution": "WEB_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "filters": {
+        "resolution": "STANDARD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "filters": {
+        "resolution": "FULL_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "filters": {
+        "resolution": "QUAD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "filters": {
+        "resolution": "FOUR_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "filters": {
+        "resolution": "FIVE_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "filters": {
+        "resolution": "SIX_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "filters": {
+        "resolution": "SEVEN_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "filters": {
+        "resolution": "EIGHT_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "filters": {
+        "resolution": "HUGE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "filters": {
+        "resolution": "VERY_LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "filters": {
+        "resolution": "LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "filters": {
+        "resolution": "R360P"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "filters": {
+        "resolution": "STANDARD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "filters": {
+        "resolution": "WEB_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "filters": {
+        "resolution": "STANDARD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "filters": {
+        "resolution": "FULL_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "filters": {
+        "resolution": "QUAD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "filters": {
+        "resolution": "FOUR_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "filters": {
+        "resolution": "FIVE_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "filters": {
+        "resolution": "SIX_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "filters": {
+        "resolution": "SEVEN_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "filters": {
+        "resolution": "EIGHT_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "filters": {
+        "resolution": "HUGE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "filters": {
+        "resolution": "VERY_LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "filters": {
+        "resolution": "LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "filters": {
+        "resolution": "R360P"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "filters": {
+        "resolution": "STANDARD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "filters": {
+        "resolution": "WEB_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "filters": {
+        "resolution": "STANDARD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "filters": {
+        "resolution": "FULL_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "filters": {
+        "resolution": "QUAD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "filters": {
+        "resolution": "FOUR_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "filters": {
+        "resolution": "FIVE_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "filters": {
+        "resolution": "SIX_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "filters": {
+        "resolution": "SEVEN_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "filters": {
+        "resolution": "EIGHT_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "filters": {
+        "resolution": "HUGE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "filters": {
+        "resolution": "VERY_LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "filters": {
+        "resolution": "LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "filters": {
+        "resolution": "R360P"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "filters": {
+        "resolution": "STANDARD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "filters": {
+        "resolution": "WEB_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "filters": {
+        "resolution": "STANDARD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "filters": {
+        "resolution": "FULL_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "filters": {
+        "resolution": "QUAD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "filters": {
+        "resolution": "FOUR_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "filters": {
+        "resolution": "FIVE_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "filters": {
+        "resolution": "SIX_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "filters": {
+        "resolution": "SEVEN_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "filters": {
+        "resolution": "EIGHT_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "filters": {
+        "resolution": "HUGE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "filters": {
+        "resolution": "VERY_LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "filters": {
+        "resolution": "LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "filters": {
+        "resolution": "R360P"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "filters": {
+        "resolution": "STANDARD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "filters": {
+        "resolution": "WEB_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "filters": {
+        "resolution": "STANDARD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "filters": {
+        "resolution": "FULL_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "filters": {
+        "resolution": "QUAD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "filters": {
+        "resolution": "FOUR_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "filters": {
+        "resolution": "FIVE_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "filters": {
+        "resolution": "SIX_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "filters": {
+        "resolution": "SEVEN_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "filters": {
+        "resolution": "EIGHT_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "filters": {
+        "resolution": "HUGE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "bitrate: min only",
+      "written": "instance=inst-a&tab=x&bitrate_min=25",
+      "filters": {
+        "bitrate": {
+          "min": "25"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "bitrate: max only",
+      "written": "instance=inst-a&tab=x&bitrate_max=75",
+      "filters": {
+        "bitrate": {
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "bitrate: min and max",
+      "written": "instance=inst-a&tab=x&bitrate_min=25&bitrate_max=75",
+      "filters": {
+        "bitrate": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "framerate: min only",
+      "written": "instance=inst-a&tab=x&framerate_min=30",
+      "filters": {
+        "framerate": {
+          "min": "30"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "framerate: max only",
+      "written": "instance=inst-a&tab=x&framerate_max=90",
+      "filters": {
+        "framerate": {
+          "max": "90"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "framerate: min and max",
+      "written": "instance=inst-a&tab=x&framerate_min=30&framerate_max=90",
+      "filters": {
+        "framerate": {
+          "min": "30",
+          "max": "90"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "orientation: LANDSCAPE",
+      "written": "instance=inst-a&tab=x&orientation=LANDSCAPE",
+      "filters": {
+        "orientation": "LANDSCAPE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "orientation: PORTRAIT",
+      "written": "instance=inst-a&tab=x&orientation=PORTRAIT",
+      "filters": {
+        "orientation": "PORTRAIT"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "orientation: SQUARE",
+      "written": "instance=inst-a&tab=x&orientation=SQUARE",
+      "filters": {
+        "orientation": "SQUARE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "videoCodec: text",
+      "written": "instance=inst-a&tab=x&videoCodec=contract",
+      "filters": {
+        "videoCodec": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "audioCodec: text",
+      "written": "instance=inst-a&tab=x&audioCodec=contract",
+      "filters": {
+        "audioCodec": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "director: text",
+      "written": "instance=inst-a&tab=x&director=contract",
+      "filters": {
+        "director": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playDuration: min only",
+      "written": "instance=inst-a&tab=x&playDuration_min=76",
+      "filters": {
+        "playDuration": {
+          "min": "76"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playDuration: max only",
+      "written": "instance=inst-a&tab=x&playDuration_max=225",
+      "filters": {
+        "playDuration": {
+          "max": "225"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playDuration: min and max",
+      "written": "instance=inst-a&tab=x&playDuration_min=76&playDuration_max=225",
+      "filters": {
+        "playDuration": {
+          "min": "76",
+          "max": "225"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: min only",
+      "written": "instance=inst-a&tab=x&playCount_min=250",
+      "filters": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: max only",
+      "written": "instance=inst-a&tab=x&playCount_max=750",
+      "filters": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: min and max",
+      "written": "instance=inst-a&tab=x&playCount_min=250&playCount_max=750",
+      "filters": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerCount: min only",
+      "written": "instance=inst-a&tab=x&performerCount_min=5",
+      "filters": {
+        "performerCount": {
+          "min": "5"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerCount: max only",
+      "written": "instance=inst-a&tab=x&performerCount_max=15",
+      "filters": {
+        "performerCount": {
+          "max": "15"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerCount: min and max",
+      "written": "instance=inst-a&tab=x&performerCount_min=5&performerCount_max=15",
+      "filters": {
+        "performerCount": {
+          "min": "5",
+          "max": "15"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerAge: min only",
+      "written": "instance=inst-a&tab=x&performerAge_min=39",
+      "filters": {
+        "performerAge": {
+          "min": "39"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerAge: max only",
+      "written": "instance=inst-a&tab=x&performerAge_max=80",
+      "filters": {
+        "performerAge": {
+          "max": "80"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerAge: min and max",
+      "written": "instance=inst-a&tab=x&performerAge_min=39&performerAge_max=80",
+      "filters": {
+        "performerAge": {
+          "min": "39",
+          "max": "80"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagCount: min only",
+      "written": "instance=inst-a&tab=x&tagCount_min=13",
+      "filters": {
+        "tagCount": {
+          "min": "13"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagCount: max only",
+      "written": "instance=inst-a&tab=x&tagCount_max=38",
+      "filters": {
+        "tagCount": {
+          "max": "38"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagCount: min and max",
+      "written": "instance=inst-a&tab=x&tagCount_min=13&tagCount_max=38",
+      "filters": {
+        "tagCount": {
+          "min": "13",
+          "max": "38"
+        }
+      },
+      "hasFilters": true
+    }
+  ],
+  "imperialListParams": [],
+  "filteredListPath": [
+    {
+      "entityType": "scenes",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "scenes",
+      "hasMultipleInstances": false
+    },
+    {
+      "entityType": "performers",
+      "hasMultipleInstances": true,
+      "withInstance": "/scenes?performerId=5&instance=inst-a",
+      "numericIdNoInstance": "/scenes?performerId=7"
+    },
+    {
+      "entityType": "performers",
+      "hasMultipleInstances": false,
+      "withInstance": "/scenes?performerId=5",
+      "numericIdNoInstance": "/scenes?performerId=7"
+    },
+    {
+      "entityType": "studios",
+      "hasMultipleInstances": true,
+      "withInstance": "/scenes?studioId=5&instance=inst-a",
+      "numericIdNoInstance": "/scenes?studioId=7"
+    },
+    {
+      "entityType": "studios",
+      "hasMultipleInstances": false,
+      "withInstance": "/scenes?studioId=5",
+      "numericIdNoInstance": "/scenes?studioId=7"
+    },
+    {
+      "entityType": "tags",
+      "hasMultipleInstances": true,
+      "withInstance": "/scenes?tagId=5&instance=inst-a",
+      "numericIdNoInstance": "/scenes?tagId=7"
+    },
+    {
+      "entityType": "tags",
+      "hasMultipleInstances": false,
+      "withInstance": "/scenes?tagId=5",
+      "numericIdNoInstance": "/scenes?tagId=7"
+    },
+    {
+      "entityType": "groups",
+      "hasMultipleInstances": true,
+      "withInstance": "/scenes?groupId=5&instance=inst-a",
+      "numericIdNoInstance": "/scenes?groupId=7"
+    },
+    {
+      "entityType": "groups",
+      "hasMultipleInstances": false,
+      "withInstance": "/scenes?groupId=5",
+      "numericIdNoInstance": "/scenes?groupId=7"
+    },
+    {
+      "entityType": "galleries",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "galleries",
+      "hasMultipleInstances": false
+    }
+  ]
+}

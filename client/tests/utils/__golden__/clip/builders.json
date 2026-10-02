@@ -1,0 +1,521 @@
+{
+  "samples": [
+    {
+      "label": "tagIds: INCLUDES_ALL one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "tagIds: one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "tagIds: two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: INCLUDES_ALL one id",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: INCLUDES_ALL two ids",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: INCLUDES one id",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: INCLUDES two ids",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: EXCLUDES one id",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: EXCLUDES two ids",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: one id",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: two ids",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "performerIds: INCLUDES one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "performerIds: INCLUDES two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "performerIds: EXCLUDES one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "EXCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "performerIds: EXCLUDES two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "EXCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "performerIds: one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "performerIds: two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "studioId: one id",
+      "state": {
+        "studioId": "1:inst-a"
+      },
+      "request": {
+        "studioId": "1:inst-a",
+        "isGenerated": true
+      }
+    },
+    {
+      "label": "isGenerated: false",
+      "state": {
+        "isGenerated": "false"
+      },
+      "request": {
+        "isGenerated": false
+      }
+    },
+    {
+      "label": "isGenerated: all",
+      "state": {
+        "isGenerated": "all"
+      },
+      "request": {}
+    }
+  ],
+  "permanent": [],
+  "imperial": {
+    "imperialOptions": [],
+    "metricOptions": []
+  },
+  "prodPresets": [
+    {
+      "name": "test",
+      "stored": {
+        "id": "5f300887-40f6-438a-adf1-9eb072e8352c",
+        "name": "test",
+        "filters": {
+          "sceneTagIds": [
+            "280"
+          ]
+        },
+        "sort": "duration",
+        "direction": "DESC",
+        "viewMode": "grid",
+        "zoomLevel": "medium",
+        "tableColumns": null,
+        "createdAt": "2026-01-29T02:00:59.279Z"
+      },
+      "asDefault": {
+        "panelFilters": {
+          "sceneTagIds": [
+            "280"
+          ]
+        },
+        "url": "",
+        "request": {
+          "filter": {
+            "page": 1,
+            "per_page": 24,
+            "q": "",
+            "sort": "duration",
+            "direction": "DESC"
+          },
+          "clip_filter": {
+            "sceneTagIds": [
+              "280"
+            ],
+            "sceneTagIdsModifier": "INCLUDES",
+            "isGenerated": true
+          }
+        }
+      },
+      "afterLoad": {
+        "panelFilters": {
+          "sceneTagIds": [
+            "280"
+          ]
+        },
+        "url": "?sceneTagIds=280&sort=duration&dir=DESC",
+        "request": {
+          "filter": {
+            "page": 1,
+            "per_page": 24,
+            "q": "",
+            "sort": "duration",
+            "direction": "DESC"
+          },
+          "clip_filter": {
+            "sceneTagIds": [
+              "280"
+            ],
+            "sceneTagIdsModifier": "INCLUDES",
+            "isGenerated": true
+          }
+        }
+      },
+      "buildListQueryFromItsFilters": {
+        "filter": {
+          "page": 1,
+          "per_page": 24,
+          "q": "",
+          "sort": "duration",
+          "direction": "DESC"
+        },
+        "clip_filter": {
+          "sceneTagIds": [
+            "280"
+          ],
+          "sceneTagIdsModifier": "INCLUDES",
+          "isGenerated": true
+        }
+      }
+    }
+  ]
+}

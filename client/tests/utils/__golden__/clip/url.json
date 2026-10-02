@@ -1,0 +1,702 @@
+{
+  "ownedKeys": [
+    "tagIds",
+    "tagId",
+    "tagIdsModifier",
+    "tagIds_min",
+    "tagIds_max",
+    "tagIds_start",
+    "tagIds_end",
+    "sceneTagIds",
+    "sceneTagId",
+    "sceneTagIdsModifier",
+    "sceneTagIds_min",
+    "sceneTagIds_max",
+    "sceneTagIds_start",
+    "sceneTagIds_end",
+    "performerIds",
+    "performerId",
+    "performerIdsModifier",
+    "performerIds_min",
+    "performerIds_max",
+    "performerIds_start",
+    "performerIds_end",
+    "studioId",
+    "studioId_min",
+    "studioId_max",
+    "studioId_start",
+    "studioId_end",
+    "isGenerated",
+    "isGenerated_min",
+    "isGenerated_max",
+    "isGenerated_start",
+    "isGenerated_end",
+    "filters",
+    "q",
+    "sort",
+    "dir",
+    "page",
+    "per_page",
+    "view",
+    "zoom",
+    "grid_density",
+    "timeline_period",
+    "folderPath"
+  ],
+  "roundTrip": [
+    {
+      "label": "tagIds: INCLUDES_ALL one id",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: one id",
+      "params": "tagIds=1%3Ainst-a",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: two ids",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES_ALL one id",
+      "params": "sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES_ALL two ids",
+      "params": "sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES one id",
+      "params": "sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES two ids",
+      "params": "sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=INCLUDES",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: EXCLUDES one id",
+      "params": "sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=EXCLUDES",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: EXCLUDES two ids",
+      "params": "sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=EXCLUDES",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: one id",
+      "params": "sceneTagIds=1%3Ainst-a",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: two ids",
+      "params": "sceneTagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL one id",
+      "params": "performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL two ids",
+      "params": "performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: INCLUDES one id",
+      "params": "performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: INCLUDES two ids",
+      "params": "performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: EXCLUDES one id",
+      "params": "performerIds=1%3Ainst-a&performerIdsModifier=EXCLUDES",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: EXCLUDES two ids",
+      "params": "performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=EXCLUDES",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: one id",
+      "params": "performerIds=1%3Ainst-a",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: two ids",
+      "params": "performerIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: one id",
+      "params": "studioId=1%3Ainst-a",
+      "parsed": {
+        "studioId": "1:inst-a"
+      },
+      "lossless": true
+    },
+    {
+      "label": "isGenerated: false",
+      "params": "isGenerated=false",
+      "parsed": {
+        "isGenerated": "false"
+      },
+      "lossless": true
+    },
+    {
+      "label": "isGenerated: all",
+      "params": "isGenerated=all",
+      "parsed": {
+        "isGenerated": "all"
+      },
+      "lossless": true
+    }
+  ],
+  "imperialRoundTrip": [],
+  "listParams": [
+    {
+      "label": "tagIds: INCLUDES_ALL one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: one id",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: two ids",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES_ALL one id",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES_ALL two ids",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=INCLUDES",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=EXCLUDES",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=EXCLUDES",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: one id",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: two ids",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL one id",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL two ids",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES",
+      "filters": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=INCLUDES",
+      "filters": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a&performerIdsModifier=EXCLUDES",
+      "filters": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=EXCLUDES",
+      "filters": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: one id",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a",
+      "filters": {
+        "performerIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: two ids",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: one id",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a",
+      "filters": {
+        "studioId": "1:inst-a"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "isGenerated: false",
+      "written": "instance=inst-a&tab=x&isGenerated=false",
+      "filters": {
+        "isGenerated": "false"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "isGenerated: all",
+      "written": "instance=inst-a&tab=x&isGenerated=all",
+      "filters": {
+        "isGenerated": "all"
+      },
+      "hasFilters": true
+    }
+  ],
+  "imperialListParams": [],
+  "filteredListPath": [
+    {
+      "entityType": "scenes",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "scenes",
+      "hasMultipleInstances": false
+    },
+    {
+      "entityType": "performers",
+      "hasMultipleInstances": true,
+      "withInstance": "/clips?performerId=5&instance=inst-a",
+      "numericIdNoInstance": "/clips?performerId=7"
+    },
+    {
+      "entityType": "performers",
+      "hasMultipleInstances": false,
+      "withInstance": "/clips?performerId=5",
+      "numericIdNoInstance": "/clips?performerId=7"
+    },
+    {
+      "entityType": "studios",
+      "hasMultipleInstances": true,
+      "withInstance": "/clips?studioId=5&instance=inst-a",
+      "numericIdNoInstance": "/clips?studioId=7"
+    },
+    {
+      "entityType": "studios",
+      "hasMultipleInstances": false,
+      "withInstance": "/clips?studioId=5",
+      "numericIdNoInstance": "/clips?studioId=7"
+    },
+    {
+      "entityType": "tags",
+      "hasMultipleInstances": true,
+      "withInstance": "/clips?tagId=5&instance=inst-a",
+      "numericIdNoInstance": "/clips?tagId=7"
+    },
+    {
+      "entityType": "tags",
+      "hasMultipleInstances": false,
+      "withInstance": "/clips?tagId=5",
+      "numericIdNoInstance": "/clips?tagId=7"
+    },
+    {
+      "entityType": "groups",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "groups",
+      "hasMultipleInstances": false
+    },
+    {
+      "entityType": "galleries",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "galleries",
+      "hasMultipleInstances": false
+    }
+  ]
+}
