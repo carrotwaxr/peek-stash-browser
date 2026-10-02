@@ -178,6 +178,15 @@ export const SCENE_FIELDS = {
   organized: bool(),
 } as const satisfies Record<string, FieldSpec>;
 
+/** A StashDB (or other stash-box) id: equal to one, or set or not set */
+function stashIdText() {
+  return text({
+    modifiers: ["EQUALS", ...PRESENCE_MODIFIERS],
+    defaultModifier: "EQUALS",
+    maxLength: 100,
+  });
+}
+
 export const PERFORMER_FIELDS = {
   ids: ref("performer", { single: true }),
   instance_id: instance(),
@@ -203,11 +212,7 @@ export const PERFORMER_FIELDS = {
   /** Any one of the performer's links */
   url: text(),
   /** A StashDB (or other stash-box) id the performer is linked to */
-  stash_id: text({
-    modifiers: ["EQUALS", ...PRESENCE_MODIFIERS],
-    defaultModifier: "EQUALS",
-    maxLength: 100,
-  }),
+  stash_id: stashIdText(),
   tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
   /** Performers in the visible scenes of these studios (depth: sub-studios) */
   studios: ref("studio", { hierarchical: true, excludable: true }),
@@ -249,6 +254,12 @@ export const STUDIO_FIELDS = {
   instance_id: instance(),
   name: text(),
   details: text(),
+  /** Any one alias */
+  aliases: text(),
+  /** The studio's website */
+  url: text(),
+  /** A StashDB (or other stash-box) id the studio is linked to */
+  stash_id: stashIdText(),
   tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
   /**
    * Studios under these (depth: further down), the parent live and visible;
@@ -276,6 +287,10 @@ export const TAG_FIELDS = {
   instance_id: instance(),
   name: text(),
   description: text(),
+  /** Any one alias */
+  aliases: text(),
+  /** A StashDB (or other stash-box) id the tag is linked to */
+  stash_id: stashIdText(),
   /** Tags under these within depth + 1 levels, through a visible parent */
   parents: ref("tag", { hierarchical: true }),
   /** Tags having these as a visible child within depth + 1 levels */
@@ -313,6 +328,10 @@ export const GROUP_FIELDS = {
   name: text(),
   synopsis: text(),
   director: text(),
+  /** Stash's single aliases text, matched as one phrase */
+  aliases: text(),
+  /** Any one of the collection's links */
+  url: text(),
   tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
   studios: ref("studio", {
     hierarchical: true,

@@ -316,6 +316,9 @@ class GroupQueryBuilder extends EntityQueryBuilder<
     name: (c) => buildTextFilter(c, "g.name"),
     synopsis: (c) => buildTextFilter(c, "g.synopsis"),
     director: (c) => buildTextFilter(c, "g.director"),
+    // Stash's single aliases text as one phrase; any one of the links
+    aliases: (c) => buildTextFilter(c, "g.aliases"),
+    url: (c) => buildTextFilter(c, null, { lists: ["g.urls"] }),
 
     // Dates
     date: (c) => buildDayFilter(c, "g.date"),
@@ -443,13 +446,14 @@ class GroupQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search across the name and synopsis: every word must match
-   * (`searchAll`), each as `likeContains` with `ESCAPE '\'`; no `LOWER()`
+   * The search across the name, synopsis and Stash's aliases text: every
+   * word must match (`searchAll`), each as `likeContains` with `ESCAPE '\'`;
+   * no `LOWER()`
    */
   protected override searchClause(q: string): FilterClause {
     return searchAll(searchTerms(q), (pattern) => ({
-      sql: "(g.name LIKE ? ESCAPE '\\' OR g.synopsis LIKE ? ESCAPE '\\')",
-      params: [pattern, pattern],
+      sql: "(g.name LIKE ? ESCAPE '\\' OR g.synopsis LIKE ? ESCAPE '\\' OR g.aliases LIKE ? ESCAPE '\\')",
+      params: [pattern, pattern, pattern],
     }));
   }
 

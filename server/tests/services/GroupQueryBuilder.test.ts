@@ -19,6 +19,7 @@ import type {
 } from "../../types/parsedFilters.js";
 import { entityKey, pairsJson } from "../../utils/entityRef.js";
 import { expandRefs } from "../../utils/hierarchyUtils.js";
+import { jsonListArm } from "../../utils/sqlHelpers.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -404,6 +405,8 @@ describe("GroupQueryBuilder", () => {
           name: { modifier: "EQUALS", value: "Box Set" },
           synopsis: { modifier: "INCLUDES", value: "three" },
           director: { modifier: "NOT_NULL" },
+          aliases: { modifier: "INCLUDES", value: "old" },
+          url: { modifier: "INCLUDES", value: "example" },
           date: { modifier: "IS_NULL" },
           created_at: { modifier: "EQUALS", value: "2025-01-01" },
           updated_at: {
@@ -423,6 +426,8 @@ describe("GroupQueryBuilder", () => {
         "LOWER(g.name) = LOWER(?)",
         "(g.synopsis LIKE ? ESCAPE '\\')",
         "(g.director IS NOT NULL AND g.director != '')",
+        "(g.aliases LIKE ? ESCAPE '\\')",
+        `(${jsonListArm("g.urls")})`,
         "g.date IS NULL",
         "g.stashCreatedAt",
         "(g.stashUpdatedAt >= ? AND g.stashUpdatedAt < ?)",
@@ -431,23 +436,23 @@ describe("GroupQueryBuilder", () => {
       }
     });
 
-    it("the search matches the name and synopsis, a % in it matching itself", async () => {
+    it("the search matches the name, synopsis and aliases text, a % in it matching itself", async () => {
       await run({ q: '"100% Real"' });
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "(g.name LIKE ? ESCAPE '\\' OR g.synopsis LIKE ? ESCAPE '\\')"
+        "(g.name LIKE ? ESCAPE '\\' OR g.synopsis LIKE ? ESCAPE '\\' OR g.aliases LIKE ? ESCAPE '\\')"
       );
       expect(sql).not.toContain("LOWER(");
-      expect(params.filter((p) => p === "%100\\% Real%")).toHaveLength(2);
+      expect(params.filter((p) => p === "%100\\% Real%")).toHaveLength(3);
     });
 
     it("two words are two AND-ed groups", async () => {
       await run({ q: "sea side" });
 
       const { params } = pageStatement();
-      expect(params.filter((p) => p === "%sea%")).toHaveLength(2);
-      expect(params.filter((p) => p === "%side%")).toHaveLength(2);
+      expect(params.filter((p) => p === "%sea%")).toHaveLength(3);
+      expect(params.filter((p) => p === "%side%")).toHaveLength(3);
     });
 
     it("the search clause sits after the field clauses", async () => {

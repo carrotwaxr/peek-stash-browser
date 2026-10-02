@@ -853,3 +853,155 @@ describeWithDb(
     });
   }
 );
+
+/**
+ * Collection parity (F15): Stash's aliases text (one phrase) and the links
+ * (one at a time). Sent over the wire parser into the builder for a viewer
+ * of their own, as the list route does.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do:
+ * - gp-a collections: 7902001 (aliases "Old Name, Other", two links),
+ *   7902002 (nothing set, links `[]`), 7902003 (aliases ""), 7902004 (hidden
+ *   by the viewer, matching everything 7902001 matches).
+ * - gp-b collection 7902001 (aliases "Zulu", a link).
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Collection parity filters (seeded)", () => {
+  const A = "gp-a";
+  const B = "gp-b";
+  const VIEWER = "gp-viewer";
+  let viewerId = 0;
+
+  const [G1, G2, G3, GH] = ["7902001", "7902002", "7902003", "7902004"];
+  const k = (id: string, instance: string) => `${id}:${instance}`;
+  /** Every collection the viewer can see */
+  const VISIBLE = [k(G1, A), k(G2, A), k(G3, A), k(G1, B)].sort();
+  const without = (...keys: string[]) =>
+    VISIBLE.filter((key) => !keys.includes(key));
+
+  async function removeRows(): Promise<void> {
+    await prisma.stashGroup.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+    await prisma.user.deleteMany({ where: { username: VIEWER } });
+  }
+
+  async function listed(filter: Record<string, unknown>): Promise<string[]> {
+    const request = parseListRequest(
+      "group",
+      { filter: { per_page: 100 }, group_filter: filter },
+      { userId: viewerId }
+    );
+    const { items, total } = await groupQueryBuilder.execute({
+      userId: viewerId,
+      allowedInstanceIds: [A, B],
+      request,
+    });
+    expect(total).toBe(items.length);
+    return items.map((g) => k(g.id, g.instanceId)).sort();
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    viewerId = (
+      await prisma.user.create({
+        data: { username: VIEWER, password: "not-a-real-hash", role: "USER" },
+      })
+    ).id;
+    const group = (
+      id: string,
+      instance: string,
+      extra: Record<string, unknown> = {}
+    ) => ({
+      id,
+      stashInstanceId: instance,
+      name: `GP ${id} ${instance}`,
+      ...extra,
+    });
+    const links = JSON.stringify([
+      "https://example.com/gp-one",
+      "https://social.example/gp",
+    ]);
+    await prisma.stashGroup.createMany({
+      data: [
+        group(G1, A, { aliases: "Old Name, Other", urls: links }),
+        group(G2, A, { urls: "[]" }),
+        group(G3, A, { aliases: "" }),
+        group(GH, A, { aliases: "Old Name, Other", urls: links }),
+        group(G1, B, {
+          aliases: "Zulu",
+          urls: JSON.stringify(["https://zulu.example/gp"]),
+        }),
+      ],
+    });
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: viewerId,
+        entityType: "group",
+        entityId: GH,
+        instanceId: A,
+        reason: "hidden",
+      },
+    });
+  });
+
+  afterAll(removeRows);
+
+  it("aliases match Stash's text as one phrase, IS_NULL lists the collections with none", async () => {
+    expect(
+      await listed({ aliases: { value: "name, oth", modifier: "INCLUDES" } })
+    ).toEqual([k(G1, A)]);
+    // One phrase: the words are not split
+    expect(
+      await listed({ aliases: { value: "other old", modifier: "INCLUDES" } })
+    ).toEqual([]);
+    expect(
+      await listed({
+        aliases: { value: "old name, other", modifier: "EQUALS" },
+      })
+    ).toEqual([k(G1, A)]);
+    expect(await listed({ aliases: { modifier: "IS_NULL" } })).toEqual(
+      [k(G2, A), k(G3, A)].sort()
+    );
+    expect(await listed({ aliases: { modifier: "NOT_NULL" } })).toEqual(
+      [k(G1, A), k(G1, B)].sort()
+    );
+  });
+
+  it("an alias on one instance never matches the other's collection of the same id", async () => {
+    expect(
+      await listed({ aliases: { value: "zulu", modifier: "INCLUDES" } })
+    ).toEqual([k(G1, B)]);
+  });
+
+  it("a collection the viewer hid is never listed by its alias or link, in any form", async () => {
+    expect(
+      await listed({ aliases: { value: "other", modifier: "INCLUDES" } })
+    ).not.toContain(k(GH, A));
+    expect(
+      await listed({ aliases: { value: "other", modifier: "EXCLUDES" } })
+    ).toEqual(without(k(G1, A)));
+    expect(await listed({ url: { modifier: "NOT_NULL" } })).not.toContain(
+      k(GH, A)
+    );
+  });
+
+  it("url matches any one of the collection's links", async () => {
+    expect(
+      await listed({ url: { value: "social.example", modifier: "INCLUDES" } })
+    ).toEqual([k(G1, A)]);
+    // A link's JSON punctuation is never matched
+    expect(
+      await listed({ url: { value: '","', modifier: "INCLUDES" } })
+    ).toEqual([]);
+    expect(
+      await listed({ url: { value: "example.com", modifier: "EXCLUDES" } })
+    ).toEqual(without(k(G1, A)));
+    expect(await listed({ url: { modifier: "NOT_NULL" } })).toEqual(
+      [k(G1, A), k(G1, B)].sort()
+    );
+    expect(await listed({ url: { modifier: "IS_NULL" } })).toEqual(
+      [k(G2, A), k(G3, A)].sort()
+    );
+  });
+});
