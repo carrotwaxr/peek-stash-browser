@@ -218,7 +218,6 @@ A filter that picks performers, tags, studios, collections or galleries has a dr
 
 - The dropdown always shows the choice the search uses. Until you change it, that is the filter's default: **Has ALL** for tags, **Has ANY** for the others.
 - A gallery or an image has one studio, so its Studios filter offers only **Has ANY** and **Has NONE**.
-- Ticking **Include sub-tags** or **Include sub-studios** sets the dropdown to **Has ANY**.
 
 ### Favorite Performers, Studios and Tags
 
