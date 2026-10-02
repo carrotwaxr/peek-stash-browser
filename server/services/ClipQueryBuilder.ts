@@ -41,8 +41,9 @@ import {
   anyOf,
   exclusionJoin,
   refClause,
+  searchAll,
 } from "../utils/sqlClauses.js";
-import { likeContains } from "../utils/sqlHelpers.js";
+import { searchTerms } from "../utils/sqlHelpers.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
@@ -358,11 +359,12 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     };
   }
 
+  /** The search across the title: every word must match (`searchAll`) */
   protected override searchClause(q: string): FilterClause {
-    return {
+    return searchAll(searchTerms(q), (pattern) => ({
       sql: "c.title LIKE ? ESCAPE '\\'",
-      params: [likeContains(q)],
-    };
+      params: [pattern],
+    }));
   }
 
   protected transformRow(row: ClipRow): ClipWithRelations {

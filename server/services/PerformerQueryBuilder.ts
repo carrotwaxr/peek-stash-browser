@@ -29,13 +29,15 @@ import {
   careerYearsSql,
   fullDateSql,
   noClause,
+  searchAll,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
-  likeContains,
+  jsonListArm,
   parseJsonArray,
   parseStashIds,
+  searchTerms,
 } from "../utils/sqlHelpers.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
@@ -328,15 +330,17 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search across the name and aliases: `likeContains` with
-   * `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
+   * The search across the name and aliases: every word must match
+   * (`searchAll`), each as `likeContains` with `ESCAPE '\'`, so a `%`, `_`
+   * or `\` in the text matches itself, an alias read one at a time. No
+   * `LOWER()`: SQLite's LIKE folds ASCII case, and a non-ASCII letter matches
+   * as typed.
    */
   protected override searchClause(q: string): FilterClause {
-    const pattern = likeContains(q.toLowerCase());
-    return {
-      sql: "(LOWER(p.name) LIKE ? ESCAPE '\\' OR LOWER(p.aliasList) LIKE ? ESCAPE '\\')",
+    return searchAll(searchTerms(q), (pattern) => ({
+      sql: `(p.name LIKE ? ESCAPE '\\' OR ${jsonListArm("p.aliasList")})`,
       params: [pattern, pattern],
-    };
+    }));
   }
 
   /**

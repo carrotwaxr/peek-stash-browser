@@ -16,6 +16,7 @@ import type {
   FilterRef,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
+import { galleryNameSql } from "../../utils/sqlClauses.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -421,7 +422,7 @@ describe("GalleryQueryBuilder", () => {
         "r.favorite = 1",
         "r.rating > ?",
         "MAX(g.imageCount - COALESCE(d.images, 0), 0) BETWEEN ? AND ?",
-        "(g.title LIKE ? ESCAPE '\\')",
+        `(${galleryNameSql("g")} LIKE ? ESCAPE '\\')`,
         "g.date < ?",
         "g.stashCreatedAt > ?",
         "g.stashUpdatedAt IS NOT NULL",
@@ -442,14 +443,33 @@ describe("GalleryQueryBuilder", () => {
       expect(params).toContain(0);
     });
 
-    it("the search matches the title, details and photographer, a % in it matching itself", async () => {
-      await run({ q: "100% Real" });
+    it("the search matches the shown name, details and photographer, a % in it matching itself", async () => {
+      await run({ q: '"100% Real"' });
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "(LOWER(g.title) LIKE ? ESCAPE '\\' OR LOWER(g.details) LIKE ? ESCAPE '\\' OR LOWER(g.photographer) LIKE ? ESCAPE '\\')"
+        `(${galleryNameSql("g")} LIKE ? ESCAPE '\\' OR g.details LIKE ? ESCAPE '\\' OR g.photographer LIKE ? ESCAPE '\\')`
       );
-      expect(params.filter((p) => p === "%100\\% real%")).toHaveLength(3);
+      expect(sql).not.toContain("LOWER(");
+      expect(params.filter((p) => p === "%100\\% Real%")).toHaveLength(3);
+    });
+
+    it("the Title filter matches the shown name too", async () => {
+      await run({
+        filter: { title: { modifier: "INCLUDES", value: "Comic" } },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(`${galleryNameSql("g")} LIKE ? ESCAPE '\\'`);
+      expect(params).toContain("%Comic%");
+    });
+
+    it("two words are two AND-ed groups", async () => {
+      await run({ q: "sea side" });
+
+      const { params } = pageStatement();
+      expect(params.filter((p) => p === "%sea%")).toHaveLength(3);
+      expect(params.filter((p) => p === "%side%")).toHaveLength(3);
     });
 
     it("the search clause sits after the field clauses", async () => {

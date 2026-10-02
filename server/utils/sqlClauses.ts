@@ -1030,6 +1030,42 @@ export function buildEpochDateFilter(
 }
 
 /**
+ * The search box's clause: every term must match, each through `termClause`
+ * on the term's `likeContains` pattern (an AND of one clause per term, so the
+ * terms may be found in different places), no terms no clause. SQL's AND
+ * stops at the first term a row fails.
+ */
+export function searchAll(
+  terms: readonly string[],
+  termClause: (pattern: string) => FilterClause
+): FilterClause {
+  if (terms.length === 0) return noClause();
+  return allOf(terms.map((term) => termClause(likeContains(term))));
+}
+
+/** SQL: the text after the last `/` or `\` in `col`, else all of it (`extractBasename`) */
+function basenameSql(col: string): string {
+  const upToSeparator = `rtrim(${col}, replace(replace(${col}, '/', ''), '\\', ''))`;
+  return `COALESCE(NULLIF(substr(${col}, length(${upToSeparator}) + 1), ''), ${col})`;
+}
+
+/** SQL: `col` without its extension (`stripExtension`) */
+function stemSql(col: string): string {
+  const upToDot = `length(rtrim(${col}, replace(${col}, '.', '')))`;
+  return `CASE WHEN ${upToDot} BETWEEN 1 AND length(${col}) - 1 THEN substr(${col}, 1, ${upToDot} - 1) ELSE ${col} END`;
+}
+
+/**
+ * SQL: a gallery's name as its card shows it: its title, else its file's name
+ * without the extension, else its folder's own name (`getGalleryFallbackTitle`).
+ * `alias` is the gallery table's alias, a code constant. The gallery search,
+ * the Title filter and the picker read it.
+ */
+export function galleryNameSql(alias: string): string {
+  return `COALESCE(NULLIF(${alias}.title, ''), ${stemSql(`NULLIF(${alias}.fileBasename, '')`)}, ${basenameSql(`NULLIF(${alias}.folderPath, '')`)})`;
+}
+
+/**
  * Build a text comparison filter clause.
  * Handles INCLUDES, EXCLUDES, EQUALS, NOT_EQUALS, IS_NULL, NOT_NULL.
  *

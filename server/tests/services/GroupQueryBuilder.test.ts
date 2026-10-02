@@ -370,13 +370,22 @@ describe("GroupQueryBuilder", () => {
     });
 
     it("the search matches the name and synopsis, a % in it matching itself", async () => {
-      await run({ q: "100% Real" });
+      await run({ q: '"100% Real"' });
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "(LOWER(g.name) LIKE ? ESCAPE '\\' OR LOWER(g.synopsis) LIKE ? ESCAPE '\\')"
+        "(g.name LIKE ? ESCAPE '\\' OR g.synopsis LIKE ? ESCAPE '\\')"
       );
-      expect(params.filter((p) => p === "%100\\% real%")).toHaveLength(2);
+      expect(sql).not.toContain("LOWER(");
+      expect(params.filter((p) => p === "%100\\% Real%")).toHaveLength(2);
+    });
+
+    it("two words are two AND-ed groups", async () => {
+      await run({ q: "sea side" });
+
+      const { params } = pageStatement();
+      expect(params.filter((p) => p === "%sea%")).toHaveLength(2);
+      expect(params.filter((p) => p === "%side%")).toHaveLength(2);
     });
 
     it("the search clause sits after the field clauses", async () => {

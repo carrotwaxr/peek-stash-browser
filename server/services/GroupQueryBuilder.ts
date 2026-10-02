@@ -34,12 +34,13 @@ import {
   buildNumericFilter,
   buildTextFilter,
   refClause,
+  searchAll,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
-  likeContains,
   parseJsonArray,
+  searchTerms,
 } from "../utils/sqlHelpers.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
@@ -273,15 +274,14 @@ class GroupQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search across the name and synopsis: `likeContains` with
-   * `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
+   * The search across the name and synopsis: every word must match
+   * (`searchAll`), each as `likeContains` with `ESCAPE '\'`; no `LOWER()`
    */
   protected override searchClause(q: string): FilterClause {
-    const pattern = likeContains(q.toLowerCase());
-    return {
-      sql: "(LOWER(g.name) LIKE ? ESCAPE '\\' OR LOWER(g.synopsis) LIKE ? ESCAPE '\\')",
+    return searchAll(searchTerms(q), (pattern) => ({
+      sql: "(g.name LIKE ? ESCAPE '\\' OR g.synopsis LIKE ? ESCAPE '\\')",
       params: [pattern, pattern],
-    };
+    }));
   }
 
   /**

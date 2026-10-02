@@ -661,6 +661,17 @@ describe("ImageQueryBuilder", () => {
       expect(ids(result.items)).toEqual([testImageIds[1]]);
     });
 
+    it("every word must match, in any order, and a quoted phrase must appear whole", async () => {
+      expect(ids((await run({ q: "two image" })).items)).toEqual([
+        testImageIds[1],
+      ]);
+      expect((await run({ q: "Two Nope" })).total).toBe(0);
+      expect(ids((await run({ q: '"Image Two"' })).items)).toEqual([
+        testImageIds[1],
+      ]);
+      expect((await run({ q: '"Two Image"' })).total).toBe(0);
+    });
+
     it("the search clause sits after the field clauses", async () => {
       const statements = await recording(() =>
         run({

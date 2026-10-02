@@ -28,11 +28,12 @@ import {
   buildFavoriteFilter,
   buildNumericFilter,
   refClause,
+  searchAll,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
-  likeContains,
   parseJsonArray,
+  searchTerms,
 } from "../utils/sqlHelpers.js";
 import { getImageFallbackTitle } from "../utils/titleUtils.js";
 import {
@@ -238,16 +239,14 @@ class ImageQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search across the title, details, photographer and file path:
-   * `likeContains` with `ESCAPE '\'`, so a `%`, `_` or `\` in the text
-   * matches itself. SQLite's LIKE folds ASCII case, as before.
+   * The search across the title, details, photographer and file path: every
+   * word must match (`searchAll`), each as `likeContains` with `ESCAPE '\'`
    */
   protected override searchClause(q: string): FilterClause {
-    const pattern = likeContains(q);
-    return {
+    return searchAll(searchTerms(q), (pattern) => ({
       sql: "(i.title LIKE ? ESCAPE '\\' OR i.details LIKE ? ESCAPE '\\' OR i.photographer LIKE ? ESCAPE '\\' OR i.filePath LIKE ? ESCAPE '\\')",
       params: [pattern, pattern, pattern, pattern],
-    };
+    }));
   }
 
   /**

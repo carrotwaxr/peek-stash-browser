@@ -1,4 +1,8 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { expectRefused } from "../helpers/refused.js";
@@ -470,5 +474,183 @@ describe("Text Search Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
+  });
+});
+
+// Skip if no database connection (matches other integration tests).
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
+
+/**
+ * The search box on seeded rows: every word must match, a quoted phrase
+ * must appear whole, a non-ASCII capital matches as typed, and a name found
+ * through a relation counts only for the scene's own instance and for what
+ * the viewer can see.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do.
+ * - ts-a performers: 7896201 "TS Anna", 7896202 "Élodie TS", 7896203 "TS
+ *   Pam" (the viewer hid it)
+ * - ts-a tags: 7896001 "TS blonde", 7896002 "TS plain"; ts-b tag 7896002
+ *   "TS needle"
+ * - ts-a scenes: 7896301 "TS one" (performer Anna, tag blonde); 7896302
+ *   "TS two" (Anna only); 7896303 "TS blonde anna" (no relations); 7896304
+ *   "TS anna blonde here"; 7896305 "TS five" (performer Élodie); 7896306
+ *   "TS six" (tag plain, the id ts-b names "needle"); 7896307 "TS seven"
+ *   (the hidden performer Pam)
+ * - ts-b scene 7896301 "TS b one" (tag 7896002, "needle")
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Search box (seeded)", () => {
+  const A = "ts-a";
+  const B = "ts-b";
+  const VIEWER = "ts-viewer";
+  let viewerId = 0;
+
+  const key = (id: string, instance: string) => `${id}:${instance}`;
+
+  async function removeRows(): Promise<void> {
+    const where = { stashInstanceId: { in: [A, B] } };
+    await prisma.stashScene.deleteMany({ where });
+    await prisma.stashTag.deleteMany({ where });
+    await prisma.stashPerformer.deleteMany({ where });
+    await prisma.user.deleteMany({ where: { username: VIEWER } });
+  }
+
+  /** The scenes a search lists for the viewer, as sorted keys */
+  async function search(q: string, applyExclusions = true): Promise<string[]> {
+    const { items, total } = await sceneQueryBuilder.execute({
+      userId: viewerId,
+      applyExclusions,
+      allowedInstanceIds: [A, B],
+      request: parsedListRequest("scene", { perPage: 50, q }),
+    });
+    expect(total).toBe(items.length);
+    return items.map((s) => key(s.id, s.instanceId)).sort();
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    viewerId = (
+      await prisma.user.create({
+        data: { username: VIEWER, password: "not-a-real-hash", role: "USER" },
+      })
+    ).id;
+    await prisma.stashPerformer.createMany({
+      data: [
+        { id: "7896201", stashInstanceId: A, name: "TS Anna" },
+        { id: "7896202", stashInstanceId: A, name: "Élodie TS" },
+        { id: "7896203", stashInstanceId: A, name: "TS Pam" },
+      ],
+    });
+    await prisma.stashTag.createMany({
+      data: [
+        { id: "7896001", stashInstanceId: A, name: "TS blonde" },
+        { id: "7896002", stashInstanceId: A, name: "TS plain" },
+        { id: "7896002", stashInstanceId: B, name: "TS needle" },
+      ],
+    });
+    const scene = (id: string, instance: string, title: string) => ({
+      id,
+      stashInstanceId: instance,
+      title,
+    });
+    await prisma.stashScene.createMany({
+      data: [
+        scene("7896301", A, "TS one"),
+        scene("7896302", A, "TS two"),
+        scene("7896303", A, "TS blonde anna"),
+        scene("7896304", A, "TS anna blonde here"),
+        scene("7896305", A, "TS five"),
+        scene("7896306", A, "TS six"),
+        scene("7896307", A, "TS seven"),
+        scene("7896301", B, "TS b one"),
+      ],
+    });
+    const performer = (scene: string, performerId: string) => ({
+      sceneId: scene,
+      sceneInstanceId: A,
+      performerId,
+      performerInstanceId: A,
+    });
+    await prisma.scenePerformer.createMany({
+      data: [
+        performer("7896301", "7896201"),
+        performer("7896302", "7896201"),
+        performer("7896305", "7896202"),
+        performer("7896307", "7896203"),
+      ],
+    });
+    const tag = (scene: string, instance: string, tagId: string) => ({
+      sceneId: scene,
+      sceneInstanceId: instance,
+      tagId,
+      tagInstanceId: instance,
+    });
+    await prisma.sceneTag.createMany({
+      data: [
+        tag("7896301", A, "7896001"),
+        tag("7896306", A, "7896002"),
+        tag("7896301", B, "7896002"),
+      ],
+    });
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: viewerId,
+        entityType: "performer",
+        entityId: "7896203",
+        instanceId: A,
+        reason: "hidden",
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  it("a scene matches words found in different places", async () => {
+    // "anna" is a performer's name and "blonde" a tag's name on 7896301; the
+    // title holds both words on 7896303 and 7896304
+    expect(await search("anna blonde")).toEqual(
+      [key("7896301", A), key("7896303", A), key("7896304", A)].sort()
+    );
+  });
+
+  it("a scene lacking one of the words does not match", async () => {
+    expect(await search("anna blonde")).not.toContain(key("7896302", A));
+  });
+
+  it("a quoted phrase must appear whole", async () => {
+    expect(await search('"anna blonde"')).toEqual([key("7896304", A)]);
+  });
+
+  it("a non-ASCII capital typed exactly matches", async () => {
+    expect(await search("Élodie")).toEqual([key("7896305", A)]);
+  });
+
+  it("a tag name from the other instance with the same tag id does not make a scene match", async () => {
+    // ts-b names tag 7896002 "TS needle"; ts-a's scene 7896306 holds ts-a's
+    // tag 7896002, "TS plain"
+    expect(await search("needle")).toEqual([key("7896301", B)]);
+  });
+
+  it("a performer the viewer hid does not make a scene match by name", async () => {
+    expect(await search("pam")).toEqual([]);
+    expect(await search("pam", false)).toEqual([key("7896307", A)]);
+  });
+
+  it("the performer list matches a non-ASCII capital typed exactly, with another word too", async () => {
+    const ids = async (q: string) =>
+      (
+        await performerQueryBuilder.execute({
+          userId: viewerId,
+          applyExclusions: true,
+          allowedInstanceIds: [A, B],
+          request: parsedListRequest("performer", { perPage: 50, q }),
+        })
+      ).items.map((p) => p.id);
+
+    expect(await ids("Élodie")).toEqual(["7896202"]);
+    expect(await ids("ts Élodie")).toEqual(["7896202"]);
+    expect(await ids("Élodie nope")).toEqual([]);
   });
 });

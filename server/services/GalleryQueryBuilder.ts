@@ -33,14 +33,16 @@ import {
   buildNumericFilter,
   buildTextFilter,
   exclusionJoin,
+  galleryNameSql,
   noClause,
   refClause,
+  searchAll,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
-  likeContains,
   parseJsonArray,
+  searchTerms,
 } from "../utils/sqlHelpers.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import {
@@ -215,7 +217,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     tag_count: (c) => buildNumericFilter(c, GALLERY_TAG_COUNT),
 
     // Text
-    title: (c) => buildTextFilter(c, "g.title"),
+    title: (c) => buildTextFilter(c, galleryNameSql("g")),
 
     // Dates
     date: (c) => buildDateFilter(c, "g.date"),
@@ -268,15 +270,15 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search across the title, details and photographer: `likeContains`
-   * with `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
+   * The search across the name the card shows (the title, else the file's or
+   * the folder's name), details and photographer: every word must match
+   * (`searchAll`), each as `likeContains` with `ESCAPE '\'`; no `LOWER()`
    */
   protected override searchClause(q: string): FilterClause {
-    const pattern = likeContains(q.toLowerCase());
-    return {
-      sql: "(LOWER(g.title) LIKE ? ESCAPE '\\' OR LOWER(g.details) LIKE ? ESCAPE '\\' OR LOWER(g.photographer) LIKE ? ESCAPE '\\')",
+    return searchAll(searchTerms(q), (pattern) => ({
+      sql: `(${galleryNameSql("g")} LIKE ? ESCAPE '\\' OR g.details LIKE ? ESCAPE '\\' OR g.photographer LIKE ? ESCAPE '\\')`,
       params: [pattern, pattern, pattern],
-    };
+    }));
   }
 
   /**
