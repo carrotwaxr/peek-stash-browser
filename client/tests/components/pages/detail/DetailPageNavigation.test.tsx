@@ -207,7 +207,7 @@ const LOCKS: {
     field: "studios",
     toggle: "includeSubStudios",
     tabs: [SCENES, GALLERIES, IMAGES, PERFORMERS, GROUPS],
-    deep: ["scenes", "galleries", "images", "groups"],
+    deep: ["scenes", "galleries", "images", "performers", "groups"],
     entity: { child_studios: [{ id: "6", name: "Sub", instanceId: "inst-b" }] },
   },
   {
