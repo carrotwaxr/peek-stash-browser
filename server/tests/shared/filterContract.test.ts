@@ -58,6 +58,61 @@ describe("filter contract", () => {
     expect(wrong).toEqual([]);
   });
 
+  it("excludable fields are refs: the tags, performers and studios of the seven lists", () => {
+    const excludable = allFields().flatMap(([name, spec]) =>
+      spec.kind === "ref" && spec.excludable ? [name] : []
+    );
+    const notRefs = allFields().flatMap(([name, spec]) =>
+      Object.prototype.hasOwnProperty.call(spec, "excludable") &&
+      spec.kind !== "ref"
+        ? [name]
+        : []
+    );
+    const expected = Object.entries(FIELDS).flatMap(([kind, fields]) =>
+      Object.entries(fields).flatMap(([field, spec]: [string, FieldSpec]) =>
+        spec.kind === "ref" && ["tags", "performers", "studios"].includes(field)
+          ? [`${kind}.${field}`]
+          : []
+      )
+    );
+
+    expect(notRefs).toEqual([]);
+    expect(excludable).toEqual(expected);
+    expect(excludable).toContain("tag.performers");
+  });
+
+  it("ref presence (has none, has any) is on the relations a row can lack", () => {
+    const presence = allFields().flatMap(([name, spec]) => {
+      if (spec.kind !== "ref") return [];
+      const modifiers: readonly string[] = spec.modifiers;
+      return modifiers.includes("IS_NULL") && modifiers.includes("NOT_NULL")
+        ? [name]
+        : [];
+    });
+
+    expect(presence.sort()).toEqual(
+      [
+        "scene.performers",
+        "scene.tags",
+        "scene.studios",
+        "scene.groups",
+        "scene.galleries",
+        "image.performers",
+        "image.tags",
+        "image.studios",
+        "image.galleries",
+        "gallery.performers",
+        "gallery.tags",
+        "gallery.studios",
+        "gallery.scenes",
+        "performer.tags",
+        "studio.tags",
+        "group.tags",
+        "group.studios",
+      ].sort()
+    );
+  });
+
   it("each sort list has no duplicates and holds its default sort", () => {
     const wrong = LIST_KINDS.flatMap((kind) => {
       const sorts: readonly string[] = SORTS[kind];

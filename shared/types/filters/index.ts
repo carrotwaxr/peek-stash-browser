@@ -20,8 +20,10 @@ export {
   PRESENCE_MODIFIERS,
   RANGE_MODIFIERS,
   REF_MODIFIERS,
+  REF_PRESENCE_MODIFIERS,
   RESOLUTIONS,
   SINGLE_REF_MODIFIERS,
+  SINGLE_REF_PRESENCE_MODIFIERS,
   TEXT_MAX_LENGTH,
   TEXT_MODIFIERS,
 } from "./criteria.js";
@@ -39,6 +41,7 @@ export type {
   NumberSpec,
   PresenceModifier,
   RangeModifier,
+  RefFieldModifier,
   RefModifier,
   RefSpec,
   Resolution,

@@ -18,6 +18,7 @@ import type {
   ListKind,
   NumberSpec,
   PlaylistItemSort,
+  PresenceModifier,
   RefModifier,
   RefSpec,
   SortDirection,
@@ -36,13 +37,38 @@ export interface FilterRef {
   readonly instanceId: string | undefined;
 }
 
-/** refs is never empty. depth is 0 unless the field is hierarchical; -1 means every descendant. */
+/**
+ * Ids of another entity. refs is empty only beside `excludes`. depth is 0
+ * unless the field is hierarchical; -1 means every descendant.
+ */
 export interface RefCriterion {
   readonly refs: readonly FilterRef[];
   /** Single-valued fields never INCLUDES_ALL */
   readonly modifier: RefModifier;
   readonly depth: number;
+  /**
+   * Ids none of which a row may have, beside `refs` (the fields that
+   * declare `excludable`), to the same depth; never empty when present.
+   * The base builder's `leavesOf` splits them into a leaf of their own
+   * (`<field>_not`, EXCLUDES), so a field's clause never sees them.
+   */
+  readonly excludes?: readonly FilterRef[];
 }
+
+/**
+ * "Has none" (IS_NULL) or "has any" (NOT_NULL) of a ref field, only on the
+ * fields that declare them; refs is empty. Only live related rows the
+ * viewer can see count. `excludes` as on RefCriterion.
+ */
+export interface RefPresenceCriterion {
+  readonly refs: readonly [];
+  readonly modifier: PresenceModifier;
+  readonly depth: number;
+  readonly excludes?: readonly FilterRef[];
+}
+
+/** A ref field's criterion: ids, or presence where the field offers it */
+export type RefFieldCriterion = RefCriterion | RefPresenceCriterion;
 
 /**
  * BETWEEN has at least one side: value alone is at least it, value2 alone at
@@ -110,25 +136,28 @@ export interface MultiEnumCriterion<V extends string> {
 }
 
 /** The parsed criterion of one field spec */
-export type CriterionOf<S extends FieldSpec> = S extends RefSpec
-  ? RefCriterion
-  : S extends NumberSpec
-    ? NumberCriterion
-    : S extends DateSpec
-      ? DateCriterion
-      : S extends TextSpec
-        ? TextCriterion
-        : S extends EnumSpec<
-              infer V,
-              EnumSpec["modifiers"][number],
-              infer Multi
-            >
-          ? Multi extends true
-            ? MultiEnumCriterion<V>
-            : EnumCriterion<V>
-          : S extends BooleanSpec
-            ? boolean
-            : never;
+export type CriterionOf<S extends FieldSpec> =
+  S extends RefSpec<EntityKind, infer M>
+    ? [Extract<M, PresenceModifier>] extends [never]
+      ? RefCriterion
+      : RefFieldCriterion
+    : S extends NumberSpec
+      ? NumberCriterion
+      : S extends DateSpec
+        ? DateCriterion
+        : S extends TextSpec
+          ? TextCriterion
+          : S extends EnumSpec<
+                infer V,
+                EnumSpec["modifiers"][number],
+                infer Multi
+              >
+            ? Multi extends true
+              ? MultiEnumCriterion<V>
+              : EnumCriterion<V>
+            : S extends BooleanSpec
+              ? boolean
+              : never;
 
 /**
  * One optional, already-valid criterion per field of a table; booleans stay

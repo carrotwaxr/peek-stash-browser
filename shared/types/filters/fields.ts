@@ -3,7 +3,9 @@
  * Every list's filter fields and sorts, declared once.
  *
  * A table holds what the list's query builder reads from its
- * `<entity>_filter`, with the modifiers its clause understands. The scene
+ * `<entity>_filter`, with the modifiers its clause understands (a ref with
+ * `presence` also takes IS_NULL and NOT_NULL, "has none" and "has any"; an
+ * `excludable` one takes `excludes` beside its values). The scene
  * `scene_index` and `last_o_at` sorts are declared before their expressions
  * exist, so the contract test lists them as known gaps until then. A new
  * filter or sort starts here.
@@ -80,11 +82,16 @@ export const SCENE_FIELDS = {
   director: text(),
   video_codec: text(),
   audio_codec: text(),
-  performers: ref("performer"),
-  tags: ref("tag", { hierarchical: true }),
-  studios: ref("studio", { hierarchical: true, single: true }),
-  groups: ref("group"),
-  galleries: ref("gallery"),
+  performers: ref("performer", { presence: true, excludable: true }),
+  tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
+  studios: ref("studio", {
+    hierarchical: true,
+    single: true,
+    presence: true,
+    excludable: true,
+  }),
+  groups: ref("group", { presence: true }),
+  galleries: ref("gallery", { presence: true }),
   rating100: nullableNum(),
   o_counter: num(),
   play_count: num(),
@@ -132,9 +139,9 @@ export const PERFORMER_FIELDS = {
   hair_color: freeText(),
   eye_color: freeText(),
   fake_tits: freeText(),
-  tags: ref("tag", { hierarchical: true }),
+  tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
   /** Performers in scenes of these studios */
-  studios: ref("studio"),
+  studios: ref("studio", { excludable: true }),
   /** Performers in these scenes */
   scenes: ref("scene"),
   /** Performers in scenes of these groups */
@@ -163,7 +170,7 @@ export const STUDIO_FIELDS = {
   instance_id: instance(),
   name: text(),
   details: text(),
-  tags: ref("tag", { hierarchical: true }),
+  tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
   rating100: nullableNum(),
   o_counter: num(),
   play_count: num(),
@@ -180,9 +187,9 @@ export const TAG_FIELDS = {
   description: text(),
   parents: ref("tag", { hierarchical: true }),
   /** Tags on these performers */
-  performers: ref("performer"),
+  performers: ref("performer", { excludable: true }),
   /** Tags on these studios */
-  studios: ref("studio"),
+  studios: ref("studio", { excludable: true }),
   /** Tags on these scenes */
   scenes: ref("scene", { path: ["scenes_filter", "id"] }),
   /** Tags on scenes of these groups */
@@ -202,12 +209,17 @@ export const GROUP_FIELDS = {
   name: text(),
   synopsis: text(),
   director: text(),
-  tags: ref("tag", { hierarchical: true }),
-  studios: ref("studio", { hierarchical: true, single: true }),
+  tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
+  studios: ref("studio", {
+    hierarchical: true,
+    single: true,
+    presence: true,
+    excludable: true,
+  }),
   /** Groups holding these scenes */
   scenes: ref("scene"),
   /** Groups holding scenes of these performers */
-  performers: ref("performer"),
+  performers: ref("performer", { excludable: true }),
   /** The direct sub-groups of these groups (no depth, as the card counts them) */
   containing_groups: ref("group"),
   rating100: nullableNum(),
@@ -223,11 +235,16 @@ export const GALLERY_FIELDS = {
   ids: ref("gallery", { single: true }),
   instance_id: instance(),
   title: text(),
-  tags: ref("tag", { hierarchical: true }),
-  studios: ref("studio", { hierarchical: true, single: true }),
-  performers: ref("performer"),
+  tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
+  studios: ref("studio", {
+    hierarchical: true,
+    single: true,
+    presence: true,
+    excludable: true,
+  }),
+  performers: ref("performer", { presence: true, excludable: true }),
   /** Galleries linked to these scenes */
-  scenes: ref("scene"),
+  scenes: ref("scene", { presence: true }),
   rating100: nullableNum(),
   image_count: num(),
   /** The gallery's tags; 0 is the folder view's Untagged */
@@ -243,10 +260,15 @@ export const GALLERY_FIELDS = {
 export const IMAGE_FIELDS = {
   ids: ref("image", { single: true }),
   instance_id: instance(),
-  tags: ref("tag", { hierarchical: true }),
-  studios: ref("studio", { hierarchical: true, single: true }),
-  performers: ref("performer"),
-  galleries: ref("gallery"),
+  tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
+  studios: ref("studio", {
+    hierarchical: true,
+    single: true,
+    presence: true,
+    excludable: true,
+  }),
+  performers: ref("performer", { presence: true, excludable: true }),
+  galleries: ref("gallery", { presence: true }),
   rating100: num({ modifiers: [...COUNT_MODIFIERS, ...PRESENCE_MODIFIERS] }),
   o_counter: num({ modifiers: COUNT_MODIFIERS }),
   /** The image's tags, its galleries' included; 0 is the folder view's Untagged */

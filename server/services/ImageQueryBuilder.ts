@@ -17,7 +17,7 @@
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type { ImageListItem } from "../types/index.js";
 import type { ImageQueryRow } from "../types/internal/queryRows.js";
-import type { RefCriterion } from "../types/parsedFilters.js";
+import type { RefFieldCriterion } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -45,6 +45,8 @@ import {
   type QueryContext,
   type SortExpr,
   hierarchicalRefClause,
+  refFieldClause,
+  refPresence,
 } from "./query/EntityQueryBuilder.js";
 import {
   GALLERY_REF,
@@ -172,10 +174,11 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     tag_count: (c) => buildNumericFilter(c, IMAGE_TAG_COUNT),
 
     // Related entities
+    // "Has any" and "has none" count only related rows the viewer can see
     performers: (c, ctx) =>
-      refClause(IMAGE_PERFORMERS, c.refs, c.modifier, {
-        name: ctx.name,
-        allowedInstanceIds: ctx.allowedInstanceIds,
+      refFieldClause(IMAGE_PERFORMERS, c, ctx, {
+        table: "StashPerformer",
+        entityType: "performer",
       }),
     tags: (c, ctx) => this.tagClause(c, ctx),
     studios: (c, ctx) => this.studioClause(c, ctx),
@@ -195,11 +198,12 @@ class ImageQueryBuilder extends EntityQueryBuilder<
    * tag, each with its own descendants (QUERIES-08).
    */
   private async tagClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("tag", IMAGE_TAGS, criterion, ctx, {
       name: ctx.name,
+      related: { table: "StashTag", entityType: "tag" },
     });
   }
 
@@ -209,7 +213,7 @@ class ImageQueryBuilder extends EntityQueryBuilder<
    * EXCLUDES keeps the images with no studio.
    */
   private async studioClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", IMAGE_STUDIO, criterion, ctx, {
@@ -228,12 +232,18 @@ class ImageQueryBuilder extends EntityQueryBuilder<
    * takes 2 to 3 ms against up to 45, its count 1.5 against 42, sorted by
    * title or created_at; the created_at index walk wins on no page, the
    * first included (2.4 against 27) (S2, C7). Above the limit, and for
-   * EXCLUDES, the default shapes.
+   * EXCLUDES, the default shapes. "Has any" and "has none" count only
+   * galleries the viewer can see.
    */
   private galleryClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): FilterClause {
+    if (criterion.modifier === "IS_NULL" || criterion.modifier === "NOT_NULL") {
+      return refPresence(IMAGE_GALLERIES, criterion.modifier, ctx, {
+        related: { table: "StashGallery", entityType: "gallery" },
+      });
+    }
     return refClause(IMAGE_GALLERIES, criterion.refs, criterion.modifier, {
       name: ctx.name,
       allowedInstanceIds: ctx.allowedInstanceIds,

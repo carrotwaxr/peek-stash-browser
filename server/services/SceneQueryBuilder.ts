@@ -25,6 +25,7 @@ import type {
   MultiEnumCriterion,
   ParsedFilter,
   RefCriterion,
+  RefFieldCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
@@ -61,6 +62,7 @@ import {
   type SortExpr,
   favoriteRefs,
   hierarchicalRefClause,
+  refFieldClause,
 } from "./query/EntityQueryBuilder.js";
 import {
   GALLERY_REF,
@@ -308,10 +310,12 @@ class SceneQueryBuilder extends EntityQueryBuilder<
   ): Record<string, SortExpr> {
     const criterion = filter.groups;
     const first = criterion?.refs[0];
+    // Only an including criterion names a collection; presence names none
     if (
       criterion === undefined ||
       first === undefined ||
-      criterion.modifier === "EXCLUDES"
+      (criterion.modifier !== "INCLUDES" &&
+        criterion.modifier !== "INCLUDES_ALL")
     ) {
       return {};
     }
@@ -354,11 +358,24 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     }),
 
     // Related entities
-    performers: (c, ctx) => this.refs(SCENE_PERFORMERS, c, ctx),
+    // "Has any" and "has none" count only related rows the viewer can see
+    performers: (c, ctx) =>
+      refFieldClause(SCENE_PERFORMERS, c, ctx, {
+        table: "StashPerformer",
+        entityType: "performer",
+      }),
     tags: (c, ctx) => this.tagClause(c, ctx),
     studios: (c, ctx) => this.studioClause(c, ctx),
-    groups: (c, ctx) => this.refs(SCENE_GROUPS, c, ctx),
-    galleries: (c, ctx) => this.refs(SCENE_GALLERIES, c, ctx),
+    groups: (c, ctx) =>
+      refFieldClause(SCENE_GROUPS, c, ctx, {
+        table: "StashGroup",
+        entityType: "group",
+      }),
+    galleries: (c, ctx) =>
+      refFieldClause(SCENE_GALLERIES, c, ctx, {
+        table: "StashGallery",
+        entityType: "gallery",
+      }),
 
     // The viewer's own data
     favorite: (favorite) => buildFavoriteFilter(favorite),
@@ -429,12 +446,21 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * one without, the tagged scenes are read from the junctions' tag indexes
    * (above 64 refs, the matched set). The count reads every match in no
    * order, so it takes the second form whatever the sort (`sortedByIndex`,
-   * L8, L9).
+   * L8, L9). "Has none" is the folder view's Untagged (`tagged: false`: no
+   * own or inherited tag row, the stored count read by its browse index),
+   * "has any" its negation.
    */
   private async tagClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
+    if (criterion.modifier === "IS_NULL" || criterion.modifier === "NOT_NULL") {
+      const untagged = sceneUntaggedSql("s");
+      return {
+        sql: criterion.modifier === "IS_NULL" ? untagged : `NOT ${untagged}`,
+        params: [],
+      };
+    }
     return hierarchicalRefClause("tag", SCENE_TAGS, criterion, ctx, {
       name: ctx.name,
       inheritedJunction: SCENE_INHERITED_TAGS,
@@ -444,7 +470,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
 
   /** The studio filter, with the studios' descendants to the depth */
   private async studioClause(
-    criterion: RefCriterion,
+    criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", SCENE_STUDIO, criterion, ctx, {
