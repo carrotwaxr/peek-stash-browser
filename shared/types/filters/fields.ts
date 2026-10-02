@@ -347,6 +347,26 @@ export const GALLERY_FIELDS = {
   favorite: bool(),
   /** Galleries with at least one image the user favorited */
   hasFavoriteImage: bool(),
+  /**
+   * Galleries with (true) or without (false) one of the viewer's favourite
+   * performers, studios (or a sub-studio of one) or tags (or a sub-tag of
+   * one), counting only those the viewer can see
+   */
+  performer_favorite: bool(),
+  studio_favorite: bool(),
+  tag_favorite: bool(),
+  /**
+   * Galleries with a performer holding these tags (with a depth, their
+   * descendants too); only live performers and tags the viewer can see count
+   */
+  performer_tags: ref("tag", { hierarchical: true, excludable: true }),
+  /** The gallery's live performers the viewer can see */
+  performer_count: count(),
+  /**
+   * Any performer the viewer can see was this age on the gallery's date;
+   * a gallery without a date never matches
+   */
+  performer_age: count(),
 } as const satisfies Record<string, FieldSpec>;
 
 export const IMAGE_FIELDS = {
@@ -381,6 +401,27 @@ export const IMAGE_FIELDS = {
   created_at: date(),
   updated_at: date(),
   favorite: bool(),
+  /**
+   * Images with (true) or without (false) one of the viewer's favourite
+   * performers, studios (or a sub-studio of one) or tags (or a sub-tag of
+   * one, its galleries' tags included), counting only those the viewer can
+   * see
+   */
+  performer_favorite: bool(),
+  studio_favorite: bool(),
+  tag_favorite: bool(),
+  /**
+   * Images with a performer holding these tags (with a depth, their
+   * descendants too); only live performers and tags the viewer can see count
+   */
+  performer_tags: ref("tag", { hierarchical: true, excludable: true }),
+  /** The image's live performers the viewer can see */
+  performer_count: count(),
+  /**
+   * Any performer the viewer can see was this age on the image's date; an
+   * image without a date never matches
+   */
+  performer_age: count(),
 } as const satisfies Record<string, FieldSpec>;
 
 /**

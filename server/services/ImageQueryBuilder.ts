@@ -17,20 +17,28 @@
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type { ImageListItem } from "../types/index.js";
 import type { ImageQueryRow } from "../types/internal/queryRows.js";
-import type { RefFieldCriterion } from "../types/parsedFilters.js";
+import type {
+  RefCriterion,
+  RefFieldCriterion,
+} from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
+  type PerformerAgeSource,
   buildDayFilter,
   buildFavoriteFilter,
   buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
   imageNameSql,
+  noClause,
   orientationClause,
+  performerAgeExists,
+  performerCountClause,
+  performerTagsFieldClause,
   refClause,
   resolutionClause,
   searchAll,
@@ -48,6 +56,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  favoriteRefs,
   hierarchicalRefClause,
   refFieldClause,
   refPresence,
@@ -131,6 +140,30 @@ const IMAGE_PERFORMERS = imageJunction("ImagePerformer", "ip", "performer");
 const IMAGE_GALLERIES = imageJunction("ImageGallery", "ig", "gallery");
 
 /**
+ * The junction Performer Age reads an image's performers from. The date is
+ * read as `+i.date` (SQLite's no-op unary plus), so the clause's
+ * `IS NOT NULL` does not send the page through `StashImage_date_idx` and a
+ * temp B-tree sort of every match: on prod's 141,957 images a page by
+ * created_at took 176 ms that way, 10 walking the browse index.
+ */
+const IMAGE_PERFORMER_AGE: PerformerAgeSource = {
+  junction: {
+    table: "ImagePerformer",
+    itemId: "imageId",
+    itemInstance: "imageInstanceId",
+    performerId: "performerId",
+    performerInstance: "performerInstanceId",
+  },
+  item: { id: "i.id", instance: "i.stashInstanceId", date: "+i.date" },
+};
+
+/**
+ * The sorts a page walks an index for (StashImage_browse_idx and
+ * StashImage_browse_titleSort_idx), stopping at the page
+ */
+const INDEXED_SORTS = new Set(["created_at", "title"]);
+
+/**
  * Builds and executes SQL queries for image filtering
  */
 class ImageQueryBuilder extends EntityQueryBuilder<
@@ -187,6 +220,35 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     tags: (c, ctx) => this.tagClause(c, ctx),
     studios: (c, ctx) => this.studioClause(c, ctx),
     galleries: (c, ctx) => this.galleryClause(c, ctx),
+    // Through the tags of the image's performers; a page under a sort with
+    // an index walks it
+    performer_tags: (c, ctx) =>
+      performerTagsFieldClause(IMAGE_PERFORMERS, c, {
+        name: ctx.name,
+        allowedInstanceIds: ctx.allowedInstanceIds,
+        viewerId: ctx.applyExclusions ? ctx.userId : null,
+        sortedByIndex: INDEXED_SORTS.has(ctx.sortField) && !ctx.underAny,
+      }),
+
+    // The image's performers the viewer can see: how many, and their age
+    // on the image's date
+    performer_count: (c, ctx) =>
+      performerCountClause(
+        c,
+        IMAGE_PERFORMERS,
+        ctx.applyExclusions ? ctx.userId : null
+      ),
+    performer_age: (c, ctx) =>
+      performerAgeExists(
+        c,
+        IMAGE_PERFORMER_AGE,
+        ctx.applyExclusions ? ctx.userId : null
+      ),
+
+    // The viewer's favorite entities; false is the negation of true
+    performer_favorite: (on, ctx) => this.favoriteClause("performer", on, ctx),
+    studio_favorite: (on, ctx) => this.favoriteClause("studio", on, ctx),
+    tag_favorite: (on, ctx) => this.favoriteClause("tag", on, ctx),
 
     // Text; the URL is matched one element of the list at a time
     title: (c) => buildTextFilter(c, imageNameSql("i")),
@@ -239,6 +301,37 @@ class ImageQueryBuilder extends EntityQueryBuilder<
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", IMAGE_STUDIO, criterion, ctx, {
       name: ctx.name,
+    });
+  }
+
+  /**
+   * `tag_favorite`, `studio_favorite` and `performer_favorite`: the image
+   * has (`true`) or lacks (`false`) one of the viewer's favourites, through
+   * the same shapes as the tag, studio and performer filters. Tags count
+   * the image's tag rows (its galleries' included) and every sub-tag,
+   * studios their sub-studios (depth -1, as the Tags and Studios filters
+   * take it). A favourite the viewer hid is dropped (`favoriteRefs`). With
+   * no favourites `true` matches nothing and `false` is no filter.
+   */
+  private async favoriteClause(
+    kind: "tag" | "studio" | "performer",
+    on: boolean,
+    ctx: LeafContext
+  ): Promise<FilterClause> {
+    const refs = await favoriteRefs(kind, ctx);
+    if (refs.length === 0) {
+      return on ? { sql: "1 = 0", params: [] } : noClause();
+    }
+    const criterion: RefCriterion = {
+      refs,
+      modifier: on ? "INCLUDES" : "EXCLUDES",
+      depth: -1,
+    };
+    if (kind === "tag") return this.tagClause(criterion, ctx);
+    if (kind === "studio") return this.studioClause(criterion, ctx);
+    return refClause(IMAGE_PERFORMERS, refs, criterion.modifier, {
+      name: ctx.name,
+      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 

@@ -33,8 +33,10 @@ import type {
   FilterRef,
   MultiEnumCriterion,
   NumberCriterion,
+  RefCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, distinctRefs, pairsJson } from "./entityRef.js";
+import { expandRefs, expandRefsEach } from "./hierarchyUtils.js";
 import { jsonListArm, likeContains, likeStartsWith } from "./sqlHelpers.js";
 import { jsonListOrEmpty } from "./sqlJson.js";
 import { instantSpan } from "./zonedTime.js";
@@ -1006,7 +1008,7 @@ export interface PerformerAgeSource {
 }
 
 /**
- * Performer Age on a dated item (a scene; an image or gallery later): the
+ * Performer Age on a dated item (a scene, an image, a gallery): the
  * item matches when any of its performers was in range on the item's date.
  * An item without a date never matches, nor does a performer without a
  * birthdate or a deleted one, nor one the viewer cannot see: pass the
@@ -1062,7 +1064,8 @@ export interface PerformerTagsOptions {
 }
 
 /**
- * Items by their performers' tags (the scene filter `performer_tags`): an
+ * Items by their performers' tags (the `performer_tags` filter of scenes,
+ * images and galleries, through `performerTagsFieldClause`): an
  * item matches when one of its performers holds one of the tags, the refs
  * already expanded to their descendants. A performer counts only while it
  * is live and, with the viewer's exclusions applied, while neither it nor
@@ -1158,6 +1161,78 @@ export function performerTagsClause(
     walk = { ...held, sql: `NOT ${held.sql}` };
   }
   return opts.sortedByIndex === true ? { ...walk, count: read } : read;
+}
+
+/**
+ * The `performer_tags` field of a list whose items reach their performers
+ * through `junction` (a scene's, an image's or a gallery's): the chosen tags
+ * with their descendants to the depth (`expandRefs`), matched through
+ * `performerTagsClause`. INCLUDES_ALL is one clause per chosen tag, each
+ * with its own descendants, AND-ed: each on some performer of the item;
+ * under `sortedByIndex` the count ANDs each clause's count form.
+ */
+export async function performerTagsFieldClause(
+  junction: JunctionTarget,
+  criterion: RefCriterion,
+  opts: PerformerTagsOptions
+): Promise<FilterClause> {
+  if (criterion.modifier === "INCLUDES_ALL") {
+    const groups = await expandRefsEach(
+      "tag",
+      criterion.refs,
+      criterion.depth,
+      opts.allowedInstanceIds
+    );
+    if (groups.length === 0) return noClause();
+    const each = groups.map((group, i) =>
+      performerTagsClause(junction, group, "INCLUDES", {
+        ...opts,
+        name: `${opts.name}_${i}`,
+      })
+    );
+    // allOf keeps no count form: the count ANDs each clause's own
+    const page = allOf(each);
+    return opts.sortedByIndex === true
+      ? { ...page, count: allOf(countForms(each)) }
+      : page;
+  }
+  const refs = await expandRefs(
+    "tag",
+    criterion.refs,
+    criterion.depth,
+    opts.allowedInstanceIds
+  );
+  return performerTagsClause(junction, refs, criterion.modifier, opts);
+}
+
+/**
+ * Performer Count on an item that stores no count (an image, a gallery):
+ * the item's live performers the viewer can see, a correlated count over
+ * its performer junction, read by the junction's primary key from the
+ * item's key, the performer by its own. A deleted performer is not
+ * counted, nor, with the viewer's exclusions applied (`viewerId`), one
+ * excluded for them (`exclusionJoin` under `pce`, its every-instance arm
+ * included). The performer is on the item's own instance.
+ */
+export function performerCountClause(
+  criterion: NumberCriterion,
+  junction: JunctionTarget,
+  viewerId: number | null
+): FilterClause {
+  const [id, instance] = parentKeyOf(junction);
+  const viewer =
+    viewerId === null
+      ? ""
+      : ` ${exclusionJoin("pce", "performer", "pcp.id", "pcp.stashInstanceId")}`;
+  const count = `(SELECT COUNT(*) FROM ${junction.table} pc CROSS JOIN StashPerformer pcp ON pcp.id = pc.${junction.refIdCol} AND pcp.stashInstanceId = pc.${junction.refInstanceCol}${viewer} WHERE pc.${junction.parentIdCol} = ${id} AND pc.${junction.parentInstanceCol} = ${instance} AND pcp.deletedAt IS NULL${viewerId === null ? "" : " AND pce.id IS NULL"})`;
+  const compared = buildNumericFilter(criterion, count);
+  if (!compared.sql) return compared;
+  // The count comes first in every comparison, so its parameter does too
+  return {
+    sql: compared.sql,
+    params:
+      viewerId === null ? compared.params : [viewerId, ...compared.params],
+  };
 }
 
 /**

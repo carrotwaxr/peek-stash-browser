@@ -36,7 +36,9 @@ import {
   orientationClause,
   pairs,
   performerAgeExists,
+  performerCountClause,
   performerTagsClause,
+  performerTagsFieldClause,
   randomOrder,
   refClause,
   refPresenceClause,
@@ -1894,6 +1896,140 @@ describe("performerAgeExists", () => {
         { modifier: "BETWEEN", value: undefined, value2: undefined },
         source,
         1
+      ).sql
+    ).toBe("");
+  });
+});
+
+describe("performerCountClause", () => {
+  const IMAGE_PERFORMERS: JunctionTarget = {
+    kind: "junction",
+    table: "ImagePerformer",
+    alias: "ip",
+    parentAlias: "i",
+    parentIdCol: "imageId",
+    parentInstanceCol: "imageInstanceId",
+    refIdCol: "performerId",
+    refInstanceCol: "performerInstanceId",
+  };
+
+  it("counts the item's live performers the viewer can see, keyed on the item", () => {
+    const result = performerCountClause(
+      { modifier: "BETWEEN", value: 1, value2: 3 },
+      IMAGE_PERFORMERS,
+      7
+    );
+    expect(result.sql).toContain(
+      "FROM ImagePerformer pc CROSS JOIN StashPerformer pcp ON pcp.id = pc.performerId AND pcp.stashInstanceId = pc.performerInstanceId"
+    );
+    expect(result.sql).toContain(
+      exclusionJoin("pce", "performer", "pcp.id", "pcp.stashInstanceId")
+    );
+    expect(result.sql).toContain(
+      "pc.imageId = i.id AND pc.imageInstanceId = i.stashInstanceId AND pcp.deletedAt IS NULL AND pce.id IS NULL) BETWEEN ? AND ?"
+    );
+    // The viewer first (the count sits before the comparison)
+    expect(result.params).toEqual([7, 1, 3]);
+  });
+
+  it("without a viewer counts every live performer", () => {
+    const result = performerCountClause(
+      { modifier: "EQUALS", value: 0 },
+      IMAGE_PERFORMERS,
+      null
+    );
+    expect(result.sql).not.toContain("UserExcludedEntity");
+    expect(result.sql).toContain("pcp.deletedAt IS NULL) = ?");
+    expect(result.params).toEqual([0]);
+  });
+
+  it("a criterion without bounds filters nothing", () => {
+    expect(
+      performerCountClause(
+        { modifier: "BETWEEN", value: undefined, value2: undefined },
+        IMAGE_PERFORMERS,
+        7
+      )
+    ).toEqual({ sql: "", params: [] });
+  });
+});
+
+describe("performerTagsFieldClause", () => {
+  const GALLERY_PERFORMERS: JunctionTarget = {
+    kind: "junction",
+    table: "GalleryPerformer",
+    alias: "gp",
+    parentAlias: "g",
+    parentIdCol: "galleryId",
+    parentInstanceCol: "galleryInstanceId",
+    refIdCol: "performerId",
+    refInstanceCol: "performerInstanceId",
+  };
+  const opts = {
+    name: "performer_tags",
+    allowedInstanceIds: ["a"],
+    viewerId: null,
+  };
+  const refs = [
+    { id: "5", instanceId: "a" },
+    { id: "6", instanceId: "a" },
+  ];
+
+  it("INCLUDES and EXCLUDES at depth 0 are performerTagsClause over the junction", async () => {
+    for (const modifier of ["INCLUDES", "EXCLUDES"] as const) {
+      expect(
+        await performerTagsFieldClause(
+          GALLERY_PERFORMERS,
+          { refs, modifier, depth: 0 },
+          opts
+        )
+      ).toEqual(performerTagsClause(GALLERY_PERFORMERS, refs, modifier, opts));
+    }
+  });
+
+  it("INCLUDES_ALL is one INCLUDES per tag, AND-ed, each named apart", async () => {
+    const clause = await performerTagsFieldClause(
+      GALLERY_PERFORMERS,
+      { refs, modifier: "INCLUDES_ALL", depth: 0 },
+      opts
+    );
+    const each = refs.map((ref, i) =>
+      performerTagsClause(GALLERY_PERFORMERS, [ref], "INCLUDES", {
+        ...opts,
+        name: `performer_tags_${i}`,
+      })
+    );
+    expect(clause.sql).toBe(`(${each.map((c) => c.sql).join(" AND ")})`);
+    expect(clause.count).toBeUndefined();
+  });
+
+  it("INCLUDES_ALL under an index sort takes each clause's count form for the count", async () => {
+    const sorted = { ...opts, sortedByIndex: true };
+    const clause = await performerTagsFieldClause(
+      GALLERY_PERFORMERS,
+      { refs, modifier: "INCLUDES_ALL", depth: 0 },
+      sorted
+    );
+    const each = refs.map((ref, i) =>
+      performerTagsClause(GALLERY_PERFORMERS, [ref], "INCLUDES", {
+        ...sorted,
+        name: `performer_tags_${i}`,
+      })
+    );
+    expect(clause.sql).toContain("EXISTS (SELECT 1 FROM GalleryPerformer gp");
+    expect(must(clause.count, "the count form").sql).toBe(
+      `(${each.map((c) => must(c.count, "a count form").sql).join(" AND ")})`
+    );
+  });
+
+  it("no refs is no filter", async () => {
+    expect(
+      (
+        await performerTagsFieldClause(
+          GALLERY_PERFORMERS,
+          { refs: [], modifier: "INCLUDES_ALL", depth: 0 },
+          opts
+        )
       ).sql
     ).toBe("");
   });
