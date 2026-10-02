@@ -1,4 +1,9 @@
 // server/scripts/generate-api-docs.ts
+//
+// Writes docs/reference/api-reference.md: one entry for every route the
+// server declares. Fails, writing nothing, when a route file has a
+// `router.<method>(` call the parser cannot read (a new handler wrapper, a
+// path that is not a string literal) or is not mounted in initializers/api.ts.
 import * as fs from "fs";
 import * as path from "path";
 import type {
@@ -7,150 +12,152 @@ import type {
 } from "./lib/markdownGenerator.js";
 import { generateMarkdown } from "./lib/markdownGenerator.js";
 import type { RouteDefinition } from "./lib/routeParser.js";
-import { parseApiMounts, parseRouteFile } from "./lib/routeParser.js";
-import { enrichTypes, extractControllerTypes } from "./lib/typeExtractor.js";
+import {
+  parseApiFile,
+  parseRouteFile,
+  routeCallLines,
+} from "./lib/routeParser.js";
+import {
+  enrichTypes,
+  extractControllerTypes,
+  extractHandlerTypes,
+} from "./lib/typeExtractor.js";
 
 const SERVER_DIR = path.resolve(import.meta.dirname, "..");
 const API_FILE = path.join(SERVER_DIR, "initializers", "api.ts");
 const ROUTES_DIR = path.join(SERVER_DIR, "routes");
-const DOCS_OUTPUT = path.join(
-  SERVER_DIR,
-  "..",
-  "docs",
-  "development",
-  "api-reference.md"
-);
-
-// Routes to skip (complex handlers, streaming, etc.)
-const SKIP_ROUTES = ["video.ts"];
-
-// Group configuration for ordering and descriptions
-const GROUP_CONFIG: Record<string, { order: number; description: string }> = {
-  "/api/auth": {
-    order: 1,
-    description:
-      "Authentication endpoints for login, logout, and session management.",
-  },
-  "/api/setup": {
-    order: 2,
-    description: "Setup wizard endpoints for initial configuration.",
-  },
-  "/api/sync": {
-    order: 3,
-    description: "Cache synchronization endpoints for refreshing Stash data.",
-  },
-  "/api/exclusions": {
-    order: 4,
-    description: "Content exclusion management endpoints.",
-  },
-  "/api/user": {
-    order: 5,
-    description: "User settings and preference endpoints.",
-  },
-  "/api/playlists": {
-    order: 6,
-    description:
-      "Playlist management endpoints for creating and organizing scene collections.",
-  },
-  "/api/carousels": {
-    order: 7,
-    description: "Custom carousel configuration endpoints.",
-  },
-  "/api/watch-history": {
-    order: 8,
-    description: "Watch history tracking endpoints.",
-  },
-  "/api/image-view-history": {
-    order: 9,
-    description: "Image view history tracking endpoints.",
-  },
-  "/api/ratings": {
-    order: 10,
-    description: "Rating and favorite management endpoints.",
-  },
-  "/api/themes/custom": {
-    order: 11,
-    description: "Custom theme management endpoints.",
-  },
-  "/api/library": {
-    order: 12,
-    description:
-      "Library browsing endpoints for scenes, performers, studios, tags, groups, galleries, and images.",
-  },
-};
+const DOCS_DIR = path.join(SERVER_DIR, "..", "docs");
+const DOCS_OUTPUT = path.join(DOCS_DIR, "reference", "api-reference.md");
+// Where older versions wrote the page; mkdocs.yml redirects it to DOCS_OUTPUT
+const OLD_DOCS_OUTPUT = path.join(DOCS_DIR, "development", "api-reference.md");
 
 /**
- * Recursively find all route files in a directory
+ * Groups in page order. A route goes into the first group with a prefix
+ * covering its path; one no group covers gets a group of its own.
  */
-function findRouteFiles(dir: string): string[] {
-  const files: string[] = [];
+const GROUPS: { name: string; prefixes: string[]; description: string }[] = [
+  {
+    name: "Server",
+    prefixes: ["/api/health", "/api/version", "/api/stats"],
+    description: "Health check, version, and server statistics.",
+  },
+  {
+    name: "Auth",
+    prefixes: ["/api/auth"],
+    description:
+      "Sign in and out, the signed-in user, and password recovery with a recovery key.",
+  },
+  {
+    name: "Setup",
+    prefixes: ["/api/setup"],
+    description:
+      "The setup wizard, and the admin's management of Stash servers.",
+  },
+  {
+    name: "User",
+    prefixes: ["/api/user"],
+    description:
+      "The signed-in user's settings, filter presets, hidden items, Stash server selection and permissions; user management for admins.",
+  },
+  {
+    name: "User Groups",
+    prefixes: ["/api/groups"],
+    description: "User groups and their members (admin only, except your own).",
+  },
+  {
+    name: "Library",
+    prefixes: ["/api/library"],
+    description:
+      "Browsing scenes, performers, studios, tags, collections, galleries and images, with the user's restrictions and hidden items applied.",
+  },
+  {
+    name: "Clips",
+    prefixes: ["/api/clips", "/api/scenes"],
+    description: "Clips (scene markers from Stash).",
+  },
+  {
+    name: "Timeline",
+    prefixes: ["/api/timeline"],
+    description: "Date distribution for the timeline view.",
+  },
+  {
+    name: "Playback",
+    prefixes: ["/api/scene"],
+    description:
+      "The stream and caption proxy, and the external player's personal signed link.",
+  },
+  {
+    name: "Media Proxy",
+    prefixes: ["/api/proxy"],
+    description:
+      "Images and previews from Stash, served through Peek so no user gets Stash's address or API key.",
+  },
+  {
+    name: "Playlists",
+    prefixes: ["/api/playlists"],
+    description: "Playlists, their items, play queue and sharing.",
+  },
+  {
+    name: "Downloads",
+    prefixes: ["/api/downloads"],
+    description: "Scene, image and playlist downloads.",
+  },
+  {
+    name: "Ratings",
+    prefixes: ["/api/ratings"],
+    description: "The user's ratings and favorites.",
+  },
+  {
+    name: "Watch History",
+    prefixes: ["/api/watch-history"],
+    description: "Plays, resume points and O counts of scenes.",
+  },
+  {
+    name: "Image View History",
+    prefixes: ["/api/image-view-history"],
+    description: "Image views and O counts.",
+  },
+  {
+    name: "User Stats",
+    prefixes: ["/api/user-stats"],
+    description: "The user's own statistics.",
+  },
+  {
+    name: "Carousels",
+    prefixes: ["/api/carousels"],
+    description: "Custom home page carousels.",
+  },
+  {
+    name: "Custom Themes",
+    prefixes: ["/api/themes/custom"],
+    description: "Custom themes.",
+  },
+  {
+    name: "Sync",
+    prefixes: ["/api/sync"],
+    description: "Syncing the library cache from Stash (admin only).",
+  },
+  {
+    name: "Exclusions",
+    prefixes: ["/api/exclusions"],
+    description: "Recomputing the content-restriction exclusions (admin only).",
+  },
+  {
+    name: "Admin",
+    prefixes: ["/api/admin"],
+    description: "Merge reconciliation and database backups (admin only).",
+  },
+];
 
-  if (!fs.existsSync(dir)) {
-    return files;
-  }
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-
-    if (entry.isDirectory()) {
-      files.push(...findRouteFiles(fullPath));
-    } else if (entry.isFile() && entry.name.endsWith(".ts")) {
-      // Skip configured routes
-      if (!SKIP_ROUTES.includes(entry.name)) {
-        files.push(fullPath);
-      }
-    }
-  }
-
-  return files;
+function covers(prefix: string, fullPath: string): boolean {
+  return fullPath === prefix || fullPath.startsWith(`${prefix}/`);
 }
 
 /**
- * Find base path for a route file based on API mounts
- */
-function findBasePath(
-  routeFile: string,
-  mounts: Map<string, string>,
-  apiContent: string
-): string | null {
-  const relativePath = path.relative(ROUTES_DIR, routeFile);
-  const routeFileName = path.basename(routeFile, ".ts");
-
-  // Try to match import statement to find the variable name
-  // Match patterns like: import xxxRoutes from "../routes/xxx.js"
-  const importPattern = new RegExp(
-    `import\\s+(\\w+)\\s+from\\s+["']\\.\\./routes/${relativePath.replace(/\\/g, "/").replace(/\.ts$/, ".js")}["']`,
-    "m"
-  );
-
-  const match = apiContent.match(importPattern);
-  if (match) {
-    const varName = match[1] as string;
-    return mounts.get(varName) ?? null;
-  }
-
-  // Fallback: try matching by route file name
-  for (const [varName, basePath] of mounts) {
-    // Check if variable name matches file name pattern
-    const expectedVarName =
-      routeFileName.replace(/([A-Z])/g, (m) => m.toLowerCase()) + "Routes";
-    if (varName.toLowerCase() === expectedVarName.toLowerCase()) {
-      return basePath;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Format base path to a readable group name
+ * Format a base path to a readable group name:
+ * /api/watch-history -> Watch History, /api/themes/custom -> Custom Themes
  */
 function formatGroupName(basePath: string): string {
-  // /api/watch-history -> Watch History
-  // /api/library -> Library
-  // /api/themes/custom -> Custom Themes
   const segments = basePath
     .replace(/^\/api\/?/, "")
     .split("/")
@@ -167,96 +174,121 @@ function formatGroupName(basePath: string): string {
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(" ")
     )
-    .reverse() // Put "custom" before "themes"
+    .reverse()
     .join(" ");
 }
 
-async function main() {
-  await Promise.resolve(); // async entry point for top-level .catch()
-  console.log("Generating API documentation...");
-
-  // Read API file content for import matching
-  const apiContent = fs.readFileSync(API_FILE, "utf-8");
-
-  // Parse mount points from api.ts
-  const mounts = parseApiMounts(API_FILE);
-  console.log(`Found ${mounts.size} route mounts`);
-
-  // Find all route files
-  const routeFiles = findRouteFiles(ROUTES_DIR);
-  console.log(`Found ${routeFiles.length} route files (excluding skipped)`);
-
-  // Group routes by base path
-  const groupedRoutes = new Map<string, DocumentedRoute[]>();
-
-  for (const routeFile of routeFiles) {
-    const basePath = findBasePath(routeFile, mounts, apiContent);
-
-    if (!basePath) {
-      console.warn(
-        `  Warning: No mount found for ${path.relative(ROUTES_DIR, routeFile)}`
-      );
-      continue;
-    }
-
-    console.log(
-      `  Processing ${path.relative(ROUTES_DIR, routeFile)} -> ${basePath}`
-    );
-
-    // Parse routes from file
-    const routes = parseRouteFile(routeFile, basePath);
-
-    // Enrich each route with type information
-    const documentedRoutes: DocumentedRoute[] = routes.map(
-      (route: RouteDefinition) => {
-        const rawTypes = extractControllerTypes(
-          route.controllerFile,
-          route.controllerName,
-          SERVER_DIR
-        );
-        const types = enrichTypes(rawTypes, SERVER_DIR);
-
-        return {
-          ...route,
-          types,
-        };
-      }
-    );
-
-    // Add to group
-    const existing = groupedRoutes.get(basePath) ?? [];
-    groupedRoutes.set(basePath, [...existing, ...documentedRoutes]);
-  }
-
-  // Convert to DocumentedGroup array and sort
-  const groups: DocumentedGroup[] = Array.from(groupedRoutes.entries())
-    .map(([basePath, routes]) => ({
-      name: formatGroupName(basePath),
-      description: GROUP_CONFIG[basePath]?.description ?? "",
-      routes,
-      _order: GROUP_CONFIG[basePath]?.order ?? 999,
-    }))
-    .sort((a, b) => a._order - b._order)
-    .map(({ _order, ...group }) => group);
-
-  // Generate markdown
-  const markdown = generateMarkdown(groups);
-
-  // Ensure output directory exists
-  const outputDir = path.dirname(DOCS_OUTPUT);
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
-  // Write output
-  fs.writeFileSync(DOCS_OUTPUT, markdown);
-
-  // Summary
-  const totalRoutes = groups.reduce((sum, g) => sum + g.routes.length, 0);
-  console.log(`\nGenerated documentation:`);
-  console.log(`  Groups: ${groups.length}`);
-  console.log(`  Routes: ${totalRoutes}`);
-  console.log(`  Output: ${DOCS_OUTPUT}`);
+function groupNameOf(fullPath: string): string {
+  const group = GROUPS.find((g) => g.prefixes.some((p) => covers(p, fullPath)));
+  return (
+    group?.name ?? formatGroupName(fullPath.split("/").slice(0, 3).join("/"))
+  );
 }
 
-main().catch(console.error);
+function findRouteFiles(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) return findRouteFiles(fullPath);
+    return entry.isFile() && entry.name.endsWith(".ts") ? [fullPath] : [];
+  });
+}
+
+/** Lines of `file` with a route call `routes` holds no entry for */
+function unreadLines(file: string, routes: RouteDefinition[]): string[] {
+  const read = new Set(routes.map((r) => r.line));
+  return routeCallLines(fs.readFileSync(file, "utf-8"))
+    .filter((line) => !read.has(line))
+    .map((line) => `${path.relative(SERVER_DIR, file)}:${line}`);
+}
+
+function document(route: RouteDefinition): DocumentedRoute {
+  const rawTypes =
+    route.inlineHandler !== null
+      ? extractHandlerTypes(route.inlineHandler)
+      : extractControllerTypes(
+          route.handlerFile,
+          route.handlerName ?? "",
+          SERVER_DIR
+        );
+  return { ...route, types: enrichTypes(rawTypes, SERVER_DIR) };
+}
+
+function main() {
+  console.log("Generating API documentation...");
+
+  const api = parseApiFile(API_FILE, SERVER_DIR);
+  const problems: string[] = [];
+  const routes: RouteDefinition[] = [...api.routes];
+  problems.push(
+    ...unreadLines(API_FILE, api.routes).map(
+      (where) => `${where}: route the parser cannot read`
+    )
+  );
+
+  const mounted = new Set<string>();
+  for (const mount of api.mounts) {
+    mounted.add(mount.file);
+    const fileRoutes = parseRouteFile(mount.file, mount.basePath, {
+      serverDir: SERVER_DIR,
+      middleware: mount.middleware,
+      prefixMiddleware: mount.prefixMiddleware,
+    });
+    console.log(
+      `  ${path.relative(ROUTES_DIR, mount.file)} -> ${mount.basePath} (${fileRoutes.length} routes)`
+    );
+    problems.push(
+      ...unreadLines(mount.file, fileRoutes).map(
+        (where) => `${where}: route the parser cannot read`
+      )
+    );
+    routes.push(...fileRoutes);
+  }
+
+  for (const file of findRouteFiles(ROUTES_DIR)) {
+    if (!mounted.has(file)) {
+      problems.push(
+        `${path.relative(SERVER_DIR, file)}: not mounted in initializers/api.ts`
+      );
+    }
+  }
+
+  if (problems.length > 0) {
+    for (const problem of problems) console.error(`  Error: ${problem}`);
+    console.error(
+      "\nAPI documentation not written: teach scripts/lib/routeParser.ts to read these routes."
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const grouped = new Map<string, DocumentedRoute[]>();
+  for (const route of routes) {
+    const name = groupNameOf(route.fullPath);
+    grouped.set(name, [...(grouped.get(name) ?? []), document(route)]);
+  }
+
+  const order = (name: string) => {
+    const index = GROUPS.findIndex((g) => g.name === name);
+    return index === -1 ? GROUPS.length : index;
+  };
+  const groups: DocumentedGroup[] = Array.from(grouped.entries())
+    .map(([name, groupRoutes]) => ({
+      name,
+      description: GROUPS.find((g) => g.name === name)?.description ?? "",
+      routes: groupRoutes,
+    }))
+    .sort((a, b) => order(a.name) - order(b.name));
+
+  fs.mkdirSync(path.dirname(DOCS_OUTPUT), { recursive: true });
+  fs.writeFileSync(DOCS_OUTPUT, generateMarkdown(groups));
+  fs.rmSync(OLD_DOCS_OUTPUT, { force: true });
+
+  console.log(`\nGenerated documentation:`);
+  console.log(`  Groups: ${groups.length}`);
+  console.log(`  Routes: ${routes.length}`);
+  console.log(
+    `  Output: ${path.relative(path.dirname(SERVER_DIR), DOCS_OUTPUT)}`
+  );
+}
+
+main();

@@ -1,6 +1,6 @@
 // server/scripts/lib/markdownGenerator.ts
 import type { RouteDefinition } from "./routeParser.js";
-import type { ControllerTypes } from "./typeExtractor.js";
+import type { ControllerTypes, TypeInfo } from "./typeExtractor.js";
 
 export interface DocumentedRoute extends RouteDefinition {
   types: ControllerTypes;
@@ -12,20 +12,47 @@ export interface DocumentedGroup {
   routes: DocumentedRoute[];
 }
 
+function typeBlock(lines: string[], label: string, info?: TypeInfo) {
+  if (info?.definition) {
+    lines.push(
+      `**${label}:**`,
+      "",
+      "```typescript",
+      info.definition,
+      "```",
+      ""
+    );
+  } else if (info?.name) {
+    lines.push(`**${label}:** \`${info.name}\``, "");
+  }
+}
+
+function handlerLine(route: DocumentedRoute): string {
+  if (route.handlerName === null) {
+    return `**Handler:** inline in \`server/${route.handlerFile}\``;
+  }
+  const where = route.handlerFile ? ` in \`server/${route.handlerFile}\`` : "";
+  return `**Handler:** \`${route.handlerName}\`${where}`;
+}
+
 /**
  * Generate markdown documentation from route groups
  */
 export function generateMarkdown(groups: DocumentedGroup[]): string {
   const lines: string[] = [];
 
-  // Header
   lines.push("# API Reference");
   lines.push("");
-  lines.push("> Auto-generated from TypeScript source files.");
+  lines.push(
+    "> Generated from the server's source by `cd server && npm run generate-api-docs`; do not edit it by hand."
+  );
   lines.push(`> Last updated: ${new Date().toISOString().split("T")[0]}`);
   lines.push("");
+  lines.push(
+    "**Authentication** names who may call a route: **None** (anyone), **Session** (a signed-in Peek user), **Admin** (a signed-in admin), **Session or signed link** (a session, or the personal link the external player gets), or **None until setup starts, then Admin** (open to the setup wizard while Peek has no user and no Stash server)."
+  );
+  lines.push("");
 
-  // Table of contents
   lines.push("## Contents");
   lines.push("");
   for (const group of groups) {
@@ -34,7 +61,6 @@ export function generateMarkdown(groups: DocumentedGroup[]): string {
   }
   lines.push("");
 
-  // Each group
   for (const group of groups) {
     lines.push(`## ${group.name}`);
     lines.push("");
@@ -46,58 +72,19 @@ export function generateMarkdown(groups: DocumentedGroup[]): string {
     for (const route of group.routes) {
       lines.push(`### ${route.method} ${route.fullPath}`);
       lines.push("");
-      lines.push(
-        `**Authentication:** ${route.requiresAuth ? "Required" : "None"}`
-      );
+      if (route.description) {
+        lines.push(route.description);
+        lines.push("");
+      }
+      lines.push(`**Authentication:** ${route.auth}`);
       lines.push("");
 
-      // Request body
-      if (route.types.requestBody?.definition) {
-        lines.push("**Request Body:**");
-        lines.push("");
-        lines.push("```typescript");
-        lines.push(formatTypeDefinition(route.types.requestBody.definition));
-        lines.push("```");
-        lines.push("");
-      }
+      typeBlock(lines, "Request Body", route.types.requestBody);
+      typeBlock(lines, "URL Parameters", route.types.requestParams);
+      typeBlock(lines, "Query Parameters", route.types.requestQuery);
+      typeBlock(lines, "Response", route.types.response);
 
-      // Request params
-      if (route.types.requestParams?.definition) {
-        lines.push("**URL Parameters:**");
-        lines.push("");
-        lines.push("```typescript");
-        lines.push(formatTypeDefinition(route.types.requestParams.definition));
-        lines.push("```");
-        lines.push("");
-      }
-
-      // Request query
-      if (route.types.requestQuery?.definition) {
-        lines.push("**Query Parameters:**");
-        lines.push("");
-        lines.push("```typescript");
-        lines.push(formatTypeDefinition(route.types.requestQuery.definition));
-        lines.push("```");
-        lines.push("");
-      }
-
-      // Response
-      if (route.types.response?.definition) {
-        lines.push("**Response:**");
-        lines.push("");
-        lines.push("```typescript");
-        lines.push(formatTypeDefinition(route.types.response.definition));
-        lines.push("```");
-        lines.push("");
-      } else if (route.types.response?.name) {
-        lines.push(`**Response:** \`${route.types.response.name}\``);
-        lines.push("");
-      }
-
-      // Controller reference
-      lines.push(
-        `**Controller:** \`${route.controllerName}\` in \`${route.controllerFile}\``
-      );
+      lines.push(handlerLine(route));
       lines.push("");
       lines.push("---");
       lines.push("");
@@ -105,16 +92,4 @@ export function generateMarkdown(groups: DocumentedGroup[]): string {
   }
 
   return lines.join("\n");
-}
-
-/**
- * Format type definition for readability
- */
-function formatTypeDefinition(definition: string): string {
-  // Basic formatting - add newlines after { and before }
-  return definition
-    .replace(/{\s*/g, "{\n  ")
-    .replace(/;\s*/g, ";\n  ")
-    .replace(/\s*}/g, "\n}")
-    .replace(/\n\s*\n/g, "\n");
 }

@@ -15,149 +15,188 @@ export interface ControllerTypes {
   response?: TypeInfo | undefined;
 }
 
+const OPENERS = "<{([";
+const CLOSERS = ">})]";
+
 /**
- * Extract type parameters from a controller function signature
+ * Index of the bracket closing the one at `open`, counting every bracket
+ * kind and skipping the `>` of `=>`; -1 when it never closes
  */
-export function extractControllerTypes(
-  controllerFile: string,
-  controllerName: string,
-  serverDir: string
-): ControllerTypes {
-  const fullPath = path.resolve(
-    serverDir,
-    "controllers",
-    controllerFile.replace(/^\.\.\/controllers\//, "")
-  );
-
-  if (!fs.existsSync(fullPath)) {
-    return {};
-  }
-
-  const content = fs.readFileSync(fullPath, "utf-8");
-  const result: ControllerTypes = {};
-
-  // Step 1: Find the controller's function signature (up to the opening brace)
-  // This prevents matching across multiple function definitions
-  const signatureStartRegex = new RegExp(
-    `export\\s+const\\s+${controllerName}\\s*=\\s*async\\s*\\(`,
-    "m"
-  );
-
-  const startMatch = signatureStartRegex.exec(content);
-  if (!startMatch) {
-    return {};
-  }
-
-  // Find the end of the parameter list (closing paren before arrow or opening brace)
-  const startIndex = startMatch.index + startMatch[0].length;
-  let parenDepth = 1;
-  let endIndex = startIndex;
-
-  while (endIndex < content.length && parenDepth > 0) {
-    const char = content[endIndex];
-    if (char === "(") parenDepth++;
-    else if (char === ")") parenDepth--;
-    endIndex++;
-  }
-
-  // Extract just the parameter list for this specific controller
-  const parameterList = content.slice(startIndex, endIndex - 1);
-
-  // Step 2: Check if this controller uses TypedRequest or TypedAuthRequest with generics
-  // Only match if there's an actual <...> with type parameters
-  const reqMatch = parameterList.match(
-    /req:\s*(?:TypedAuthRequest|TypedRequest)<([^>]+)>/
-  );
-
-  if (reqMatch) {
-    const reqTypes = reqMatch[1] as string;
-    const parts = splitTypeParams(reqTypes);
-    if (parts[0] && parts[0] !== "unknown") {
-      result.requestBody = { name: parts[0], definition: "", sourceFile: "" };
-    }
-    if (parts[1]) {
-      result.requestParams = { name: parts[1], definition: "", sourceFile: "" };
-    }
-    if (parts[2]) {
-      result.requestQuery = { name: parts[2], definition: "", sourceFile: "" };
+function closingIndex(src: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    const ch = src[i] ?? "";
+    if (OPENERS.includes(ch)) depth++;
+    else if (CLOSERS.includes(ch) && !(ch === ">" && src[i - 1] === "=")) {
+      depth--;
+      if (depth === 0) return i;
     }
   }
-  // If req uses plain Request or AuthenticatedRequest (no generics), don't populate request types
-
-  // Step 3: Extract response type
-  const resMatch = parameterList.match(/res:\s*TypedResponse<([^>]+)>/);
-
-  if (resMatch) {
-    const resType = resMatch[1] as string;
-    const cleanType = resType.replace(/\s*\|\s*ApiErrorResponse/, "").trim();
-    result.response = { name: cleanType, definition: "", sourceFile: "" };
-  }
-
-  return result;
+  return -1;
 }
 
-/**
- * Split generic type parameters, handling nested generics
- */
-function splitTypeParams(typeStr: string): string[] {
-  const result: string[] = [];
-  let current = "";
+/** Split at `separator` outside any brackets, each part trimmed to one line */
+function splitTopLevel(text: string, separator: string): string[] {
+  const parts: string[] = [];
   let depth = 0;
-
-  for (const char of typeStr) {
-    if (char === "<") depth++;
-    else if (char === ">") depth--;
-    else if (char === "," && depth === 0) {
-      result.push(current.trim());
+  let current = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i] ?? "";
+    if (OPENERS.includes(ch)) depth++;
+    else if (CLOSERS.includes(ch) && !(ch === ">" && text[i - 1] === "=")) {
+      depth--;
+    } else if (ch === separator && depth === 0) {
+      parts.push(current);
       current = "";
       continue;
     }
-    current += char;
+    current += ch;
   }
-  if (current.trim()) {
-    result.push(current.trim());
+  parts.push(current);
+  return parts.map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
+}
+
+/** The text inside the `<...>` that follows `pattern` in `src`, or null */
+function genericArgs(src: string, pattern: RegExp): string | null {
+  const match = pattern.exec(src);
+  if (!match) return null;
+  const open = match.index + match[0].length - 1;
+  const close = closingIndex(src, open);
+  return close === -1 ? null : src.slice(open + 1, close);
+}
+
+const typeName = (name: string): TypeInfo => ({
+  name,
+  definition: "",
+  sourceFile: "",
+});
+
+/** Request and response types from a handler's parameter list */
+function typesFromParams(params: string): ControllerTypes {
+  const result: ControllerTypes = {};
+
+  const request = genericArgs(
+    params,
+    /\b_?req\s*:\s*(?:TypedAuthRequest|TypedRequest|TypedLibraryRequest)\s*</
+  );
+  if (request !== null) {
+    const [body, requestParams, query] = splitTopLevel(request, ",");
+    if (body && body !== "unknown") result.requestBody = typeName(body);
+    if (requestParams) result.requestParams = typeName(requestParams);
+    if (query) result.requestQuery = typeName(query);
+  }
+
+  const response = genericArgs(params, /\b_?res\s*:\s*TypedResponse\s*</);
+  if (response !== null) {
+    const members = splitTopLevel(response, "|").filter(
+      (member) => member !== "ApiErrorResponse"
+    );
+    if (members.length > 0) result.response = typeName(members.join(" | "));
   }
 
   return result;
 }
 
-/**
- * Resolve a type name to its full definition from types/api/*.ts files
- */
-export function resolveTypeDefinition(
-  typeName: string,
-  serverDir: string
-): TypeInfo | null {
-  const apiTypesDir = path.join(serverDir, "types", "api");
+/** The parameter list of the function whose `(` is at `open` */
+function parameterList(src: string, open: number): string {
+  const close = closingIndex(src, open);
+  return close === -1 ? "" : src.slice(open + 1, close);
+}
 
-  if (!fs.existsSync(apiTypesDir)) {
+/**
+ * Types from a named handler's signature, in `handlerFile` (server-relative)
+ */
+export function extractControllerTypes(
+  handlerFile: string,
+  handlerName: string,
+  serverDir: string
+): ControllerTypes {
+  if (!handlerFile || !/^\w+$/.test(handlerName)) return {};
+  const fullPath = path.resolve(serverDir, handlerFile);
+  if (!fs.existsSync(fullPath)) return {};
+
+  const content = fs.readFileSync(fullPath, "utf-8");
+  const start = new RegExp(
+    `(?:const\\s+${handlerName}\\s*=\\s*(?:async\\s*)?\\(|function\\s+${handlerName}\\s*\\()`
+  ).exec(content);
+  if (!start) return {};
+
+  return typesFromParams(
+    parameterList(content, start.index + start[0].length - 1)
+  );
+}
+
+/**
+ * Types from an inline handler's source, such as
+ * `authenticated(async (req: TypedAuthRequest<Body>, res) => ...)`
+ */
+export function extractHandlerTypes(source: string): ControllerTypes {
+  const start = /^(?:\w+\(\s*)?(?:async\s*)?(?:function\b\s*\w*\s*)?\(/.exec(
+    source
+  );
+  if (!start) return {};
+  return typesFromParams(parameterList(source, start[0].length - 1));
+}
+
+/** The declaration starting at `start` (after `export `), through its end */
+function declarationAt(content: string, start: number, isType: boolean) {
+  if (isType) {
+    // A type alias ends at the first `;` outside brackets
+    let depth = 0;
+    for (let i = start; i < content.length; i++) {
+      const ch = content[i] ?? "";
+      if (OPENERS.includes(ch)) depth++;
+      else if (
+        CLOSERS.includes(ch) &&
+        !(ch === ">" && content[i - 1] === "=")
+      ) {
+        depth--;
+      } else if (ch === ";" && depth === 0) return content.slice(start, i + 1);
+    }
     return null;
   }
+  const brace = content.indexOf("{", start);
+  if (brace === -1) return null;
+  const close = closingIndex(content, brace);
+  return close === -1 ? null : content.slice(start, close + 1);
+}
 
-  const files = fs
-    .readdirSync(apiTypesDir)
-    .filter((f) => f.endsWith(".ts") && f !== "index.ts");
+/**
+ * Resolve a type name to its declaration in `server/types/api/` or
+ * `shared/types/api/`: an interface, or a type alias
+ */
+export function resolveTypeDefinition(
+  name: string,
+  serverDir: string
+): TypeInfo | null {
+  if (!/^\w+$/.test(name)) return null;
 
-  for (const file of files) {
-    const filePath = path.join(apiTypesDir, file);
-    const content = fs.readFileSync(filePath, "utf-8");
+  const dirs = [
+    { dir: path.join(serverDir, "types", "api"), label: "server/types/api" },
+    {
+      dir: path.join(serverDir, "..", "shared", "types", "api"),
+      label: "shared/types/api",
+    },
+  ];
+  const declaration = new RegExp(
+    `export\\s+(?:(interface)\\s+${name}\\b|(type)\\s+${name}\\b[^=;]*=)`
+  );
 
-    // Find: export interface TypeName
-    const interfaceStart = new RegExp(
-      `export\\s+interface\\s+${typeName}\\s*(?:extends[^{]+)?{`,
-      "m"
-    );
+  for (const { dir, label } of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".ts") && f !== "index.ts")
+      .sort();
 
-    const match = interfaceStart.exec(content);
-    if (match) {
-      const startIndex = match.index + match[0].length - 1; // Position of opening {
-      const body = extractBracedContent(content, startIndex);
-      if (body) {
-        return {
-          name: typeName,
-          definition: `interface ${typeName} ${body}`,
-          sourceFile: `types/api/${file}`,
-        };
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(dir, file), "utf-8");
+      const match = declaration.exec(content);
+      if (!match) continue;
+      const start = match.index + match[0].indexOf(match[1] ?? match[2] ?? "");
+      const definition = declarationAt(content, start, Boolean(match[2]));
+      if (definition) {
+        return { name, definition, sourceFile: `${label}/${file}` };
       }
     }
   }
@@ -166,34 +205,8 @@ export function resolveTypeDefinition(
 }
 
 /**
- * Extract content between matching braces using depth counting
- */
-function extractBracedContent(
-  content: string,
-  startIndex: number
-): string | null {
-  if (content[startIndex] !== "{") return null;
-
-  let depth = 0;
-  let i = startIndex;
-
-  while (i < content.length) {
-    const char = content[i];
-    if (char === "{") depth++;
-    else if (char === "}") {
-      depth--;
-      if (depth === 0) {
-        return content.slice(startIndex, i + 1);
-      }
-    }
-    i++;
-  }
-
-  return null; // Unbalanced braces
-}
-
-/**
- * Enrich ControllerTypes with resolved definitions
+ * Enrich ControllerTypes with resolved definitions; an inline object type is
+ * its own definition
  */
 export function enrichTypes(
   types: ControllerTypes,
@@ -201,8 +214,8 @@ export function enrichTypes(
 ): ControllerTypes {
   const enrich = (info?: TypeInfo): TypeInfo | undefined => {
     if (!info) return undefined;
-    const resolved = resolveTypeDefinition(info.name, serverDir);
-    return resolved ?? info;
+    if (info.name.startsWith("{")) return { ...info, definition: info.name };
+    return resolveTypeDefinition(info.name, serverDir) ?? info;
   };
 
   return {

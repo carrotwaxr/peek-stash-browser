@@ -12,6 +12,8 @@ on:
       - "server/types/api/**"
       - "server/controllers/**"
       - "server/scripts/**"
+      - "server/initializers/api.ts"
+      - "shared/types/**"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
