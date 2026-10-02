@@ -108,6 +108,7 @@ const LIBRARY_ROUTES = [
   "GET /api/user-stats",
   "GET /api/watch-history/scenes",
   "GET /api/timeline/:entityType/distribution",
+  "POST /api/timeline/:entityType/distribution",
 ];
 
 /** Where `initializers/api.ts` mounts each router (checked below). */

@@ -243,6 +243,12 @@ export interface ListResult<Entity> {
   total: number | null;
 }
 
+/** One period's rows (`periodCounts`): a timeline bar */
+export interface PeriodCount {
+  period: string;
+  count: number;
+}
+
 /** The seed of a random sort no request set (the parser always sets one) */
 export const DEFAULT_RANDOM_SEED = 12345;
 
@@ -673,6 +679,41 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     const { request } = options;
     const ctx = this.context(options, request);
     return this.countRows(await this.build(ctx, request));
+  }
+
+  /**
+   * The request's rows per period, as `count` counts them (C12): the
+   * timeline's bars. The statement is the count's (its clauses' count
+   * forms), so exclusions, instances, `deletedAt`, the search and every
+   * filter are the list's and the bars equal the grid by construction.
+   * `periodSql` is the period of `dateColumn`, a whole-day text date
+   * (`YYYY-MM-DD`); rows without one, and periods before year 0, have no
+   * bar. Page and sort are not read, except for the shape a clause takes
+   * for its count.
+   */
+  async periodCounts(
+    options: ListQueryOptions<K>,
+    periodSql: string,
+    dateColumn: string
+  ): Promise<PeriodCount[]> {
+    const { request } = options;
+    const ctx = this.context(options, request);
+    const parts = (await this.build(ctx, request)).count;
+    const sql = `${parts.with}SELECT period, COUNT(*) AS count FROM (
+SELECT ${periodSql} AS period
+${parts.from}
+WHERE ${parts.where} AND ${dateColumn} LIKE '____-__-__'
+)
+GROUP BY period
+HAVING period IS NOT NULL AND period NOT LIKE '-%'
+ORDER BY period`;
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ period: string; count: bigint }>
+    >(sql, ...parts.withParams, ...parts.fromParams, ...parts.whereParams);
+    return rows.map((row) => ({
+      period: row.period,
+      count: Number(row.count),
+    }));
   }
 
   /**

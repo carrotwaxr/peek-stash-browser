@@ -4,6 +4,7 @@ import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { expectRefused } from "../helpers/refused.js";
 import {
+  TestClient,
   adminClient,
   findTestInstanceId,
   guestClient,
@@ -287,6 +288,269 @@ describe("Timeline API", () => {
         `${path}&performerId=1&performerId=2`
       );
       expectRefused(response, ["performerId"]);
+    });
+  });
+  /**
+   * The bars count what the list shows (C12, UD-09): the POST takes the
+   * list's own request (`filter: { q }`, `<entity>_filter`, `ids`) plus
+   * `granularity`, and counts through the list builder, so a bar's total is
+   * the grid's for the same body (the grid's dated rows: every replay date
+   * is a whole day, so NOT_NULL on `date` is the bars' rows)
+   */
+  describe("POST /api/timeline/:entityType/distribution", () => {
+    type Bars = DistributionResponse["distribution"];
+    let instanceId: string;
+
+    const total = (bars: Bars): number =>
+      bars.reduce((sum, bar) => sum + bar.count, 0);
+
+    async function bars(
+      body: Record<string, unknown>,
+      client: TestClient = adminClient,
+      headers: Record<string, string> = {}
+    ): Promise<Bars> {
+      const response = await client.post<DistributionResponse>(
+        "/api/timeline/scene/distribution",
+        { granularity: "years", ...body },
+        { headers }
+      );
+      expect(response.status, JSON.stringify(response.data)).toBe(200);
+      return response.data.distribution;
+    }
+
+    /** The scene grid's total for the same body, its dated rows */
+    async function gridTotal(
+      body: { filter?: object; scene_filter?: object; ids?: string[] },
+      client: TestClient = adminClient,
+      headers: Record<string, string> = {}
+    ): Promise<number> {
+      const response = await client.post<{ findScenes: { count: number } }>(
+        "/api/library/scenes",
+        {
+          ...body,
+          filter: { ...body.filter, per_page: 1 },
+          scene_filter: {
+            ...body.scene_filter,
+            date: { modifier: "NOT_NULL" },
+          },
+        },
+        { headers }
+      );
+      expect(response.status, JSON.stringify(response.data)).toBe(200);
+      return response.data.findScenes.count;
+    }
+
+    beforeAll(async () => {
+      instanceId = await findTestInstanceId();
+      await selectAllInstances();
+    });
+
+    afterAll(restoreInstanceSelection);
+
+    it("rejects unauthenticated requests", async () => {
+      const response = await guestClient.post(
+        "/api/timeline/scene/distribution",
+        {}
+      );
+      expect(response.status).toBe(401);
+    });
+
+    it("a tag page's bars count scenes that inherit the tag", async () => {
+      const tag = `${TEST_ENTITIES.tagWithEntities}:${instanceId}`;
+      const body = {
+        scene_filter: { tags: { value: [tag], modifier: "INCLUDES" } },
+      };
+      // The tag's dated scenes all hold it by inheritance (from a performer,
+      // studio or collection): the old bars, on SceneTag alone, were 0
+      const direct = await prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
+        `SELECT COUNT(*) AS n FROM SceneTag st
+         JOIN StashScene s ON s.id = st.sceneId AND s.stashInstanceId = st.sceneInstanceId
+         WHERE st.tagId = ? AND st.tagInstanceId = ? AND s.deletedAt IS NULL
+           AND s.date LIKE '____-__-__'`,
+        TEST_ENTITIES.tagWithEntities,
+        instanceId
+      );
+      const inherited = total(await bars(body));
+
+      expect(inherited).toBe(await gridTotal(body));
+      expect(inherited).toBeGreaterThan(
+        Number(must(direct[0], "a count row").n)
+      );
+    });
+
+    it("the bars apply a panel filter and the search text", async () => {
+      const body = {
+        filter: { q: "10002" },
+        scene_filter: { rating100: { modifier: "IS_NULL" } },
+      };
+      const filtered = total(await bars(body));
+
+      expect(filtered).toBe(await gridTotal(body));
+      expect(filtered).toBeGreaterThan(0);
+      expect(filtered).toBeLessThan(total(await bars({})));
+    });
+
+    it("the bars read a created filter's days in the viewer's zone, as the list does", async () => {
+      // A dated scene created late enough in a UTC day that Los Angeles
+      // still has the day before
+      const rows = await prisma.$queryRawUnsafe<
+        Array<{ id: string; created: bigint | number }>
+      >(
+        `SELECT id, CAST(stashCreatedAt AS INTEGER) AS created FROM StashScene
+         WHERE stashInstanceId = ? AND deletedAt IS NULL
+           AND date LIKE '____-__-__' AND stashCreatedAt IS NOT NULL
+         ORDER BY id`,
+        instanceId
+      );
+      const dayIn = (ms: number, timeZone: string): string =>
+        new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date(ms));
+      const scene = rows.find(
+        (row) =>
+          dayIn(Number(row.created), "UTC") !==
+          dayIn(Number(row.created), "America/Los_Angeles")
+      );
+      expect(
+        scene,
+        "a scene created on different days in UTC and Los Angeles"
+      ).toBeDefined();
+      const { id, created } = must(scene, "the scene");
+      const day = dayIn(Number(created), "UTC");
+      const body = {
+        ids: [`${id}:${instanceId}`],
+        scene_filter: { created_at: { value: day, modifier: "EQUALS" } },
+      };
+      const la = { "X-Peek-Time-Zone": "America/Los_Angeles" };
+
+      expect(total(await bars(body))).toBe(1);
+      expect(await gridTotal(body)).toBe(1);
+      expect(total(await bars(body, adminClient, la))).toBe(0);
+      expect(await gridTotal(body, adminClient, la)).toBe(0);
+    });
+
+    it("the GET with tagId gives the same bars as the POST with scene_filter.tags", async () => {
+      const tag = `${TEST_ENTITIES.tagWithEntities}:${instanceId}`;
+      const response = await adminClient.get<DistributionResponse>(
+        `/api/timeline/scene/distribution?granularity=years&tagId=${encodeURIComponent(tag)}`
+      );
+      expect(response.status).toBe(200);
+      const viaPost = await bars({
+        scene_filter: { tags: { value: [tag], modifier: "INCLUDES" } },
+      });
+
+      expect(viaPost.length).toBeGreaterThan(0);
+      expect(response.data.distribution).toEqual(viaPost);
+    });
+
+    it("the GET with no entity parameter gives the unfiltered bars", async () => {
+      const response = await adminClient.get<DistributionResponse>(
+        "/api/timeline/scene/distribution?granularity=years"
+      );
+      expect(response.status).toBe(200);
+      expect(response.data.distribution).toEqual(await bars({}));
+    });
+
+    it("a disabled instance's scenes are not counted", async () => {
+      await selectTestInstanceOnly();
+      const testOnly = await bars({});
+      await selectAllInstances();
+      const all = await bars({});
+      const second = must(
+        await prisma.stashInstance.findFirst({
+          where: { id: { not: instanceId } },
+          select: { id: true, enabled: true },
+        }),
+        "a second instance"
+      );
+      // The second library has dated scenes, so it adds to the bars
+      expect(total(all)).toBeGreaterThan(total(testOnly));
+
+      await prisma.stashInstance.update({
+        where: { id: second.id },
+        data: { enabled: false },
+      });
+      try {
+        expect(await bars({})).toEqual(testOnly);
+      } finally {
+        await prisma.stashInstance.update({
+          where: { id: second.id },
+          data: { enabled: second.enabled },
+        });
+      }
+    });
+
+    it("an unknown granularity answers 400 naming it", async () => {
+      const response = await adminClient.post(
+        "/api/timeline/scene/distribution",
+        { granularity: "fortnights" }
+      );
+      expectRefused(response, ["granularity"]);
+    });
+
+    it("an unknown filter field answers the list parser's 400 naming its path", async () => {
+      const response = await adminClient.post(
+        "/api/timeline/scene/distribution",
+        { scene_filter: { nope: { value: 1 } } }
+      );
+      expectRefused(response, ["scene_filter.nope"]);
+    });
+
+    /** A throwaway viewer who hides one dated scene (invariant 3) */
+    describe("the bars skip excluded scenes", () => {
+      const username = "timeline_hide_user";
+      const password = "timeline_password_123";
+      const viewer = new TestClient();
+      let userId: number | undefined;
+
+      beforeAll(async () => {
+        const created = await adminClient.post<{ user?: { id: number } }>(
+          "/api/user/create",
+          { username, password, role: "USER" }
+        );
+        expect(created.ok, JSON.stringify(created.data)).toBe(true);
+        userId = must(created.data.user, "the created user").id;
+        await viewer.login(username, password);
+      });
+
+      afterAll(async () => {
+        if (userId !== undefined)
+          await adminClient.delete(`/api/user/${userId}`);
+      });
+
+      it("a hidden scene leaves its year's bar and the grid alike", async () => {
+        const dated = must(
+          await prisma.stashScene.findFirst({
+            where: {
+              stashInstanceId: instanceId,
+              deletedAt: null,
+              date: { not: null },
+            },
+            select: { id: true, date: true },
+            orderBy: { id: "asc" },
+          }),
+          "a dated scene"
+        );
+        const year = must(dated.date, "its date").slice(0, 4);
+        const before = await bars({}, viewer);
+        expect(total(before)).toBe(await gridTotal({}, viewer));
+
+        const hidden = await viewer.post("/api/user/hidden-entities", {
+          entityType: "scene",
+          entityId: dated.id,
+          instanceId,
+        });
+        expect(hidden.ok, JSON.stringify(hidden.data)).toBe(true);
+
+        const after = await bars({}, viewer);
+        const countIn = (list: Bars) =>
+          list.find((bar) => bar.period === year)?.count ?? 0;
+        expect(total(after)).toBe(total(before) - 1);
+        expect(countIn(after)).toBe(countIn(before) - 1);
+        expect(total(after)).toBe(await gridTotal({}, viewer));
+        // Filtered by the scene's own id, nothing is left
+        expect(
+          await bars({ ids: [`${dated.id}:${instanceId}`] }, viewer)
+        ).toEqual([]);
+      }, 30_000);
     });
   });
 });

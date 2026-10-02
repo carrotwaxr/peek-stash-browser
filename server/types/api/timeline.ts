@@ -4,4 +4,7 @@ export type {
   GetDateDistributionQuery,
   DateDistributionEntry,
   GetDateDistributionResponse,
+  PostDateDistributionRequest,
+  TimelineEntityType,
+  TimelineGranularity,
 } from "@peek/shared-types/api/timeline.js";
