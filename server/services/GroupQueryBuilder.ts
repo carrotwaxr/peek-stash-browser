@@ -228,8 +228,10 @@ class GroupQueryBuilder extends EntityQueryBuilder<
 
     // Related entities
     studios: (c, ctx) => this.studioClause(c, ctx),
-    scenes: (c) => viaSceneClause(GROUPS_BY_SCENE, c.refs, c.modifier),
-    performers: (c) => viaSceneClause(GROUPS_BY_PERFORMER, c.refs, c.modifier),
+    scenes: (c, ctx) =>
+      viaSceneClause(GROUPS_BY_SCENE, c.refs, c.modifier, ctx),
+    performers: (c, ctx) =>
+      viaSceneClause(GROUPS_BY_PERFORMER, c.refs, c.modifier, ctx),
     tags: (c, ctx) => this.tagClause(c, ctx),
     containing_groups: (c, ctx) =>
       refClause(GROUP_CONTAINING, c.refs, c.modifier, {

@@ -27,8 +27,8 @@ import { TagChips } from "../ui/index";
 
 /**
  * Whether each tab's studio filter takes sub-studios (a depth) in the
- * shared contract: a performer's studios come through their scenes and
- * take none, so Include sub-studios is hidden on the Performers tab
+ * shared contract; Include sub-studios is hidden on a tab whose field takes
+ * none
  */
 const TAB_TAKES_SUB_STUDIOS: Readonly<Record<string, boolean>> = {
   scenes: SCENE_FIELDS.studios.hierarchical,
@@ -75,8 +75,8 @@ const StudioPage = ({ detail }: { detail: FoundEntityDetail<"studio"> }) => {
   });
   const totals = counts.data?.counts;
 
-  // The scenes, galleries and collections list by this studio, with its
-  // sub-studios under the toggle; the Performers tab takes no depth
+  // Each tab lists by this studio, with its sub-studios under the toggle
+  // where the tab's field takes a depth
   const lock = (withDepth: boolean) => ({
     value: [ref],
     modifier: "INCLUDES",

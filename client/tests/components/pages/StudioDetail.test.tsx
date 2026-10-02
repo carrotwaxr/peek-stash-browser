@@ -1,8 +1,7 @@
 /**
  * A studio page's Include sub-studios toggle: every tab whose filter field
- * takes a depth in the shared contract (a scene's, gallery's, image's and
- * collection's studio) sends depth -1 while it is on; the Performers tab's
- * field takes none, so the toggle is hidden there.
+ * takes a depth in the shared contract (a scene's, gallery's, image's,
+ * collection's and performer's studio) sends depth -1 while it is on.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
@@ -107,8 +106,6 @@ async function sentCriterion(tab: string): Promise<unknown> {
   }
 }
 
-const toggle = () =>
-  screen.queryByRole("checkbox", { name: /Include sub-studios/ });
 const findToggle = () =>
   screen.findByRole("checkbox", { name: /Include sub-studios/ });
 
@@ -146,7 +143,7 @@ describe("StudioDetail: Include sub-studios", () => {
     await screen.findByText(/No images found/);
   });
 
-  it.each(["scenes", "galleries", "images", "groups"])(
+  it.each(["scenes", "galleries", "images", "performers", "groups"])(
     "the %s tab sends depth -1 when the toggle is on",
     async (tab) => {
       renderPage(`tab=${tab}&includeSubStudios=true`);
@@ -160,7 +157,7 @@ describe("StudioDetail: Include sub-studios", () => {
     }
   );
 
-  it.each(["scenes", "galleries", "images", "groups"])(
+  it.each(["scenes", "galleries", "images", "performers", "groups"])(
     "the %s tab sends no depth when the toggle is off",
     async (tab) => {
       renderPage(`tab=${tab}`);
@@ -184,16 +181,6 @@ describe("StudioDetail: Include sub-studios", () => {
       modifier: "INCLUDES",
       depth: -1,
     });
-  });
-
-  it("the Performers tab hides the toggle and sends no depth: a performer's studios take none", async () => {
-    renderPage("tab=performers&includeSubStudios=true");
-
-    expect(await sentCriterion("performers")).toEqual({
-      value: ["5:inst-a"],
-      modifier: "INCLUDES",
-    });
-    expect(toggle()).not.toBeInTheDocument();
   });
 });
 

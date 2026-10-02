@@ -112,9 +112,14 @@ export type TextModifier = (typeof TEXT_MODIFIERS)[number];
 /**
  * An enum's value compared (GREATER_THAN and LESS_THAN only where the values
  * are ordered, as resolutions are); a multi-valued enum criterion matches any
- * of its values (INCLUDES)
+ * of its values (INCLUDES), and where its field offers them IS_NULL ("not
+ * set") and NOT_NULL ("is set"), which take no value
  */
-export const ENUM_MODIFIERS = [...COMPARISON_MODIFIERS, "INCLUDES"] as const;
+export const ENUM_MODIFIERS = [
+  ...COMPARISON_MODIFIERS,
+  "INCLUDES",
+  ...PRESENCE_MODIFIERS,
+] as const;
 export type EnumModifier = (typeof ENUM_MODIFIERS)[number];
 
 // =============================================================================
@@ -143,6 +148,9 @@ export type Resolution = (typeof RESOLUTIONS)[number];
 
 /** Stash's OrientationEnum */
 export const ORIENTATIONS = ["LANDSCAPE", "PORTRAIT", "SQUARE"] as const;
+
+/** Stash's CircumisedEnum */
+export const CIRCUMCISED = ["CUT", "UNCUT"] as const;
 
 /** Stash's GenderEnum */
 export const GENDERS = [

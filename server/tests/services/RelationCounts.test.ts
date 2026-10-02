@@ -146,7 +146,7 @@ describe("countRelations", () => {
     expect(builders.scene.count).toHaveBeenCalledTimes(1);
   });
 
-  it("a studio page's sub-studios reach the tabs whose field takes a depth, not the performers'", async () => {
+  it("a studio page's sub-studios reach every tab, the performers' through their scenes", async () => {
     await countRelations("studio", ref, { ...options, depth: -1 });
 
     const deep = { refs: [ref], modifier: "INCLUDES", depth: -1 };
@@ -154,7 +154,7 @@ describe("countRelations", () => {
       scene: { studios: deep },
       gallery: { studios: deep },
       image: { studios: deep },
-      performer: { studios: { ...deep, depth: 0 } },
+      performer: { studios: deep },
       group: { studios: deep },
     });
   });

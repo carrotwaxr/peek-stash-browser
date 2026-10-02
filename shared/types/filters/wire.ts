@@ -133,14 +133,13 @@ export interface EnumInput<
   modifier?: M | null;
 }
 
-/** Any of these values */
-export interface MultiEnumInput<
+/** Any of these values; IS_NULL and NOT_NULL (where offered) no value */
+export type MultiEnumInput<
   V extends string = string,
   M extends EnumModifier = EnumModifier,
-> {
-  value: V[];
-  modifier?: M | null;
-}
+> =
+  | { value: V[]; modifier?: Exclude<M, PresenceModifier> | null }
+  | WithPresence<M, { modifier: Extract<M, PresenceModifier>; value?: null }>;
 
 /** One field's criterion as sent */
 export type CriterionInput<S extends FieldSpec> =

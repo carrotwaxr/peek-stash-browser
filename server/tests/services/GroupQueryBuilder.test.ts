@@ -315,7 +315,7 @@ describe("GroupQueryBuilder", () => {
       expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
-    it("scenes match through SceneGroup, performers through their scenes, each with the scene live", async () => {
+    it("scenes match through SceneGroup, performers through their scenes, each with the scene live and not excluded for the viewer", async () => {
       await run({
         filter: {
           scenes: { refs: [ref("3")], modifier: "EXCLUDES", depth: 0 },
@@ -325,12 +325,15 @@ describe("GroupQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "NOT EXISTS (SELECT 1 FROM SceneGroup sg JOIN StashScene lsc ON lsc.id = sg.sceneId AND lsc.stashInstanceId = sg.sceneInstanceId WHERE sg.groupId = g.id AND sg.groupInstanceId = g.stashInstanceId AND lsc.deletedAt IS NULL AND ((sg.sceneId = ? AND sg.sceneInstanceId = ?)))"
+        "NOT EXISTS (SELECT 1 FROM SceneGroup sg JOIN StashScene lsc ON lsc.id = sg.sceneId AND lsc.stashInstanceId = sg.sceneInstanceId LEFT JOIN UserExcludedEntity vse ON vse.userId = ? AND vse.entityType = 'scene' AND vse.entityId = lsc.id AND (vse.instanceId = '' OR vse.instanceId = lsc.stashInstanceId) WHERE sg.groupId = g.id AND sg.groupInstanceId = g.stashInstanceId AND lsc.deletedAt IS NULL AND vse.id IS NULL AND ((sg.sceneId = ? AND sg.sceneInstanceId = ?)))"
       );
       expect(sql).toContain(
-        "(g.id, g.stashInstanceId) IN (SELECT sg.groupId, sg.groupInstanceId FROM ScenePerformer sp JOIN SceneGroup sg ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId JOIN StashScene lsc ON lsc.id = sp.sceneId AND lsc.stashInstanceId = sp.sceneInstanceId WHERE lsc.deletedAt IS NULL AND ((sp.performerId = ? AND sp.performerInstanceId = ?)))"
+        "(g.id, g.stashInstanceId) IN (SELECT sg.groupId, sg.groupInstanceId FROM ScenePerformer sp JOIN SceneGroup sg ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId JOIN StashScene lsc ON lsc.id = sp.sceneId AND lsc.stashInstanceId = sp.sceneInstanceId LEFT JOIN UserExcludedEntity vse ON vse.userId = ? AND vse.entityType = 'scene' AND vse.entityId = lsc.id AND (vse.instanceId = '' OR vse.instanceId = lsc.stashInstanceId) WHERE lsc.deletedAt IS NULL AND vse.id IS NULL AND ((sp.performerId = ? AND sp.performerInstanceId = ?)))"
       );
-      expect(params).toEqual(arrayContaining(["3", "inst-a", "7", "inst-a"]));
+      // Each clause binds the viewer's id before its refs
+      expect(params.join("|")).toContain(
+        ["1", "3", "inst-a", "1", "7", "inst-a"].join("|")
+      );
     });
 
     it("the viewer's rating and favorite, the counts and the text and date fields each reach SQL", async () => {

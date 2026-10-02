@@ -8,6 +8,7 @@ import type {
   ParsedFilter,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
+import { parseListRequest } from "../../utils/listRequest.js";
 import { careerYearsSql } from "../../utils/sqlClauses.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
@@ -958,5 +959,471 @@ describeWithDb("Performer birth year and age, partial dates (seeded)", () => {
     expect(
       await listed({ age: { modifier: "GREATER_THAN", value: 200 } })
     ).toEqual([]);
+  });
+});
+
+/**
+ * Performer parity (F14): studios with sub-studios, disambiguation, country,
+ * circumcised, aliases, links, StashDB ids, the visible tag, image, gallery
+ * and marker counts, "appears with" and favourite tags. Sent over the wire
+ * parser into the builder for a viewer of their own, as the list route does.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do:
+ * - pf-a tags: 7899001 (the viewer's favourite), 7899002 under it, 7899003
+ *   (a favourite the viewer hid), 7899004 (another user's favourite),
+ *   7899005 (deleted). pf-b tag 7899001 (no one's favourite).
+ * - pf-a studios: 7899201 with its child 7899202. pf-b studio 7899201.
+ * - pf-a performers: 7899101 (every new text set; tags 2 and 3; 5 images of
+ *   which the viewer cannot see 2; 2 galleries), 7899102 (tags 4 and 5),
+ *   7899103 (nothing set; tag 3), 7899104 (hidden by the viewer, matching
+ *   every text 7899101 matches). pf-b performers 7899101 (tag 1 of pf-b,
+ *   the same StashDB id) and 7899102.
+ * - pf-a scenes: 7899301 (studio 7899202; performers 1 and 2; a live clip,
+ *   one the viewer hid, a deleted one), 7899302 (studio 7899201; performers
+ *   1 and 3; a clip; hidden by the viewer), 7899303 (performers 2, 3 and 4).
+ *   pf-b scene 7899301 (studio 7899201; performers 1 and 2; a clip).
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Performer parity filters (seeded)", () => {
+  const A = "pf-a";
+  const B = "pf-b";
+  const VIEWER = "pf-viewer";
+  const OTHER = "pf-other";
+  let viewerId = 0;
+  let otherId = 0;
+
+  const [P1, P2, P3, P4] = ["7899101", "7899102", "7899103", "7899104"];
+  const [S1, S2, S3] = ["7899301", "7899302", "7899303"];
+  const STUDIO = "7899201";
+  const STASHDB = "https://stashdb.org/graphql";
+  const key = (id: string, instance: string) => `${id}:${instance}`;
+  /** Every performer the viewer can see */
+  const VISIBLE = [
+    key(P1, A),
+    key(P2, A),
+    key(P3, A),
+    key(P1, B),
+    key(P2, B),
+  ].sort();
+  const without = (...keys: string[]) =>
+    VISIBLE.filter((k) => !keys.includes(k));
+
+  async function removeRows(): Promise<void> {
+    const where = { stashInstanceId: { in: [A, B] } };
+    await prisma.stashScene.deleteMany({ where });
+    await prisma.stashStudio.deleteMany({ where });
+    await prisma.stashPerformer.deleteMany({ where });
+    await prisma.stashTag.deleteMany({ where });
+    await prisma.user.deleteMany({
+      where: { username: { in: [VIEWER, OTHER] } },
+    });
+  }
+
+  /** The performers a wire `performer_filter` lists, as sorted keys */
+  async function listed(
+    filter: Record<string, unknown>,
+    userId = viewerId
+  ): Promise<string[]> {
+    const request = parseListRequest(
+      "performer",
+      { filter: { per_page: 100 }, performer_filter: filter },
+      { userId }
+    );
+    const { items, total } = await performerQueryBuilder.execute({
+      userId,
+      allowedInstanceIds: [A, B],
+      request,
+    });
+    expect(total).toBe(items.length);
+    return items.map((p) => key(p.id, p.instanceId)).sort();
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    const user = async (username: string) =>
+      (
+        await prisma.user.create({
+          data: { username, password: "not-a-real-hash", role: "USER" },
+        })
+      ).id;
+    viewerId = await user(VIEWER);
+    otherId = await user(OTHER);
+
+    const tag = (
+      id: string,
+      instance: string,
+      parents: string[] = [],
+      deletedAt: Date | null = null
+    ) => ({
+      id,
+      stashInstanceId: instance,
+      name: `PF tag ${id} ${instance}`,
+      parentIds: JSON.stringify(parents),
+      deletedAt,
+    });
+    await prisma.stashTag.createMany({
+      data: [
+        tag("7899001", A),
+        tag("7899002", A, ["7899001"]),
+        tag("7899003", A),
+        tag("7899004", A),
+        tag("7899005", A, [], new Date()),
+        tag("7899001", B),
+      ],
+    });
+    await prisma.stashStudio.createMany({
+      data: [
+        { id: STUDIO, stashInstanceId: A, name: "PF studio a" },
+        {
+          id: "7899202",
+          stashInstanceId: A,
+          name: "PF child a",
+          parentId: STUDIO,
+        },
+        { id: STUDIO, stashInstanceId: B, name: "PF studio b" },
+      ],
+    });
+    const stashIds = (id: string) =>
+      JSON.stringify([{ endpoint: STASHDB, stash_id: id }]);
+    await prisma.stashPerformer.createMany({
+      data: [
+        {
+          id: P1,
+          stashInstanceId: A,
+          name: "PF one",
+          disambiguation: "the first",
+          country: "US",
+          circumcised: "CUT",
+          aliasList: JSON.stringify(["Alpha One", "A1"]),
+          urls: JSON.stringify([
+            "https://example.com/pf-one",
+            "https://social.example/pf",
+          ]),
+          stashIds: stashIds("aaaa-1111"),
+          imageCount: 5,
+          galleryCount: 2,
+        },
+        {
+          id: P2,
+          stashInstanceId: A,
+          name: "PF two",
+          country: "DE",
+          circumcised: "UNCUT",
+          stashIds: "[]",
+        },
+        { id: P3, stashInstanceId: A, name: "PF three" },
+        {
+          id: P4,
+          stashInstanceId: A,
+          name: "PF four",
+          disambiguation: "the first",
+          country: "US",
+          circumcised: "CUT",
+          aliasList: JSON.stringify(["Alpha Four"]),
+          urls: JSON.stringify(["https://example.com/pf-four"]),
+          stashIds: stashIds("aaaa-1111"),
+          imageCount: 3,
+          galleryCount: 2,
+        },
+        {
+          id: P1,
+          stashInstanceId: B,
+          name: "PF one b",
+          stashIds: stashIds("aaaa-1111"),
+          imageCount: 5,
+        },
+        { id: P2, stashInstanceId: B, name: "PF two b" },
+      ],
+    });
+    const performerTag = (performerId: string, tagId: string, inst = A) => ({
+      performerId,
+      performerInstanceId: inst,
+      tagId,
+      tagInstanceId: inst,
+    });
+    await prisma.performerTag.createMany({
+      data: [
+        performerTag(P1, "7899002"),
+        performerTag(P1, "7899003"),
+        performerTag(P2, "7899004"),
+        performerTag(P2, "7899005"),
+        performerTag(P3, "7899003"),
+        performerTag(P4, "7899002"),
+        performerTag(P1, "7899001", B),
+      ],
+    });
+    await prisma.stashScene.createMany({
+      data: [
+        { id: S1, stashInstanceId: A, studioId: "7899202" },
+        { id: S2, stashInstanceId: A, studioId: STUDIO },
+        { id: S3, stashInstanceId: A },
+        { id: S1, stashInstanceId: B, studioId: STUDIO },
+      ],
+    });
+    const cast = (sceneId: string, performerId: string, inst = A) => ({
+      sceneId,
+      sceneInstanceId: inst,
+      performerId,
+      performerInstanceId: inst,
+    });
+    await prisma.scenePerformer.createMany({
+      data: [
+        cast(S1, P1),
+        cast(S1, P2),
+        cast(S2, P1),
+        cast(S2, P3),
+        cast(S3, P2),
+        cast(S3, P3),
+        cast(S3, P4),
+        cast(S1, P1, B),
+        cast(S1, P2, B),
+      ],
+    });
+    const clip = (
+      id: string,
+      sceneId: string,
+      inst = A,
+      deletedAt: Date | null = null
+    ) => ({
+      id,
+      stashInstanceId: inst,
+      sceneId,
+      sceneInstanceId: inst,
+      seconds: 1,
+      deletedAt,
+    });
+    await prisma.stashClip.createMany({
+      data: [
+        clip("7899401", S1),
+        clip("7899402", S1),
+        clip("7899403", S1, A, new Date()),
+        clip("7899404", S2),
+        clip("7899401", S1, B),
+      ],
+    });
+    const excluded = (
+      entityType: string,
+      entityId: string,
+      instanceId = A
+    ) => ({
+      userId: viewerId,
+      entityType,
+      entityId,
+      instanceId,
+      reason: "hidden",
+    });
+    await prisma.userExcludedEntity.createMany({
+      data: [
+        excluded("performer", P4),
+        excluded("scene", S2),
+        excluded("clip", "7899402"),
+        excluded("tag", "7899003", ""),
+      ],
+    });
+    await prisma.userExcludedContentCount.create({
+      data: {
+        userId: viewerId,
+        entityType: "performer",
+        entityId: P1,
+        instanceId: A,
+        images: 2,
+      },
+    });
+    const favourite = (userId: number, tagId: string, instanceId = A) => ({
+      userId,
+      tagId,
+      instanceId,
+      favorite: true,
+    });
+    await prisma.tagRating.createMany({
+      data: [
+        favourite(viewerId, "7899001"),
+        favourite(viewerId, "7899003"),
+        favourite(otherId, "7899004"),
+        favourite(otherId, "7899001", B),
+      ],
+    });
+  });
+
+  afterAll(removeRows);
+
+  it("studios at depth -1 include the sub-studios' scenes; without a depth only the studio's own, and the viewer's hidden scene links nobody", async () => {
+    const studio = `${STUDIO}:${A}`;
+    expect(
+      await listed({
+        studios: { value: [studio], modifier: "INCLUDES", depth: -1 },
+      })
+    ).toEqual([key(P1, A), key(P2, A)].sort());
+    expect(
+      await listed({ studios: { value: [studio], modifier: "INCLUDES" } })
+    ).toEqual([]);
+    expect(
+      await listed({
+        studios: { value: [`${STUDIO}:${B}`], modifier: "INCLUDES", depth: -1 },
+      })
+    ).toEqual([key(P1, B), key(P2, B)].sort());
+    expect(
+      await listed({
+        studios: { value: [studio], modifier: "EXCLUDES", depth: -1 },
+      })
+    ).toEqual(without(key(P1, A), key(P2, A)));
+  });
+
+  it("disambiguation and country match the text; a hidden performer never shows", async () => {
+    expect(
+      await listed({ disambiguation: { value: "first", modifier: "INCLUDES" } })
+    ).toEqual([key(P1, A)]);
+    expect(await listed({ disambiguation: { modifier: "IS_NULL" } })).toEqual(
+      without(key(P1, A))
+    );
+    expect(
+      await listed({ country: { value: "us", modifier: "EQUALS" } })
+    ).toEqual([key(P1, A)]);
+    expect(
+      await listed({ country: { value: "US", modifier: "NOT_EQUALS" } })
+    ).toEqual(without(key(P1, A)));
+  });
+
+  it("circumcised takes any of its values, IS_NULL and NOT_NULL", async () => {
+    expect(await listed({ circumcised: { value: ["CUT"] } })).toEqual([
+      key(P1, A),
+    ]);
+    expect(await listed({ circumcised: { value: ["CUT", "UNCUT"] } })).toEqual(
+      [key(P1, A), key(P2, A)].sort()
+    );
+    expect(await listed({ circumcised: { modifier: "IS_NULL" } })).toEqual(
+      without(key(P1, A), key(P2, A))
+    );
+    expect(await listed({ circumcised: { modifier: "NOT_NULL" } })).toEqual(
+      [key(P1, A), key(P2, A)].sort()
+    );
+  });
+
+  it("aliases match one alias at a time, and IS_NULL lists the performers with none", async () => {
+    expect(
+      await listed({ aliases: { value: "alpha", modifier: "INCLUDES" } })
+    ).toEqual([key(P1, A)]);
+    expect(
+      await listed({ aliases: { value: "a1", modifier: "EQUALS" } })
+    ).toEqual([key(P1, A)]);
+    // The list's JSON punctuation is never matched
+    expect(
+      await listed({ aliases: { value: '","', modifier: "INCLUDES" } })
+    ).toEqual([]);
+    expect(await listed({ aliases: { modifier: "IS_NULL" } })).toEqual(
+      without(key(P1, A))
+    );
+  });
+
+  it("url matches any of the performer's links", async () => {
+    expect(
+      await listed({ url: { value: "social.example", modifier: "INCLUDES" } })
+    ).toEqual([key(P1, A)]);
+    expect(
+      await listed({ url: { value: "example.com", modifier: "EXCLUDES" } })
+    ).toEqual(without(key(P1, A)));
+    expect(await listed({ url: { modifier: "NOT_NULL" } })).toEqual([
+      key(P1, A),
+    ]);
+  });
+
+  it("stash_id EQUALS a StashDB id on any instance, IS_NULL and NOT_NULL", async () => {
+    expect(
+      await listed({ stash_id: { value: "AAAA-1111", modifier: "EQUALS" } })
+    ).toEqual([key(P1, A), key(P1, B)].sort());
+    expect(await listed({ stash_id: { modifier: "IS_NULL" } })).toEqual(
+      without(key(P1, A), key(P1, B))
+    );
+    expect(await listed({ stash_id: { modifier: "NOT_NULL" } })).toEqual(
+      [key(P1, A), key(P1, B)].sort()
+    );
+  });
+
+  it("tag_count counts the live tags the viewer can see", async () => {
+    // 7899101: tag 2 (tag 3 is hidden); 7899102: tag 4 (tag 5 is deleted)
+    expect(
+      await listed({ tag_count: { value: 1, modifier: "EQUALS" } })
+    ).toEqual([key(P1, A), key(P2, A), key(P1, B)].sort());
+    expect(
+      await listed({ tag_count: { value: 0, modifier: "EQUALS" } })
+    ).toEqual([key(P3, A), key(P2, B)].sort());
+    expect(
+      await listed({ tag_count: { value: 1, modifier: "GREATER_THAN" } })
+    ).toEqual([]);
+  });
+
+  it("image_count and gallery_count are the counts the viewer sees", async () => {
+    expect(
+      await listed({ image_count: { value: 3, modifier: "EQUALS" } })
+    ).toEqual([key(P1, A)]);
+    expect(
+      await listed({ image_count: { value: 5, modifier: "EQUALS" } })
+    ).toEqual([key(P1, B)]);
+    expect(
+      await listed({ gallery_count: { value: 1, modifier: "GREATER_THAN" } })
+    ).toEqual([key(P1, A)]);
+  });
+
+  it("marker_count counts the live clips the viewer can see in the scenes they can see", async () => {
+    // 7899101 on pf-a: one live visible clip in 7899301; the hidden and the
+    // deleted clip, and the clip of the hidden scene 7899302, do not count
+    expect(
+      await listed({ marker_count: { value: 1, modifier: "EQUALS" } })
+    ).toEqual([key(P1, A), key(P2, A), key(P1, B), key(P2, B)].sort());
+    expect(
+      await listed({ marker_count: { value: 0, modifier: "EQUALS" } })
+    ).toEqual([key(P3, A)]);
+    expect(
+      await listed({ marker_count: { value: 1, modifier: "GREATER_THAN" } })
+    ).toEqual([]);
+  });
+
+  it("appears with lists the performers sharing a visible scene, never the performer itself", async () => {
+    expect(await listed({ performers: { value: [`${P1}:${A}`] } })).toEqual([
+      key(P2, A),
+    ]);
+    // 7899104 shares 7899303 but is hidden
+    expect(await listed({ performers: { value: [`${P2}:${A}`] } })).toEqual(
+      [key(P1, A), key(P3, A)].sort()
+    );
+    expect(
+      await listed({
+        performers: {
+          value: [`${P1}:${A}`, `${P3}:${A}`],
+          modifier: "INCLUDES_ALL",
+        },
+      })
+    ).toEqual([key(P2, A)]);
+    expect(
+      await listed({
+        performers: { value: [`${P1}:${A}`], modifier: "EXCLUDES" },
+      })
+    ).toEqual(without(key(P2, A)));
+    // Excludes beside the values: with 7899102 but never with 7899103
+    expect(
+      await listed({
+        performers: { value: [`${P2}:${A}`], excludes: [`${P3}:${A}`] },
+      })
+    ).toEqual([key(P1, A), key(P3, A)].sort());
+    expect(await listed({ performers: { excludes: [`${P1}:${A}`] } })).toEqual(
+      without(key(P2, A))
+    );
+    // The same id on the other instance is another performer
+    expect(await listed({ performers: { value: [`${P1}:${B}`] } })).toEqual([
+      key(P2, B),
+    ]);
+  });
+
+  it("appears with a performer the viewer hid matches no one", async () => {
+    expect(await listed({ performers: { value: [`${P4}:${A}`] } })).toEqual([]);
+  });
+
+  it("tag_favorite: a favourite tag or one under it; a hidden favourite, another user's and the same id on another instance never count", async () => {
+    expect(await listed({ tag_favorite: true })).toEqual([key(P1, A)]);
+    expect(await listed({ tag_favorite: false })).toEqual(without(key(P1, A)));
+    // The other user's favourites are theirs: 7899004 on pf-a, 7899001 on pf-b
+    expect(await listed({ tag_favorite: true }, otherId)).toEqual(
+      [key(P2, A), key(P1, B)].sort()
+    );
   });
 });

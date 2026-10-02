@@ -135,6 +135,11 @@ export interface MultiEnumCriterion<V extends string> {
   readonly values: readonly V[];
 }
 
+/** A multi-valued enum offering IS_NULL ("not set") and NOT_NULL ("is set") */
+export type MultiEnumFieldCriterion<V extends string> =
+  | MultiEnumCriterion<V>
+  | { readonly modifier: "IS_NULL" | "NOT_NULL" };
+
 /** The parsed criterion of one field spec */
 export type CriterionOf<S extends FieldSpec> =
   S extends RefSpec<EntityKind, infer M>
@@ -147,13 +152,11 @@ export type CriterionOf<S extends FieldSpec> =
         ? DateCriterion
         : S extends TextSpec
           ? TextCriterion
-          : S extends EnumSpec<
-                infer V,
-                EnumSpec["modifiers"][number],
-                infer Multi
-              >
+          : S extends EnumSpec<infer V, infer M, infer Multi>
             ? Multi extends true
-              ? MultiEnumCriterion<V>
+              ? [Extract<M, PresenceModifier>] extends [never]
+                ? MultiEnumCriterion<V>
+                : MultiEnumFieldCriterion<V>
               : EnumCriterion<V>
             : S extends BooleanSpec
               ? boolean

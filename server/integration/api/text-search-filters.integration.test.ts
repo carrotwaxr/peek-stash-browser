@@ -381,13 +381,6 @@ describe("Text Search Filters", () => {
           },
         },
       },
-      {
-        path: "performer_filter.aliases",
-        list: "performers",
-        body: {
-          performer_filter: { aliases: { value: "a", modifier: "INCLUDES" } },
-        },
-      },
     ])("$path answers 400 naming it", async ({ path, list, body }) => {
       const response = await adminClient.post(`/api/library/${list}`, {
         filter: { per_page: 50 },

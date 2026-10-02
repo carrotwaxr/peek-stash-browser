@@ -745,7 +745,8 @@ interface AliasedTable {
  * matched on the junction's scene columns. With `via` they are what a scene
  * links to (a group, a studio): `via` is joined to the junction on the scene
  * and the refs are matched on its ref columns. Every arm requires the scene
- * to be live (`StashScene.deletedAt IS NULL`).
+ * to be live (`StashScene.deletedAt IS NULL`) and, with the viewer's
+ * exclusions applied, not excluded for them.
  */
 export interface ViaSceneSpec {
   /** The listed entity's alias in the outer query ("g" for StashGroup g) */
@@ -766,13 +767,37 @@ export interface ViaSceneSpec {
     /** Its columns the refs are matched on */
     readonly refIdCol: string;
     readonly refInstanceCol: string;
+    /**
+     * The refs' own table, when a via row counts only while the entity it
+     * names is live and, for a viewer, not excluded for them ("appears
+     * with" a performer the viewer hid matches no one)
+     */
+    readonly related?: {
+      readonly table: string;
+      readonly entityType: string;
+    };
   };
   /** A further condition inside the subquery ("sc.organized = 1") */
   readonly where?: string;
 }
 
+/** Whose exclusions a clause reads: the viewer's, when they apply */
+export interface ExclusionContext {
+  readonly userId: number;
+  readonly applyExclusions: boolean;
+}
+
 /** The alias of the scene row joined for its `deletedAt` */
 const LIVE_SCENE = "lsc";
+
+/**
+ * The aliases of the via-scene anti-joins: the scene's exclusion rows, the
+ * related ref's row and its exclusion rows. Never `e`, the outer
+ * statement's own exclusion join.
+ */
+const SCENE_EXCLUDED = "vse";
+const RELATED = "vr";
+const RELATED_EXCLUDED = "vre";
 
 /**
  * Filters the listed entity by what its scenes hold: groups holding a scene,
@@ -782,13 +807,17 @@ const LIVE_SCENE = "lsc";
  * ref (the via row by its ref index, the junction by the scene, the live
  * scene by its key), which at 200k scenes takes milliseconds where the
  * correlated EXISTS took hundreds; the scene-keyed form (no `via`) keeps the
- * EXISTS, one full-key probe per row. No refs, or another modifier, is no
- * filter.
+ * EXISTS, one full-key probe per row. With the viewer's exclusions applied
+ * every arm anti-joins the scene's exclusion rows (`exclusionJoin`, its
+ * every-instance arm included), so a scene the viewer hid links nothing:
+ * neither a match nor, under EXCLUDES, an exclusion. No refs, or another
+ * modifier, is no filter.
  */
 export function viaSceneClause(
   spec: ViaSceneSpec,
   refs: readonly FilterRef[],
-  modifier: string
+  modifier: string,
+  ctx: ExclusionContext
 ): FilterClause {
   if (refs.length === 0) return EMPTY;
 
@@ -797,16 +826,56 @@ export function viaSceneClause(
   // the live scene is joined on the scene columns of the given table
   const viaIsScene = via?.table === "StashScene";
   const liveAlias = via?.table === "StashScene" ? via.alias : LIVE_SCENE;
-  const live = `${liveAlias}.deletedAt IS NULL`;
   const liveJoin = (t: AliasedTable, idCol: string, instanceCol: string) =>
     viaIsScene
       ? ""
       : ` JOIN StashScene ${LIVE_SCENE} ON ${LIVE_SCENE}.id = ${t.alias}.${idCol} AND ${LIVE_SCENE}.stashInstanceId = ${t.alias}.${instanceCol}`;
-  const where = spec.where === undefined ? "" : ` AND ${spec.where}`;
   const [refIdCol, refInstanceCol] = via
     ? [`${via.alias}.${via.refIdCol}`, `${via.alias}.${via.refInstanceCol}`]
     : [`${j.alias}.${spec.sceneIdCol}`, `${j.alias}.${spec.sceneInstanceCol}`];
   const keyed = `${j.alias}.${spec.entityIdCol} = ${alias}.id AND ${j.alias}.${spec.entityInstanceCol} = ${alias}.stashInstanceId`;
+
+  // What every arm requires after the live scene's join: the scene not
+  // excluded for the viewer, and the related ref live and not excluded
+  const viewer = ctx.applyExclusions ? ctx.userId : null;
+  const guardJoins: string[] = [];
+  const guardWhere = [`${liveAlias}.deletedAt IS NULL`];
+  const guardParams: SqlParam[] = [];
+  if (viewer !== null) {
+    guardJoins.push(
+      exclusionJoin(
+        SCENE_EXCLUDED,
+        "scene",
+        `${liveAlias}.id`,
+        `${liveAlias}.stashInstanceId`
+      )
+    );
+    guardWhere.push(`${SCENE_EXCLUDED}.id IS NULL`);
+    guardParams.push(viewer);
+  }
+  if (via?.related) {
+    guardJoins.push(
+      `JOIN ${via.related.table} ${RELATED} ON ${RELATED}.id = ${refIdCol} AND ${RELATED}.stashInstanceId = ${refInstanceCol}`
+    );
+    guardWhere.push(`${RELATED}.deletedAt IS NULL`);
+    if (viewer !== null) {
+      guardJoins.push(
+        exclusionJoin(
+          RELATED_EXCLUDED,
+          via.related.entityType,
+          `${RELATED}.id`,
+          `${RELATED}.stashInstanceId`
+        )
+      );
+      guardWhere.push(`${RELATED_EXCLUDED}.id IS NULL`);
+      guardParams.push(viewer);
+    }
+  }
+  const guards = guardJoins.map((join) => ` ${join}`).join("");
+  const where = [
+    ...guardWhere,
+    ...(spec.where === undefined ? [] : [spec.where]),
+  ].join(" AND ");
 
   /** The keyed EXISTS: the junction, the via row on the scene, the live scene */
   const exists = (matched: readonly FilterRef[]): FilterClause => {
@@ -815,8 +884,8 @@ export function viaSceneClause(
       ? ` JOIN ${via.table} ${via.alias} ON ${via.alias}.${via.sceneIdCol} = ${j.alias}.${spec.sceneIdCol} AND ${via.alias}.${via.sceneInstanceCol} = ${j.alias}.${spec.sceneInstanceCol}`
       : "";
     return {
-      sql: `EXISTS (SELECT 1 FROM ${j.table} ${j.alias}${viaJoin}${liveJoin(j, spec.sceneIdCol, spec.sceneInstanceCol)} WHERE ${keyed} AND ${live}${where} AND (${p.sql}))`,
-      params: p.params,
+      sql: `EXISTS (SELECT 1 FROM ${j.table} ${j.alias}${viaJoin}${liveJoin(j, spec.sceneIdCol, spec.sceneInstanceCol)}${guards} WHERE ${keyed} AND ${where} AND (${p.sql}))`,
+      params: [...guardParams, ...p.params],
     };
   };
 
@@ -825,8 +894,8 @@ export function viaSceneClause(
     if (!via) return exists(matched);
     const p = pairs(refIdCol, refInstanceCol, matched);
     return {
-      sql: `(${alias}.id, ${alias}.stashInstanceId) IN (SELECT ${j.alias}.${spec.entityIdCol}, ${j.alias}.${spec.entityInstanceCol} FROM ${via.table} ${via.alias} JOIN ${j.table} ${j.alias} ON ${j.alias}.${spec.sceneIdCol} = ${via.alias}.${via.sceneIdCol} AND ${j.alias}.${spec.sceneInstanceCol} = ${via.alias}.${via.sceneInstanceCol}${liveJoin(via, via.sceneIdCol, via.sceneInstanceCol)} WHERE ${live}${where} AND (${p.sql}))`,
-      params: p.params,
+      sql: `(${alias}.id, ${alias}.stashInstanceId) IN (SELECT ${j.alias}.${spec.entityIdCol}, ${j.alias}.${spec.entityInstanceCol} FROM ${via.table} ${via.alias} JOIN ${j.table} ${j.alias} ON ${j.alias}.${spec.sceneIdCol} = ${via.alias}.${via.sceneIdCol} AND ${j.alias}.${spec.sceneInstanceCol} = ${via.alias}.${via.sceneInstanceCol}${liveJoin(via, via.sceneIdCol, via.sceneInstanceCol)}${guards} WHERE ${where} AND (${p.sql}))`,
+      params: [...guardParams, ...p.params],
     };
   };
 

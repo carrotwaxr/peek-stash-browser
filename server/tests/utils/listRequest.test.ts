@@ -719,6 +719,34 @@ describe("parseListRequest: filter fields", () => {
     expect(paths(issues)).toEqual(["performer_filter.gender.value"]);
   });
 
+  it("a multi-valued enum offering presence takes IS_NULL and NOT_NULL with no value; one without refuses them", () => {
+    const parsed = parseListRequest(
+      "performer",
+      {
+        performer_filter: {
+          circumcised: { modifier: "IS_NULL", value: ["CUT"] },
+        },
+      },
+      opts()
+    );
+    expect(parsed.filter.circumcised).toEqual({ modifier: "IS_NULL" });
+    expect(
+      parseListRequest(
+        "performer",
+        { performer_filter: { circumcised: { modifier: "NOT_NULL" } } },
+        opts()
+      ).filter.circumcised
+    ).toEqual({ modifier: "NOT_NULL" });
+    const issues = issuesOf(() =>
+      parseListRequest(
+        "scene",
+        { scene_filter: { orientation: { modifier: "IS_NULL" } } },
+        opts()
+      )
+    );
+    expect(paths(issues)).toEqual(["scene_filter.orientation.modifier"]);
+  });
+
   it("booleans stay boolean; a string is invalid", () => {
     const parsed = parseListRequest(
       "scene",

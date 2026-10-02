@@ -1,10 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
+import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
 import type { ParsedFilter } from "../../types/parsedFilters.js";
+import { parseListRequest } from "../../utils/listRequest.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
@@ -400,3 +403,303 @@ describeWithDb("Via-scene filters and soft-deleted scenes", () => {
     );
   });
 });
+
+/**
+ * A hidden scene does not link (A5): every via-scene filter reads only the
+ * scenes the viewer can see, with the exclusion anti-join on the scene, an
+ * exclusion stored for every instance (`instanceId = ''`) included. Read
+ * through the builders over the wire parser, as the list routes do.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do:
+ * - vh-x: studio 7861001 with its child 7861002; scenes 7861101 (studio
+ *   7861001, performer 7861201, group 7861301, gallery 7861401, tag
+ *   7861501), hidden by the viewer on vh-x; 7861102 (studio 7861001,
+ *   performer 7861202, group 7861302, gallery 7861402, tag 7861502), hidden
+ *   by the admin; 7861103 (studio 7861001, performer 7861203), hidden by the
+ *   viewer on every instance ('').
+ * - vh-y: studio 7861001; scene 7861101 (studio 7861001, performer 7861201).
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb(
+  "Via-scene filters skip the scenes the viewer hid (seeded)",
+  () => {
+    const X = "vh-x";
+    const Y = "vh-y";
+    const VIEWER = "vh-viewer";
+    const ADMIN = "vh-admin";
+    let viewerId = 0;
+    let adminId = 0;
+
+    const STUDIO = "7861001";
+    const HIDDEN_SCENE = "7861101";
+    const ADMIN_HIDDEN_SCENE = "7861102";
+    const GLOBAL_HIDDEN_SCENE = "7861103";
+    const [P1, P2, P3] = ["7861201", "7861202", "7861203"];
+    const [G1, G2] = ["7861301", "7861302"];
+    const [GA1, GA2] = ["7861401", "7861402"];
+    const [T1, T2] = ["7861501", "7861502"];
+    const key = (id: string, instance: string) => `${id}:${instance}`;
+
+    async function removeRows(): Promise<void> {
+      const where = { stashInstanceId: { in: [X, Y] } };
+      await prisma.stashScene.deleteMany({ where });
+      await prisma.stashStudio.deleteMany({ where });
+      await prisma.stashPerformer.deleteMany({ where });
+      await prisma.stashGroup.deleteMany({ where });
+      await prisma.stashGallery.deleteMany({ where });
+      await prisma.stashTag.deleteMany({ where });
+      await prisma.user.deleteMany({
+        where: { username: { in: [VIEWER, ADMIN] } },
+      });
+    }
+
+    /** The rows a wire filter lists for a user, as sorted "id:instance" keys */
+    async function listed(
+      entity: "performer" | "group" | "gallery" | "tag",
+      filter: Record<string, unknown>,
+      userId = viewerId
+    ): Promise<string[]> {
+      const body = { filter: { per_page: 100 }, [`${entity}_filter`]: filter };
+      const options = { userId, allowedInstanceIds: [X, Y] };
+      const parse = { userId };
+      const result =
+        entity === "performer"
+          ? await performerQueryBuilder.execute({
+              ...options,
+              request: parseListRequest(entity, body, parse),
+            })
+          : entity === "group"
+            ? await groupQueryBuilder.execute({
+                ...options,
+                request: parseListRequest(entity, body, parse),
+              })
+            : entity === "gallery"
+              ? await galleryQueryBuilder.execute({
+                  ...options,
+                  request: parseListRequest(entity, body, parse),
+                })
+              : await tagQueryBuilder.execute({
+                  ...options,
+                  request: parseListRequest(entity, body, parse),
+                });
+      expect(result.total).toBe(result.items.length);
+      return result.items.map((row) => key(row.id, row.instanceId)).sort();
+    }
+
+    const includes = (ref: string) => ({ value: [ref], modifier: "INCLUDES" });
+
+    beforeAll(async () => {
+      await removeRows();
+      viewerId = (
+        await prisma.user.create({
+          data: { username: VIEWER, password: "not-a-real-hash", role: "USER" },
+        })
+      ).id;
+      adminId = (
+        await prisma.user.create({
+          data: { username: ADMIN, password: "not-a-real-hash", role: "ADMIN" },
+        })
+      ).id;
+
+      await prisma.stashStudio.createMany({
+        data: [
+          { id: STUDIO, stashInstanceId: X, name: "VH studio x" },
+          {
+            id: "7861002",
+            stashInstanceId: X,
+            name: "VH child x",
+            parentId: STUDIO,
+          },
+          { id: STUDIO, stashInstanceId: Y, name: "VH studio y" },
+        ],
+      });
+      await prisma.stashPerformer.createMany({
+        data: [
+          { id: P1, stashInstanceId: X, name: "VH one x" },
+          { id: P2, stashInstanceId: X, name: "VH two x" },
+          { id: P3, stashInstanceId: X, name: "VH three x" },
+          { id: P1, stashInstanceId: Y, name: "VH one y" },
+        ],
+      });
+      await prisma.stashGroup.createMany({
+        data: [
+          { id: G1, stashInstanceId: X, name: "VH group one" },
+          { id: G2, stashInstanceId: X, name: "VH group two" },
+        ],
+      });
+      await prisma.stashGallery.createMany({
+        data: [
+          { id: GA1, stashInstanceId: X, title: "VH gallery one" },
+          { id: GA2, stashInstanceId: X, title: "VH gallery two" },
+        ],
+      });
+      await prisma.stashTag.createMany({
+        data: [
+          { id: T1, stashInstanceId: X, name: "VH tag one" },
+          { id: T2, stashInstanceId: X, name: "VH tag two" },
+        ],
+      });
+      await prisma.stashScene.createMany({
+        data: [
+          { id: HIDDEN_SCENE, stashInstanceId: X, studioId: STUDIO },
+          { id: ADMIN_HIDDEN_SCENE, stashInstanceId: X, studioId: STUDIO },
+          { id: GLOBAL_HIDDEN_SCENE, stashInstanceId: X, studioId: STUDIO },
+          { id: HIDDEN_SCENE, stashInstanceId: Y, studioId: STUDIO },
+        ],
+      });
+      const on = (sceneId: string, instance: string) => ({
+        sceneId,
+        sceneInstanceId: instance,
+      });
+      await prisma.scenePerformer.createMany({
+        data: [
+          { ...on(HIDDEN_SCENE, X), performerId: P1, performerInstanceId: X },
+          {
+            ...on(ADMIN_HIDDEN_SCENE, X),
+            performerId: P2,
+            performerInstanceId: X,
+          },
+          {
+            ...on(GLOBAL_HIDDEN_SCENE, X),
+            performerId: P3,
+            performerInstanceId: X,
+          },
+          { ...on(HIDDEN_SCENE, Y), performerId: P1, performerInstanceId: Y },
+        ],
+      });
+      await prisma.sceneGroup.createMany({
+        data: [
+          { ...on(HIDDEN_SCENE, X), groupId: G1, groupInstanceId: X },
+          { ...on(ADMIN_HIDDEN_SCENE, X), groupId: G2, groupInstanceId: X },
+        ],
+      });
+      await prisma.sceneGallery.createMany({
+        data: [
+          { ...on(HIDDEN_SCENE, X), galleryId: GA1, galleryInstanceId: X },
+          {
+            ...on(ADMIN_HIDDEN_SCENE, X),
+            galleryId: GA2,
+            galleryInstanceId: X,
+          },
+        ],
+      });
+      await prisma.sceneTag.createMany({
+        data: [
+          { ...on(HIDDEN_SCENE, X), tagId: T1, tagInstanceId: X },
+          { ...on(ADMIN_HIDDEN_SCENE, X), tagId: T2, tagInstanceId: X },
+        ],
+      });
+      const hide = (userId: number, entityId: string, instanceId: string) => ({
+        userId,
+        entityType: "scene",
+        entityId,
+        instanceId,
+        reason: "hidden",
+      });
+      await prisma.userExcludedEntity.createMany({
+        data: [
+          hide(viewerId, HIDDEN_SCENE, X),
+          hide(viewerId, GLOBAL_HIDDEN_SCENE, ""),
+          hide(adminId, ADMIN_HIDDEN_SCENE, X),
+        ],
+      });
+    });
+
+    afterAll(removeRows);
+
+    it("performers by studio leave out a performer whose only scene of the studio the viewer hid", async () => {
+      expect(
+        await listed("performer", { studios: includes(`${STUDIO}:${X}`) })
+      ).toEqual([key(P2, X)]);
+    });
+
+    it("a hide stored for every instance ('') also stops the link", async () => {
+      const byStudio = await listed("performer", {
+        studios: includes(`${STUDIO}:${X}`),
+      });
+      expect(byStudio).not.toContain(key(P3, X));
+      expect(
+        await listed("performer", {
+          scenes: includes(`${GLOBAL_HIDDEN_SCENE}:${X}`),
+        })
+      ).toEqual([]);
+    });
+
+    it("studios 7@x never lists a performer whose scene is on studio 7@y, and the hide on x leaves y's scene linking", async () => {
+      expect(
+        await listed("performer", { studios: includes(`${STUDIO}:${X}`) })
+      ).not.toContain(key(P1, Y));
+      expect(
+        await listed("performer", { studios: includes(`${STUDIO}:${Y}`) })
+      ).toEqual([key(P1, Y)]);
+      // A bare id means every instance
+      expect(await listed("performer", { studios: includes(STUDIO) })).toEqual(
+        [key(P2, X), key(P1, Y)].sort()
+      );
+    });
+
+    it("excluding the studio keeps a performer whose only scene of it is hidden", async () => {
+      expect(
+        await listed("performer", {
+          studios: { value: [`${STUDIO}:${X}`], modifier: "EXCLUDES" },
+        })
+      ).toEqual([key(P1, X), key(P3, X), key(P1, Y)].sort());
+    });
+
+    it("collections by performer, galleries by scene and tags by scene skip the hidden scene", async () => {
+      expect(
+        await listed("group", { performers: includes(`${P1}:${X}`) })
+      ).toEqual([]);
+      expect(
+        await listed("group", { performers: includes(`${P2}:${X}`) })
+      ).toEqual([key(G2, X)]);
+      expect(
+        await listed("gallery", { scenes: includes(`${HIDDEN_SCENE}:${X}`) })
+      ).toEqual([]);
+      expect(
+        await listed("gallery", {
+          scenes: includes(`${ADMIN_HIDDEN_SCENE}:${X}`),
+        })
+      ).toEqual([key(GA2, X)]);
+      expect(
+        await listed("tag", {
+          scenes_filter: { id: includes(`${HIDDEN_SCENE}:${X}`) },
+        })
+      ).toEqual([]);
+      expect(
+        await listed("tag", {
+          scenes_filter: { id: includes(`${ADMIN_HIDDEN_SCENE}:${X}`) },
+        })
+      ).toEqual([key(T2, X)]);
+      // Performers and tags by collection read the same anti-join
+      expect(
+        await listed("performer", { groups: includes(`${G1}:${X}`) })
+      ).toEqual([]);
+      expect(
+        await listed("tag", {
+          scenes_filter: { groups: includes(`${G1}:${X}`) },
+        })
+      ).toEqual([]);
+    });
+
+    it("an admin sees what the viewer hid, but not what they hid themselves", async () => {
+      expect(
+        await listed(
+          "performer",
+          { studios: includes(`${STUDIO}:${X}`) },
+          adminId
+        )
+      ).toEqual([key(P1, X), key(P3, X)].sort());
+      expect(
+        await listed("group", { performers: includes(`${P1}:${X}`) }, adminId)
+      ).toEqual([key(G1, X)]);
+      expect(
+        await listed(
+          "gallery",
+          { scenes: includes(`${ADMIN_HIDDEN_SCENE}:${X}`) },
+          adminId
+        )
+      ).toEqual([]);
+    });
+  }
+);
