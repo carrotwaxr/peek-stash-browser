@@ -596,7 +596,11 @@ export const FilterPanel = ({
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
+        {/* Each field is a cell TV focus moves between (spatialFocus) */}
+        <div
+          data-tv-cells=""
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4"
+        >
           {children}
         </div>
 

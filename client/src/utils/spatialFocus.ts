@@ -45,13 +45,26 @@ function gap(from: Rect, to: Rect, direction: Direction) {
   return Math.max(0, primary);
 }
 
-/** The gap along the direction plus twice the centres' offset across it */
-function distance(from: Rect, to: Rect, direction: Direction) {
+/**
+ * How far the narrower box sticks out of the wider one across the direction:
+ * the centres' offset for boxes of one size (cards), 0 for a box wholly
+ * within the other's span. From a full-width header every field of the row
+ * below is level with it, so the first of them wins, not the one under the
+ * header's centre.
+ */
+function crossOffset(from: Rect, to: Rect, direction: Direction) {
   const vertical = direction === "up" || direction === "down";
-  const cross = vertical
-    ? Math.abs((to.left + to.right) / 2 - (from.left + from.right) / 2)
-    : Math.abs((to.top + to.bottom) / 2 - (from.top + from.bottom) / 2);
-  return gap(from, to, direction) + 2 * cross;
+  const [fromStart, fromEnd, toStart, toEnd] = vertical
+    ? [from.left, from.right, to.left, to.right]
+    : [from.top, from.bottom, to.top, to.bottom];
+  const centres = Math.abs((toStart + toEnd) / 2 - (fromStart + fromEnd) / 2);
+  const slack = Math.abs(toEnd - toStart - (fromEnd - fromStart)) / 2;
+  return Math.max(0, centres - slack);
+}
+
+/** The gap along the direction plus twice the offset across it */
+function distance(from: Rect, to: Rect, direction: Direction) {
+  return gap(from, to, direction) + 2 * crossOffset(from, to, direction);
 }
 
 /**
@@ -83,8 +96,9 @@ function nearestRow<T>(
 
 /**
  * The candidate beyond `from` in `direction` with the least primary gap plus
- * twice the cross-axis offset of centres, among the nearest row for Up and
- * Down; null when none is beyond it.
+ * twice the cross-axis offset (`crossOffset`), among the nearest row for Up
+ * and Down; on a tie the first in document order. Null when none is beyond
+ * it.
  */
 export function pickNext<T>(
   from: Rect,
@@ -151,6 +165,52 @@ export function tvCandidates(root: Element): HTMLElement[] {
   return found;
 }
 
+// A grid of form fields: each child is a cell holding one field's controls
+const CELLS = "[data-tv-cells]";
+
+/** The child of `grid` that holds `el` */
+function cellOf(grid: Element, el: Element): Element | null {
+  let node: Element | null = el;
+  while (node && node.parentElement !== grid) node = node.parentElement;
+  return node;
+}
+
+/**
+ * Picks inside a grid of cells (`data-tv-cells`): the controls of `from`'s own
+ * cell first, then the nearest cell beyond, measured by the cells' boxes, and
+ * in it the control nearest `from`. A cell stretches to its row's height, so
+ * a picker stacked under its condition select stays in its row, and Down from
+ * a text field goes to the field under it, not the picker lower in the next
+ * column. Null when no cell lies that way.
+ */
+function pickInCells(
+  grid: Element,
+  from: HTMLElement,
+  fromRect: Rect,
+  measured: ReadonlyArray<Candidate<HTMLElement>>,
+  direction: Direction
+): HTMLElement | null {
+  const fromCell = cellOf(grid, from);
+  if (!fromCell) return null;
+  const byCell = new Map<Element, Candidate<HTMLElement>[]>();
+  for (const candidate of measured) {
+    const cell = grid.contains(candidate.el) && cellOf(grid, candidate.el);
+    if (!cell) continue;
+    byCell.set(cell, [...(byCell.get(cell) ?? []), candidate]);
+  }
+
+  const inCell = pickNext(fromRect, byCell.get(fromCell) ?? [], direction);
+  if (inCell) return inCell;
+
+  const cells = [...byCell.keys()]
+    .filter((cell) => cell !== fromCell)
+    .map((cell) => ({ el: cell, rect: cell.getBoundingClientRect() }));
+  const cell = pickNext(fromCell.getBoundingClientRect(), cells, direction);
+  if (!cell) return null;
+  const controls = byCell.get(cell) ?? [];
+  return pickNext(fromRect, controls, direction) ?? controls[0]?.el ?? null;
+}
+
 /** The layout region an element belongs to: the sidebar or the page */
 const regionOf = (el: Element) => el.closest("main, aside");
 
@@ -171,9 +231,10 @@ function firstInView(candidates: HTMLElement[]): HTMLElement | null {
 /**
  * Picks where an arrow goes from `from`: its own group first (the cards of
  * one grid or carousel, so Down reaches a short last row before whatever is
- * under the grid), then its region (the page or the sidebar). Left and Right
- * then cross between regions; Up and Down do not, so the fixed sidebar
- * beside the page never takes a vertical move.
+ * under the grid), then its grid of cells (`pickInCells`, the filter panel's
+ * fields), then its region (the page or the sidebar). Left and Right then
+ * cross between regions; Up and Down do not, so the fixed sidebar beside the
+ * page never takes a vertical move.
  */
 function pickFrom(
   from: HTMLElement,
@@ -189,6 +250,11 @@ function pickFrom(
   const siblings = measured.filter((c) => c.el.parentElement === group);
   const inGroup = pickNext(fromRect, siblings, direction);
   if (inGroup) return inGroup;
+
+  const grid = from.closest(CELLS);
+  const inCells =
+    grid && pickInCells(grid, from, fromRect, measured, direction);
+  if (inCells) return inCells;
 
   const region = regionOf(from);
   if (!region) return pickNext(fromRect, measured, direction);
