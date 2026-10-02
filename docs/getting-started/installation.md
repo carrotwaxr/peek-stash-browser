@@ -70,15 +70,11 @@ https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-temp
 # Pull the latest image
 docker pull carrotwaxr/peek-stash-browser:latest
 
-# Generate JWT secret
-export JWT_SECRET=$(openssl rand -base64 32)
-
 # Run Peek
 docker run -d \
   --name peek-stash-browser \
   -p 6969:80 \
   -v peek-data:/app/data \
-  -e JWT_SECRET="${JWT_SECRET}" \
   --restart unless-stopped \
   carrotwaxr/peek-stash-browser:latest
 ```
@@ -119,18 +115,11 @@ See [Configuration Guide](configuration.md) for all environment variables.
 # Pull the latest image from Docker Hub
 docker pull carrotwaxr/peek-stash-browser:latest
 
-# Generate JWT secret (one-time)
-$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-$bytes = New-Object byte[] 32
-$rng.GetBytes($bytes)
-$jwt = [Convert]::ToBase64String($bytes)
-
 # Run Peek
 docker run -d `
     --name peek-stash-browser `
     -p 6969:80 `
     -v peek-data:/app/data `
-    -e JWT_SECRET=$jwt `
     --restart unless-stopped `
     carrotwaxr/peek-stash-browser:latest
 ```
@@ -166,15 +155,11 @@ docker pull carrotwaxr/peek-stash-browser:latest
 # Pull the latest image from Docker Hub
 docker pull carrotwaxr/peek-stash-browser:latest
 
-# Generate a secure random JWT secret
-export JWT_SECRET=$(openssl rand -base64 32)
-
 # Run Peek
 docker run -d \
     --name peek-stash-browser \
     -p 6969:80 \
     -v peek-data:/app/data \
-    -e JWT_SECRET="${JWT_SECRET}" \
     --restart unless-stopped \
     carrotwaxr/peek-stash-browser:latest
 ```
@@ -226,7 +211,7 @@ After installation, access Peek in your browser for the first-time setup:
 1. Navigate to `http://localhost:6969` (or your server IP)
 2. **Complete the 4-step setup wizard**:
    - **Welcome**: Introduction to Peek
-   - **Create Admin**: Set your admin username and password
+   - **Create Admin User**: The username is `admin`; choose a password
    - **Connect to Stash**: Enter your Stash URL and API key
    - **Complete**: Setup finished!
 3. **Login** with your newly created admin credentials
@@ -237,9 +222,9 @@ After installation, access Peek in your browser for the first-time setup:
 
 Peek includes a built-in update checker:
 
-1. Navigate to **Settings → Server Settings**
+1. Navigate to **Settings → Server Settings → Server Configuration**
 2. Scroll to the **Version Information** section
-3. Click **Check for Updates**
+3. Peek checks for a newer release when you open it; click **Check for Updates** to check again
 
 The system will query GitHub for new releases and notify you if an update is available.
 
@@ -264,7 +249,6 @@ To update your Docker container to the latest version:
       --name peek-stash-browser \
       -p 6969:80 \
       -v peek-data:/app/data \
-      -e JWT_SECRET="${JWT_SECRET}" \
       --restart unless-stopped \
       carrotwaxr/peek-stash-browser:latest
     ```
@@ -283,7 +267,6 @@ To update your Docker container to the latest version:
       --name peek-stash-browser `
       -p 6969:80 `
       -v peek-data:/app/data `
-      -e JWT_SECRET=$jwt `
       --restart unless-stopped `
       carrotwaxr/peek-stash-browser:latest
     ```
@@ -297,8 +280,8 @@ To use a specific version instead of `:latest`:
 
 ```bash
 # Pull and use specific version
-docker pull carrotwaxr/peek-stash-browser:1.0.0
-docker run ... carrotwaxr/peek-stash-browser:1.0.0
+docker pull carrotwaxr/peek-stash-browser:3.3.8
+docker run ... carrotwaxr/peek-stash-browser:3.3.8
 ```
 
 Available versions: [GitHub Releases](https://github.com/carrotwaxr/peek-stash-browser/releases)

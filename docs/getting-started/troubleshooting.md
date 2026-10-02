@@ -65,14 +65,14 @@ docker exec peek-stash-browser curl -X POST http://your-stash-ip:9999/graphql \
 
 **Checklist:**
 
-- [ ] Stash URL is correct in Settings → Server Settings
+- [ ] Stash URL is correct in Settings → Server Settings → Server Configuration → Stash Instances
 - [ ] API key is valid (Stash → Settings → Security)
 - [ ] Stash is reachable from Peek container (check Docker networking)
 - [ ] No firewall blocking the connection
 
 ## Sync Problems
 
-**Where to look:** Settings → Server Configuration → Sync status. Each Stash instance has a table with one row per type (tags, studios, performers, collections, galleries, scenes, clips, images): when it last had a full sync, the newest change Peek has from Stash, how many items the last run synced and how long it took, and the problem the last run had with that type, if any. A type that fails does not stop the others: the next sync retries it from where it left off, and its problem clears once it syncs cleanly.
+**Where to look:** Settings → Server Settings → Server Configuration → Sync status. Each Stash instance has a table with one row per type (tags, studios, performers, collections, galleries, scenes, clips, images): when it last had a full sync, the newest change Peek has from Stash, how many items the last run synced and how long it took, and the problem the last run had with that type, if any. A type that fails does not stop the others: the next sync retries it from where it left off, and its problem clears once it syncs cleanly.
 
 - **A Stash error on one type**, such as `FindStudios: runtime error: invalid memory address or nil pointer dereference (at findStudios.studios.3.image_path) (HTTP 200)`: Stash failed to answer for that type. The part in brackets names the field that broke (a studio's `image_path` here).
 - **`Stash request FindStudios timed out after 120 s`**: every request to Stash gives up after two minutes, so a Stash that hangs cannot hold the sync forever. Check that Stash is running and answers in its own web UI, then let the next sync try again.
@@ -128,11 +128,11 @@ If your container starts, connects to Stash, and the web UI loads - most things 
 
 1. Check container logs for errors
 2. Check browser console (F12 → Console)
-3. Note your Peek version (Settings → Server Settings)
+3. Note your Peek version (Settings → Server Settings → Server Configuration → Version Information)
 
 **Report issues:**
 
-- [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-- [Stash Discord](https://discord.gg/2TsNFKt) - #third-party-integrations channel
+- [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues) for bugs
+- [Peek on the Stash community forum](https://discourse.stashapp.cc/t/peek-stash-browser/4018) for questions
 
 Include: Peek version, Stash version, relevant logs, and steps to reproduce.

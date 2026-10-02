@@ -19,7 +19,7 @@ Peek can connect to **multiple Stash servers** simultaneously. This is useful wh
 
 ### Adding Instances
 
-**Location:** Settings → Server Configuration → Stash Instances
+**Location:** Settings → Server Settings → Server Configuration → Stash Instances
 
 1. Click **Add Instance**
 2. Fill in the instance details:
@@ -27,7 +27,7 @@ Peek can connect to **multiple Stash servers** simultaneously. This is useful wh
    - **Description** — Help users understand what content this instance contains
    - **URL** (required) — Stash GraphQL endpoint (must end with `/graphql`)
    - **API Key** (required) — From the Stash instance's Settings → Security
-   - **Priority** — Lower number = higher priority for deduplication
+   - **Priority**: Lower number comes first: it orders the servers in Peek's lists, and the server with the lowest number is the one whose filter entries carry no server name when two servers have entries with the same name
 3. Click **Test Connection** to validate
 4. Save the instance
 
@@ -47,7 +47,7 @@ Peek always keeps one enabled instance: the last one can be neither disabled nor
 
 ### Sync Status
 
-**Location:** Settings → Server Configuration → Sync status
+**Location:** Settings → Server Settings → Server Configuration → Sync status
 
 Each instance has a table of its entity types: when each last had a full sync, the newest change Peek has from Stash, the last run's count and duration, and any problem the last run had with that type (a Stash error, a timeout, or a cleanup that was skipped or held back). While a sync runs, the status refreshes every 10 seconds and an **Abort sync** button stops it. **Full Sync** under Server Statistics asks before it starts. See [Sync Problems](troubleshooting.md#sync-problems) for what each problem means.
 
@@ -57,7 +57,7 @@ Each instance has a table of its entity types: when each last had a full sync, t
 
 When multiple instances are configured, each user can choose which instances they see content from:
 
-**Location:** Settings → Content → Content Sources
+**Location:** Settings → User Preferences → Content → Content Sources
 
 - Check or uncheck instances to control which content appears in your library
 - At least one instance must remain selected
@@ -74,7 +74,7 @@ Users have a page of their own on this: [Using Several Stash Servers](../user-gu
 
 - Content from all selected instances appears together in search results, carousels, and browsing pages
 - Each entity is tagged internally with its source instance
-- If the same content exists on multiple instances, the instance with the lowest priority number is used as the primary source
+- Peek does not merge or deduplicate content across instances: the same scene on two servers shows as two scenes. Priority only orders the servers, and decides which server's same-named tags, studios and performers in a filter list get no server name after them
 - Ratings, watch history, and playlists track which instance each scene belongs to
 
 ## Required Environment Variables
@@ -95,6 +95,7 @@ These settings have sensible defaults but can be customized:
 | `PGID`               | Group that owns `/app/data` | `100` (unRAID's `users`)              | See [File ownership](installation.md#file-ownership-puidpgid) |
 | `LOG_LEVEL`          | Server log detail          | `INFO`                                 | `ERROR`, `WARN`, `INFO`, `DEBUG` or `VERBOSE`. `INFO` logs server events (library syncs, users, settings, restrictions, writes to Stash) and errors with their cause; `DEBUG` adds per-request timings (lists, playback progress, ratings). No level logs Stash API keys or signed stream links, so a `DEBUG` log is safe to share |
 | `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
+| `STASH_HEADERS_TIMEOUT_MS` | How long a file download waits for Stash to start answering | `60000` (60 seconds) | In milliseconds. Raise it if downloads from a slow NAS or a sleeping disk fail before they start. A value that is not a positive number uses the default |
 | `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
 | `PROXY_AUTH_TRUSTED_IPS` | Addresses allowed to send `PROXY_AUTH_HEADER` | Unset (any address, with a startup warning) | Comma-separated IPs and CIDR ranges of your auth proxy. See [Trusted proxy addresses](#trusted-proxy-addresses) |
 | `TRUST_PROXY`        | Reverse proxies in front of Peek | Unset (trusts only the image's own nginx) | Set to the number of reverse proxies between browsers and Peek. See [Behind a reverse proxy](#behind-a-reverse-proxy) |
@@ -265,10 +266,10 @@ services:
 
 Users **must exist** in Peek's database for proxy authentication to work:
 
-1. Create users through Peek's admin panel (Settings → User Management)
+1. Create users through Peek's admin panel (Settings → Server Settings → User Management)
 2. The **username** in Peek must **exactly match** the username passed by the proxy
 3. User roles and permissions are still managed within Peek
-4. Passwords are not used when proxy auth is enabled (but must still be set in the database)
+4. Passwords still work for anyone who reaches Peek without the proxy, so every user needs one in the database (see [Fallback Behavior](#fallback-behavior))
 
 ### Fallback Behavior
 
@@ -324,18 +325,6 @@ NODE_ENV=production
 # Stash connection configured via Setup Wizard (stored in database)
 ```
 
-### Development Configuration
-
-```bash
-# Database (local SQLite file)
-DATABASE_URL=file:./data/peek-db.db
-
-# Development
-NODE_ENV=development
-
-# Stash connection configured via Setup Wizard
-```
-
 
 ## Docker Compose Example
 
@@ -380,13 +369,13 @@ Test connectivity:
 docker exec peek-stash-browser curl http://your-stash-ip:9999/graphql
 ```
 
-You can update Stash connection details in Settings → Stash Configuration.
+You can update Stash connection details in Settings → Server Settings → Server Configuration → Stash Instances.
 
 ### Videos Won't Play
 
 Check:
 
-- Stash connection is configured correctly (Settings → Stash Configuration)
+- Stash connection is configured correctly (Settings → Server Settings → Server Configuration → Stash Instances)
 - Stash server is running and accessible
 - The scene exists in Stash and has a valid video file
 
