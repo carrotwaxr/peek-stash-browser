@@ -29,8 +29,9 @@ import {
   type JunctionTarget,
   type SqlFragment,
   type ViaSceneSpec,
-  buildDateFilter,
+  buildDayFilter,
   buildFavoriteFilter,
+  buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
   refClause,
@@ -245,9 +246,11 @@ class GroupQueryBuilder extends EntityQueryBuilder<
     director: (c) => buildTextFilter(c, "g.director"),
 
     // Dates
-    date: (c) => buildDateFilter(c, "g.date"),
-    created_at: (c) => buildDateFilter(c, "g.stashCreatedAt"),
-    updated_at: (c) => buildDateFilter(c, "g.stashUpdatedAt"),
+    date: (c) => buildDayFilter(c, "g.date"),
+    created_at: (c, ctx) =>
+      buildInstantFilter(c, "g.stashCreatedAt", ctx.timeZone),
+    updated_at: (c, ctx) =>
+      buildInstantFilter(c, "g.stashUpdatedAt", ctx.timeZone),
   };
 
   /**

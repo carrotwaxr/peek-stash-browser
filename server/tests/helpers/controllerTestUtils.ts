@@ -154,6 +154,11 @@ export interface ReqParts<H extends Handler> {
    * out, the request has none, as when a route lost that middleware.
    */
   allowedInstanceIds?: readonly string[] | undefined;
+  /**
+   * The zone `requestTimeZone` put on the request; left out, the request
+   * has none, and the builders read UTC
+   */
+  timeZone?: string | undefined;
 }
 
 /**
@@ -189,6 +194,7 @@ export function reqFor<H extends Handler>(
     parts.allowedInstanceIds === undefined
       ? {}
       : { allowedInstanceIds: parts.allowedInstanceIds };
+  const zone = parts.timeZone === undefined ? {} : { timeZone: parts.timeZone };
   // The one cast: a test request carries only the parts a handler reads
   return {
     body,
@@ -202,6 +208,7 @@ export function reqFor<H extends Handler>(
     ...socket,
     ...url,
     ...instances,
+    ...zone,
   } as ReqFor<H>;
 }
 

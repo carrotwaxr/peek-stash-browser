@@ -61,12 +61,13 @@ export const findScenes = async (
   // A detail page asks for its scene by id
   const lookup = singleIdRef(request.filter.ids);
 
-  const { allowedInstanceIds } = req;
+  const { allowedInstanceIds, timeZone } = req;
 
   // Execute query (applyExclusions defaults to true)
   const result = await sceneQueryBuilder.execute({
     userId,
     allowedInstanceIds,
+    timeZone,
     request,
   });
 

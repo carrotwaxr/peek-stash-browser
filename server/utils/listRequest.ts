@@ -445,15 +445,14 @@ function blankAsNull(value: unknown): unknown {
 
 /**
  * A number or date criterion. IS_NULL and NOT_NULL need no value;
- * NOT_BETWEEN needs value and value2; a number's BETWEEN needs either side
- * (value alone is at least it, value2 alone at most it), a date's both
- * (until dates take open-ended ranges).
+ * NOT_BETWEEN needs value and value2; BETWEEN needs either side (value
+ * alone is at least it, value2 alone at most it; a date's side includes its
+ * own day).
  */
 function rangeSchema<V extends number | string>(
   spec: NumberSpec | DateSpec,
   valueSchema: z.ZodType<V>
 ): z.ZodType<RangeCriterion<V>> {
-  const openBetween = spec.kind === "number";
   return z
     .strictObject({
       modifier: z.enum(spec.modifiers).nullish(),
@@ -465,7 +464,7 @@ function rangeSchema<V extends number | string>(
       if (isPresence(modifier)) return { modifier };
       const value = c.value ?? undefined;
       const value2 = c.value2 ?? undefined;
-      if (modifier === "BETWEEN" && openBetween) {
+      if (modifier === "BETWEEN") {
         if (value === undefined && value2 === undefined) {
           ctx.addIssue({
             code: "custom",
@@ -485,10 +484,7 @@ function rangeSchema<V extends number | string>(
           ctx.addIssue({
             code: "custom",
             path: ["value2"],
-            message:
-              modifier === "BETWEEN"
-                ? "Required with BETWEEN on a date"
-                : "Required with NOT_BETWEEN",
+            message: "Required with NOT_BETWEEN",
           });
           return z.NEVER;
         }

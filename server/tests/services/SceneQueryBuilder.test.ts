@@ -1194,6 +1194,7 @@ describe("the scene field table", () => {
       allowedInstanceIds: ALLOWED,
       specificInstanceId: undefined,
       sortField: "created_at",
+      timeZone: "UTC",
       name: "tags",
       underAny,
     });

@@ -25,8 +25,8 @@ import {
   type SqlFragment,
   type SqlParam,
   type ViaSceneSpec,
-  buildDateFilter,
   buildFavoriteFilter,
+  buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
   refClause,
@@ -245,8 +245,10 @@ class TagQueryBuilder extends EntityQueryBuilder<
     description: (c) => buildTextFilter(c, "t.description"),
 
     // Dates
-    created_at: (c) => buildDateFilter(c, "t.stashCreatedAt"),
-    updated_at: (c) => buildDateFilter(c, "t.stashUpdatedAt"),
+    created_at: (c, ctx) =>
+      buildInstantFilter(c, "t.stashCreatedAt", ctx.timeZone),
+    updated_at: (c, ctx) =>
+      buildInstantFilter(c, "t.stashUpdatedAt", ctx.timeZone),
   };
 
   /** A ref filter on a junction, its CTEs named from the leaf */

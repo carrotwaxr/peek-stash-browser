@@ -46,12 +46,13 @@ export const findGalleries = async (
   // Exclusions apply to every user; an admin's rows hold only their own hides
   const applyExclusions = true;
 
-  const { allowedInstanceIds } = req;
+  const { allowedInstanceIds, timeZone } = req;
 
   // Use SQL-native query builder
   const { items: galleries, total } = await galleryQueryBuilder.execute({
     userId,
     allowedInstanceIds,
+    timeZone,
     request,
     applyExclusions,
   });

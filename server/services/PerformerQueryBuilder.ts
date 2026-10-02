@@ -22,8 +22,9 @@ import {
   type JunctionTarget,
   type ViaSceneSpec,
   ageYearsSql,
-  buildDateFilter,
+  buildDayFilter,
   buildFavoriteFilter,
+  buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
   careerYearsSql,
@@ -313,10 +314,12 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
     age: (c) => datedNumberClause(c, "p.birthdate", AGE),
 
     // Dates
-    birthdate: (c) => buildDateFilter(c, "p.birthdate"),
-    death_date: (c) => buildDateFilter(c, "p.deathDate"),
-    created_at: (c) => buildDateFilter(c, "p.stashCreatedAt"),
-    updated_at: (c) => buildDateFilter(c, "p.stashUpdatedAt"),
+    birthdate: (c) => buildDayFilter(c, "p.birthdate"),
+    death_date: (c) => buildDayFilter(c, "p.deathDate"),
+    created_at: (c, ctx) =>
+      buildInstantFilter(c, "p.stashCreatedAt", ctx.timeZone),
+    updated_at: (c, ctx) =>
+      buildInstantFilter(c, "p.stashUpdatedAt", ctx.timeZone),
   };
 
   /** The tag filter, with the tags' descendants to the depth */

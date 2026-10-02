@@ -806,6 +806,23 @@ describe("Carousel Controller", () => {
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
+    it("runs the carousel query in the viewer's time zone", async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
+      mockAddStashUrl.mockReturnValue([]);
+
+      const req = reqFor(previewCarousel, {
+        body: { rules: RULES, sort: "rating", direction: "DESC" },
+        user: USER,
+        allowedInstanceIds: ["inst-a"],
+        timeZone: "Asia/Kolkata",
+      });
+      await previewCarousel(req, resFor(previewCarousel));
+
+      expect(must(mockQueryBuilder.execute.mock.lastCall)[0].timeZone).toBe(
+        "Asia/Kolkata"
+      );
+    });
+
     it("applies addStashUrl to results", async () => {
       const rawScenes = [SAMPLE_SCENE];
       const scenesWithUrl = [{ ...SAMPLE_SCENE, stashUrl: null }];

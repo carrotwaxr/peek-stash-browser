@@ -380,8 +380,8 @@ describe("TagQueryBuilder", () => {
         "MAX(t.sceneCountAll - COALESCE(d.scenes, 0), 0) > ?",
         "(t.name IS NULL OR LOWER(t.name) != LOWER(?))",
         "(t.description IS NOT NULL AND t.description != '')",
-        "date(t.stashCreatedAt) = date(?)",
-        "t.stashUpdatedAt > ?",
+        "(t.stashCreatedAt >= ? AND t.stashCreatedAt < ?)",
+        "t.stashUpdatedAt >= ?",
       ]) {
         expect(sql).toContain(fragment);
       }

@@ -1171,7 +1171,29 @@ describe("parseListRequest: open-ended ranges and presence on numbers", () => {
     ).toEqual(["scene_filter.o_counter.modifier"]);
   });
 
-  it("a date BETWEEN still needs both sides", () => {
+  it("a date BETWEEN takes one side alone, and neither side is an unset option", () => {
+    const parsed = parseListRequest(
+      "scene",
+      {
+        scene_filter: {
+          date: { modifier: "BETWEEN", value2: "2024-01-01" },
+          created_at: { modifier: "BETWEEN", value: "2024-01-01" },
+          updated_at: { modifier: "BETWEEN" },
+        },
+      },
+      opts()
+    );
+    expect(parsed.filter).toEqual({
+      date: { modifier: "BETWEEN", value: undefined, value2: "2024-01-01" },
+      created_at: {
+        modifier: "BETWEEN",
+        value: "2024-01-01",
+        value2: undefined,
+      },
+    });
+  });
+
+  it("a date NOT_BETWEEN still needs both sides", () => {
     expect(
       paths(
         issuesOf(() =>
@@ -1179,7 +1201,7 @@ describe("parseListRequest: open-ended ranges and presence on numbers", () => {
             "scene",
             {
               scene_filter: {
-                date: { modifier: "BETWEEN", value2: "2024-01-01" },
+                date: { modifier: "NOT_BETWEEN", value2: "2024-01-01" },
               },
             },
             opts()
@@ -1210,13 +1232,36 @@ describe("parseListRequest: an empty value", () => {
     });
   });
 
+  it("a date BETWEEN with only value2 is an open-ended range", () => {
+    const parsed = parseListRequest(
+      "performer",
+      {
+        performer_filter: {
+          birthdate: { value: "", value2: "2000-01-01", modifier: "BETWEEN" },
+        },
+      },
+      opts()
+    );
+    expect(parsed.filter).toEqual({
+      birthdate: {
+        modifier: "BETWEEN",
+        value: undefined,
+        value2: "2000-01-01",
+      },
+    });
+  });
+
   it("still leaves a comparison without its value", () => {
     const issues = issuesOf(() =>
       parseListRequest(
         "performer",
         {
           performer_filter: {
-            birthdate: { value: "", value2: "2000-01-01", modifier: "BETWEEN" },
+            birthdate: {
+              value: "",
+              value2: "2000-01-01",
+              modifier: "NOT_BETWEEN",
+            },
           },
         },
         opts()

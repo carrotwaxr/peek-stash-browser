@@ -28,6 +28,7 @@ import type {
   Resolution,
 } from "@peek/shared-types/filters/index.js";
 import type {
+  DateCriterion,
   EnumCriterion,
   FilterRef,
   NumberCriterion,
@@ -35,6 +36,7 @@ import type {
 import { type EntityRef, distinctRefs, pairsJson } from "./entityRef.js";
 import { jsonListArm, likeContains } from "./sqlHelpers.js";
 import { jsonListOrEmpty } from "./sqlJson.js";
+import { instantSpan } from "./zonedTime.js";
 
 export type SqlParam = string | number | boolean;
 
@@ -883,149 +885,146 @@ export function performerAgeExists(
 }
 
 /**
- * Build a date comparison filter clause.
- * Handles EQUALS, NOT_EQUALS, GREATER_THAN, LESS_THAN, BETWEEN, NOT_BETWEEN, IS_NULL, NOT_NULL.
+ * A date criterion's clause on a text day column Stash keeps (`s.date`,
+ * `p.birthdate`): each row's day is `fullDateSql(column)` cut to its first
+ * 10 characters, so a `YYYY` or `YYYY-MM` value is its first day, compared
+ * as text with the criterion's day (a date-time value's first 10
+ * characters, as written: a day column has no zone). EQUALS is the day,
+ * NOT_EQUALS any other, GREATER_THAN after it, LESS_THAN before it; BETWEEN
+ * includes both days, and one side alone is from that day on or up to it;
+ * NOT_BETWEEN is outside both. A row without a date matches only IS_NULL:
+ * every comparison, the negatives included, leaves it out (Stash's rule).
  *
- * @param filter - Filter with value, optional value2, and modifier
- * @param column - SQL column name (e.g. "s.date", "p.birthdate")
+ * @param criterion - The parsed criterion
+ * @param column - The text column (e.g. "s.date", "p.birthdate")
  */
-export function buildDateFilter(
-  filter:
-    | {
-        value?: string | null;
-        value2?: string | null;
-        modifier?: string | null;
-      }
-    | undefined
-    | null,
+export function buildDayFilter(
+  criterion: DateCriterion,
   column: string
 ): FilterClause {
-  if (!filter) {
-    return { sql: "", params: [] };
-  }
-
-  const { value, value2, modifier = "GREATER_THAN" } = filter;
-
-  // IS_NULL and NOT_NULL don't require a value
-  if (modifier === "IS_NULL") {
-    return { sql: `${column} IS NULL`, params: [] };
-  }
-  if (modifier === "NOT_NULL") {
-    return { sql: `${column} IS NOT NULL`, params: [] };
-  }
-
-  // All other modifiers require a value
-  if (!value) {
-    return { sql: "", params: [] };
-  }
-
-  switch (modifier) {
+  const day = `substr(${fullDateSql(column)}, 1, 10)`;
+  const dayOf = (value: string) => value.slice(0, 10);
+  switch (criterion.modifier) {
+    case "IS_NULL":
+      return { sql: `${column} IS NULL`, params: [] };
+    case "NOT_NULL":
+      return { sql: `${column} IS NOT NULL`, params: [] };
     case "EQUALS":
-      return { sql: `date(${column}) = date(?)`, params: [value] };
+      return { sql: `${day} = ?`, params: [dayOf(criterion.value)] };
     case "NOT_EQUALS":
-      return {
-        sql: `(${column} IS NULL OR date(${column}) != date(?))`,
-        params: [value],
-      };
+      return { sql: `${day} != ?`, params: [dayOf(criterion.value)] };
     case "GREATER_THAN":
-      return { sql: `${column} > ?`, params: [value] };
+      return { sql: `${day} > ?`, params: [dayOf(criterion.value)] };
     case "LESS_THAN":
-      return { sql: `${column} < ?`, params: [value] };
-    case "BETWEEN":
-      if (value2) {
-        return { sql: `${column} BETWEEN ? AND ?`, params: [value, value2] };
-      }
-      return { sql: `${column} >= ?`, params: [value] };
-    case "NOT_BETWEEN":
-      if (value2) {
+      return { sql: `${day} < ?`, params: [dayOf(criterion.value)] };
+    case "BETWEEN": {
+      const { value, value2 } = criterion;
+      if (value !== undefined && value2 !== undefined) {
         return {
-          sql: `(${column} IS NULL OR ${column} < ? OR ${column} > ?)`,
-          params: [value, value2],
+          sql: `(${day} >= ? AND ${day} <= ?)`,
+          params: [dayOf(value), dayOf(value2)],
         };
       }
-      return { sql: `${column} < ?`, params: [value] };
-    case null:
-    default:
-      return { sql: "", params: [] };
-  }
-}
-
-const DAY_MS = 86_400_000;
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * A date criterion's bound as epoch milliseconds, `[start, end)`: a
- * `YYYY-MM-DD` value spans its UTC day, an ISO date-time is the instant.
- */
-function epochSpan(value: string): { start: number; end: number } | undefined {
-  const start = Date.parse(value);
-  if (Number.isNaN(start)) return undefined;
-  return { start, end: start + (DATE_ONLY.test(value) ? DAY_MS : 1) };
-}
-
-/**
- * The date filter for a column Prisma wrote as a `DateTime`, which SQLite
- * holds as integer epoch milliseconds (`WatchHistory.lastPlayedAt`):
- * `buildDateFilter` compares text, and an integer sorts before any text. The
- * criterion's dates bind as milliseconds; a date-only value stands for its
- * whole UTC day, so BETWEEN includes its last day and EQUALS is the day.
- */
-export function buildEpochDateFilter(
-  filter:
-    | {
-        value?: string | null;
-        value2?: string | null;
-        modifier?: string | null;
+      if (value !== undefined) {
+        return { sql: `${day} >= ?`, params: [dayOf(value)] };
       }
-    | undefined
-    | null,
-  column: string
-): FilterClause {
-  if (!filter) return { sql: "", params: [] };
-  const { value, value2, modifier = "GREATER_THAN" } = filter;
-
-  if (modifier === "IS_NULL") return { sql: `${column} IS NULL`, params: [] };
-  if (modifier === "NOT_NULL") {
-    return { sql: `${column} IS NOT NULL`, params: [] };
+      if (value2 !== undefined) {
+        return { sql: `${day} <= ?`, params: [dayOf(value2)] };
+      }
+      return noClause();
+    }
+    case "NOT_BETWEEN":
+      return {
+        sql: `(${day} < ? OR ${day} > ?)`,
+        params: [dayOf(criterion.value), dayOf(criterion.value2)],
+      };
   }
-  const first = value ? epochSpan(value) : undefined;
-  if (!first) return { sql: "", params: [] };
-  const last = value2 ? epochSpan(value2) : undefined;
+}
 
-  switch (modifier) {
+/**
+ * A date criterion's clause on a column of epoch milliseconds (Stash's
+ * created and updated times since migration `20261002000600`, the viewer's
+ * `w.lastPlayedAt`): a `YYYY-MM-DD` value is that day in the viewer's zone,
+ * `[its first instant, the next day's)` (`instantSpan` in
+ * `utils/zonedTime.ts`), a date-time value its one millisecond. EQUALS is
+ * in the span, NOT_EQUALS outside it, GREATER_THAN after it (from the next
+ * day's start), LESS_THAN before it; BETWEEN runs from the start of the
+ * first to the end of the second, and one side alone is from it on or up
+ * to its end; NOT_BETWEEN is outside. A row without a value matches only
+ * IS_NULL, as `buildDayFilter`. A value no span can be made of (the parser
+ * refuses one) adds no clause.
+ *
+ * @param criterion - The parsed criterion
+ * @param column - The epoch column (e.g. "s.stashCreatedAt")
+ * @param timeZone - The viewer's IANA zone (`QueryContext.timeZone`)
+ */
+export function buildInstantFilter(
+  criterion: DateCriterion,
+  column: string,
+  timeZone: string
+): FilterClause {
+  const spanOf = (value: string | undefined) =>
+    value === undefined ? undefined : instantSpan(value, timeZone);
+  /** One span's clause, none when the value makes no span */
+  const within = (
+    value: string,
+    clause: (span: { start: number; end: number }) => FilterClause
+  ): FilterClause => {
+    const span = spanOf(value);
+    return span === undefined ? noClause() : clause(span);
+  };
+  switch (criterion.modifier) {
+    case "IS_NULL":
+      return { sql: `${column} IS NULL`, params: [] };
+    case "NOT_NULL":
+      return { sql: `${column} IS NOT NULL`, params: [] };
     case "EQUALS":
-      return {
+      return within(criterion.value, ({ start, end }) => ({
         sql: `(${column} >= ? AND ${column} < ?)`,
-        params: [first.start, first.end],
-      };
+        params: [start, end],
+      }));
     case "NOT_EQUALS":
-      return {
-        sql: `(${column} IS NULL OR ${column} < ? OR ${column} >= ?)`,
-        params: [first.start, first.end],
-      };
+      return within(criterion.value, ({ start, end }) => ({
+        sql: `(${column} < ? OR ${column} >= ?)`,
+        params: [start, end],
+      }));
     case "GREATER_THAN":
-      return { sql: `${column} > ?`, params: [first.start] };
+      return within(criterion.value, ({ end }) => ({
+        sql: `${column} >= ?`,
+        params: [end],
+      }));
     case "LESS_THAN":
-      return { sql: `${column} < ?`, params: [first.start] };
-    case "BETWEEN":
-      if (last) {
+      return within(criterion.value, ({ start }) => ({
+        sql: `${column} < ?`,
+        params: [start],
+      }));
+    case "BETWEEN": {
+      const first = spanOf(criterion.value);
+      const last = spanOf(criterion.value2);
+      if (first !== undefined && last !== undefined) {
         return {
           sql: `(${column} >= ? AND ${column} < ?)`,
           params: [first.start, last.end],
         };
       }
-      return { sql: `${column} >= ?`, params: [first.start] };
-    case "NOT_BETWEEN":
-      if (last) {
-        return {
-          sql: `(${column} IS NULL OR ${column} < ? OR ${column} >= ?)`,
-          params: [first.start, last.end],
-        };
+      if (first !== undefined) {
+        return { sql: `${column} >= ?`, params: [first.start] };
       }
-      return { sql: `${column} < ?`, params: [first.start] };
-    case null:
-    default:
-      return { sql: "", params: [] };
+      if (last !== undefined) {
+        return { sql: `${column} < ?`, params: [last.end] };
+      }
+      return noClause();
+    }
+    case "NOT_BETWEEN": {
+      const first = spanOf(criterion.value);
+      const last = spanOf(criterion.value2);
+      return first !== undefined && last !== undefined
+        ? {
+            sql: `(${column} < ? OR ${column} >= ?)`,
+            params: [first.start, last.end],
+          }
+        : noClause();
+    }
   }
 }
 

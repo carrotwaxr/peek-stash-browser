@@ -44,7 +44,12 @@ async function clipsOf(
   const counts = await countRelations(
     "tag",
     { id: TAG, instanceId },
-    { userId: user, allowedInstanceIds: allowed, depth: undefined }
+    {
+      userId: user,
+      allowedInstanceIds: allowed,
+      depth: undefined,
+      timeZone: "UTC",
+    }
   );
   return counts.clips;
 }

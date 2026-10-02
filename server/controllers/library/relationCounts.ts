@@ -87,6 +87,7 @@ export function relationCountsHandler<T extends RelationCountsType>(type: T) {
       userId,
       allowedInstanceIds: req.allowedInstanceIds,
       depth: depthOf(parsed.data),
+      timeZone: req.timeZone,
     });
     res.json({ counts });
   };

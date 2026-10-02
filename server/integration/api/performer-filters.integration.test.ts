@@ -929,6 +929,31 @@ describeWithDb("Performer birth year and age, partial dates (seeded)", () => {
     ).toContain("7895002:by-a");
   });
 
+  it("a `YYYY` birthdate is in a range covering its 1 January", async () => {
+    expect(
+      await listed({
+        birthdate: {
+          modifier: "BETWEEN",
+          value: "1995-01-01",
+          value2: "1995-01-01",
+        },
+      })
+    ).toEqual(["7895001:by-a"]);
+    // A month is its first day; a From date alone includes its own day
+    expect(
+      await listed({
+        birthdate: {
+          modifier: "BETWEEN",
+          value: "1995-06-01",
+          value2: undefined,
+        },
+      })
+    ).toEqual(["7895002:by-a"]);
+    expect(
+      await listed({ birthdate: { modifier: "EQUALS", value: "1980-01-01" } })
+    ).toEqual(["7895001:by-b"]);
+  });
+
   it("an age never reads thousands of years for a partial date", async () => {
     expect(
       await listed({ age: { modifier: "GREATER_THAN", value: 200 } })

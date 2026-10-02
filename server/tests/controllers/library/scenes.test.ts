@@ -219,6 +219,22 @@ describe("findScenes", () => {
     );
   });
 
+  it("passes the request's time zone to the builder", async () => {
+    mockSceneQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
+    const req = reqFor(findScenes, {
+      body: { filter: { page: 1, per_page: 40 }, scene_filter: {} },
+      user: testUser(),
+      allowedInstanceIds: ["inst-a"],
+      timeZone: "America/Chicago",
+    });
+
+    await findScenes(req, resFor(findScenes));
+
+    expect(mockSceneQueryBuilder.execute).toHaveBeenCalledWith(
+      objectContaining({ timeZone: "America/Chicago" })
+    );
+  });
+
   it("findScenes logs its timings at DEBUG, not INFO", async () => {
     mockSceneQueryBuilder.execute.mockResolvedValue({
       items: [createMockScene({ id: "s1" })],

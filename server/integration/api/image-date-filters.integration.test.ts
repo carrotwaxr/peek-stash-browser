@@ -1,7 +1,25 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
-import { adminClient } from "../helpers/testClient.js";
+import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
+
+const CHICAGO = "America/Chicago";
+
+/** The calendar day an instant falls on in a zone, as YYYY-MM-DD */
+function localDay(iso: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(iso));
+  const part = (type: string) =>
+    must(
+      parts.find((p) => p.type === type),
+      type
+    ).value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
 
 /**
  * Image Date Filters Integration Tests
@@ -20,6 +38,8 @@ interface FindImagesResponse {
   findImages: {
     images: Array<{
       id: string;
+      instanceId?: string;
+      stashCreatedAt?: string | null;
       title?: string;
       date?: string | null;
       created_at?: string;
@@ -343,5 +363,52 @@ describe("Image Date Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
     });
+  });
+});
+
+/**
+ * One day rule (item 43): created and updated days are the viewer's, in the
+ * zone the request names (`X-Peek-Time-Zone`), and BETWEEN includes both ends
+ */
+describe("Image date filters: the viewer's day", () => {
+  beforeAll(async () => {
+    await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+  });
+
+  it("a same-day created range lists the images created that local day", async () => {
+    const instanceId = await findTestInstanceId();
+    const newest = await adminClient.post<FindImagesResponse>(
+      "/api/library/images",
+      { filter: { per_page: 250, sort: "created_at", direction: "DESC" } }
+    );
+    expect(newest.ok, JSON.stringify(newest.data)).toBe(true);
+    const item = must(
+      newest.data.findImages.images.find(
+        (x) => x.instanceId === instanceId && x.stashCreatedAt
+      ),
+      "a image with a created time on the test instance"
+    );
+    const ref = `${item.id}:${instanceId}`;
+    // An image carries its Stash created time as stashCreatedAt
+    const day = localDay(must(item.stashCreatedAt, "stashCreatedAt"), CHICAGO);
+
+    const response = await adminClient.post<FindImagesResponse>(
+      "/api/library/images",
+      {
+        filter: { per_page: 10 },
+        image_filter: {
+          ids: { value: [ref], modifier: "INCLUDES" },
+          created_at: { modifier: "BETWEEN", value: day, value2: day },
+        },
+      },
+      { headers: { "X-Peek-Time-Zone": CHICAGO } }
+    );
+
+    expect(response.ok, JSON.stringify(response.data)).toBe(true);
+    expect(
+      response.data.findImages.images.map(
+        (x) => `${x.id}:${x.instanceId ?? ""}`
+      )
+    ).toEqual([ref]);
   });
 });

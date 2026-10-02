@@ -33,13 +33,14 @@ export const findImages = async (
   // Exclusions apply to every user; an admin's rows hold only their own hides
   const applyExclusions = true;
 
-  const { allowedInstanceIds } = req;
+  const { allowedInstanceIds, timeZone } = req;
 
   // The request's instance_id (specificInstanceId) narrows the list to
   // one instance
   const result = await imageQueryBuilder.execute({
     userId,
     allowedInstanceIds,
+    timeZone,
     request,
     applyExclusions,
   });

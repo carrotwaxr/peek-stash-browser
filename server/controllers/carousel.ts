@@ -310,7 +310,8 @@ export const previewCarousel = async (
     userId,
     req.allowedInstanceIds,
     query,
-    req.user
+    req.user,
+    req.timeZone
   );
 
   res.json({ scenes });
@@ -324,12 +325,15 @@ export const previewCarousel = async (
  * has none (an empty list matches nothing).
  *
  * `viewer` is the requesting user: only an admin's scenes carry stashUrl.
+ * `timeZone` is the viewer's (`req.timeZone`): a stored rule keeps plain
+ * dates, so its days follow whoever is looking.
  */
 export async function executeCarouselQuery(
   userId: number,
   allowedInstanceIds: readonly string[],
   query: ParsedListRequest<"scene">,
-  viewer: { role: string } | undefined
+  viewer: { role: string } | undefined,
+  timeZone: string
 ): Promise<WithStashUrl<NormalizedScene>[]> {
   const startTime = Date.now();
 
@@ -337,6 +341,7 @@ export async function executeCarouselQuery(
     userId,
     allowedInstanceIds,
     request: query,
+    timeZone,
   });
 
   const scenes = addStashUrl(result.items, viewer);
@@ -391,7 +396,8 @@ export const executeCarouselById = async (
     userId,
     req.allowedInstanceIds,
     query,
-    req.user
+    req.user,
+    req.timeZone
   );
 
   res.json({
