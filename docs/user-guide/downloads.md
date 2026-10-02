@@ -26,7 +26,7 @@ Downloads follow the same rules as browsing. You can download only scenes and im
 2. Click the **Download** button in the action bar
 3. The download starts immediately
 
-Scene downloads stream directly from your Stash server—there's no waiting for file preparation.
+Peek streams a scene file from your Stash server to you as it downloads, so there's no waiting for file preparation. Your browser talks only to Peek, never to Stash.
 
 ### What's Downloaded
 
@@ -44,7 +44,7 @@ Scene downloads stream directly from your Stash server—there's no waiting for 
 2. Click the **Download** button in the top bar, beside Info (it shows only with the Can Download Files permission)
 3. The image downloads immediately
 
-The file keeps its real extension. Image downloads also stream directly from Stash. An image you cannot see (hidden or restricted for you) is refused.
+The file keeps its real extension. Image downloads are streamed by Peek from Stash the same way. An image you cannot see (hidden or restricted for you) is refused.
 
 ---
 

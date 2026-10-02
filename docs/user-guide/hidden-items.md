@@ -27,13 +27,14 @@ The same three-dot menu is available on:
 - Tag cards
 - Group/Collection cards
 - Gallery cards
+- Image cards
 - Clip cards (on the Clips page)
 
 ### Bulk Actions (Scenes)
 
 1. Enable multi-select mode by clicking the checkbox icon
 2. Select multiple scenes
-3. Click "Hide Selected" in the bulk action bar
+3. Click **Hide** in the bulk action bar
 
 A bulk hide is all or nothing: either every selected item is hidden, or, if something goes wrong, none is and you can try again.
 
@@ -41,9 +42,9 @@ A bulk hide is all or nothing: either every selected item is hidden, or, if some
 
 ### Viewing Hidden Items
 
-1. Go to **My Settings**
-2. Scroll to the "Hidden Items" section
-3. Click **View Hidden Items**
+1. Go to **Settings** > **User Preferences** > **Content**
+2. Find the **Hidden Items** section
+3. Click **Hidden Items**
 
 The page lists your hidden items newest first, 50 to a page, each with its thumbnail and name. The tabs show how many items of each type you have hidden; a type you have hidden nothing of has no tab. An item you can no longer see for another reason (a content restriction, or it was removed from the library) shows as its type with "Details unavailable", and you can still restore it.
 
@@ -58,7 +59,7 @@ From the Hidden Items page:
 
 If you frequently hide items and want to skip the confirmation dialog:
 1. Check "Don't ask me again" when hiding an item, OR
-2. Go to **My Settings** > Hidden Items section
+2. Go to **Settings** > **User Preferences** > **Content**, in the **Hidden Items** section
 3. Check "Don't ask for confirmation when hiding items"
 
 You can toggle this setting on/off at any time.
@@ -87,12 +88,12 @@ When you hide an entity:
 - **Hiding a Gallery**: That gallery, its images and the scenes linked to it
 - **Hiding a Clip**: Only that clip. Its scene and the scene's other clips stay; hiding a scene hides its clips too
 
-Hiding a tag or studio hides its whole subtree; unhiding the parent restores the children and their content at the next recompute. Performers, studios, collections and tags left with no visible content disappear from lists until some of their content is visible again.
+Hiding a tag or studio hides its whole subtree; unhiding the parent restores the children and their content at the next recompute. For user accounts, performers, studios, collections and tags left with no visible content disappear from lists until some of their content is visible again; admin accounts keep seeing them.
 
 ## FAQ
 
 ### Can I accidentally hide something important?
-You can always restore hidden items from **My Settings** > **View Hidden Items**. The Restore All button makes it easy to undo bulk actions.
+You can always restore hidden items from **Settings** > **User Preferences** > **Content** > **Hidden Items**. The Restore All button makes it easy to undo bulk actions.
 
 ### Do hidden items count toward my stats?
 Hidden items are excluded from most views but may still appear in certain statistics or reports.

@@ -126,7 +126,7 @@ The box is disabled until a list has an item. When you add the first item it tak
 - With a Show-only list, the box decides what happens to content with no item of that type: hidden when ticked, visible when unticked
 - With only an Always-hide list, ticking the box hides content with no item of that type on top of the listed items
 
-Images use their own tags here: an image in a tagged gallery still counts as having no tags of its own.
+Images use their own tags and studio here, and an image with none takes its gallery's: an image with no tags in a tagged gallery counts as having that gallery's tags, so "no tags" hides only images that have none of their own and none from their gallery (and likewise for a studio).
 
 ### When a Stash server is deleted
 
@@ -177,7 +177,7 @@ An always-hidden gallery hides:
 
 ### Organizing entities
 
-Performers, studios, collections and tags that are left with no visible content disappear from lists and filters. They come back as soon as some of their content is visible again.
+Performers, studios, collections and tags that are left with no visible content disappear from lists and filters for user accounts. Admin accounts always see them (their restrictions do not apply). They come back as soon as some of their content is visible again.
 
 A collection's content includes its sub-collections, at any depth: a collection that only groups other collections stays visible while one of them holds a visible scene. A collection whose sub-collections are all empty or hidden, and which holds no visible scene of its own, disappears like any other empty collection.
 
