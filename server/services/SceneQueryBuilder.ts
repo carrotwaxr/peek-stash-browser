@@ -3,8 +3,8 @@
  *
  * The scene builder on the base (`query/EntityQueryBuilder.ts`): this file
  * declares the scene's spec (table, per-user joins, columns), its filter
- * clauses from the parsed request, its sort map, its row transform and its
- * relations. The instance filter, the exclusion join, the `ids` filter, the
+ * clauses (a table with one function per field, and the search), its sort
+ * map, its row transform and its relations. The instance filter, the exclusion join, the `ids` filter, the
  * random sort, the primary key ending every order and the count are the
  * base's.
  */
@@ -55,6 +55,8 @@ import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  type FieldClauses,
+  type LeafContext,
   type QueryContext,
   type SortExpr,
   hierarchicalRefClause,
@@ -353,133 +355,83 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /** The scene filter's clauses, one per criterion the request carried */
-  protected async filterClauses(
-    filter: ParsedFilter<"scene">,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    const { userId, allowedInstanceIds } = ctx;
-    const refs = (
-      name: string,
-      target: JunctionTarget,
-      criterion: RefCriterion
-    ) =>
-      refClause(target, criterion.refs, criterion.modifier, {
-        name,
-        allowedInstanceIds,
-      });
-
-    const clauses: FilterClause[] = [];
-    const push = (clause: FilterClause | undefined) => {
-      if (clause !== undefined) clauses.push(clause);
-    };
-
+  /**
+   * The scene filter's clauses, one per field, in the order the statement
+   * ANDs them. A ref field's CTEs are named from the leaf (`ctx.name`).
+   */
+  protected override readonly fieldClauses: FieldClauses<"scene"> = {
     // Metadata
-    if (filter.duration) {
-      push(buildNumericFilter(filter.duration, "COALESCE(s.duration, 0)"));
-    }
-    if (filter.resolution) push(this.resolutionClause(filter.resolution));
+    duration: (c) => buildNumericFilter(c, "COALESCE(s.duration, 0)"),
+    resolution: (c) => this.resolutionClause(c),
     // No tag, own or inherited (the folder view's Untagged), or some tag
-    if (filter.tagged !== undefined) {
+    tagged: (tagged) => {
       const untagged = sceneUntaggedSql("s");
-      push({ sql: filter.tagged ? `NOT ${untagged}` : untagged, params: [] });
-    }
-    if (filter.organized !== undefined) {
-      push({ sql: "s.organized = ?", params: [filter.organized ? 1 : 0] });
-    }
+      return { sql: tagged ? `NOT ${untagged}` : untagged, params: [] };
+    },
+    organized: (organized) => ({
+      sql: "s.organized = ?",
+      params: [organized ? 1 : 0],
+    }),
 
     // Related entities
-    if (filter.performers) {
-      push(refs("performers", SCENE_PERFORMERS, filter.performers));
-    }
-    if (filter.tags) push(await this.tagClause(filter.tags, ctx));
-    if (filter.studios) push(await this.studioClause(filter.studios, ctx));
-    if (filter.groups) push(refs("groups", SCENE_GROUPS, filter.groups));
-    if (filter.galleries) {
-      push(refs("galleries", SCENE_GALLERIES, filter.galleries));
-    }
+    performers: (c, ctx) => this.refs(SCENE_PERFORMERS, c, ctx),
+    tags: (c, ctx) => this.tagClause(c, ctx),
+    studios: (c, ctx) => this.studioClause(c, ctx),
+    groups: (c, ctx) => this.refs(SCENE_GROUPS, c, ctx),
+    galleries: (c, ctx) => this.refs(SCENE_GALLERIES, c, ctx),
 
     // The viewer's own data
-    push(buildFavoriteFilter(filter.favorite));
-    if (filter.rating100) {
-      push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
-    }
-    if (filter.play_count) {
-      push(buildNumericFilter(filter.play_count, "COALESCE(w.playCount, 0)"));
-    }
-    if (filter.o_counter) {
-      push(buildNumericFilter(filter.o_counter, "COALESCE(w.oCount, 0)"));
-    }
+    favorite: (favorite) => buildFavoriteFilter(favorite),
+    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    play_count: (c) => buildNumericFilter(c, "COALESCE(w.playCount, 0)"),
+    o_counter: (c) => buildNumericFilter(c, "COALESCE(w.oCount, 0)"),
 
     // Text
-    if (filter.title) push(buildTextFilter(filter.title, "s.title"));
-    if (filter.details) push(buildTextFilter(filter.details, "s.details"));
-    if (filter.director) push(buildTextFilter(filter.director, "s.director"));
+    title: (c) => buildTextFilter(c, "s.title"),
+    details: (c) => buildTextFilter(c, "s.details"),
+    director: (c) => buildTextFilter(c, "s.director"),
 
     // Dates
-    if (filter.date) push(buildDateFilter(filter.date, "s.date"));
-    if (filter.created_at) {
-      push(buildDateFilter(filter.created_at, "s.stashCreatedAt"));
-    }
-    if (filter.updated_at) {
-      push(buildDateFilter(filter.updated_at, "s.stashUpdatedAt"));
-    }
-    if (filter.last_played_at) {
-      push(buildEpochDateFilter(filter.last_played_at, "w.lastPlayedAt"));
-    }
+    date: (c) => buildDateFilter(c, "s.date"),
+    created_at: (c) => buildDateFilter(c, "s.stashCreatedAt"),
+    updated_at: (c) => buildDateFilter(c, "s.stashUpdatedAt"),
+    last_played_at: (c) => buildEpochDateFilter(c, "w.lastPlayedAt"),
 
     // Numbers
-    if (filter.bitrate) {
-      push(buildNumericFilter(filter.bitrate, "COALESCE(s.fileBitRate, 0)"));
-    }
-    if (filter.framerate) {
-      push(
-        buildNumericFilter(filter.framerate, "COALESCE(s.fileFrameRate, 0)")
-      );
-    }
-    if (filter.play_duration) {
-      push(
-        buildNumericFilter(filter.play_duration, "COALESCE(w.playDuration, 0)")
-      );
-    }
+    bitrate: (c) => buildNumericFilter(c, "COALESCE(s.fileBitRate, 0)"),
+    framerate: (c) => buildNumericFilter(c, "COALESCE(s.fileFrameRate, 0)"),
+    play_duration: (c) => buildNumericFilter(c, "COALESCE(w.playDuration, 0)"),
 
     // Counts, stored by sync (SCENE_DERIVED_COLUMNS_SQL): the scene's
     // ScenePerformer and SceneTag rows
-    if (filter.performer_count) {
-      push(buildNumericFilter(filter.performer_count, "s.performerCount"));
-    }
-    if (filter.tag_count) {
-      push(buildNumericFilter(filter.tag_count, "s.tagCount"));
-    }
-    if (filter.performer_age) {
-      push(buildNumericFilter(filter.performer_age, PERFORMER_AGE));
-    }
+    performer_count: (c) => buildNumericFilter(c, "s.performerCount"),
+    tag_count: (c) => buildNumericFilter(c, "s.tagCount"),
+    performer_age: (c) => buildNumericFilter(c, PERFORMER_AGE),
 
     // Enums
-    if (filter.orientation) push(this.orientationClause(filter.orientation));
-    if (filter.video_codec) {
-      push(buildTextFilter(filter.video_codec, "s.fileVideoCodec"));
-    }
-    if (filter.audio_codec) {
-      push(buildTextFilter(filter.audio_codec, "s.fileAudioCodec"));
-    }
+    orientation: (c) => this.orientationClause(c),
+    video_codec: (c) => buildTextFilter(c, "s.fileVideoCodec"),
+    audio_codec: (c) => buildTextFilter(c, "s.fileAudioCodec"),
 
-    // The viewer's favorite entities
-    if (filter.performer_favorite === true) {
-      push(this.buildPerformerFavoriteFilter(userId));
-    }
-    if (filter.studio_favorite === true) {
-      push(this.buildStudioFavoriteFilter(userId));
-    }
-    if (filter.tag_favorite === true) {
-      push(this.buildTagFavoriteFilter(userId));
-    }
+    // The viewer's favorite entities; false is no filter
+    performer_favorite: (on, ctx) =>
+      on ? this.buildPerformerFavoriteFilter(ctx.userId) : noClause(),
+    studio_favorite: (on, ctx) =>
+      on ? this.buildStudioFavoriteFilter(ctx.userId) : noClause(),
+    tag_favorite: (on, ctx) =>
+      on ? this.buildTagFavoriteFilter(ctx.userId) : noClause(),
+  };
 
-    // Text search across title, details, path, performers, studio, tags
-    if (q !== undefined) push(this.buildSearchQueryFilter(q, ctx));
-
-    return clauses;
+  /** A ref filter on one of the scene's junctions, its CTEs named from the leaf */
+  private refs(
+    target: JunctionTarget,
+    criterion: RefCriterion,
+    ctx: LeafContext
+  ): FilterClause {
+    return refClause(target, criterion.refs, criterion.modifier, {
+      name: ctx.name,
+      allowedInstanceIds: ctx.allowedInstanceIds,
+    });
   }
 
   /**
@@ -496,22 +448,22 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    */
   private async tagClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("tag", SCENE_TAGS, criterion, ctx, {
-      name: "tags",
+      name: ctx.name,
       inheritedJunction: SCENE_INHERITED_TAGS,
-      sortedByIndex: INDEXED_SORTS.has(ctx.sortField),
+      sortedByIndex: INDEXED_SORTS.has(ctx.sortField) && !ctx.underAny,
     });
   }
 
   /** The studio filter, with the studios' descendants to the depth */
   private async studioClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", SCENE_STUDIO, criterion, ctx, {
-      name: "studios",
+      name: ctx.name,
     });
   }
 
@@ -547,7 +499,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * text matches itself. LOWER() on both sides folds ASCII case only, as
    * SQLite's LIKE does.
    */
-  private buildSearchQueryFilter(
+  protected override searchClause(
     searchQuery: string,
     ctx: QueryContext
   ): FilterClause {

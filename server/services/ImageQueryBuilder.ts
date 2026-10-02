@@ -152,7 +152,7 @@ class ImageQueryBuilder extends EntityQueryBuilder<
   }
 
   /** The image filter's clauses, one per criterion the request carried */
-  protected async filterClauses(
+  protected override async legacyFilterClauses(
     filter: ParsedFilter<"image">,
     q: string | undefined,
     ctx: QueryContext
@@ -258,7 +258,7 @@ class ImageQueryBuilder extends EntityQueryBuilder<
    * `likeContains` with `ESCAPE '\'`, so a `%`, `_` or `\` in the text
    * matches itself. SQLite's LIKE folds ASCII case, as before.
    */
-  private searchClause(q: string): FilterClause {
+  protected override searchClause(q: string): FilterClause {
     const pattern = likeContains(q);
     return {
       sql: "(i.title LIKE ? ESCAPE '\\' OR i.details LIKE ? ESCAPE '\\' OR i.photographer LIKE ? ESCAPE '\\' OR i.filePath LIKE ? ESCAPE '\\')",

@@ -5,9 +5,11 @@
  * Verifies multi-instance support, exclusion filtering, search queries,
  * and allowedInstanceIds filtering by inspecting generated SQL.
  */
+import { SCENE_FIELDS } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import type { LeafContext } from "../../services/query/EntityQueryBuilder.js";
 import type { SceneQueryRow } from "../../types/internal/queryRows.js";
 import type {
   ParsedFilter,
@@ -983,5 +985,53 @@ describe("sortTerms", () => {
     expect(order.sql).toMatch(/^\(\(\(\(\(s\.id \+ \?\).* ASC$/);
     expect(order.sql).not.toMatch(/\b7\b/);
     expect(order.params).toEqual([7, 7, 7]);
+  });
+});
+
+describe("the scene field table", () => {
+  it("has a clause for every scene field but the base's", () => {
+    const fields = Object.keys(SCENE_FIELDS).filter(
+      (field) => field !== "ids" && field !== "instance_id"
+    );
+
+    // The table is in the statement's clause order, the fields in the
+    // contract's: the same set
+    expect(Object.keys(sceneQueryBuilder["fieldClauses"]).sort()).toEqual(
+      fields.sort()
+    );
+  });
+
+  it("a tags leaf under an any group takes the read-once shape under an indexed sort", async () => {
+    const leaf = {
+      field: "tags",
+      criterion: {
+        refs: [{ id: "284", instanceId: "inst-a" }],
+        modifier: "INCLUDES",
+        depth: 0,
+      },
+    } as const;
+    const ctx = (underAny: boolean): LeafContext => ({
+      userId: 1,
+      applyExclusions: true,
+      allowedInstanceIds: ALLOWED,
+      specificInstanceId: undefined,
+      sortField: "created_at",
+      name: "tags",
+      underAny,
+    });
+
+    const anyGroup = await sceneQueryBuilder.clauseFor(leaf, ctx(true));
+    const own = await sceneQueryBuilder.clauseFor(leaf, ctx(false));
+
+    // junctionInList: the matches read once from the junctions' tag index
+    expect(anyGroup.sql).toMatch(
+      /^\(s\.id, s\.stashInstanceId\) IN \(SELECT st\.sceneId, st\.sceneInstanceId FROM SceneTag st WHERE /
+    );
+    expect(anyGroup.sql).not.toContain("EXISTS");
+    // The per-row EXISTS, walking the sort's index
+    expect(own.sql).toContain(
+      "EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?)))"
+    );
+    expect(own.sql).not.toContain("IN (SELECT");
   });
 });

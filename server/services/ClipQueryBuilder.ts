@@ -308,7 +308,7 @@ class ClipQueryBuilder extends EntityQueryBuilder<
    * clip tag: 10 ms, against 13 with the list). Has NONE keeps its NOT
    * EXISTS per clip.
    */
-  protected filterClauses(
+  protected override legacyFilterClauses(
     filter: ClipListRequest["filter"],
     q: string | undefined,
     ctx: QueryContext

@@ -147,7 +147,7 @@ class StudioQueryBuilder extends EntityQueryBuilder<
   }
 
   /** The studio filter's clauses, one per criterion the request carried */
-  protected async filterClauses(
+  protected override async legacyFilterClauses(
     filter: ParsedFilter<"studio">,
     q: string | undefined,
     ctx: QueryContext
@@ -211,7 +211,7 @@ class StudioQueryBuilder extends EntityQueryBuilder<
    * The search across the name and details: `likeContains` with
    * `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
    */
-  private searchClause(q: string): FilterClause {
+  protected override searchClause(q: string): FilterClause {
     const pattern = likeContains(q.toLowerCase());
     return {
       sql: "(LOWER(s.name) LIKE ? ESCAPE '\\' OR LOWER(s.details) LIKE ? ESCAPE '\\')",

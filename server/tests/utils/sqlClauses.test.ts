@@ -750,6 +750,21 @@ describe("combine", () => {
       ],
     });
   });
+
+  it("combine refuses two CTEs with one name", () => {
+    const cte = {
+      name: "tags_refs",
+      sql: "tags_refs(id) AS (SELECT ?)",
+      params: ["x"],
+    };
+
+    expect(() =>
+      combine([
+        { sql: "a = 1", params: [], ctes: [cte] },
+        { sql: "b = 1", params: [], ctes: [cte] },
+      ])
+    ).toThrow("Duplicate CTE name tags_refs");
+  });
 });
 
 describe("countForms", () => {
