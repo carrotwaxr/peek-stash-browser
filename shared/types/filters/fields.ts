@@ -101,7 +101,10 @@ export const SCENE_FIELDS = {
    * in no tag's folder
    */
   tagged: bool(),
-  /** The oldest performer's age on the scene's date */
+  /**
+   * Any performer the viewer can see was this age on the scene's date, as
+   * in Stash; a scene without a date never matches
+   */
   performer_age: count(),
   resolution: enumOf(RESOLUTIONS, { modifiers: COMPARISON_MODIFIERS }),
   orientation: enumOf(ORIENTATIONS, { multi: true }),

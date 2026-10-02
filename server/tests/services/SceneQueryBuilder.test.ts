@@ -609,9 +609,12 @@ describe("SceneQueryBuilder", () => {
       expect(sql).toContain("PerformerRating pr");
       expect(sql).toContain("StudioRating sr");
       expect(sql).toContain("TagRating tr");
-      expect(sql).toContain("julianday(p.birthdate)");
-      // The three favorite clauses bind the viewer
-      expect(params.filter((p) => p === 1)).toHaveLength(6);
+      expect(sql).toContain("strftime('%Y.%m%d', ");
+      expect(sql).not.toContain("julianday");
+      expect(sql).toContain("s.date IS NOT NULL AND EXISTS");
+      // The three favorite clauses bind the viewer, and so does the age
+      // clause's exclusion arm
+      expect(params.filter((p) => p === 1)).toHaveLength(7);
     });
 
     it("a filter with nothing in it adds no clause", async () => {

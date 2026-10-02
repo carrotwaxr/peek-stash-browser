@@ -802,6 +802,78 @@ export function buildNumericFilter(
 }
 
 /**
+ * A date column as Stash reads it: a year alone (`1995`) is its 1 January
+ * and a year and month (`1995-06`) its first day. SQLite reads a bare `1995`
+ * as a Julian day number and `1995-06` as no date, so a partial date must
+ * be completed before `strftime` or `date` sees it. A NULL stays NULL.
+ */
+export function fullDateSql(col: string): string {
+  return `CASE length(${col}) WHEN 4 THEN ${col} || '-01-01' WHEN 7 THEN ${col} || '-01' ELSE ${col} END`;
+}
+
+/**
+ * The whole years from `birth` to `at`, Stash's arithmetic: the difference
+ * of `YYYY.MMDD` read as a number, cut to its integer part. Both dates may
+ * be partial (see fullDateSql).
+ */
+export function ageYearsSql(at: string, birth: string): string {
+  return `CAST(strftime('%Y.%m%d', ${fullDateSql(at)}) - strftime('%Y.%m%d', ${fullDateSql(birth)}) AS INTEGER)`;
+}
+
+/** The junction that joins a dated item to its performers, and the item's own columns */
+export interface PerformerAgeSource {
+  readonly junction: {
+    readonly table: string;
+    readonly itemId: string;
+    readonly itemInstance: string;
+    readonly performerId: string;
+    readonly performerInstance: string;
+  };
+  /** The item's id, instance and date columns as the statement names them (`s.id`) */
+  readonly item: {
+    readonly id: string;
+    readonly instance: string;
+    readonly date: string;
+  };
+}
+
+/**
+ * Performer Age on a dated item (a scene; an image or gallery later): the
+ * item matches when any of its performers was in range on the item's date.
+ * An item without a date never matches, nor does a performer without a
+ * birthdate or a deleted one, nor one the viewer cannot see: pass the
+ * viewer's id when exclusions apply (their hides, restrictions and cascades
+ * in `UserExcludedEntity`, with the instance), null when they do not. The
+ * performer is on the item's own instance.
+ *
+ * IS_NULL and NOT_NULL, which the contract allows none of here, and a
+ * criterion without a bound filter nothing.
+ */
+export function performerAgeExists(
+  criterion: NumberCriterion,
+  source: PerformerAgeSource,
+  viewerId: number | null
+): FilterClause {
+  if (criterion.modifier === "IS_NULL" || criterion.modifier === "NOT_NULL") {
+    return noClause();
+  }
+  const age = buildNumericFilter(
+    criterion,
+    ageYearsSql(source.item.date, "p.birthdate")
+  );
+  if (!age.sql) return age;
+  const { junction, item } = source;
+  const visible =
+    viewerId === null
+      ? ""
+      : ` AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity x WHERE x.userId = ? AND x.entityType = 'performer' AND x.entityId = p.id AND (x.instanceId = '' OR x.instanceId = p.stashInstanceId))`;
+  return {
+    sql: `(${item.date} IS NOT NULL AND EXISTS (SELECT 1 FROM ${junction.table} sp JOIN StashPerformer p ON p.id = sp.${junction.performerId} AND p.stashInstanceId = sp.${junction.performerInstance} WHERE sp.${junction.itemId} = ${item.id} AND sp.${junction.itemInstance} = ${item.instance} AND p.deletedAt IS NULL AND p.birthdate IS NOT NULL${visible} AND ${age.sql}))`,
+    params: viewerId === null ? age.params : [viewerId, ...age.params],
+  };
+}
+
+/**
  * Build a date comparison filter clause.
  * Handles EQUALS, NOT_EQUALS, GREATER_THAN, LESS_THAN, BETWEEN, NOT_BETWEEN, IS_NULL, NOT_NULL.
  *

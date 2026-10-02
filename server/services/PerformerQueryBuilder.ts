@@ -21,11 +21,13 @@ import {
   type FilterClause,
   type JunctionTarget,
   type ViaSceneSpec,
+  ageYearsSql,
   buildDateFilter,
   buildFavoriteFilter,
   buildNumericFilter,
   buildTextFilter,
   careerYearsSql,
+  fullDateSql,
   noClause,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
@@ -135,8 +137,12 @@ const PERFORMERS_BY_STUDIO: ViaSceneSpec = {
   },
 };
 
-/** A performer's age today, from the birthdate, as SQLite computes it */
-const AGE = `CAST((julianday(date('now')) - julianday(p.birthdate)) / 365.25 AS INTEGER)`;
+/**
+ * A performer's age, Stash's way: today's, or the age reached at death. A
+ * birthdate or death date of only a year, or a year and month, counts from
+ * its first day.
+ */
+const AGE = ageYearsSql("COALESCE(p.deathDate, date('now'))", "p.birthdate");
 
 /** The years of the performer's career, from Stash's free-text career field */
 const CAREER_YEARS = careerYearsSql("p.careerLength");
@@ -294,13 +300,13 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       datedNumberClause(
         c,
         "p.birthdate",
-        "CAST(SUBSTR(p.birthdate, 1, 4) AS INTEGER)"
+        `CAST(SUBSTR(${fullDateSql("p.birthdate")}, 1, 4) AS INTEGER)`
       ),
     death_year: (c) =>
       datedNumberClause(
         c,
         "p.deathDate",
-        "CAST(SUBSTR(p.deathDate, 1, 4) AS INTEGER)"
+        `CAST(SUBSTR(${fullDateSql("p.deathDate")}, 1, 4) AS INTEGER)`
       ),
     age: (c) => datedNumberClause(c, "p.birthdate", AGE),
 

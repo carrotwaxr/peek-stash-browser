@@ -15,7 +15,11 @@ import type {
   FilterRef,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
-import { careerYearsSql } from "../../utils/sqlClauses.js";
+import {
+  ageYearsSql,
+  careerYearsSql,
+  fullDateSql,
+} from "../../utils/sqlClauses.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -369,13 +373,13 @@ describe("PerformerQueryBuilder", () => {
 
       const { sql } = pageStatement();
       expect(sql).toContain(
-        "(p.birthdate IS NOT NULL AND CAST(SUBSTR(p.birthdate, 1, 4) AS INTEGER) BETWEEN ? AND ?)"
+        `(p.birthdate IS NOT NULL AND CAST(SUBSTR(${fullDateSql("p.birthdate")}, 1, 4) AS INTEGER) BETWEEN ? AND ?)`
       );
       expect(sql).toContain(
-        "(p.deathDate IS NOT NULL AND CAST(SUBSTR(p.deathDate, 1, 4) AS INTEGER) != ?)"
+        `(p.deathDate IS NOT NULL AND CAST(SUBSTR(${fullDateSql("p.deathDate")}, 1, 4) AS INTEGER) != ?)`
       );
       expect(sql).toContain(
-        "(p.birthdate IS NOT NULL AND CAST((julianday(date('now')) - julianday(p.birthdate)) / 365.25 AS INTEGER) < ?)"
+        `(p.birthdate IS NOT NULL AND ${ageYearsSql("COALESCE(p.deathDate, date('now'))", "p.birthdate")} < ?)`
       );
     });
 
@@ -403,7 +407,7 @@ describe("PerformerQueryBuilder", () => {
 
       const { sql } = pageStatement();
       expect(sql).toContain(
-        "(p.birthdate IS NOT NULL AND CAST((julianday(date('now')) - julianday(p.birthdate)) / 365.25 AS INTEGER) != ?)"
+        `(p.birthdate IS NOT NULL AND ${ageYearsSql("COALESCE(p.deathDate, date('now'))", "p.birthdate")} != ?)`
       );
       expect(sql).not.toContain("p.birthdate IS NULL OR");
     });

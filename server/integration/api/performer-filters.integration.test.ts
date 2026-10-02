@@ -5,6 +5,7 @@ import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
 import type {
   NumberCriterion,
+  ParsedFilter,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
 import { careerYearsSql } from "../../utils/sqlClauses.js";
@@ -850,3 +851,87 @@ describeWithDb(
     });
   }
 );
+
+/**
+ * Birth year and age on partial birthdates, on seeded performers. Stash
+ * keeps a year alone as text (`1995`), which SQLite reads as a Julian day;
+ * it counts from its 1 January.
+ *
+ * Two made-up instances reuse the same id, as two Stash servers do:
+ * - by-a: 7895001 born "1995", 7895002 born "1995-06", 7895003 born
+ *   1995-03-15, 7895004 born 1990-01-01
+ * - by-b: 7895001 born 1980-01-01
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Performer birth year and age, partial dates (seeded)", () => {
+  const A = "by-a";
+  const B = "by-b";
+
+  const performer = (id: string, instance: string, birthdate: string) => ({
+    id,
+    stashInstanceId: instance,
+    name: `BY ${id} ${instance}`,
+    birthdate,
+  });
+
+  async function removeRows(): Promise<void> {
+    await prisma.stashPerformer.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+  }
+
+  async function listed(filter: ParsedFilter<"performer">): Promise<string[]> {
+    const { items } = await performerQueryBuilder.execute({
+      userId: 0,
+      applyExclusions: false,
+      allowedInstanceIds: [A, B],
+      request: parsedListRequest("performer", { perPage: 50, filter }),
+    });
+    return items.map((p) => `${p.id}:${p.instanceId}`).sort();
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    await prisma.stashPerformer.createMany({
+      data: [
+        performer("7895001", A, "1995"),
+        performer("7895002", A, "1995-06"),
+        performer("7895003", A, "1995-03-15"),
+        performer("7895004", A, "1990-01-01"),
+        performer("7895001", B, "1980-01-01"),
+      ],
+    });
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  it("birth_year 1995 lists a performer born `1995`, and `1995-06`", async () => {
+    expect(
+      await listed({ birth_year: { modifier: "EQUALS", value: 1995 } })
+    ).toEqual(["7895001:by-a", "7895002:by-a", "7895003:by-a"]);
+  });
+
+  it("age reads a `YYYY` birthdate as its 1 January", async () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    // Born 1995-01-01: a birthday already passed this year, every day of it
+    expect(
+      await listed({ age: { modifier: "EQUALS", value: year - 1995 } })
+    ).toContain("7895001:by-a");
+    // Born 1995-06-01 and 1995-03-15 have had their birthday from the month on
+    const month = now.getMonth() + 1;
+    expect(
+      await listed({
+        age: { modifier: "EQUALS", value: year - 1995 - (month < 6 ? 1 : 0) },
+      })
+    ).toContain("7895002:by-a");
+  });
+
+  it("an age never reads thousands of years for a partial date", async () => {
+    expect(
+      await listed({ age: { modifier: "GREATER_THAN", value: 200 } })
+    ).toEqual([]);
+  });
+});
