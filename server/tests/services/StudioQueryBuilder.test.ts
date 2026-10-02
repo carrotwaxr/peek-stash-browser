@@ -23,6 +23,7 @@ import type {
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
 import { entityKey } from "../../utils/entityRef.js";
+import { jsonListArm } from "../../utils/sqlHelpers.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -297,6 +298,9 @@ describe("StudioQueryBuilder", () => {
           scene_count: { modifier: "NOT_EQUALS", value: 5 },
           name: { modifier: "EQUALS", value: "Studio One" },
           details: { modifier: "INCLUDES", value: "beach" },
+          aliases: { modifier: "INCLUDES", value: "stu" },
+          url: { modifier: "INCLUDES", value: "example" },
+          stash_id: { modifier: "EQUALS", value: "AAAA-1" },
           created_at: {
             modifier: "BETWEEN",
             value: "2025-01-01",
@@ -315,6 +319,9 @@ describe("StudioQueryBuilder", () => {
         "MAX(s.sceneCount - COALESCE(d.scenes, 0), 0) != ?",
         "LOWER(s.name) = LOWER(?)",
         "(s.details LIKE ? ESCAPE '\\')",
+        `(${jsonListArm("s.aliases")})`,
+        "(s.url LIKE ? ESCAPE '\\')",
+        "json_extract(si.value, '$.stash_id')",
         "(s.stashCreatedAt >= ? AND s.stashCreatedAt < ?)",
         "s.stashUpdatedAt IS NULL",
       ]) {
@@ -322,23 +329,23 @@ describe("StudioQueryBuilder", () => {
       }
     });
 
-    it("the search matches the name and details, a % in it matching itself", async () => {
+    it("the search matches the name, details and each alias, a % in it matching itself", async () => {
       await run({ q: '"100% Real"' });
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "(s.name LIKE ? ESCAPE '\\' OR s.details LIKE ? ESCAPE '\\')"
+        `(s.name LIKE ? ESCAPE '\\' OR s.details LIKE ? ESCAPE '\\' OR ${jsonListArm("s.aliases")})`
       );
       expect(sql).not.toContain("LOWER(");
-      expect(params.filter((p) => p === "%100\\% Real%")).toHaveLength(2);
+      expect(params.filter((p) => p === "%100\\% Real%")).toHaveLength(3);
     });
 
     it("two words are two AND-ed groups", async () => {
       await run({ q: "sea side" });
 
       const { params } = pageStatement();
-      expect(params.filter((p) => p === "%sea%")).toHaveLength(2);
-      expect(params.filter((p) => p === "%side%")).toHaveLength(2);
+      expect(params.filter((p) => p === "%sea%")).toHaveLength(3);
+      expect(params.filter((p) => p === "%side%")).toHaveLength(3);
     });
 
     it("the search clause sits after the field clauses", async () => {

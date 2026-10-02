@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
@@ -645,5 +647,166 @@ describeWithDb("Search box (seeded)", () => {
     expect(await ids("Élodie")).toEqual(["7896202"]);
     expect(await ids("ts Élodie")).toEqual(["7896202"]);
     expect(await ids("Élodie nope")).toEqual([]);
+  });
+});
+
+/**
+ * The studio and collection search finds a row by its aliases: a studio's one
+ * at a time (the list's punctuation never matches), a collection's as Stash's
+ * single text, each word of the box on its own. A row the viewer hid is never
+ * found by its alias, and another instance's alias never counts.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do.
+ * - as-a studios: 7903001 "AS one" (aliases "Alpha One" and "Second Name"),
+ *   7903002 "AS two" (no aliases), 7903003 (hidden by the viewer, alias
+ *   "Alpha Hidden"); as-b studio 7903001 "AS b one" (alias "Zulu")
+ * - as-a collections: 7903101 "AS group one" (aliases "Old Name, Other"),
+ *   7903102 "AS group two", 7903103 (hidden by the viewer, aliases "Old
+ *   Hidden"); as-b collection 7903101 (aliases "Zulu")
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Studio and collection search by alias (seeded)", () => {
+  const A = "as-a";
+  const B = "as-b";
+  const VIEWER = "as-viewer";
+  let viewerId = 0;
+
+  const key = (id: string, instance: string) => `${id}:${instance}`;
+
+  async function removeRows(): Promise<void> {
+    const where = { stashInstanceId: { in: [A, B] } };
+    await prisma.stashStudio.deleteMany({ where });
+    await prisma.stashGroup.deleteMany({ where });
+    await prisma.user.deleteMany({ where: { username: VIEWER } });
+  }
+
+  async function studios(q: string, applyExclusions = true): Promise<string[]> {
+    const { items, total } = await studioQueryBuilder.execute({
+      userId: viewerId,
+      applyExclusions,
+      allowedInstanceIds: [A, B],
+      request: parsedListRequest("studio", { perPage: 50, q }),
+    });
+    expect(total).toBe(items.length);
+    return items.map((s) => key(s.id, s.instanceId)).sort();
+  }
+
+  async function groups(q: string, applyExclusions = true): Promise<string[]> {
+    const { items, total } = await groupQueryBuilder.execute({
+      userId: viewerId,
+      applyExclusions,
+      allowedInstanceIds: [A, B],
+      request: parsedListRequest("group", { perPage: 50, q }),
+    });
+    expect(total).toBe(items.length);
+    return items.map((g) => key(g.id, g.instanceId)).sort();
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    viewerId = (
+      await prisma.user.create({
+        data: { username: VIEWER, password: "not-a-real-hash", role: "USER" },
+      })
+    ).id;
+    await prisma.stashStudio.createMany({
+      data: [
+        {
+          id: "7903001",
+          stashInstanceId: A,
+          name: "AS one",
+          aliases: JSON.stringify(["Alpha One", "Second Name"]),
+        },
+        { id: "7903002", stashInstanceId: A, name: "AS two" },
+        {
+          id: "7903003",
+          stashInstanceId: A,
+          name: "AS three",
+          aliases: JSON.stringify(["Alpha Hidden"]),
+        },
+        {
+          id: "7903001",
+          stashInstanceId: B,
+          name: "AS b one",
+          aliases: JSON.stringify(["Zulu"]),
+        },
+      ],
+    });
+    await prisma.stashGroup.createMany({
+      data: [
+        {
+          id: "7903101",
+          stashInstanceId: A,
+          name: "AS group one",
+          aliases: "Old Name, Other",
+        },
+        { id: "7903102", stashInstanceId: A, name: "AS group two" },
+        {
+          id: "7903103",
+          stashInstanceId: A,
+          name: "AS group three",
+          aliases: "Old Hidden",
+        },
+        {
+          id: "7903101",
+          stashInstanceId: B,
+          name: "AS group b one",
+          aliases: "Zulu",
+        },
+      ],
+    });
+    await prisma.userExcludedEntity.createMany({
+      data: [
+        {
+          userId: viewerId,
+          entityType: "studio",
+          entityId: "7903003",
+          instanceId: A,
+          reason: "hidden",
+        },
+        {
+          userId: viewerId,
+          entityType: "group",
+          entityId: "7903103",
+          instanceId: A,
+          reason: "hidden",
+        },
+      ],
+    });
+  });
+
+  afterAll(removeRows);
+
+  it("studio search finds a studio by an alias, per alias", async () => {
+    expect(await studios("alpha")).toEqual([key("7903001", A)]);
+    expect(await studios("second")).toEqual([key("7903001", A)]);
+    // Words may be found in different places: the name and an alias
+    expect(await studios("one second")).toEqual([key("7903001", A)]);
+    // The alias list's JSON punctuation never matches
+    for (const q of ['"', "[", "]", ",", '"]', '","']) {
+      expect(await studios(q)).toEqual([]);
+    }
+  });
+
+  it("studio search by an alias on one instance never finds the other's studio of the same id", async () => {
+    expect(await studios("zulu")).toEqual([key("7903001", B)]);
+  });
+
+  it("a studio the viewer hid is never found by its alias", async () => {
+    expect(await studios("hidden")).toEqual([]);
+    expect(await studios("hidden", false)).toEqual([key("7903003", A)]);
+  });
+
+  it("collection search finds a collection by its aliases text", async () => {
+    expect(await groups("name, oth")).toEqual([key("7903101", A)]);
+    // The box splits words, each matched in the text
+    expect(await groups("other old")).toEqual([key("7903101", A)]);
+    expect(await groups("old nope")).toEqual([]);
+  });
+
+  it("a collection search by an alias on one instance never finds the other's, and a hidden one is never found", async () => {
+    expect(await groups("zulu")).toEqual([key("7903101", B)]);
+    expect(await groups("hidden")).toEqual([]);
+    expect(await groups("hidden", false)).toEqual([key("7903103", A)]);
   });
 });

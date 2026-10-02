@@ -35,6 +35,7 @@ import {
   refClause,
   refSetMatch,
   searchAll,
+  stashIdsClause,
   viaSceneClause,
   visibleGuard,
 } from "../utils/sqlClauses.js";
@@ -329,6 +330,9 @@ class TagQueryBuilder extends EntityQueryBuilder<
     // Text
     name: (c) => buildTextFilter(c, "t.name"),
     description: (c) => buildTextFilter(c, "t.description"),
+    // The aliases one at a time, the StashDB ids
+    aliases: (c) => buildTextFilter(c, null, { lists: ["t.aliases"] }),
+    stash_id: (c) => stashIdsClause(c, "t.stashIds"),
 
     // Dates
     created_at: (c, ctx) =>

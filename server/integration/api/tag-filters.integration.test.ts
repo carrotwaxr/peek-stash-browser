@@ -1,5 +1,8 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { must } from "../../tests/helpers/must.js";
+import { parseListRequest } from "../../utils/listRequest.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
 
@@ -443,5 +446,174 @@ describe("Tag Filters", () => {
       expect(tag.id).toBe(TEST_ENTITIES.tagWithEntities);
       expect(tag.instanceId).toBe(instanceId);
     });
+  });
+});
+
+// Skip if no database connection (matches other integration tests).
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
+
+/**
+ * Tag parity (F15): aliases (one at a time) and StashDB ids. Sent over the
+ * wire parser into the builder for a viewer of their own, as the list route
+ * does.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do:
+ * - tp-a tags: 7901001 (aliases "Alpha One" and "A1", a StashDB id), 7901002
+ *   (alias "Beta", `[]` StashDB ids), 7901003 (nothing set), 7901004 (aliases
+ *   `[]`), 7901005 (hidden by the viewer, matching everything 7901001 does).
+ * - tp-b tags: 7901001 (alias "Zulu", another StashDB id), 7901002.
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Tag parity filters (seeded)", () => {
+  const A = "tp-a";
+  const B = "tp-b";
+  const VIEWER = "tp-viewer";
+  let viewerId = 0;
+
+  const [T1, T2, T3, T4, TH] = [
+    "7901001",
+    "7901002",
+    "7901003",
+    "7901004",
+    "7901005",
+  ];
+  const STASHDB = "https://stashdb.org/graphql";
+  const key = (id: string, instance: string) => `${id}:${instance}`;
+  /** Every tag the viewer can see */
+  const VISIBLE = [
+    key(T1, A),
+    key(T2, A),
+    key(T3, A),
+    key(T4, A),
+    key(T1, B),
+    key(T2, B),
+  ].sort();
+  const without = (...keys: string[]) =>
+    VISIBLE.filter((k) => !keys.includes(k));
+
+  async function removeRows(): Promise<void> {
+    await prisma.stashTag.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+    await prisma.user.deleteMany({ where: { username: VIEWER } });
+  }
+
+  async function listed(filter: Record<string, unknown>): Promise<string[]> {
+    const request = parseListRequest(
+      "tag",
+      { filter: { per_page: 100 }, tag_filter: filter },
+      { userId: viewerId }
+    );
+    const { items, total } = await tagQueryBuilder.execute({
+      userId: viewerId,
+      allowedInstanceIds: [A, B],
+      request,
+    });
+    expect(total).toBe(items.length);
+    return items.map((t) => key(t.id, t.instanceId)).sort();
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    viewerId = (
+      await prisma.user.create({
+        data: { username: VIEWER, password: "not-a-real-hash", role: "USER" },
+      })
+    ).id;
+    const stashIds = (id: string) =>
+      JSON.stringify([{ endpoint: STASHDB, stash_id: id }]);
+    const tag = (
+      id: string,
+      instance: string,
+      extra: Record<string, unknown> = {}
+    ) => ({
+      id,
+      stashInstanceId: instance,
+      name: `TP ${id} ${instance}`,
+      ...extra,
+    });
+    await prisma.stashTag.createMany({
+      data: [
+        tag(T1, A, {
+          aliases: JSON.stringify(["Alpha One", "A1"]),
+          stashIds: stashIds("aaaa-1111"),
+        }),
+        tag(T2, A, { aliases: JSON.stringify(["Beta"]), stashIds: "[]" }),
+        tag(T3, A),
+        tag(T4, A, { aliases: "[]" }),
+        tag(TH, A, {
+          aliases: JSON.stringify(["Alpha One", "A1"]),
+          stashIds: stashIds("aaaa-1111"),
+        }),
+        tag(T1, B, {
+          aliases: JSON.stringify(["Zulu"]),
+          stashIds: stashIds("bbbb-2222"),
+        }),
+        tag(T2, B),
+      ],
+    });
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: viewerId,
+        entityType: "tag",
+        entityId: TH,
+        instanceId: A,
+        reason: "hidden",
+      },
+    });
+  });
+
+  afterAll(removeRows);
+
+  it("aliases match one alias at a time, and IS_NULL lists the tags with none", async () => {
+    expect(
+      await listed({ aliases: { value: "alpha", modifier: "INCLUDES" } })
+    ).toEqual([key(T1, A)]);
+    expect(
+      await listed({ aliases: { value: "a1", modifier: "EQUALS" } })
+    ).toEqual([key(T1, A)]);
+    // The list's JSON punctuation is never matched
+    expect(
+      await listed({ aliases: { value: '","', modifier: "INCLUDES" } })
+    ).toEqual([]);
+    expect(await listed({ aliases: { modifier: "IS_NULL" } })).toEqual(
+      [key(T3, A), key(T4, A), key(T2, B)].sort()
+    );
+    expect(await listed({ aliases: { modifier: "NOT_NULL" } })).toEqual(
+      [key(T1, A), key(T2, A), key(T1, B)].sort()
+    );
+  });
+
+  it("an alias on one instance never matches the other's tag of the same id", async () => {
+    expect(
+      await listed({ aliases: { value: "zulu", modifier: "INCLUDES" } })
+    ).toEqual([key(T1, B)]);
+  });
+
+  it("a tag the viewer hid is never listed by its alias, in any form", async () => {
+    expect(
+      await listed({ aliases: { value: "alpha", modifier: "INCLUDES" } })
+    ).not.toContain(key(TH, A));
+    expect(
+      await listed({ aliases: { value: "alpha", modifier: "EXCLUDES" } })
+    ).toEqual(without(key(T1, A)));
+    expect(await listed({ aliases: { modifier: "NOT_NULL" } })).not.toContain(
+      key(TH, A)
+    );
+  });
+
+  it("stash_id EQUALS a StashDB id on its own instance, IS_NULL and NOT_NULL", async () => {
+    expect(
+      await listed({ stash_id: { value: "AAAA-1111", modifier: "EQUALS" } })
+    ).toEqual([key(T1, A)]);
+    expect(
+      await listed({ stash_id: { value: "bbbb-2222", modifier: "EQUALS" } })
+    ).toEqual([key(T1, B)]);
+    expect(await listed({ stash_id: { modifier: "NOT_NULL" } })).toEqual(
+      [key(T1, A), key(T1, B)].sort()
+    );
+    expect(await listed({ stash_id: { modifier: "IS_NULL" } })).toEqual(
+      without(key(T1, A), key(T1, B))
+    );
   });
 });

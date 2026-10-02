@@ -45,6 +45,7 @@ import {
   resolutionClause,
   searchAll,
   specificInstanceClause,
+  stashIdsClause,
   viaSceneClause,
 } from "../../utils/sqlClauses.js";
 import { jsonListOrEmpty } from "../../utils/sqlJson.js";
@@ -2305,5 +2306,46 @@ describe("orientationClause", () => {
       sql: "((i.w = i.h AND i.w > 0) OR (i.w > i.h))",
       params: [],
     });
+  });
+});
+
+describe("stashIdsClause, run on SQLite", () => {
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  const ids = (...values: unknown[]) =>
+    JSON.stringify(values.map((stash_id) => ({ endpoint: "e", stash_id })));
+  const matches = async (
+    criterion: { modifier: string; value?: string },
+    list: string | null
+  ) => {
+    const clause = stashIdsClause(
+      criterion as Parameters<typeof stashIdsClause>[0],
+      "x.list"
+    );
+    const rows = await prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
+      `SELECT count(*) AS n FROM (SELECT ? AS list) x WHERE ${clause.sql}`,
+      list,
+      ...clause.params
+    );
+    return Number(must(rows[0]).n) === 1;
+  };
+
+  it("EQUALS one of the ids, case folded", async () => {
+    const equals = { modifier: "EQUALS", value: "AAAA-1" };
+    expect(await matches(equals, ids("aaaa-1", "bbbb-2"))).toBe(true);
+    expect(await matches(equals, ids("bbbb-2"))).toBe(false);
+    expect(await matches(equals, null)).toBe(false);
+  });
+
+  it("IS_NULL and NOT_NULL read none and any; a damaged row or element holds none and never fails the statement", async () => {
+    for (const none of [null, "", "[]", "not json", '["text", 5, null]']) {
+      expect(await matches({ modifier: "IS_NULL" }, none)).toBe(true);
+      expect(await matches({ modifier: "NOT_NULL" }, none)).toBe(false);
+    }
+    expect(await matches({ modifier: "IS_NULL" }, ids(""))).toBe(true);
+    expect(await matches({ modifier: "NOT_NULL" }, ids("a"))).toBe(true);
+    expect(await matches({ modifier: "IS_NULL" }, ids("a"))).toBe(false);
   });
 });

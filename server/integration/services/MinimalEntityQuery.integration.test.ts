@@ -140,6 +140,18 @@ async function seedPickers(): Promise<void> {
     ...onA(4),
     data: { details: "studio details text" },
   });
+  await prisma.stashStudio.update({
+    ...onA(8),
+    data: { aliases: JSON.stringify(["Studio Alias", "Second"]) },
+  });
+  await prisma.stashStudio.update({
+    ...onA(9),
+    data: { aliases: JSON.stringify(["Hidden Studio Alias"]) },
+  });
+  await prisma.stashGroup.update({
+    ...onA(8),
+    data: { aliases: "Group Alias, Third" },
+  });
   // Counts: 11 has scenes, 12 images, 13 galleries only
   await prisma.stashPerformer.update({ ...onA(11), data: { sceneCount: 2 } });
   await prisma.stashPerformer.update({ ...onA(12), data: { imageCount: 1 } });
@@ -180,6 +192,7 @@ describeWithDb("findMinimalEntities (integration)", () => {
     await hideFor(viewer, "performer", FX_ID.SAME, FX.B);
     await hideFor(viewer, "performer", FX_ID.HIDDEN_A, FX.A);
     await hideFor(viewer, "tag", FX_ID.VISIBLE_A, "");
+    await hideFor(viewer, "studio", mxId(9), FX.A);
     await prisma.userExcludedEntity.create({
       data: {
         userId: viewer,
@@ -273,6 +286,45 @@ describeWithDb("findMinimalEntities (integration)", () => {
       "Mx 18",
       "Mx 19",
     ]);
+  });
+
+  it("the studio picker finds a studio by an alias, one at a time, as the list does", async () => {
+    expect(
+      names(await find(onlyA, "studio", { filter: { q: "STUDIO AL" } }))
+    ).toEqual(["Mx 08", "Mx 09"]);
+    expect(
+      names(await find(onlyA, "studio", { filter: { q: "ond" } }))
+    ).toEqual(["Mx 08"]);
+    expect(
+      names(await find(onlyA, "studio", { filter: { q: "second alias" } }))
+    ).toEqual(["Mx 08"]);
+    // The alias list's JSON punctuation never matches
+    for (const q of ['"', "[", "]", ",", '"]']) {
+      expect(await find(onlyA, "studio", { filter: { q } })).toEqual([]);
+    }
+  });
+
+  it("the collection picker finds a collection by its aliases text", async () => {
+    expect(
+      names(await find(onlyA, "group", { filter: { q: "alias, thi" } }))
+    ).toEqual(["Mx 08"]);
+    // Each word of the box on its own, as the list does
+    expect(
+      names(await find(onlyA, "group", { filter: { q: "third group" } }))
+    ).toEqual(["Mx 08"]);
+  });
+
+  it("a studio the viewer hid is never found by its alias, in the picker", async () => {
+    expect(
+      names(await find(onlyA, "studio", { filter: { q: "hidden studio" } }))
+    ).toEqual(["Mx 09"]);
+    expect(
+      await find(viewer, "studio", { filter: { q: "hidden studio" } })
+    ).toEqual([]);
+    // The studio's other alias is still found, the hidden one is not
+    expect(
+      names(await find(viewer, "studio", { filter: { q: "studio al" } }))
+    ).toEqual(["Mx 08"]);
   });
 
   it("q splits into words that must all match, a quoted phrase staying whole", async () => {

@@ -476,6 +476,8 @@ describe("TagQueryBuilder", () => {
           scene_count: { modifier: "GREATER_THAN", value: 0 },
           name: { modifier: "NOT_EQUALS", value: "Beach" },
           description: { modifier: "NOT_NULL" },
+          aliases: { modifier: "EQUALS", value: "bch" },
+          stash_id: { modifier: "NOT_NULL" },
           created_at: { modifier: "EQUALS", value: "2025-05-05" },
           updated_at: { modifier: "GREATER_THAN", value: "2025-01-01" },
         },
@@ -490,6 +492,8 @@ describe("TagQueryBuilder", () => {
         "MAX(t.sceneCountAll - COALESCE(d.scenes, 0), 0) > ?",
         "(t.name IS NULL OR LOWER(t.name) != LOWER(?))",
         "(t.description IS NOT NULL AND t.description != '')",
+        "LOWER(a.value) = LOWER(?)",
+        "json_extract(si.value, '$.stash_id')",
         "(t.stashCreatedAt >= ? AND t.stashCreatedAt < ?)",
         "t.stashUpdatedAt >= ?",
       ]) {

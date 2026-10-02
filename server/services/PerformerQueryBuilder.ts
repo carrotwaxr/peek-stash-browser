@@ -16,7 +16,6 @@ import type {
   ParsedFilter,
   RefCriterion,
   RefFieldCriterion,
-  TextCriterion,
 } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import { expandRefs, expandRefsEach } from "../utils/hierarchyUtils.js";
@@ -37,6 +36,7 @@ import {
   fullDateSql,
   noClause,
   searchAll,
+  stashIdsClause,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
 import {
@@ -46,7 +46,6 @@ import {
   parseStashIds,
   searchTerms,
 } from "../utils/sqlHelpers.js";
-import { jsonListOrEmpty } from "../utils/sqlJson.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
@@ -202,32 +201,6 @@ function visibleMarkerCount(ctx: QueryContext): FilterClause {
     sql: `(SELECT COUNT(*) FROM ScenePerformer mcp JOIN StashScene mcs ON mcs.id = mcp.sceneId AND mcs.stashInstanceId = mcp.sceneInstanceId JOIN StashClip mcc ON mcc.sceneId = mcs.id AND mcc.sceneInstanceId = mcs.stashInstanceId${excluded} WHERE mcp.performerId = p.id AND mcp.performerInstanceId = p.stashInstanceId AND mcs.deletedAt IS NULL AND mcc.deletedAt IS NULL${viewer ? " AND mcsx.id IS NULL AND mccx.id IS NULL" : ""})`,
     params: viewer ? [ctx.userId, ctx.userId] : [],
   };
-}
-
-/**
- * The stash-box ids on the performer (`stashIds`, a JSON list of
- * `{ endpoint, stash_id }`): EQUALS one of them, ignoring case; IS_NULL
- * none, NOT_NULL any. An element that is not an object holds none.
- */
-function stashIdClause(criterion: TextCriterion): FilterClause {
-  const id =
-    "CASE WHEN si.type = 'object' THEN json_extract(si.value, '$.stash_id') END";
-  const any = (where: string) =>
-    `EXISTS (SELECT 1 FROM json_each(${jsonListOrEmpty("p.stashIds")}) si WHERE ${where})`;
-  switch (criterion.modifier) {
-    case "EQUALS":
-      return { sql: any(`LOWER(${id}) = LOWER(?)`), params: [criterion.value] };
-    case "IS_NULL":
-      return { sql: `NOT ${any(`COALESCE(${id}, '') != ''`)}`, params: [] };
-    case "NOT_NULL":
-      return { sql: any(`COALESCE(${id}, '') != ''`), params: [] };
-    // Not offered: the parser refuses them
-    case "INCLUDES":
-    case "EXCLUDES":
-    case "NOT_EQUALS":
-    case "STARTS_WITH":
-      return noClause();
-  }
 }
 
 /** Circumcised: any of the values, or not set ('' or NULL) and set */
@@ -406,7 +379,7 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
     country: (c) => buildTextFilter(c, "p.country"),
     // Any one of the performer's links
     url: (c) => buildTextFilter(c, null, { lists: ["p.urls"] }),
-    stash_id: (c) => stashIdClause(c),
+    stash_id: (c) => stashIdsClause(c, "p.stashIds"),
     circumcised: (c) => circumcisedClause(c),
     details: (c) => buildTextFilter(c, "p.details"),
     tattoos: (c) => buildTextFilter(c, "p.tattoos"),

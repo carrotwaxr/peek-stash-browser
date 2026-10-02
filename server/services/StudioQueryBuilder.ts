@@ -31,10 +31,12 @@ import {
   buildTextFilter,
   noClause,
   searchAll,
+  stashIdsClause,
   visibleGuard,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
+  jsonListArm,
   parseJsonArray,
   parseStashIds,
   searchTerms,
@@ -234,6 +236,10 @@ class StudioQueryBuilder extends EntityQueryBuilder<
     // Text
     name: (c) => buildTextFilter(c, "s.name"),
     details: (c) => buildTextFilter(c, "s.details"),
+    // The aliases one at a time, the website, the StashDB ids
+    aliases: (c) => buildTextFilter(c, null, { lists: ["s.aliases"] }),
+    url: (c) => buildTextFilter(c, "s.url"),
+    stash_id: (c) => stashIdsClause(c, "s.stashIds"),
 
     // Dates
     created_at: (c, ctx) =>
@@ -290,13 +296,14 @@ class StudioQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search across the name and details: every word must match
-   * (`searchAll`), each as `likeContains` with `ESCAPE '\'`; no `LOWER()`
+   * The search across the name, details and aliases: every word must match
+   * (`searchAll`), each as `likeContains` with `ESCAPE '\\'`, an alias read
+   * one at a time; no `LOWER()`
    */
   protected override searchClause(q: string): FilterClause {
     return searchAll(searchTerms(q), (pattern) => ({
-      sql: "(s.name LIKE ? ESCAPE '\\' OR s.details LIKE ? ESCAPE '\\')",
-      params: [pattern, pattern],
+      sql: `(s.name LIKE ? ESCAPE '\\' OR s.details LIKE ? ESCAPE '\\' OR ${jsonListArm("s.aliases")})`,
+      params: [pattern, pattern, pattern],
     }));
   }
 

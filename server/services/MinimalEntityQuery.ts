@@ -11,7 +11,8 @@
  * hid for themselves (owner, 2026-09-28). Deleted entities stay out, and
  * without the scope (filter dropdowns, carousel rules) the admin's own
  * hidden items apply as everywhere else. The search matches the name and,
- * for performers and tags, their aliases, never a description (lead
+ * for performers, studios and tags, their aliases (a collection's aliases text
+ * too), never a description (lead
  * decision, PR 4). The order is always the name with case folded, and the
  * `LIMIT` is the page size: a picker lists one page.
  *
@@ -86,6 +87,7 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
     entityType: "studio",
     name: "x.name",
     search: ["x.name"],
+    searchLists: ["x.aliases"],
     counts: [
       ["min_scene_count", "x.sceneCount"],
       ["min_gallery_count", "x.galleryCount"],
@@ -112,7 +114,8 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
     table: "StashGroup",
     entityType: "group",
     name: "x.name",
-    search: ["x.name"],
+    // Stash's single aliases text, one phrase per word of the box
+    search: ["x.name", "x.aliases"],
     counts: [
       ["min_scene_count", "x.sceneCount"],
       ["min_performer_count", "x.performerCount"],

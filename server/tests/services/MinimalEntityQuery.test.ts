@@ -106,9 +106,9 @@ describe("findMinimalEntities", () => {
 
   it.each([
     ["performer", ["x.name"], ["x.aliasList"]],
-    ["studio", ["x.name"], []],
+    ["studio", ["x.name"], ["x.aliases"]],
     ["tag", ["x.name"], ["x.aliases"]],
-    ["group", ["x.name"], []],
+    ["group", ["x.name", "x.aliases"], []],
   ] as const)(
     "q matches the %s's name and aliases only, escaped, an alias list one alias at a time",
     async (entity, columns, lists) => {

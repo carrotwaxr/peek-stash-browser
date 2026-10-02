@@ -742,3 +742,184 @@ describeWithDb("Studio parents and counts (seeded)", () => {
     }
   });
 });
+
+/**
+ * Studio parity (F15): aliases (one at a time), the website and StashDB ids.
+ * Sent over the wire parser into the builder for a viewer of their own, as
+ * the list route does.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do:
+ * - sp-a studios: 7900001 (aliases "Alpha One" and "A1", a website, a StashDB
+ *   id), 7900002 (alias "Beta", `[]` StashDB ids, no website), 7900003
+ *   (nothing set), 7900004 (aliases `[]`), 7900005 (hidden by the viewer,
+ *   matching everything 7900001 matches).
+ * - sp-b studios: 7900001 (alias "Zulu", another StashDB id), 7900002.
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Studio parity filters (seeded)", () => {
+  const A = "sp-a";
+  const B = "sp-b";
+  const VIEWER = "sp-viewer";
+  let viewerId = 0;
+
+  const [S1, S2, S3, S4, SH] = [
+    "7900001",
+    "7900002",
+    "7900003",
+    "7900004",
+    "7900005",
+  ];
+  const STASHDB = "https://stashdb.org/graphql";
+  const key = (id: string, instance: string) => `${id}:${instance}`;
+  /** Every studio the viewer can see */
+  const VISIBLE = [
+    key(S1, A),
+    key(S2, A),
+    key(S3, A),
+    key(S4, A),
+    key(S1, B),
+    key(S2, B),
+  ].sort();
+  const without = (...keys: string[]) =>
+    VISIBLE.filter((k) => !keys.includes(k));
+
+  async function removeRows(): Promise<void> {
+    await prisma.stashStudio.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+    await prisma.user.deleteMany({ where: { username: VIEWER } });
+  }
+
+  async function listed(filter: Record<string, unknown>): Promise<string[]> {
+    const request = parseListRequest(
+      "studio",
+      { filter: { per_page: 100 }, studio_filter: filter },
+      { userId: viewerId }
+    );
+    const { items, total } = await studioQueryBuilder.execute({
+      userId: viewerId,
+      allowedInstanceIds: [A, B],
+      request,
+    });
+    expect(total).toBe(items.length);
+    return items.map((s) => key(s.id, s.instanceId)).sort();
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    viewerId = (
+      await prisma.user.create({
+        data: { username: VIEWER, password: "not-a-real-hash", role: "USER" },
+      })
+    ).id;
+    const stashIds = (id: string) =>
+      JSON.stringify([{ endpoint: STASHDB, stash_id: id }]);
+    const studio = (
+      id: string,
+      instance: string,
+      extra: Record<string, unknown> = {}
+    ) => ({
+      id,
+      stashInstanceId: instance,
+      name: `SP ${id} ${instance}`,
+      ...extra,
+    });
+    await prisma.stashStudio.createMany({
+      data: [
+        studio(S1, A, {
+          aliases: JSON.stringify(["Alpha One", "A1"]),
+          url: "https://example.com/sp-one",
+          stashIds: stashIds("aaaa-1111"),
+        }),
+        studio(S2, A, { aliases: JSON.stringify(["Beta"]), stashIds: "[]" }),
+        studio(S3, A),
+        studio(S4, A, { aliases: "[]" }),
+        studio(SH, A, {
+          aliases: JSON.stringify(["Alpha One", "A1"]),
+          url: "https://example.com/sp-one",
+          stashIds: stashIds("aaaa-1111"),
+        }),
+        studio(S1, B, {
+          aliases: JSON.stringify(["Zulu"]),
+          stashIds: stashIds("bbbb-2222"),
+        }),
+        studio(S2, B),
+      ],
+    });
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: viewerId,
+        entityType: "studio",
+        entityId: SH,
+        instanceId: A,
+        reason: "hidden",
+      },
+    });
+  });
+
+  afterAll(removeRows);
+
+  it("aliases match one alias at a time, and IS_NULL lists the studios with none", async () => {
+    expect(
+      await listed({ aliases: { value: "alpha", modifier: "INCLUDES" } })
+    ).toEqual([key(S1, A)]);
+    expect(
+      await listed({ aliases: { value: "a1", modifier: "EQUALS" } })
+    ).toEqual([key(S1, A)]);
+    // The list's JSON punctuation is never matched
+    expect(
+      await listed({ aliases: { value: '","', modifier: "INCLUDES" } })
+    ).toEqual([]);
+    expect(await listed({ aliases: { modifier: "IS_NULL" } })).toEqual(
+      [key(S3, A), key(S4, A), key(S2, B)].sort()
+    );
+    expect(await listed({ aliases: { modifier: "NOT_NULL" } })).toEqual(
+      [key(S1, A), key(S2, A), key(S1, B)].sort()
+    );
+  });
+
+  it("an alias on one instance never matches the other's studio of the same id", async () => {
+    expect(
+      await listed({ aliases: { value: "zulu", modifier: "INCLUDES" } })
+    ).toEqual([key(S1, B)]);
+  });
+
+  it("a studio the viewer hid is never listed by its alias, in any form", async () => {
+    expect(
+      await listed({ aliases: { value: "alpha", modifier: "INCLUDES" } })
+    ).not.toContain(key(SH, A));
+    expect(
+      await listed({ aliases: { value: "alpha", modifier: "EXCLUDES" } })
+    ).toEqual(without(key(S1, A)));
+    expect(await listed({ aliases: { modifier: "NOT_NULL" } })).not.toContain(
+      key(SH, A)
+    );
+  });
+
+  it("url matches the studio's website", async () => {
+    expect(
+      await listed({ url: { value: "example.com/sp", modifier: "INCLUDES" } })
+    ).toEqual([key(S1, A)]);
+    expect(await listed({ url: { modifier: "NOT_NULL" } })).toEqual([
+      key(S1, A),
+    ]);
+    expect(
+      await listed({ url: { value: "example.com", modifier: "EXCLUDES" } })
+    ).toEqual(without(key(S1, A)));
+  });
+
+  it("stash_id EQUALS a StashDB id on its own instance, IS_NULL and NOT_NULL", async () => {
+    expect(
+      await listed({ stash_id: { value: "AAAA-1111", modifier: "EQUALS" } })
+    ).toEqual([key(S1, A)]);
+    expect(
+      await listed({ stash_id: { value: "bbbb-2222", modifier: "EQUALS" } })
+    ).toEqual([key(S1, B)]);
+    expect(await listed({ stash_id: { modifier: "NOT_NULL" } })).toEqual(
+      [key(S1, A), key(S1, B)].sort()
+    );
+    expect(await listed({ stash_id: { modifier: "IS_NULL" } })).toEqual(
+      without(key(S1, A), key(S1, B))
+    );
+  });
+});

@@ -34,6 +34,7 @@ import type {
   MultiEnumCriterion,
   NumberCriterion,
   RefCriterion,
+  TextCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, distinctRefs, pairsJson } from "./entityRef.js";
 import { expandRefs, expandRefsEach } from "./hierarchyUtils.js";
@@ -1562,6 +1563,36 @@ export function buildTextFilter(
     case null:
     default:
       return none;
+  }
+}
+
+/**
+ * The stash-box ids in `column` (`stashIds`, a JSON list of
+ * `{ endpoint, stash_id }`; `column` is a code constant): EQUALS one of
+ * them, ignoring case; IS_NULL none, NOT_NULL any. An element that is not an
+ * object holds none, and a NULL or damaged column holds no element.
+ */
+export function stashIdsClause(
+  criterion: TextCriterion,
+  column: string
+): FilterClause {
+  const id =
+    "CASE WHEN si.type = 'object' THEN json_extract(si.value, '$.stash_id') END";
+  const any = (where: string) =>
+    `EXISTS (SELECT 1 FROM json_each(${jsonListOrEmpty(column)}) si WHERE ${where})`;
+  switch (criterion.modifier) {
+    case "EQUALS":
+      return { sql: any(`LOWER(${id}) = LOWER(?)`), params: [criterion.value] };
+    case "IS_NULL":
+      return { sql: `NOT ${any(`COALESCE(${id}, '') != ''`)}`, params: [] };
+    case "NOT_NULL":
+      return { sql: any(`COALESCE(${id}, '') != ''`), params: [] };
+    // Not offered: the parser refuses them
+    case "INCLUDES":
+    case "EXCLUDES":
+    case "NOT_EQUALS":
+    case "STARTS_WITH":
+      return noClause();
   }
 }
 
