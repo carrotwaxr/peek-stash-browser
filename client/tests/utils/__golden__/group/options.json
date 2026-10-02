@@ -99,7 +99,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 0,
-      "max": 100
+      "max": 100,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not rated"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Rated"
+        }
+      ],
+      "modifierKey": "ratingModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "sceneCount",
@@ -115,7 +131,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 1,
-      "max": 300
+      "max": 300,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not set"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Set"
+        }
+      ],
+      "modifierKey": "durationModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "favorite",
@@ -282,7 +314,8 @@
         "rating100"
       ],
       "removedStateKeys": [
-        "rating"
+        "rating",
+        "ratingModifier"
       ],
       "removedOptions": [
         "range:rating"
@@ -316,7 +349,8 @@
         "group_filter"
       ],
       "removedStateKeys": [
-        "duration"
+        "duration",
+        "durationModifier"
       ],
       "removedOptions": [
         "range:duration"

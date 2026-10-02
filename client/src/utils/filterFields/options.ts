@@ -187,7 +187,40 @@ function refOption(row: RefField, spec: FieldSpec | undefined): FilterOption {
   };
 }
 
-function numberOption(row: NumberField, unitPreference: string): FilterOption {
+/**
+ * The condition select of a number row whose contract field takes IS_NULL:
+ * "Between" (the bounds, the default), then the field's "is not set" and
+ * "is set" words. Read from the spec, so the fields the server opened are
+ * exactly the ones offered. Nothing for a row with no `modifierKey`.
+ */
+function presenceOptions(
+  row: NumberField,
+  spec: FieldSpec | undefined
+): Partial<FilterOption> {
+  if (
+    row.modifierKey === undefined ||
+    spec?.kind !== "number" ||
+    !(spec.modifiers as readonly string[]).includes("IS_NULL")
+  ) {
+    return {};
+  }
+  const words = row.presenceLabels ?? { isNull: "Not set", notNull: "Set" };
+  return {
+    modifierOptions: [
+      { value: "BETWEEN", label: "Between" },
+      { value: "IS_NULL", label: words.isNull },
+      { value: "NOT_NULL", label: words.notNull },
+    ],
+    modifierKey: row.modifierKey,
+    defaultModifier: "BETWEEN",
+  };
+}
+
+function numberOption(
+  row: NumberField,
+  spec: FieldSpec | undefined,
+  unitPreference: string
+): FilterOption {
   const imperial =
     unitPreference === IMPERIAL && row.measure !== undefined
       ? IMPERIAL_EDITORS[row.measure]
@@ -206,6 +239,7 @@ function numberOption(row: NumberField, unitPreference: string): FilterOption {
       ? {}
       : { step: row.bounds.step }),
     ...(imperial === undefined ? {} : { measure: row.measure }),
+    ...presenceOptions(row, spec),
   };
 }
 
@@ -219,7 +253,7 @@ function optionOf(
     case "ref":
       return refOption(row, spec);
     case "number":
-      return numberOption(row, unitPreference);
+      return numberOption(row, spec, unitPreference);
     case "date":
       return { ...head(row), defaultValue: {} };
     case "text":

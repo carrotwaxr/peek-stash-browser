@@ -655,6 +655,30 @@ describeWithDb(
       WALK_TIMEOUT_MS
     );
 
+    it("Rating's presence choices are walked: IS_NULL and NOT_NULL samples reach SQL", () => {
+      const rating = must(
+        clientList(client, "scene").options.find(
+          (option) => option.key === "rating"
+        ),
+        "the scene Rating option"
+      );
+      const samples = optionSamples(rating, walk.refs);
+
+      expect(rating.modifierKey).toBe("ratingModifier");
+      expect(new Set(samples.map((sample) => sample.modifier))).toEqual(
+        new Set(["BETWEEN", "IS_NULL", "NOT_NULL"])
+      );
+      for (const presence of ["IS_NULL", "NOT_NULL"]) {
+        expect(
+          samples.some(
+            (sample) =>
+              sample.modifier === presence &&
+              sample.state.ratingModifier === presence
+          )
+        ).toBe(true);
+      }
+    });
+
     /**
      * A gallery's or image's tag count is its junction rows on its own
      * instance (an image's include its galleries' tags): for each count, 0

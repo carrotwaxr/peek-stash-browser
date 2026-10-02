@@ -118,6 +118,15 @@ export interface NumberField<F extends string = string> extends FieldBase<F> {
   readonly unit?: "minutes" | "Mbps" | "fps" | "years";
   /** Shown in the viewer's unit system */
   readonly measure?: "height" | "weight" | "length";
+  /**
+   * The words of the "is not set" and "is set" choices a field whose spec
+   * takes IS_NULL offers ("Not rated" and "Rated"); "Not set" and "Set"
+   * when absent. A row offering the choice also has a `modifierKey`.
+   */
+  readonly presenceLabels?: {
+    readonly isNull: string;
+    readonly notNull: string;
+  };
 }
 
 export interface DateField<F extends string = string> extends FieldBase<F> {

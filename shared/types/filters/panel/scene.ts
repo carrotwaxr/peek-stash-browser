@@ -110,6 +110,8 @@ export const SCENE_PANEL = [
     label: "Rating (0-100)",
     group: "common",
     editor: "number",
+    modifierKey: "ratingModifier",
+    presenceLabels: { isNull: "Not rated", notNull: "Rated" },
     bounds: { min: 0, max: 100 },
     pinnedByDefault: true,
   },

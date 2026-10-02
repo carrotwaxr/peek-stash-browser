@@ -364,13 +364,21 @@ describe("filter panel keys", () => {
   });
 
   it("every v3.4.0-beta.7 UI key is still in the panel table's projection", () => {
-    const missing = LIST_KINDS.flatMap((kind) => {
-      const now = new Set(panelOf(kind).map((field) => describeKey(field)));
-      return BETA7_UI_KEYS[kind]
-        .map(describeKey)
-        .filter((line) => !now.has(line))
-        .map((line) => `${kind}.${line}`);
-    });
+    // A key may gain companions (a number's presence choice), never lose or change one
+    const missing = LIST_KINDS.flatMap((kind) =>
+      BETA7_UI_KEYS[kind]
+        .filter((old) => {
+          const now = panelOf(kind).find((field) => field.key === old.key);
+          return (
+            now === undefined ||
+            (old.modifierKey !== undefined &&
+              now.modifierKey !== old.modifierKey) ||
+            (old.hierarchyKey !== undefined &&
+              now.hierarchyKey !== old.hierarchyKey)
+          );
+        })
+        .map((old) => `${kind}.${describeKey(old)}`)
+    );
 
     expect(missing).toEqual([]);
   });

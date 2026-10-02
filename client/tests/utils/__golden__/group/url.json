@@ -35,6 +35,7 @@
     "tagIds_start",
     "tagIds_end",
     "rating",
+    "ratingModifier",
     "rating_min",
     "rating_max",
     "rating_start",
@@ -45,6 +46,7 @@
     "sceneCount_start",
     "sceneCount_end",
     "duration",
+    "durationModifier",
     "duration_min",
     "duration_max",
     "duration_start",
@@ -301,6 +303,85 @@
       "lossless": true
     },
     {
+      "label": "rating: BETWEEN min only",
+      "params": "rating_min=25",
+      "parsed": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: BETWEEN max only",
+      "params": "rating_max=75",
+      "parsed": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: BETWEEN min and max",
+      "params": "rating_min=25&rating_max=75",
+      "parsed": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: IS_NULL min only",
+      "params": "ratingModifier=IS_NULL",
+      "parsed": {
+        "ratingModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: IS_NULL max only",
+      "params": "ratingModifier=IS_NULL",
+      "parsed": {
+        "ratingModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: IS_NULL min and max",
+      "params": "ratingModifier=IS_NULL",
+      "parsed": {
+        "ratingModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: NOT_NULL min only",
+      "params": "ratingModifier=NOT_NULL",
+      "parsed": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: NOT_NULL max only",
+      "params": "ratingModifier=NOT_NULL",
+      "parsed": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: NOT_NULL min and max",
+      "params": "ratingModifier=NOT_NULL",
+      "parsed": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
       "label": "rating: min only",
       "params": "rating_min=25",
       "parsed": {
@@ -361,6 +442,85 @@
         }
       },
       "lossless": true
+    },
+    {
+      "label": "duration: BETWEEN min only",
+      "params": "duration_min=76",
+      "parsed": {
+        "duration": {
+          "min": "76"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "duration: BETWEEN max only",
+      "params": "duration_max=225",
+      "parsed": {
+        "duration": {
+          "max": "225"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "duration: BETWEEN min and max",
+      "params": "duration_min=76&duration_max=225",
+      "parsed": {
+        "duration": {
+          "min": "76",
+          "max": "225"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "duration: IS_NULL min only",
+      "params": "durationModifier=IS_NULL",
+      "parsed": {
+        "durationModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "duration: IS_NULL max only",
+      "params": "durationModifier=IS_NULL",
+      "parsed": {
+        "durationModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "duration: IS_NULL min and max",
+      "params": "durationModifier=IS_NULL",
+      "parsed": {
+        "durationModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "duration: NOT_NULL min only",
+      "params": "durationModifier=NOT_NULL",
+      "parsed": {
+        "durationModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "duration: NOT_NULL max only",
+      "params": "durationModifier=NOT_NULL",
+      "parsed": {
+        "durationModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "duration: NOT_NULL min and max",
+      "params": "durationModifier=NOT_NULL",
+      "parsed": {
+        "durationModifier": "NOT_NULL"
+      },
+      "lossless": false
     },
     {
       "label": "duration: min only",
@@ -731,6 +891,85 @@
       "hasFilters": true
     },
     {
+      "label": "rating: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&rating_min=25",
+      "filters": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&rating_max=75",
+      "filters": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&rating_min=25&rating_max=75",
+      "filters": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&ratingModifier=IS_NULL",
+      "filters": {
+        "ratingModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&ratingModifier=IS_NULL",
+      "filters": {
+        "ratingModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&ratingModifier=IS_NULL",
+      "filters": {
+        "ratingModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&ratingModifier=NOT_NULL",
+      "filters": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&ratingModifier=NOT_NULL",
+      "filters": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&ratingModifier=NOT_NULL",
+      "filters": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "rating: min only",
       "written": "instance=inst-a&tab=x&rating_min=25",
       "filters": {
@@ -789,6 +1028,85 @@
           "min": "250",
           "max": "750"
         }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&duration_min=76",
+      "filters": {
+        "duration": {
+          "min": "76"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&duration_max=225",
+      "filters": {
+        "duration": {
+          "max": "225"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&duration_min=76&duration_max=225",
+      "filters": {
+        "duration": {
+          "min": "76",
+          "max": "225"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&durationModifier=IS_NULL",
+      "filters": {
+        "durationModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&durationModifier=IS_NULL",
+      "filters": {
+        "durationModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&durationModifier=IS_NULL",
+      "filters": {
+        "durationModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&durationModifier=NOT_NULL",
+      "filters": {
+        "durationModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&durationModifier=NOT_NULL",
+      "filters": {
+        "durationModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&durationModifier=NOT_NULL",
+      "filters": {
+        "durationModifier": "NOT_NULL"
       },
       "hasFilters": true
     },

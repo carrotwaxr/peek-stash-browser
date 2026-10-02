@@ -322,68 +322,93 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               style={baseInputStyle}
             />
           );
-        case "range": {
-          if (measure === "weight") {
-            return (
-              <ImperialWeightRange
-                id={controlId}
-                value={value}
-                onChange={onChange}
-                label={label}
-                inputClasses={inputClasses}
-                inputStyle={baseInputStyle}
-              />
-            );
-          }
-          if (measure === "length") {
-            return (
-              <ImperialLengthRange
-                id={controlId}
-                value={value}
-                onChange={onChange}
-                label={label}
-                inputClasses={inputClasses}
-                inputStyle={baseInputStyle}
-              />
-            );
-          }
+        case "range":
+        case "imperial-height-range": {
+          // A field that takes IS_NULL: a condition select first; while
+          // "Not set" or "Set" is chosen the bounds are not drawn
+          const hasCondition =
+            modifierOptions !== undefined && modifierOptions.length > 0;
+          const boundsId = hasCondition ? undefined : controlId;
+          const presence =
+            modifierValue === "IS_NULL" || modifierValue === "NOT_NULL";
           const rangeVal = (value || {}) as RangeValue;
+          const bounds =
+            type === "imperial-height-range" ? (
+              <ImperialHeightRange
+                id={boundsId}
+                value={value}
+                onChange={onChange}
+                inputClasses={inputClasses}
+                inputStyle={baseInputStyle}
+              />
+            ) : measure === "weight" ? (
+              <ImperialWeightRange
+                id={boundsId}
+                value={value}
+                onChange={onChange}
+                label={label}
+                inputClasses={inputClasses}
+                inputStyle={baseInputStyle}
+              />
+            ) : measure === "length" ? (
+              <ImperialLengthRange
+                id={boundsId}
+                value={value}
+                onChange={onChange}
+                label={label}
+                inputClasses={inputClasses}
+                inputStyle={baseInputStyle}
+              />
+            ) : (
+              <div className="flex space-x-2">
+                <input
+                  id={boundsId}
+                  type="number"
+                  value={rangeVal.min || ""}
+                  onChange={(e) =>
+                    onChange({ ...rangeVal, min: e.target.value })
+                  }
+                  placeholder="Min"
+                  min={min}
+                  max={max}
+                  className={inputClasses}
+                  style={baseInputStyle}
+                />
+                <input
+                  type="number"
+                  value={rangeVal.max || ""}
+                  onChange={(e) =>
+                    onChange({ ...rangeVal, max: e.target.value })
+                  }
+                  placeholder="Max"
+                  min={min}
+                  max={max}
+                  className={inputClasses}
+                  style={baseInputStyle}
+                />
+              </div>
+            );
+          if (!hasCondition) return bounds;
           return (
-            <div className="flex space-x-2">
-              <input
+            <div className="space-y-2">
+              <select
                 id={controlId}
-                type="number"
-                value={rangeVal.min || ""}
-                onChange={(e) => onChange({ ...rangeVal, min: e.target.value })}
-                placeholder="Min"
-                min={min}
-                max={max}
+                aria-label={`${label} condition`}
+                value={modifierValue}
+                onChange={(e) => onModifierChange?.(e.target.value)}
                 className={inputClasses}
                 style={baseInputStyle}
-              />
-              <input
-                type="number"
-                value={rangeVal.max || ""}
-                onChange={(e) => onChange({ ...rangeVal, max: e.target.value })}
-                placeholder="Max"
-                min={min}
-                max={max}
-                className={inputClasses}
-                style={baseInputStyle}
-              />
+              >
+                {modifierOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {presence ? null : bounds}
             </div>
           );
         }
-        case "imperial-height-range":
-          return (
-            <ImperialHeightRange
-              id={controlId}
-              value={value}
-              onChange={onChange}
-              inputClasses={inputClasses}
-              inputStyle={baseInputStyle}
-            />
-          );
         case "date-range": {
           const dateRangeVal = (value || {}) as RangeValue;
           return (

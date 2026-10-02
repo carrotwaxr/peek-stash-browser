@@ -227,6 +227,10 @@ On the Scenes list, **Favorite Tags** lists the scenes that have one of your fav
 
 A number range (rating, height, weight, duration and the like) never matches an item with no value: "rating at most 40" lists only items you rated 40 or less, not the ones you have not rated, and "weight at most 60 kg" only performers with a weight.
 
+#### Unknown values
+
+A range never matches an item with no value. To list those items, open the condition select above the range and choose **Not rated** (Rating) or **Not set** (Height, Weight, Penis Length, Career Length and a collection's Duration); **Rated** and **Set** list the items that have a value. While one of these is chosen the range boxes are hidden and not used. Custom carousels offer the same choices.
+
 ### Date Ranges
 
 Set a start date, an end date, or both. Both ends are included: a start alone matches that day and later, an end alone that day and earlier, and both the days in between, so the same day as start and end lists that one day. An item with no date never matches a range.

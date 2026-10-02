@@ -83,7 +83,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 0,
-      "max": 100
+      "max": 100,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not rated"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Rated"
+        }
+      ],
+      "modifierKey": "ratingModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "oCounter",
@@ -145,7 +161,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 0,
-      "max": 50
+      "max": 50,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not set"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Set"
+        }
+      ],
+      "modifierKey": "careerLengthModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "birthdate",
@@ -344,7 +376,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 100,
-      "max": 250
+      "max": 250,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not set"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Set"
+        }
+      ],
+      "modifierKey": "heightModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "weight",
@@ -352,7 +400,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 30,
-      "max": 200
+      "max": 200,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not set"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Set"
+        }
+      ],
+      "modifierKey": "weightModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "penisLength",
@@ -360,7 +424,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 0,
-      "max": 40
+      "max": 40,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not set"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Set"
+        }
+      ],
+      "modifierKey": "penisLengthModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "type": "section-header",
@@ -470,7 +550,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 0,
-      "max": 100
+      "max": 100,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not rated"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Rated"
+        }
+      ],
+      "modifierKey": "ratingModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "oCounter",
@@ -532,7 +628,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 0,
-      "max": 50
+      "max": 50,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not set"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Set"
+        }
+      ],
+      "modifierKey": "careerLengthModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "birthdate",
@@ -732,7 +844,23 @@
       "defaultValue": {},
       "min": 100,
       "max": 250,
-      "measure": "height"
+      "measure": "height",
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not set"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Set"
+        }
+      ],
+      "modifierKey": "heightModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "weight",
@@ -741,7 +869,23 @@
       "defaultValue": {},
       "min": 50,
       "max": 500,
-      "measure": "weight"
+      "measure": "weight",
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not set"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Set"
+        }
+      ],
+      "modifierKey": "weightModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "penisLength",
@@ -750,7 +894,23 @@
       "defaultValue": {},
       "min": 1,
       "max": 15,
-      "measure": "length"
+      "measure": "length",
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not set"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Set"
+        }
+      ],
+      "modifierKey": "penisLengthModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "type": "section-header",
@@ -840,7 +1000,8 @@
         "rating100"
       ],
       "removedStateKeys": [
-        "rating"
+        "rating",
+        "ratingModifier"
       ],
       "removedOptions": [
         "range:rating"
@@ -959,7 +1120,8 @@
         "performer_filter"
       ],
       "removedStateKeys": [
-        "careerLength"
+        "careerLength",
+        "careerLengthModifier"
       ],
       "removedOptions": [
         "range:careerLength"
@@ -1163,7 +1325,8 @@
         "performer_filter"
       ],
       "removedStateKeys": [
-        "height"
+        "height",
+        "heightModifier"
       ],
       "removedOptions": [
         "range:height"
@@ -1180,7 +1343,8 @@
         "weight"
       ],
       "removedStateKeys": [
-        "weight"
+        "weight",
+        "weightModifier"
       ],
       "removedOptions": [
         "range:weight"
@@ -1197,7 +1361,8 @@
         "performer_filter"
       ],
       "removedStateKeys": [
-        "penisLength"
+        "penisLength",
+        "penisLengthModifier"
       ],
       "removedOptions": [
         "range:penisLength"

@@ -11,6 +11,7 @@
     "description_start",
     "description_end",
     "rating",
+    "ratingModifier",
     "rating_min",
     "rating_max",
     "rating_start",
@@ -90,6 +91,85 @@
         "description": "contract"
       },
       "lossless": true
+    },
+    {
+      "label": "rating: BETWEEN min only",
+      "params": "rating_min=25",
+      "parsed": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: BETWEEN max only",
+      "params": "rating_max=75",
+      "parsed": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: BETWEEN min and max",
+      "params": "rating_min=25&rating_max=75",
+      "parsed": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: IS_NULL min only",
+      "params": "ratingModifier=IS_NULL",
+      "parsed": {
+        "ratingModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: IS_NULL max only",
+      "params": "ratingModifier=IS_NULL",
+      "parsed": {
+        "ratingModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: IS_NULL min and max",
+      "params": "ratingModifier=IS_NULL",
+      "parsed": {
+        "ratingModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: NOT_NULL min only",
+      "params": "ratingModifier=NOT_NULL",
+      "parsed": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: NOT_NULL max only",
+      "params": "ratingModifier=NOT_NULL",
+      "parsed": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "rating: NOT_NULL min and max",
+      "params": "ratingModifier=NOT_NULL",
+      "parsed": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "lossless": false
     },
     {
       "label": "rating: min only",
@@ -351,6 +431,85 @@
       "written": "instance=inst-a&tab=x&description=contract",
       "filters": {
         "description": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: BETWEEN min only",
+      "written": "instance=inst-a&tab=x&rating_min=25",
+      "filters": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: BETWEEN max only",
+      "written": "instance=inst-a&tab=x&rating_max=75",
+      "filters": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: BETWEEN min and max",
+      "written": "instance=inst-a&tab=x&rating_min=25&rating_max=75",
+      "filters": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: IS_NULL min only",
+      "written": "instance=inst-a&tab=x&ratingModifier=IS_NULL",
+      "filters": {
+        "ratingModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: IS_NULL max only",
+      "written": "instance=inst-a&tab=x&ratingModifier=IS_NULL",
+      "filters": {
+        "ratingModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: IS_NULL min and max",
+      "written": "instance=inst-a&tab=x&ratingModifier=IS_NULL",
+      "filters": {
+        "ratingModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: NOT_NULL min only",
+      "written": "instance=inst-a&tab=x&ratingModifier=NOT_NULL",
+      "filters": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: NOT_NULL max only",
+      "written": "instance=inst-a&tab=x&ratingModifier=NOT_NULL",
+      "filters": {
+        "ratingModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: NOT_NULL min and max",
+      "written": "instance=inst-a&tab=x&ratingModifier=NOT_NULL",
+      "filters": {
+        "ratingModifier": "NOT_NULL"
       },
       "hasFilters": true
     },

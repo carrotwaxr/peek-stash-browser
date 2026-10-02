@@ -119,7 +119,23 @@
       "type": "range",
       "defaultValue": {},
       "min": 0,
-      "max": 100
+      "max": 100,
+      "modifierOptions": [
+        {
+          "value": "BETWEEN",
+          "label": "Between"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Not rated"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Rated"
+        }
+      ],
+      "modifierKey": "ratingModifier",
+      "defaultModifier": "BETWEEN"
     },
     {
       "key": "favorite",
@@ -231,7 +247,8 @@
         "rating100"
       ],
       "removedStateKeys": [
-        "rating"
+        "rating",
+        "ratingModifier"
       ],
       "removedOptions": [
         "range:rating"
