@@ -23,3 +23,23 @@ export interface ExternalPlayerLinkResponse {
    */
   mimeType: string;
 }
+
+/**
+ * POST /api/scene/:sceneId/media-link: signed paths (scope `media`) for one
+ * scene's media, for a Cast receiver or Safari's native player. Every URL is a
+ * path; the client prefixes `window.location.origin`.
+ */
+export interface SceneMediaLinkRequest {
+  instanceId: string;
+}
+
+export interface SceneMediaLinkResponse {
+  /** ISO timestamp, 12 hours after minting. */
+  expiresAt: string;
+  /** Direct and the HLS tiers only, in `buildSceneStreams`' order. */
+  streams: { url: string; mime_type: string; label: string }[];
+  /** The one source a Cast receiver is given; null when none plays there. */
+  cast: { url: string; contentType: string; kind: "direct" | "hls" } | null;
+  captions: { url: string; lang: string; type: string }[];
+  poster: string | null;
+}

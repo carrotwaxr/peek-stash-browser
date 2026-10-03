@@ -31,6 +31,12 @@ export interface StreamLinkClaims {
   exp: number;
   /** User.passwordChangedAt as epoch ms, 0 when never changed. */
   passwordChangedAtMs: number;
+  /**
+   * Absent for an external-player link (v1, the direct stream only). `media`
+   * is a link a player or a Cast receiver can use for one scene's media: the
+   * direct stream, HLS, captions and poster (v2).
+   */
+  scope?: "media";
 }
 
 export function deriveStreamLinkKey(jwtSecret: string): Buffer {
@@ -39,10 +45,30 @@ export function deriveStreamLinkKey(jwtSecret: string): Buffer {
   );
 }
 
+/**
+ * Without a scope this is today's v1 join, byte for byte, so links minted
+ * before the scope existed still verify (and never widen). A scope signs a
+ * different message, so a v1 signature never passes as a media one.
+ */
 const message = (c: StreamLinkClaims): string =>
-  ["v1", c.userId, c.sceneId, c.instanceId, c.exp, c.passwordChangedAtMs].join(
-    "\n"
-  );
+  c.scope === undefined
+    ? [
+        "v1",
+        c.userId,
+        c.sceneId,
+        c.instanceId,
+        c.exp,
+        c.passwordChangedAtMs,
+      ].join("\n")
+    : [
+        "v2",
+        c.scope,
+        c.userId,
+        c.sceneId,
+        c.instanceId,
+        c.exp,
+        c.passwordChangedAtMs,
+      ].join("\n");
 
 /** base64url HMAC-SHA256 over the claims: 43 characters. */
 export function signStreamLink(c: StreamLinkClaims, key: Buffer): string {
@@ -59,13 +85,33 @@ export function isStreamLinkSignatureValid(
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
+/**
+ * The signed query: `instanceId`, `uid`, `exp`, `scope` (only when set) and
+ * `sig`, in that order. Nothing else builds one.
+ */
+export function signedQuery(c: StreamLinkClaims, sig: string): URLSearchParams {
+  const q = new URLSearchParams();
+  q.set("instanceId", c.instanceId);
+  q.set("uid", String(c.userId));
+  q.set("exp", String(c.exp));
+  if (c.scope !== undefined) q.set("scope", c.scope);
+  q.set("sig", sig);
+  return q;
+}
+
+/**
+ * Merge a signed query into a URL's parameters with `set`, never append: the
+ * URL often holds `instanceId` already, and a repeated key is refused.
+ */
+export function applySignedQuery(
+  params: URLSearchParams,
+  signed: URLSearchParams
+): void {
+  for (const [key, value] of signed) params.set(key, value);
+}
+
 export function buildStreamLinkPath(c: StreamLinkClaims, sig: string): string {
-  const q = new URLSearchParams({
-    instanceId: c.instanceId,
-    uid: String(c.userId),
-    exp: String(c.exp),
-    sig,
-  });
+  const q = signedQuery(c, sig);
   return `/api/scene/${c.sceneId}/proxy-stream/stream?${q.toString()}`;
 }
 

@@ -11,11 +11,13 @@ import { getJwtSecret } from "../../utils/jwtSecret.js";
 import {
   STREAM_LINK_TTL_SECONDS,
   type StreamLinkClaims,
+  applySignedQuery,
   buildStreamLinkPath,
   deriveStreamLinkKey,
   getStreamLinkKey,
   isStreamLinkSignatureValid,
   signStreamLink,
+  signedQuery,
 } from "../../utils/streamLink.js";
 
 vi.mock("../../utils/jwtSecret.js", () => ({
@@ -114,6 +116,76 @@ describe("streamLink", () => {
     expect(buildStreamLinkPath(claims, "SIG")).toBe(
       "/api/scene/123/proxy-stream/stream?instanceId=inst-a&uid=7&exp=1790208000&sig=SIG"
     );
+  });
+
+  it("a media-scope signature differs from a v1 signature over the same claims", () => {
+    const v1 = signStreamLink(claims, key);
+    const media = signStreamLink({ ...claims, scope: "media" }, key);
+    expect(media).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(media).not.toBe(v1);
+  });
+
+  it("a v1 signature does not verify as media scope, nor the reverse", () => {
+    const mediaClaims: StreamLinkClaims = { ...claims, scope: "media" };
+    const v1 = signStreamLink(claims, key);
+    const media = signStreamLink(mediaClaims, key);
+    expect(isStreamLinkSignatureValid(mediaClaims, v1, key)).toBe(false);
+    expect(isStreamLinkSignatureValid(claims, media, key)).toBe(false);
+    expect(isStreamLinkSignatureValid(mediaClaims, media, key)).toBe(true);
+  });
+
+  it("the v1 message is byte-identical to today's", () => {
+    // Golden: links minted before the upgrade must still verify.
+    const golden = "v1\n7\n123\ninst-a\n1790208000\n1788220800000";
+    expect(claims.passwordChangedAtMs).toBe(1788220800000);
+    const expected = createHmac("sha256", key)
+      .update(golden)
+      .digest("base64url");
+    expect(signStreamLink(claims, key)).toBe(expected);
+  });
+
+  it("the media message is the v2 join with the scope", () => {
+    const golden = "v2\nmedia\n7\n123\ninst-a\n1790208000\n1788220800000";
+    const expected = createHmac("sha256", key)
+      .update(golden)
+      .digest("base64url");
+    expect(signStreamLink({ ...claims, scope: "media" }, key)).toBe(expected);
+  });
+
+  it("buildStreamLinkPath with scope media adds scope=media and keeps instanceId", () => {
+    expect(buildStreamLinkPath({ ...claims, scope: "media" }, "SIG")).toBe(
+      "/api/scene/123/proxy-stream/stream?instanceId=inst-a&uid=7&exp=1790208000&scope=media&sig=SIG"
+    );
+  });
+
+  it("signedQuery orders instanceId, uid, exp, scope, sig and leaves out scope for v1", () => {
+    expect([
+      ...signedQuery({ ...claims, scope: "media" }, "SIG").keys(),
+    ]).toEqual(["instanceId", "uid", "exp", "scope", "sig"]);
+    const v1 = signedQuery(claims, "SIG");
+    expect([...v1.keys()]).toEqual(["instanceId", "uid", "exp", "sig"]);
+    expect(v1.has("scope")).toBe(false);
+  });
+
+  it("applying a signed query to parameters that already hold instanceId leaves exactly one of each key", () => {
+    const params = new URLSearchParams({
+      resolution: "1080",
+      instanceId: "inst-a",
+    });
+    applySignedQuery(params, signedQuery({ ...claims, scope: "media" }, "SIG"));
+    for (const k of ["instanceId", "uid", "exp", "scope", "sig"]) {
+      expect(params.getAll(k), k).toHaveLength(1);
+    }
+    expect(params.get("resolution")).toBe("1080");
+    expect(params.get("instanceId")).toBe("inst-a");
+    expect(params.get("sig")).toBe("SIG");
+  });
+
+  it("applying a signed query replaces a stale signed value", () => {
+    const params = new URLSearchParams({ instanceId: "other", sig: "OLD" });
+    applySignedQuery(params, signedQuery(claims, "SIG"));
+    expect(params.getAll("instanceId")).toEqual(["inst-a"]);
+    expect(params.getAll("sig")).toEqual(["SIG"]);
   });
 
   it("getStreamLinkKey derives from getJwtSecret and memoizes per secret", () => {
