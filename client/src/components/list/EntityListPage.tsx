@@ -283,12 +283,15 @@ const EntityListPage = ({
   ]);
 
   // The timeline's bars count what the list shows: its search and filter
-  // (the page's permanent filters, not the period's own `date`), no page or sort
+  // (the page's permanent filters, not the period's own `date`), no page or
+  // sort. The user's Date filter counts before and after a period locks
+  // `date`, so choosing one asks for the bars no second time
+  const { filtersBeforeView } = listState;
   const timelineRequest = useMemo(() => {
     if (viewMode !== "timeline") return undefined;
     const query = buildListQuery(
       entityType,
-      { ready, filters, sort, page, perPage, q },
+      { ready, filters: filtersBeforeView, sort, page, perPage, q },
       pagePermanentFilters
     );
     if (!query) return null;
@@ -298,7 +301,7 @@ const EntityListPage = ({
     viewMode,
     entityType,
     ready,
-    filters,
+    filtersBeforeView,
     sort,
     page,
     perPage,

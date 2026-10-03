@@ -12,7 +12,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { must, renderListPage } from "@tests/testUtils";
+import { flushPromises, must, renderListPage } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import SceneSearch from "@/components/scene-search/SceneSearch";
@@ -552,6 +552,52 @@ describe("SceneSearch", () => {
         modifier: "INCLUDES",
         depth: -1,
       });
+    });
+  });
+
+  describe("Timeline", () => {
+    it("with a Date filter the bars are asked for once, over the user's dates, before and after a period is chosen", async () => {
+      apiPost.mockResolvedValue({
+        distribution: [
+          { period: "2024-04", count: 2 },
+          { period: "2024-05", count: 3 },
+        ],
+      });
+      const { router } = renderListPage(<SceneSearch title="Scenes" />, {
+        initialEntries: [
+          "/scenes?view=timeline&date_start=2024-01-01&date_end=2024-12-31",
+        ],
+      });
+
+      // The latest period is chosen and the grid asks for its scenes
+      await waitFor(() =>
+        expect(router.state.location.search).toContain(
+          "timeline_period=2024-05"
+        )
+      );
+      await waitFor(() =>
+        expect(lastSent().scene_filter?.date).toEqual({
+          modifier: "BETWEEN",
+          value: "2024-05-01",
+          value2: "2024-05-31",
+        })
+      );
+      await flushPromises();
+
+      // One request for the bars: the user's Date filter, never the period's
+      expect(distributionBodies()).toEqual([
+        {
+          filter: { q: "" },
+          scene_filter: {
+            date: {
+              modifier: "BETWEEN",
+              value: "2024-01-01",
+              value2: "2024-12-31",
+            },
+          },
+          granularity: "months",
+        },
+      ]);
     });
   });
 
