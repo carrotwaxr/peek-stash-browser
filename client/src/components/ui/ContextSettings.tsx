@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { UpdateUserSettingsBody } from "@peek/shared-types";
 import { LucideSettings } from "lucide-react";
 import { getErrorMessage } from "../../api";
@@ -14,6 +14,7 @@ import {
 } from "../../config/entityDisplayConfig";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { showError, showSuccess } from "../../utils/toast";
+import Popover from "./Popover";
 import ZoomSlider from "./ZoomSlider";
 
 /**
@@ -155,48 +156,13 @@ const ContextSettings = ({
   entityType = null,
 }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Card display settings
   const { getSettings, updateSettings } = useCardDisplaySettings();
   const cardSettings = entityType ? getSettings(entityType) : null;
 
   const hasSettings = settings.length > 0 || entityType;
-
-  // Close popover when clicking outside
-  // Use mouseup instead of mousedown to avoid closing when interacting with
-  // native select dropdowns (their options render outside our container)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("mouseup", handleClickOutside);
-      return () => document.removeEventListener("mouseup", handleClickOutside);
-    }
-    return undefined;
-  }, [isOpen]);
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
-    }
-    return undefined;
-  }, [isOpen]);
 
   const handleCardSettingChange = useCallback(
     async (key: string, value: string | boolean) => {
@@ -219,9 +185,10 @@ const ContextSettings = ({
   };
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div className={`relative ${className}`}>
       {/* Cog Button */}
       <button
+        ref={buttonRef}
         type="button"
         onClick={togglePopover}
         disabled={!hasSettings}
@@ -244,175 +211,168 @@ const ContextSettings = ({
         }
         aria-label="View settings"
         aria-expanded={isOpen}
-        aria-haspopup="true"
+        aria-haspopup="dialog"
       >
         <LucideSettings size={18} />
       </button>
 
       {/* Popover */}
-      {isOpen && hasSettings && (
+      {/* A Popover: focus moves in and back, Escape and a press outside
+          close it, and the list's keys and TV focus stay out of the page */}
+      <Popover
+        anchorRef={buttonRef}
+        open={isOpen && Boolean(hasSettings)}
+        onClose={() => setIsOpen(false)}
+        label="View settings"
+        placement="bottom-end"
+        className="w-64 max-w-[calc(100vw-1rem)]"
+      >
+        {/* Header */}
         <div
-          className="absolute top-full mt-2 w-64 rounded-lg shadow-lg z-50"
-          style={{
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border-color)",
-            right: "max(-1rem, calc(-100vw + 100% + 1rem))",
-            maxWidth: "calc(100vw - 1rem)",
-          }}
+          className="px-3 py-2 border-b"
+          style={{ borderColor: "var(--border-color)" }}
         >
-          {/* Header */}
-          <div
-            className="px-3 py-2 border-b"
-            style={{ borderColor: "var(--border-color)" }}
+          <h3
+            className="text-sm font-medium"
+            style={{ color: "var(--text-primary)" }}
           >
-            <h3
-              className="text-sm font-medium"
-              style={{ color: "var(--text-primary)" }}
+            View Settings
+          </h3>
+        </div>
+
+        {/* Settings */}
+        <div className="p-3 space-y-3">
+          <UserSettingFields settings={settings} />
+
+          {/* Card Display Section - shown when entityType is provided */}
+          {entityType && (
+            <div
+              className="border-t pt-3 mt-3"
+              style={{ borderColor: "var(--border-color)" }}
             >
-              View Settings
-            </h3>
-          </div>
-
-          {/* Settings */}
-          <div className="p-3 space-y-3">
-            <UserSettingFields settings={settings} />
-
-            {/* Card Display Section - shown when entityType is provided */}
-            {entityType && (
-              <div
-                className="border-t pt-3 mt-3"
-                style={{ borderColor: "var(--border-color)" }}
+              <h4
+                className="text-xs font-medium mb-2"
+                style={{ color: "var(--text-secondary)" }}
               >
-                <h4
-                  className="text-xs font-medium mb-2"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  Card Display
-                </h4>
-                <div className="space-y-2">
-                  {/* Default View Mode dropdown */}
-                  {(getAvailableSettings(entityType) as string[]).includes(
-                    "defaultViewMode"
-                  ) && (
-                    <div>
-                      <label
-                        htmlFor="context-defaultViewMode"
-                        className="block text-xs font-medium mb-1"
-                        style={{ color: "var(--text-secondary)" }}
-                      >
-                        {SETTING_LABELS.defaultViewMode}
-                      </label>
-                      <select
-                        id="context-defaultViewMode"
-                        value={settingText(
-                          cardSettings?.defaultViewMode,
-                          "grid"
-                        )}
+                Card Display
+              </h4>
+              <div className="space-y-2">
+                {/* Default View Mode dropdown */}
+                {(getAvailableSettings(entityType) as string[]).includes(
+                  "defaultViewMode"
+                ) && (
+                  <div>
+                    <label
+                      htmlFor="context-defaultViewMode"
+                      className="block text-xs font-medium mb-1"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {SETTING_LABELS.defaultViewMode}
+                    </label>
+                    <select
+                      id="context-defaultViewMode"
+                      value={settingText(cardSettings?.defaultViewMode, "grid")}
+                      onChange={(e) =>
+                        void handleCardSettingChange(
+                          "defaultViewMode",
+                          e.target.value
+                        )
+                      }
+                      className="w-full px-2 py-1.5 rounded text-sm"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {(
+                        getViewModes(entityType) as Array<{
+                          id: string;
+                          label: string;
+                        }>
+                      ).map((mode) => (
+                        <option key={mode.id} value={mode.id}>
+                          {mode.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {/* Default Density - shown for Grid or Wall view modes */}
+                {(cardSettings?.defaultViewMode === "grid" ||
+                  cardSettings?.defaultViewMode === "wall") && (
+                  <div className="mt-2">
+                    <label
+                      className="block text-xs font-medium mb-1"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {cardSettings?.defaultViewMode === "grid"
+                        ? "Default Grid Density"
+                        : "Default Wall Size"}
+                    </label>
+                    <ZoomSlider
+                      value={
+                        cardSettings?.defaultViewMode === "grid"
+                          ? settingText(
+                              cardSettings?.defaultGridDensity,
+                              "medium"
+                            )
+                          : settingText(cardSettings?.defaultWallZoom, "medium")
+                      }
+                      onChange={(density) =>
+                        void handleCardSettingChange(
+                          cardSettings?.defaultViewMode === "grid"
+                            ? "defaultGridDensity"
+                            : "defaultWallZoom",
+                          density
+                        )
+                      }
+                    />
+                  </div>
+                )}
+                {/* Toggle settings */}
+                {(getAvailableSettings(entityType) as string[])
+                  .filter(
+                    (key) =>
+                      ![
+                        "defaultViewMode",
+                        "defaultGridDensity",
+                        "defaultWallZoom",
+                        "showDescriptionOnDetail",
+                      ].includes(key)
+                  )
+                  .map((settingKey) => (
+                    <label
+                      key={settingKey}
+                      className="flex items-center cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(cardSettings?.[settingKey] ?? true)}
                         onChange={(e) =>
                           void handleCardSettingChange(
-                            "defaultViewMode",
-                            e.target.value
+                            settingKey,
+                            e.target.checked
                           )
                         }
-                        className="w-full px-2 py-1.5 rounded text-sm"
-                        style={{
-                          backgroundColor: "var(--bg-secondary)",
-                          border: "1px solid var(--border-color)",
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        {(
-                          getViewModes(entityType) as Array<{
-                            id: string;
-                            label: string;
-                          }>
-                        ).map((mode) => (
-                          <option key={mode.id} value={mode.id}>
-                            {mode.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {/* Default Density - shown for Grid or Wall view modes */}
-                  {(cardSettings?.defaultViewMode === "grid" ||
-                    cardSettings?.defaultViewMode === "wall") && (
-                    <div className="mt-2">
-                      <label
-                        className="block text-xs font-medium mb-1"
-                        style={{ color: "var(--text-secondary)" }}
-                      >
-                        {cardSettings?.defaultViewMode === "grid"
-                          ? "Default Grid Density"
-                          : "Default Wall Size"}
-                      </label>
-                      <ZoomSlider
-                        value={
-                          cardSettings?.defaultViewMode === "grid"
-                            ? settingText(
-                                cardSettings?.defaultGridDensity,
-                                "medium"
-                              )
-                            : settingText(
-                                cardSettings?.defaultWallZoom,
-                                "medium"
-                              )
-                        }
-                        onChange={(density) =>
-                          void handleCardSettingChange(
-                            cardSettings?.defaultViewMode === "grid"
-                              ? "defaultGridDensity"
-                              : "defaultWallZoom",
-                            density
-                          )
-                        }
+                        className="w-4 h-4"
+                        style={{ accentColor: "var(--accent-primary)" }}
                       />
-                    </div>
-                  )}
-                  {/* Toggle settings */}
-                  {(getAvailableSettings(entityType) as string[])
-                    .filter(
-                      (key) =>
-                        ![
-                          "defaultViewMode",
-                          "defaultGridDensity",
-                          "defaultWallZoom",
-                          "showDescriptionOnDetail",
-                        ].includes(key)
-                    )
-                    .map((settingKey) => (
-                      <label
-                        key={settingKey}
-                        className="flex items-center cursor-pointer"
+                      <span
+                        className="ml-2 text-sm"
+                        style={{ color: "var(--text-primary)" }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={Boolean(cardSettings?.[settingKey] ?? true)}
-                          onChange={(e) =>
-                            void handleCardSettingChange(
-                              settingKey,
-                              e.target.checked
-                            )
-                          }
-                          className="w-4 h-4"
-                          style={{ accentColor: "var(--accent-primary)" }}
-                        />
-                        <span
-                          className="ml-2 text-sm"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          {SETTING_LABELS[
-                            settingKey as keyof typeof SETTING_LABELS
-                          ] || settingKey}
-                        </span>
-                      </label>
-                    ))}
-                </div>
+                        {SETTING_LABELS[
+                          settingKey as keyof typeof SETTING_LABELS
+                        ] || settingKey}
+                      </span>
+                    </label>
+                  ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      )}
+      </Popover>
     </div>
   );
 };

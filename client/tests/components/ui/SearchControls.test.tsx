@@ -1512,6 +1512,62 @@ describe("keys", () => {
     expect(findFilter()).not.toBeInTheDocument();
   });
 
+  it("neither runs inside the View settings dropdown (a dialog that takes focus, as TV focus reads it) or an open menu", async () => {
+    const user = userEvent.setup();
+    const WithMenu = (props: ListControlsProps) => (
+      <>
+        <div role="menu" aria-label="A menu">
+          <button type="button" role="menuitem">
+            Item
+          </button>
+        </div>
+        <ListControls {...props} />
+      </>
+    );
+    // Signed in: the dropdown reads the user's settings
+    vi.mocked(apiModule.apiGet).mockImplementation((path: string) =>
+      Promise.resolve(
+        path === "/user/settings"
+          ? userSettingsResponse({})
+          : path === "/user/filter-pins"
+            ? pinsAnswer()
+            : { presets: {}, defaults: {} }
+      )
+    );
+    render(
+      <SignedInWithQuery>
+        <PlainMemoryRouter initialEntries={["/scenes"]}>
+          <WithMenu artifactType="scene" totalPages={1} totalCount={1}>
+            {null}
+          </WithMenu>
+        </PlainMemoryRouter>
+      </SignedInWithQuery>
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "View settings" })
+    );
+    const settings = screen.getByRole("dialog", { name: "View settings" });
+    const box = within(settings).getAllByRole("checkbox")[0];
+    box?.focus();
+    expect(settings).toContainElement(box ?? null);
+    await user.keyboard("f");
+    await user.keyboard("/");
+    expect(findFilter()).not.toBeInTheDocument();
+    expect(searchBox()).not.toHaveFocus();
+    expect(settings).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(
+      screen.queryByRole("dialog", { name: "View settings" })
+    ).not.toBeInTheDocument();
+
+    screen.getByRole("menuitem", { name: "Item" }).focus();
+    await user.keyboard("f");
+    await user.keyboard("/");
+    expect(findFilter()).not.toBeInTheDocument();
+    expect(searchBox()).not.toHaveFocus();
+  });
+
   it("`f` does nothing while the list is not filterable (the Tags hierarchy)", async () => {
     const user = userEvent.setup();
     const list = renderSearchControls(
