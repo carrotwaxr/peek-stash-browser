@@ -19,6 +19,7 @@ import {
   deleteUserRestrictions,
   getAnyUserPermissions,
   getDefaultFilterPresets,
+  getFilterPins,
   getFilterPresets,
   getHiddenEntities,
   getSetupStatus,
@@ -28,6 +29,8 @@ import {
   getUserStashInstances,
   hideEntities,
   hideEntity,
+  putFilterPins,
+  resetFilterPins,
   saveFilterPreset,
   setDefaultFilterPreset,
   syncFromStash,
@@ -38,6 +41,7 @@ import {
   updateUserRestrictions,
   updateUserStashInstances,
 } from "../../controllers/user.js";
+import { ValidationError } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import userRoutes from "../../routes/user.js";
 import { getVisibleEntityKeys } from "../../services/EntityAccessService.js";
@@ -52,7 +56,9 @@ import {
   hashRecoveryKey,
 } from "../../utils/recoveryKey.js";
 import { authenticated } from "../../utils/routeHelpers.js";
+import { updateUserJson } from "../../utils/userJsonColumn.js";
 import {
+  findHandler,
   malformed,
   reqFor,
   resFor,
@@ -63,7 +69,7 @@ import {
   userPermissions,
   userRow,
 } from "../helpers/fixtures.js";
-import { objectContaining } from "../helpers/matchers.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -72,6 +78,11 @@ vi.mock(
   "../../prisma/singleton.js",
   () => import("../helpers/prismaSingletonMock.js")
 );
+
+// The pins save is a compare-and-set raw write; the tests run its mutation
+vi.mock("../../utils/userJsonColumn.js", () => ({
+  updateUserJson: vi.fn(),
+}));
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -149,6 +160,7 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
+const mockUpdateUserJson = vi.mocked(updateUserJson);
 const mockVisibleKeys = vi.mocked(getVisibleEntityKeys);
 const mockAlreadyHidden = vi.mocked(userHiddenEntityService.findAlreadyHidden);
 
@@ -400,7 +412,7 @@ describe("User Controller — Features", () => {
       await saveFilterPreset(req, res);
       const body = res._getOkBody();
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
+        objectContaining({
           data: objectContaining({
             defaultFilterPresets: { scene: body.preset.id },
           }),
@@ -625,6 +637,236 @@ describe("User Controller — Features", () => {
       const res = resFor(setDefaultFilterPreset);
       await setDefaultFilterPreset(req, res);
       expect(res._getOkBody().success).toBe(true);
+    });
+  });
+
+  // ─── Filter Pins ───
+
+  describe("filter pins", () => {
+    const SCENE_PINS = {
+      fields: ["rating"],
+      filters: [
+        {
+          id: "0123456789abcdef0123456789abcdef",
+          key: "favorite",
+          state: { favorite: "true" },
+        },
+      ],
+    };
+
+    /** Runs the mutation `updateUserJson` was given on the stored columns */
+    function runMutation(stored: unknown) {
+      const call =
+        mockUpdateUserJson.mock.calls[mockUpdateUserJson.mock.calls.length - 1];
+      if (!call) throw new Error("updateUserJson was not called");
+      const [userId, columns, mutate] = call;
+      const values = mutate({
+        filterPresets: null,
+        defaultFilterPresets: null,
+        filterPins: stored,
+      });
+      return { userId, columns, values };
+    }
+
+    beforeEach(() => {
+      mockUpdateUserJson.mockResolvedValue({
+        filterPresets: null,
+        defaultFilterPresets: null,
+        filterPins: null,
+      });
+    });
+
+    it("GET answers every list, the defaults filled in", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ filterPins: { scene: SCENE_PINS } })
+      );
+      const req = reqFor(getFilterPins, { user: USER });
+      const res = resFor(getFilterPins);
+      await getFilterPins(req, res);
+
+      const { pins } = res._getOkBody();
+      expect(Object.keys(pins).sort()).toEqual([
+        "clip",
+        "gallery",
+        "group",
+        "image",
+        "performer",
+        "scene",
+        "studio",
+        "tag",
+      ]);
+      expect(pins.scene).toEqual(SCENE_PINS);
+      expect(pins.performer.filters.map((filter) => filter.key)).toEqual([
+        "favorite",
+      ]);
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: USER.id },
+        select: { filterPins: true },
+      });
+    });
+
+    it("GET answers the defaults for a user with none stored", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ filterPins: null })
+      );
+      const res = resFor(getFilterPins);
+      await getFilterPins(reqFor(getFilterPins, { user: USER }), res);
+      expect(res._getOkBody().pins.scene.filters.map((f) => f.id)).toEqual([
+        "default-unwatched",
+        "default-favorites",
+      ]);
+    });
+
+    it("GET answers 404 when the user is gone", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      const res = resFor(getFilterPins);
+      await getFilterPins(reqFor(getFilterPins, { user: USER }), res);
+      expect(res._getStatus()).toBe(404);
+    });
+
+    it("PUT stores one list and answers it", async () => {
+      const req = reqFor(putFilterPins, {
+        user: USER,
+        params: { list: "scene" },
+        body: SCENE_PINS,
+      });
+      const res = resFor(putFilterPins);
+      await putFilterPins(req, res);
+
+      expect(res._getOkBody()).toEqual({ pins: SCENE_PINS });
+      const { userId, columns, values } = runMutation({
+        performer: { fields: [], filters: [] },
+        scene: { fields: ["oCount"], filters: [] },
+      });
+      expect(userId).toBe(USER.id);
+      expect(columns).toEqual(["filterPins"]);
+      // the other lists are kept, this one replaced
+      expect(values.filterPins).toEqual({
+        performer: { fields: [], filters: [] },
+        scene: SCENE_PINS,
+      });
+    });
+
+    it("PUT stores a list over a user's first save (NULL stored)", async () => {
+      const req = reqFor(putFilterPins, {
+        user: USER,
+        params: { list: "tag" },
+        body: { fields: [], filters: [] },
+      });
+      await putFilterPins(req, resFor(putFilterPins));
+      expect(runMutation(null).values.filterPins).toEqual({
+        tag: { fields: [], filters: [] },
+      });
+    });
+
+    it("PUT refuses invalid pins with their paths, and writes nothing", async () => {
+      const req = reqFor(putFilterPins, {
+        user: USER,
+        params: { list: "scene" },
+        body: { fields: ["nope"], filters: [] },
+      });
+      const failure = await putFilterPins(req, resFor(putFilterPins)).catch(
+        (error: unknown) => error
+      );
+      expect(failure).toBeInstanceOf(ValidationError);
+      expect((failure as ValidationError).issues).toEqual([
+        { path: "fields[0]", message: anyOf(String) },
+      ]);
+      expect(mockUpdateUserJson).not.toHaveBeenCalled();
+    });
+
+    it("PUT and DELETE answer 400 for a list that is no list kind", async () => {
+      await expect(
+        putFilterPins(
+          reqFor(putFilterPins, {
+            user: USER,
+            params: { list: "playlist" },
+            body: { fields: [], filters: [] },
+          }),
+          resFor(putFilterPins)
+        )
+      ).rejects.toBeInstanceOf(ValidationError);
+      await expect(
+        resetFilterPins(
+          reqFor(resetFilterPins, { user: USER, params: { list: "x" } }),
+          resFor(resetFilterPins)
+        )
+      ).rejects.toBeInstanceOf(ValidationError);
+      expect(mockUpdateUserJson).not.toHaveBeenCalled();
+    });
+
+    it("DELETE removes that list's entry and answers its defaults", async () => {
+      const req = reqFor(resetFilterPins, {
+        user: USER,
+        params: { list: "scene" },
+      });
+      const res = resFor(resetFilterPins);
+      await resetFilterPins(req, res);
+
+      expect(res._getOkBody().pins.filters.map((f) => f.id)).toEqual([
+        "default-unwatched",
+        "default-favorites",
+      ]);
+      const { columns, values } = runMutation({
+        scene: SCENE_PINS,
+        tag: { fields: [], filters: [] },
+      });
+      expect(columns).toEqual(["filterPins"]);
+      expect(values.filterPins).toEqual({
+        tag: { fields: [], filters: [] },
+      });
+      // the last entry going leaves NULL
+      expect(runMutation({ scene: SCENE_PINS }).values.filterPins).toBeNull();
+      expect(runMutation(null).values.filterPins).toBeNull();
+    });
+
+    it("reads and writes only the signed-in user's pins", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ filterPins: null })
+      );
+      // a body or params naming another user change nothing: only req.user.id is read
+      await getFilterPins(
+        reqFor(getFilterPins, {
+          user: USER,
+          query: malformed({ userId: "1" }),
+        }),
+        resFor(getFilterPins)
+      );
+      await putFilterPins(
+        reqFor(putFilterPins, {
+          user: USER,
+          params: malformed({ list: "scene", userId: "1" }),
+          body: malformed({ ...SCENE_PINS, userId: 1 }),
+        }),
+        resFor(putFilterPins)
+      );
+      await resetFilterPins(
+        reqFor(resetFilterPins, {
+          user: USER,
+          params: malformed({ list: "scene", userId: "1" }),
+        }),
+        resFor(resetFilterPins)
+      );
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith(
+        objectContaining({ where: { id: USER.id } })
+      );
+      expect(mockUpdateUserJson.mock.calls.map((call) => call[0])).toEqual([
+        USER.id,
+        USER.id,
+      ]);
+    });
+
+    it("registers the routes behind authenticate with the list as a param", () => {
+      expect(findHandler(userRoutes, "get", "/filter-pins")).toBeTypeOf(
+        "function"
+      );
+      expect(findHandler(userRoutes, "put", "/filter-pins/:list")).toBeTypeOf(
+        "function"
+      );
+      expect(
+        findHandler(userRoutes, "delete", "/filter-pins/:list")
+      ).toBeTypeOf("function");
     });
   });
 

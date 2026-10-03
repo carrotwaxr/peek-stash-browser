@@ -35,6 +35,8 @@ export type {
   OverwriteViewBody,
   RenameViewBody,
   GetFilterPinsResponse,
+  FilterPinsParams,
+  FilterPinsListResponse,
   PutFilterPinsBody,
   FilterPresets,
   DefaultFilterPresets,

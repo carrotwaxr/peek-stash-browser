@@ -68,6 +68,7 @@ async function snapshot(): Promise<Snapshot> {
       navPreferences: true,
       filterPresets: true,
       defaultFilterPresets: true,
+      filterPins: true,
       tableColumnDefaults: true,
       cardDisplaySettings: true,
       landingPagePreference: true,

@@ -11,6 +11,7 @@ import {
   getAllUsers,
   getAnyUserPermissions,
   getDefaultFilterPresets,
+  getFilterPins,
   getFilterPresets,
   getHiddenEntities,
   getRecoveryKey,
@@ -22,7 +23,9 @@ import {
   getUserStashInstances,
   hideEntities,
   hideEntity,
+  putFilterPins,
   regenerateRecoveryKey,
+  resetFilterPins,
   saveFilterPreset,
   setDefaultFilterPreset,
   syncFromStash,
@@ -67,6 +70,11 @@ router.delete(
 // Default filter preset routes
 router.get("/default-presets", authenticated(getDefaultFilterPresets));
 router.put("/default-preset", authenticated(setDefaultFilterPreset));
+
+// Pinned fields and filters, per list
+router.get("/filter-pins", authenticated(getFilterPins));
+router.put("/filter-pins/:list", authenticated(putFilterPins));
+router.delete("/filter-pins/:list", authenticated(resetFilterPins));
 
 // User's own permissions
 router.get("/permissions", authenticated(getUserPermissions));

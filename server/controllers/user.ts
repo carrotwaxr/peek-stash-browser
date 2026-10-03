@@ -2,6 +2,11 @@ import {
   type GetUserRestrictionsResponse,
   TABLE_COLUMN_KINDS,
 } from "@peek/shared-types/api/user.js";
+import {
+  LIST_KINDS,
+  type ListKind,
+  defaultPinsOf,
+} from "@peek/shared-types/filters/index.js";
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import {
   isPresetContext,
@@ -78,10 +83,13 @@ import type {
   DeleteUserResponse,
   DeleteUserRestrictionsParams,
   DeleteUserRestrictionsResponse,
+  FilterPinsListResponse,
+  FilterPinsParams,
   FilterPreset,
   FilterPresets,
   GetAllUsersResponse,
   GetDefaultFilterPresetsResponse,
+  GetFilterPinsResponse,
   GetFilterPresetsResponse,
   GetHiddenEntitiesQuery,
   GetHiddenEntitiesResponse,
@@ -97,6 +105,7 @@ import type {
   HideEntityResponse,
   LandingPagePreference,
   NavPreference,
+  PutFilterPinsBody,
   RegenerateRecoveryKeyBody,
   RegenerateRecoveryKeyResponse,
   SaveFilterPresetBody,
@@ -128,6 +137,7 @@ import type {
 import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { userDownloadsDir } from "../utils/downloadPaths.js";
 import { type EntityRef, compositeKey, entityKey } from "../utils/entityRef.js";
+import { pinsOf, validateListPins } from "../utils/filterPins.js";
 import { logger } from "../utils/logger.js";
 import { validatePassword } from "../utils/passwordValidation.js";
 import {
@@ -137,6 +147,7 @@ import {
 } from "../utils/recoveryKey.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
+import { updateUserJson } from "../utils/userJsonColumn.js";
 import { USER_GROUP_SUMMARY_SELECT } from "./groups.js";
 
 // Inline the default carousel preferences to avoid ESM loading issues
@@ -1259,6 +1270,87 @@ export const setDefaultFilterPreset = async (
   });
 
   res.json({ success: true, defaults: currentDefaults });
+};
+
+// =============================================================================
+// FILTER PINS
+// =============================================================================
+
+/** The `:list` param as a list kind, else a 400 */
+function listKindOf(raw: string): ListKind {
+  const kind = LIST_KINDS.find((each) => each === raw);
+  if (kind === undefined) {
+    throw new ValidationError("Invalid list", {
+      issues: [
+        { path: "list", message: `Expected one of ${LIST_KINDS.join(", ")}` },
+      ],
+    });
+  }
+  return kind;
+}
+
+/** The stored column as a map of list to pins (anything else is nothing stored) */
+function storedPinsOf(stored: unknown): Record<string, unknown> {
+  return typeof stored === "object" && stored !== null && !Array.isArray(stored)
+    ? { ...stored }
+    : {};
+}
+
+/**
+ * GET /api/user/filter-pins: every list's pins; a list the user never
+ * changed shows its defaults
+ */
+export const getFilterPins = async (
+  req: TypedAuthRequest,
+  res: TypedResponse<GetFilterPinsResponse | ApiErrorResponse>
+) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { filterPins: true },
+  });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  res.json({ pins: pinsOf(user.filterPins) });
+};
+
+/** PUT /api/user/filter-pins/:list: stores one list's pins and answers them */
+export const putFilterPins = async (
+  req: TypedAuthRequest<PutFilterPinsBody, FilterPinsParams>,
+  res: TypedResponse<FilterPinsListResponse | ApiErrorResponse>
+) => {
+  const kind = listKindOf(req.params.list);
+  const checked = validateListPins(kind, req.body);
+  if ("issues" in checked) {
+    throw new ValidationError("Invalid pins", { issues: checked.issues });
+  }
+  const { pins } = checked;
+
+  await updateUserJson(req.user.id, ["filterPins"], (values) => ({
+    ...values,
+    filterPins: { ...storedPinsOf(values.filterPins), [kind]: pins },
+  }));
+
+  res.json({ pins });
+};
+
+/** DELETE /api/user/filter-pins/:list: back to that list's defaults */
+export const resetFilterPins = async (
+  req: TypedAuthRequest<never, FilterPinsParams>,
+  res: TypedResponse<FilterPinsListResponse | ApiErrorResponse>
+) => {
+  const kind = listKindOf(req.params.list);
+
+  await updateUserJson(req.user.id, ["filterPins"], (values) => {
+    const { [kind]: _removed, ...rest } = storedPinsOf(values.filterPins);
+    return {
+      ...values,
+      filterPins: Object.keys(rest).length === 0 ? null : rest,
+    };
+  });
+
+  res.json({ pins: defaultPinsOf(kind) });
 };
 
 /**
