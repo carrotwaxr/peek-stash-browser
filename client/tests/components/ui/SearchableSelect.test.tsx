@@ -803,6 +803,31 @@ describe("SearchableSelect include or exclude per value (F22a)", () => {
     expect(picked()).toEqual({ value: [], excluded: [] });
   });
 
+  it("every pick shows its toggle and remove icons, not drawn in the pick's own colour; an included pick's toggle is dimmed until hover or focus", async () => {
+    render(<ExcludeHarness initial={["1:i"]} initialExcluded={["2:i"]} />);
+
+    const include = await screen.findByRole("button", {
+      name: "Exclude Tag 1",
+    });
+    const exclude = screen.getByRole("button", { name: "Exclude Tag 2" });
+    for (const name of ["Tag 1", "Tag 2"]) {
+      const toggle = screen.getByRole("button", { name: `Exclude ${name}` });
+      const remove = screen.getByRole("button", { name: `Remove ${name}` });
+      const pick = must(toggle.parentElement, `${name}'s pick`);
+      // The icons take the pick's text colour, never its background
+      expect(toggle.style.color).not.toBe(pick.style.backgroundColor);
+      expect(remove.style.color).not.toBe(pick.style.backgroundColor);
+    }
+    // Included: there but quiet, full strength on hover or focus
+    expect(include).toHaveClass(
+      "opacity-60",
+      "hover:!opacity-100",
+      "focus-visible:!opacity-100"
+    );
+    // Excluded: the pressed toggle shows at full strength
+    expect(exclude).not.toHaveClass("opacity-60");
+  });
+
   it("an excluded value is picked in the list, and picking it again removes it", async () => {
     const user = userEvent.setup();
     render(<ExcludeHarness initial={[]} initialExcluded={["2:i"]} />);

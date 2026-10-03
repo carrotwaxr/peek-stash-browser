@@ -117,6 +117,16 @@ function minimalFinder(entityType: string): FindMinimal | undefined {
     : undefined;
 }
 
+/**
+ * A pick's icon buttons draw in the pick's own text colour: the tertiary
+ * button's accent would vanish on an included pick's accent background
+ */
+const ICON_ON_PICK = {
+  backgroundColor: "transparent",
+  borderColor: "transparent",
+  color: "inherit",
+} as const;
+
 /** What a stale playlist id shows as: deleted, or no longer shared */
 const UNAVAILABLE_PLAYLIST = "Unavailable playlist";
 
@@ -660,7 +670,14 @@ const SearchableSelect = ({
                   <Button
                     onClick={(e) => handleToggle(item.id, e)}
                     variant="tertiary"
-                    className="hover:opacity-70 !p-0 !border-0 rounded"
+                    // On every pick: an included one's is quiet until
+                    // hovered or focused, an excluded one's at full strength
+                    className={`!p-0 !border-0 rounded ${
+                      out
+                        ? "hover:opacity-70"
+                        : "opacity-60 hover:!opacity-100 focus-visible:!opacity-100"
+                    }`}
+                    style={ICON_ON_PICK}
                     aria-pressed={out}
                     aria-label={`Exclude ${shownName(item)}`}
                     title={
@@ -679,6 +696,7 @@ const SearchableSelect = ({
                   onClick={(e) => handleRemove(item.id, e)}
                   variant="tertiary"
                   className="hover:opacity-70 !p-0 !border-0"
+                  style={ICON_ON_PICK}
                   aria-label={`Remove ${shownName(item)}`}
                   icon={<LucideX size={14} />}
                 />
