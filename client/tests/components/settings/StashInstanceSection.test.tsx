@@ -1196,7 +1196,9 @@ describe("StashInstanceSection", () => {
 
       renderSection(client);
       fireEvent.click(
-        await screen.findByRole("button", { name: "Choose VR tag" })
+        await screen.findByRole("button", {
+          name: "Choose VR tag for Test Stash",
+        })
       );
 
       // The search is scoped to the instance
@@ -1241,7 +1243,7 @@ describe("StashInstanceSection", () => {
         });
         renderSection();
         const choose = await screen.findByRole("button", {
-          name: "Choose VR tag",
+          name: "Choose VR tag for Test Stash",
         });
         fireEvent.click(choose);
         return choose;
@@ -1261,6 +1263,31 @@ describe("StashInstanceSection", () => {
 
         expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
         expect(choose).toHaveFocus();
+      });
+
+      it("the button names its instance, says whether the picker is open, and points at it", async () => {
+        const choose = await openPicker();
+        const picker = await screen.findByRole("group", {
+          name: "Choose the VR tag of Test Stash",
+        });
+
+        expect(choose).toHaveAttribute("aria-expanded", "true");
+        expect(choose).toHaveAttribute("aria-controls", picker.id);
+        fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Escape" });
+        expect(choose).toHaveAttribute("aria-expanded", "false");
+      });
+
+      it("after a pick is saved, focus returns to Choose VR tag", async () => {
+        mockApiPut.mockResolvedValue({ success: true });
+        await openPicker();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Virtual" }));
+
+        await waitFor(() => {
+          expect(
+            screen.getByRole("button", { name: "Choose VR tag for Test Stash" })
+          ).toHaveFocus();
+        });
       });
 
       it("Cancel closes it and returns focus to Choose VR tag", async () => {

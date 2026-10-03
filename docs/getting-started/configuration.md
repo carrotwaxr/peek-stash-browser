@@ -56,7 +56,7 @@ Peek shows a **VR** button on a scene when one of its own tags is its server's V
 - Changing a server's **URL** clears both, since the new address may be another Stash.
 - Only admins see this setting and the tag's name. Users just see the VR button.
 
-The picker lists tags the way your own library does: a tag you have hidden does not show in it, and a server that is disabled lists none until you enable it. A new tag or setting reaches the scene pages after the next sync.
+The picker lists tags the way your own library does: a tag you have hidden does not show in it, a server that is disabled lists none until you enable it, and so does a server you have left out of your own [Content Sources](#per-user-instance-selection) until you select it there again. A new tag or setting reaches the scene pages after the next sync.
 
 ### Sync Status
 

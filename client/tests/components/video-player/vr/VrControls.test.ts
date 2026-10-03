@@ -102,6 +102,7 @@ describe("VrMenuButton", () => {
   it("shows no HTTPS note on a secure origin", () => {
     const { el } = mount({ secure: true });
     expect(el.textContent).not.toContain("Headset mode needs HTTPS");
+    expect(toggle(el).hasAttribute("aria-describedby")).toBe(false);
   });
 
   it("says headset mode needs HTTPS on an insecure origin, as a line that cannot take focus", () => {
@@ -114,6 +115,9 @@ describe("VrMenuButton", () => {
     );
     expect(note.getAttribute("role")).toBe("presentation");
     expect(note.hasAttribute("tabindex")).toBe(false);
+    // Menu navigation skips the line: the VR view item reads it out
+    expect(note.id).not.toBe("");
+    expect(toggle(el).getAttribute("aria-describedby")).toBe(note.id);
     expect(note.classList.contains("vjs-menu-item")).toBe(false);
     // The toggle and the projections still work: desktop drag needs no HTTPS
     expect(toggle(el)).toBeTruthy();

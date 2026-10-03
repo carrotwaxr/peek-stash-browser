@@ -1,3 +1,5 @@
+import { ratingMedal } from "./ratingMedal";
+
 interface Props {
   rating: number | null | undefined;
   onClick?: () => void;
@@ -8,8 +10,9 @@ interface Props {
  * Rating badge with metallic medal appearance based on rating value
  * Displays rating as 0.0-10.0 with copper/silver/gold gradients
  * Circular medal shape with realistic metallic sheen and depth
- * The medals are fixed colours (like the status colours) with text that
- * keeps 4.5:1 on every stop; the unrated badge uses the theme's variables.
+ * The medals are fixed colours (`ratingMedal`, shared with the tag tree)
+ * with text that keeps 4.5:1 on every stop; the unrated badge uses the
+ * theme's variables.
  */
 const RatingBadge = ({ rating, onClick, size = "small" }: Props) => {
   const getRatingGradient = (rating: number | null | undefined) => {
@@ -25,42 +28,7 @@ const RatingBadge = ({ rating, onClick, size = "small" }: Props) => {
       };
     }
 
-    const value = rating / 10; // Convert 0-100 to 0-10
-
-    if (value < 3.5) {
-      // Bronze medal - warm metallic with highlights and shadows
-      return {
-        background:
-          "linear-gradient(135deg, #A8652B 0%, #8B4F1F 30%, #A8652B 50%, #7A4219 70%, #8B4F1F 100%)",
-        boxShadow:
-          "inset 0 1px 3px rgba(255, 200, 150, 0.6), inset 0 -1px 2px rgba(80, 40, 20, 0.8), 0 3px 6px rgba(0, 0, 0, 0.4)",
-        border: "1px solid rgba(139, 69, 19, 0.5)",
-        color: "#ffffff",
-        text: value.toFixed(1),
-      };
-    } else if (value < 7.0) {
-      // Silver medal - cool metallic with bright highlights
-      return {
-        background:
-          "linear-gradient(135deg, #F2F2F2 0%, #C4C4C4 30%, #E0E0E0 50%, #B0B0B0 70%, #D0D0D0 100%)",
-        boxShadow:
-          "inset 0 1px 3px rgba(255, 255, 255, 0.8), inset 0 -1px 2px rgba(100, 100, 100, 0.6), 0 3px 6px rgba(0, 0, 0, 0.4)",
-        border: "1px solid rgba(144, 144, 144, 0.5)",
-        color: "#1a1a1a",
-        text: value.toFixed(1),
-      };
-    } else {
-      // Gold medal - rich metallic with warm highlights
-      return {
-        background:
-          "linear-gradient(135deg, #FFE87C 0%, #D4AF37 30%, #FFD700 50%, #B8860B 70%, #DAA520 100%)",
-        boxShadow:
-          "inset 0 1px 3px rgba(255, 250, 200, 0.9), inset 0 -1px 2px rgba(150, 100, 0, 0.6), 0 3px 6px rgba(0, 0, 0, 0.4)",
-        border: "1px solid rgba(184, 134, 11, 0.5)",
-        color: "#1a1a1a",
-        text: value.toFixed(1),
-      };
-    }
+    return { ...ratingMedal(rating), text: (rating / 10).toFixed(1) };
   };
 
   const style = getRatingGradient(rating);

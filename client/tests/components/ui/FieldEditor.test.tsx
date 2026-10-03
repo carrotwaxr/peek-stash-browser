@@ -191,6 +191,27 @@ describe("a range row", () => {
     );
   });
 
+  it("a rating takes a comma as its decimal point and nothing past 10", () => {
+    const spy = vi.fn<(next: PanelState) => void>();
+    render(<Harness option={optionOf("scene", "rating")} spy={spy} />);
+    const minimum = screen.getByRole("textbox", { name: "Minimum Rating" });
+    const maximum = screen.getByRole("textbox", { name: "Maximum Rating" });
+
+    // A comma locale's decimal keyboard offers ","
+    fireEvent.change(minimum, { target: { value: "6,5" } });
+    expect(lastOf(spy)).toEqual({ rating: { min: 65 } });
+    fireEvent.blur(minimum);
+    expect(minimum).toHaveValue("6.5");
+
+    fireEvent.change(maximum, { target: { value: "10" } });
+    expect(lastOf(spy)).toEqual({ rating: { min: 65, max: 100 } });
+    // Past the scale's 10 is not taken (10.5 would be sent as 105)
+    fireEvent.change(maximum, { target: { value: "10.5" } });
+    fireEvent.change(maximum, { target: { value: "105" } });
+    expect(maximum).toHaveValue("10");
+    expect(lastOf(spy)).toEqual({ rating: { min: 65, max: 100 } });
+  });
+
   it("a bound of 0 shows, and a cleared bound leaves the other", () => {
     const spy = vi.fn<(next: PanelState) => void>();
     render(

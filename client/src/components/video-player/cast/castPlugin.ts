@@ -134,6 +134,14 @@ export function addCastButton(
         button.removeClass("vjs-cast-connected");
         button.controlText("Cast");
       }
+      // A press opens Chrome's Cast dialog (pick a device, or stop), except
+      // on a page whose scene a press casts into the live session
+      const el = button.el();
+      if (castState === CONNECTED && !attached) {
+        el.removeAttribute("aria-haspopup");
+      } else {
+        el.setAttribute("aria-haspopup", "dialog");
+      }
     },
     remove() {
       const bar = player.controlBar as RemovableBar;

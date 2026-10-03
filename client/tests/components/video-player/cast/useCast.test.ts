@@ -163,7 +163,11 @@ const settle = () =>
 async function renderCast(options: RenderOptions = {}) {
   const player = await startPlayer();
   players.push(player);
-  const before = fake.controllers.length;
+  // The framework's one RemotePlayerController (shared by every page of the
+  // tab) has one more listener once this page's controller attaches
+  const listeners = () =>
+    fake.controllers.at(-1)?.count(REMOTE_EVENT.CURRENT_TIME_CHANGED) ?? 0;
+  const before = listeners();
   const { tvMode = false, strict = false, waitForAttach = !tvMode } = options;
   const wrapper = ({ children }: { children: ReactNode }) => {
     const inner = createElement(
@@ -203,13 +207,7 @@ async function renderCast(options: RenderOptions = {}) {
   // The SDK and the cast chunk resolve after the effect runs
   await act(() => Promise.resolve());
   if (waitForAttach) {
-    await eventually(
-      () =>
-        fake.controllers.length > before &&
-        must(fake.controllers.at(-1)).count(REMOTE_EVENT.CURRENT_TIME_CHANGED) >
-          0,
-      "the cast controller"
-    );
+    await eventually(() => listeners() > before, "the cast controller");
   }
 
   let current = props;
@@ -944,6 +942,18 @@ describe("useCast", () => {
       expect(castButton(player)).toBeUndefined();
       expect(vi.mocked(showError)).not.toHaveBeenCalled();
     });
+  });
+
+  it("every Scene visit reuses the tab's one RemotePlayer and RemotePlayerController (the SDK cannot release one)", async () => {
+    const first = await renderCast();
+    first.rendered.unmount();
+    await renderCast();
+    await renderCast();
+
+    expect(fake.remotes).toHaveLength(1);
+    expect(fake.controllers).toHaveLength(1);
+    // The pages still on screen each listen once; the one left listens no more
+    expect(fake.controller().count(REMOTE_EVENT.CURRENT_TIME_CHANGED)).toBe(2);
   });
 
   it("unmount removes every listener, the button and the status line", async () => {

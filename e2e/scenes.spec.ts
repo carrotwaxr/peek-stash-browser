@@ -104,9 +104,10 @@ test.describe("Scene Library", () => {
 
     // Focus reaching the last chip scrolls it into view
     await list.filterBar.getByRole("button").last().focus();
-    expect(
-      await list.filterBar.evaluate((el) => el.scrollLeft)
-    ).toBeGreaterThan(row.scrollLeft);
+    // Polled: a smooth scroll would still be under way
+    await expect
+      .poll(() => list.filterBar.evaluate((el) => el.scrollLeft))
+      .toBeGreaterThan(row.scrollLeft);
   });
 
   test("search input accepts text and updates URL", async ({ page }) => {

@@ -210,7 +210,7 @@ The filter bar sits under the search toolbar. Only the filters you use take spac
 
 Each active filter shows as a chip that names its picks and its condition, such as "Tags: none of Anal, with sub-tags" or "Rating: 4 to 8"; a pick that is no longer visible to you reads as "unavailable". Click a chip, or press Enter on it, to open its filter in a panel right under it. The **x** on a chip removes the filter.
 
-- **Changes apply as you make them.** Picking a tag, an option or a Yes / No applies at once; typing a number, a date or text applies a moment after you stop, so a rating typed as `60` is one search, not two. Close the panel with Escape, with a click outside it, or by clicking the chip again.
+- **Changes apply as you make them.** Picking a tag, an option or a Yes / No applies at once; typing a number, a date or text applies a moment after you stop, so a rating typed as `6.5` is one search, not three. Close the panel with Escape, with a click outside it, or by clicking the chip again.
 - **Back undoes the whole edit.** Everything you changed in one open panel is one step in your browser history, so Back returns to how the list was before you opened it.
 - The panel's header names the filter and offers **Remove** and the pin buttons (see [Pinned Filters](#pinned-filters)).
 - A page's own filter, such as the studio on a studio's page, shows as a dimmed label before the chips and has no **x**.
@@ -314,7 +314,7 @@ On the Scenes list, **Favorite Tags** lists the scenes that have one of your fav
 
 ### Number Ranges
 
-A number range (rating, height, weight, duration and the like) never matches an item with no value: "rating at most 40" lists only items you rated 40 or less, not the ones you have not rated, and "weight at most 60 kg" only performers with a weight.
+A number range (rating, height, weight, duration and the like) never matches an item with no value: "rating at most 4" lists only items you rated 4 or less, not the ones you have not rated, and "weight at most 60 kg" only performers with a weight.
 
 Ranges take decimals (a penis length of 14.5 cm, a frame rate of 29.97) and a minimum or a maximum on its own includes that value: "at least 10" lists 10 and up. Heights, weights and penis lengths are stored and linked in metric, so an address or View means the same to everyone; with imperial units on, the boxes and chips show feet, inches and pounds and the address still holds centimetres and kilograms.
 

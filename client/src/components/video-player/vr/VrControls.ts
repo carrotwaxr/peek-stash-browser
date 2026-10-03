@@ -8,7 +8,8 @@
  * The menu follows ARIA: the toggle is a `menuitemcheckbox` and each
  * projection a `menuitemradio`, both with `aria-checked` (video.js's
  * `MenuItem` sets role and state). The note is a menu title (`li`,
- * `role="presentation"`, no tabindex): video.js's arrow keys skip it.
+ * `role="presentation"`, no tabindex): video.js's arrow keys skip it, so the
+ * "VR view" item names it in `aria-describedby` for a screen reader.
  *
  * Nothing here imports the fork or `vrPlugin` (lint): this file loads with
  * the Scene page.
@@ -52,6 +53,9 @@ const MenuButtonBase = videojs.getComponent(
 export const VR_BUTTON_NAME = "peekVrButton";
 
 export const HTTPS_NOTE = "Headset mode needs HTTPS";
+
+/** Each menu's note gets its own id (two players can be on a page) */
+let notes = 0;
 
 /** What the menu shows, read each time it is built or refreshed. */
 export interface VrMenuModel {
@@ -127,9 +131,13 @@ export class VrMenuButton extends MenuButtonBase {
     const model = state();
     const player = this.player();
     const items: ComponentLike[] = [];
+    let noteId: string | null = null;
 
     if (!model.secure) {
+      notes += 1;
+      noteId = `vjs-vr-note-${notes}`;
       const note = document.createElement("li");
+      note.id = noteId;
       note.className = "vjs-menu-title vjs-vr-note";
       note.setAttribute("role", "presentation");
       note.textContent = HTTPS_NOTE;
@@ -143,6 +151,7 @@ export class VrMenuButton extends MenuButtonBase {
       selected: model.enabled,
       onSelect: onToggle,
     });
+    if (noteId) this.vrToggle.el().setAttribute("aria-describedby", noteId);
     items.push(this.vrToggle);
 
     this.vrRadios = VR_PROJECTIONS.map((projection) => {

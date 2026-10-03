@@ -308,6 +308,32 @@ function mediaOf(
 }
 
 /**
+ * The tab's one RemotePlayer and its controller, per framework. The SDK
+ * cannot release a pair (each registers with the CastContext for good), so
+ * every Scene visit shares it, each page adding and removing its listeners.
+ */
+const remotes = new WeakMap<
+  object,
+  {
+    remote: cast.framework.RemotePlayer;
+    controller: cast.framework.RemotePlayerController;
+  }
+>();
+
+function remoteOf(framework: CastFramework) {
+  let pair = remotes.get(framework);
+  if (!pair) {
+    const remote = new framework.RemotePlayer();
+    pair = {
+      remote,
+      controller: new framework.RemotePlayerController(remote),
+    };
+    remotes.set(framework, pair);
+  }
+  return pair;
+}
+
+/**
  * Ties one player to the Cast framework. `attach` adds the button, the
  * status line and every listener; `detach` removes them all; `update` hears
  * each render of the page, whose scene may have changed.
@@ -358,8 +384,9 @@ export class CastSessionController {
     const media = options.media ?? chrome.cast.media;
     this.media = media;
     this.context = framework.CastContext.getInstance();
-    this.remote = new framework.RemotePlayer();
-    this.controller = new framework.RemotePlayerController(this.remote);
+    const { remote, controller } = remoteOf(framework);
+    this.remote = remote;
+    this.controller = controller;
     const view = remoteView(
       this.remote,
       this.controller,

@@ -107,6 +107,19 @@ describe("Cast button", () => {
     expect(castButton(player)?.hasClass("vjs-cast-connected")).toBe(true);
   });
 
+  it("says it opens a dialog (Chrome's Cast dialog) except where a press casts this scene into the live session", () => {
+    const player = makePlayer();
+    const button = addCastButton(asCastPlayer(player), vi.fn());
+    const popup = () => castButton(player)?.el().getAttribute("aria-haspopup");
+
+    button.setCastState("NOT_CONNECTED", null);
+    expect(popup()).toBe("dialog");
+    button.setCastState("CONNECTED", "Living Room TV");
+    expect(popup()).toBe("dialog");
+    button.setCastState("CONNECTED", "Living Room TV", false);
+    expect(popup()).toBeNull();
+  });
+
   it("is added through addOrderedControl as peekCastButton, before the fullscreen toggle", () => {
     const player = makePlayer();
     addCastButton(asCastPlayer(player), vi.fn());

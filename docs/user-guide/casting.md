@@ -12,7 +12,7 @@ Location: Scene page, in the player's control bar.
 | Peek's address | HTTPS, with a certificate the device trusts | Any address the Apple TV can reach |
 | Where | The Scene page (not [TV mode](keyboard-navigation.md#tv-mode)) | The Scene page (not TV mode) |
 
-The Cast button shows in the control bar when the browser can cast and a Cast device is on your network. It reads "Cast this scene" while idle and "Stop casting" while a scene plays on the TV. The AirPlay button appears the same way in Safari, or any browser on an iPhone or iPad, when an Apple TV is in range.
+The Cast button shows in the control bar when the browser can cast and a Cast device is on your network. It reads "Cast" while idle and "Stop casting" while this page's scene plays on the TV; both open the browser's own Cast dialog, to pick a device or stop. On another scene's page while a session is live it reads "Cast this scene". The AirPlay button appears the same way in Safari, or any browser on an iPhone or iPad, when an Apple TV is in range.
 
 ### Chromecast needs HTTPS
 
@@ -46,7 +46,7 @@ A reverse proxy that puts its own login in front of Peek (Authelia, Authentik, `
 3. The scene starts on the TV. The player shows "Casting to <device>", and its controls (play, pause, seek, captions) steer the TV. The player's volume does not: set the volume with the TV's own remote.
 4. Press **Cast** again, and choose to stop, to end the session.
 
-The scene starts at your **resume point** if you have not played it on this page, and where the page's player was otherwise. Peek picks the file's own stream when the Cast device can play it directly (MP4 with H.264 up to 1080p, or WebM), and an HLS stream from Stash otherwise. This is automatic.
+The scene starts at your **resume point** if you have not played it on this page, and where the page's player was otherwise. Peek picks the file's own stream when the Cast device can play it directly, and an HLS stream from Stash otherwise. This is automatic. Directly means up to 1080p, as an MP4 with H.264 video (AAC or MP3 audio) or a WebM with VP8 or VP9 video (Opus or Vorbis audio).
 
 Peek gives the TV the scene's title, its performers, its poster and a personal signed link that works for 12 hours. A long session past that stops, and the page says "Cast link expired: press play to try again": press play (or Cast), and the scene loads on the TV again with a new link, where it stopped. The link follows your access: a scene you hide, or that an admin restricts, stops playing at the TV's next request, and trying again then says "Couldn't play this scene on <device>".
 
@@ -89,7 +89,7 @@ In Safari, and in any browser on an iPhone or iPad (Chrome and Edge there are bu
 ## Troubleshooting
 
 - **No Cast button:** you are on plain `http://`, in a browser without Cast (Firefox, Safari, Brave without Media Router), in [TV mode](keyboard-navigation.md#tv-mode), or no device was found on the network. Check the address bar first.
-- **The TV says "Couldn't play this scene":** the TV could not fetch the link. The address must resolve and be reachable from the TV, over HTTPS with a trusted certificate. See the split DNS note above, and for a login proxy [the bypass](external-player.md#behind-a-login-proxy).
+- **The page says "Couldn't play this scene on <device>":** the TV could not fetch the link. The address must resolve and be reachable from the TV, over HTTPS with a trusted certificate. See the split DNS note above, and for a login proxy [the bypass](external-player.md#behind-a-login-proxy).
 - **"This scene has no format a Cast device can play":** Peek found neither a file the device decodes nor an HLS stream for this scene.
 - **Nothing records:** keep a Peek tab on the scene's page while it plays on the TV.
 - **A playlist stops after one scene:** the casting tab was closed, or Autoplay is off.

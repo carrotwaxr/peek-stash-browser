@@ -108,11 +108,14 @@ interface VrTagChoice {
  * and Escape in the group cancels.
  */
 const VrTagPicker = ({
+  id,
   instance,
   onPick,
   onCancel,
   disabled,
 }: {
+  /** The group's id, which the Choose VR tag button controls */
+  id: string;
   instance: { id: string; name: string };
   onPick: (tagId: string) => void;
   onCancel: () => void;
@@ -156,6 +159,7 @@ const VrTagPicker = ({
 
   return (
     <div
+      id={id}
       className="mt-2 space-y-2"
       role="group"
       aria-label={`Choose the VR tag of ${instance.name}`}
@@ -175,7 +179,7 @@ const VrTagPicker = ({
         aria-label={`Search ${instance.name}'s tags`}
         className="w-full px-3 py-2 rounded-lg border text-sm"
         style={{
-          backgroundColor: "var(--bg-input)",
+          backgroundColor: "var(--bg-secondary)",
           borderColor: "var(--border-color)",
           color: "var(--text-primary)",
         }}
@@ -185,11 +189,11 @@ const VrTagPicker = ({
           Could not load tags
         </p>
       ) : tags === null ? (
-        <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           Loading tags...
         </p>
       ) : tags.length === 0 ? (
-        <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           No tags found
         </p>
       ) : (
@@ -249,6 +253,9 @@ const StashInstanceSection = () => {
   // Each instance's "Choose VR tag" button, which gets focus back when its
   // picker closes without a pick
   const chooseVrTagButtons = useRef(new Map<string, HTMLButtonElement>());
+  // The instance whose VR tag was just saved: its button takes focus once
+  // the reloaded list shows it (the list is replaced while it loads)
+  const [focusVrTagFor, setFocusVrTagFor] = useState<string | null>(null);
 
   const loadInstances = useCallback(async () => {
     try {
@@ -509,6 +516,12 @@ const StashInstanceSection = () => {
     }
   };
 
+  useEffect(() => {
+    if (!focusVrTagFor || loading) return;
+    chooseVrTagButtons.current.get(focusVrTagFor)?.focus();
+    setFocusVrTagFor(null);
+  }, [focusVrTagFor, loading]);
+
   /** Saves the server's VR tag: a bare tag id on it, or null for Stash's own */
   const cancelVrTagPicker = (instanceId: string) => {
     setPickingVrTagFor(null);
@@ -525,6 +538,7 @@ const StashInstanceSection = () => {
       void invalidateInstanceQueries(queryClient);
       setPickingVrTagFor(null);
       await loadInstances();
+      setFocusVrTagFor(instance.id);
     } catch (err) {
       showError(getErrorMessage(err, "Failed to save the VR tag"));
     } finally {
@@ -912,6 +926,13 @@ const StashInstanceSection = () => {
                             variant="tertiary"
                             size="sm"
                             onClick={() => setPickingVrTagFor(instance.id)}
+                            aria-label={`Choose VR tag for ${instance.name}`}
+                            aria-expanded={pickingVrTagFor === instance.id}
+                            aria-controls={
+                              pickingVrTagFor === instance.id
+                                ? `vr-tag-picker-${instance.id}`
+                                : undefined
+                            }
                           >
                             Choose VR tag
                           </Button>
@@ -930,6 +951,7 @@ const StashInstanceSection = () => {
                         </div>
                         {pickingVrTagFor === instance.id && (
                           <VrTagPicker
+                            id={`vr-tag-picker-${instance.id}`}
                             instance={instance}
                             disabled={savingVrTagFor === instance.id}
                             onPick={(tagId) =>

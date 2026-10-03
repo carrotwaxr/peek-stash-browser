@@ -50,7 +50,7 @@ Peek picks one for each scene. It reads, strongest first:
 
 1. the scene's **tags and their aliases**, for example `180`, `360`, `SBS`, `LR`, `TB`, `FISHEYE` or `MKX200`;
 2. words in the **file name**, such as `Scene_180_LR.mp4` or `Scene_360_TB.mp4`, the suffixes HereSphere and DeoVR use;
-3. the **shape** of the frame: a square frame is 360° top and bottom, a 2:1 or wider one is 180° side by side;
+3. the **shape** of the frame: a square frame is 360° top and bottom, one about 16:9 or wider is 180° side by side;
 4. otherwise 180° stereo, which most VR scenes are.
 
 ### Fixing a projection

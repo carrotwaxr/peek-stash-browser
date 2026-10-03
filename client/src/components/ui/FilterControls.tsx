@@ -466,6 +466,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                 onChange={onChange}
                 label={label}
                 display={display}
+                max={max}
                 inputClasses={inputClasses}
                 inputStyle={baseInputStyle}
               />

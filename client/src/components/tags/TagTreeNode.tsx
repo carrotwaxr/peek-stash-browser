@@ -6,6 +6,7 @@ import { useConfig } from "../../contexts/ConfigContext";
 import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { tagTreeKey, tagTreeRowKey } from "../../utils/buildTagTree";
 import { getEntityPath } from "../../utils/entityLinks";
+import { ratingMedal } from "../ui/ratingMedal";
 
 interface TagNodeData {
   id: string;
@@ -49,35 +50,6 @@ const hueify = (color: string, direction = "lighter", amount = 12) => {
   return `lch(from ${color} calc(l ${
     direction === "lighter" ? "+" : "-"
   } ${Math.abs(amount)}) c h)`;
-};
-
-// Rating badge gradient matching RatingBadge component
-const getRatingStyle = (rating100: number | null | undefined) => {
-  if (rating100 === null || rating100 === undefined) return null;
-  const value = rating100 / 10; // 0-10 scale
-
-  if (value < 3.5) {
-    // Bronze
-    return {
-      background:
-        "linear-gradient(135deg, #C77B30 0%, #965A1E 30%, #C77B30 50%, #8B4513 70%, #965A1E 100%)",
-      color: "#FFF",
-    };
-  } else if (value < 7.0) {
-    // Silver
-    return {
-      background:
-        "linear-gradient(135deg, #E8E8E8 0%, #A8A8A8 30%, #D0D0D0 50%, #909090 70%, #C0C0C0 100%)",
-      color: "#333",
-    };
-  } else {
-    // Gold
-    return {
-      background:
-        "linear-gradient(135deg, #FFE87C 0%, #D4AF37 30%, #FFD700 50%, #B8860B 70%, #DAA520 100%)",
-      color: "#333",
-    };
-  }
 };
 
 /**
@@ -299,8 +271,9 @@ const TagTreeNode = ({
           {(tag.rating100 ?? 0) > 0 &&
             (() => {
               const rating100 = tag.rating100;
-              const ratingStyle = getRatingStyle(rating100);
-              if (!ratingStyle || rating100 == null) return null;
+              if (rating100 == null) return null;
+              // RatingBadge's medal, so its text reads the same way
+              const ratingStyle = ratingMedal(rating100);
               return (
                 <span
                   className="text-xs px-2 py-0.5 rounded font-bold"

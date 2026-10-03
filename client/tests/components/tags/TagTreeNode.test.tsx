@@ -13,6 +13,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TagTreeNode from "../../../src/components/tags/TagTreeNode";
+import RatingBadge from "../../../src/components/ui/RatingBadge";
 import {
   MOUSE_QUERIES,
   TOUCH_QUERIES,
@@ -91,6 +92,27 @@ describe("TagTreeNode", () => {
       expect(screen.getByText("7.5")).toBeInTheDocument();
       expect(screen.getByTitle("Rating: 7.5")).toBeInTheDocument();
     });
+
+    it.each([20, 50, 85])(
+      "the rating pill for %i wears the same medal as RatingBadge (its readable text included)",
+      (rating100) => {
+        renderWithRouter(
+          <>
+            <TagTreeNode
+              tag={{ ...mockTagWithRating, rating100 }}
+              onToggle={() => {}}
+            />
+            <RatingBadge rating={rating100} />
+          </>
+        );
+        const shown = (rating100 / 10).toFixed(1);
+        const pill = screen.getByTitle(`Rating: ${shown}`);
+        const badge = screen.getByRole("button", { name: `Rating: ${shown}` });
+
+        expect(pill.style.background).toBe(badge.style.background);
+        expect(pill.style.color).toBe(badge.style.color);
+      }
+    );
 
     it("renders o-counter indicator", () => {
       renderWithRouter(
