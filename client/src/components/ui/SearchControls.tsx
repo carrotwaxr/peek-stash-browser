@@ -187,13 +187,6 @@ const SearchControls = ({
     return ids;
   }, [filterOptions]);
 
-  // Clear all filters
-  const handleClearFilters = useCallback(() => {
-    clearFilters();
-    setDraft(null);
-    setIsFilterPanelOpen(false);
-  }, [clearFilters]);
-
   // Handle filter change in panel (editing before submit)
   const handleFilterChange = useCallback(
     (filterKey: string, value: unknown) => {
@@ -221,6 +214,14 @@ const SearchControls = ({
     setIsFilterPanelOpen(false);
     focusFiltersButton();
   }, [applyFilters, panelFilters, focusFiltersButton]);
+
+  // Clear All drops every filter and closes the panel
+  const handleClearFilters = useCallback(() => {
+    clearFilters();
+    setDraft(null);
+    setIsFilterPanelOpen(false);
+    focusFiltersButton();
+  }, [clearFilters, focusFiltersButton]);
 
   // Cancel drops the draft and closes the panel
   const handleFilterCancel = useCallback(() => {

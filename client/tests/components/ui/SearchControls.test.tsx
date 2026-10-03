@@ -1266,6 +1266,21 @@ describe("SearchControls", () => {
       await waitFor(() => expect(list.lastQuery().scene_filter).toEqual({}));
       expect(list.params().has("favorite")).toBe(false);
     });
+
+    it("Clear All moves focus to the Filters button", async () => {
+      const user = userEvent.setup();
+      renderSearchControls({}, { url: "/scenes?favorite=true" });
+      const filtersButton = () =>
+        screen.getByRole("button", { name: /^Filters/ });
+
+      await user.click(filtersButton());
+      await user.click(
+        must((await screen.findByText("Clear All")).closest("button"))
+      );
+
+      expect(screen.queryByText("Clear All")).not.toBeInTheDocument();
+      expect(filtersButton()).toHaveFocus();
+    });
   });
 
   describe("Stale results", () => {
