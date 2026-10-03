@@ -324,3 +324,71 @@ describe("A field's label and its controls", () => {
     );
   });
 });
+
+describe("every control has a name", () => {
+  const CONDITIONS = [
+    { value: "EQUALS", label: "is" },
+    { value: "GREATER_THAN", label: "above" },
+  ];
+  const CHOICES = [
+    { value: "FULL_HD", label: "1080p" },
+    { value: "FOUR_K", label: "4K" },
+  ];
+
+  it.each([
+    {
+      name: "a select with a condition",
+      props: {
+        type: "select" as const,
+        options: CHOICES,
+        modifierOptions: CONDITIONS,
+        modifierValue: "EQUALS",
+      },
+      names: ["Resolution condition", "Resolution"],
+    },
+    {
+      name: "a number range",
+      props: { type: "range" as const },
+      names: ["Minimum Resolution", "Maximum Resolution"],
+    },
+    {
+      name: "a number range with a condition",
+      props: {
+        type: "range" as const,
+        modifierOptions: CONDITIONS,
+        modifierValue: "BETWEEN",
+      },
+      names: [
+        "Resolution condition",
+        "Minimum Resolution",
+        "Maximum Resolution",
+      ],
+    },
+    {
+      name: "a date range",
+      props: { type: "date-range" as const },
+      names: ["Resolution from", "Resolution to"],
+    },
+    {
+      name: "a time range",
+      props: { type: "time-range" as const },
+      names: ["Resolution start", "Resolution end"],
+    },
+  ])("$name", ({ props, names }) => {
+    const { container } = render(
+      <FilterControl
+        label="Resolution"
+        controlId="field"
+        value={undefined}
+        onChange={() => {}}
+        {...props}
+      />
+    );
+
+    const controls = [...container.querySelectorAll("input, select")];
+    expect(controls).toHaveLength(names.length);
+    controls.forEach((control, index) => {
+      expect(control).toHaveAccessibleName(names[index]);
+    });
+  });
+});
