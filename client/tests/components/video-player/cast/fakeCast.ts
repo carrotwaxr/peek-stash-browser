@@ -154,7 +154,7 @@ export const fakeMedia = {
   TextTrackType: { SUBTITLES: "SUBTITLES" },
   HlsSegmentFormat: { TS: "ts" },
   HlsVideoSegmentFormat: { MPEG2_TS: "mpeg2_ts" },
-  PlayerState: { IDLE: "IDLE" },
+  PlayerState: { IDLE: "IDLE", PLAYING: "PLAYING" },
   IdleReason: { ERROR: "ERROR", FINISHED: "FINISHED" },
   Image: class {
     constructor(readonly url: string) {}

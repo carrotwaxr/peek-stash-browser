@@ -141,6 +141,8 @@ async function renderCast(options: RenderOptions = {}) {
     playlist: null,
     resumeTime: options.resumeTime ?? null,
     minimumPlayPercent: 20,
+    // No viewing: the cast tracker's own tests are in castActivity.test.ts
+    viewing: { current: null },
   };
   const rendered = renderHook(() => useCast(props), { wrapper });
   // The SDK and the cast chunk resolve after the effect runs

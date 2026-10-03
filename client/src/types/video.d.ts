@@ -149,7 +149,7 @@ declare namespace chrome.cast.media {
   const TextTrackType: { SUBTITLES: string };
   const HlsSegmentFormat: { TS: string };
   const HlsVideoSegmentFormat: { MPEG2_TS: string };
-  const PlayerState: { IDLE: string };
+  const PlayerState: { IDLE: string; PLAYING: string };
   const IdleReason: { ERROR: string; FINISHED: string };
   class Image {
     constructor(url: string);

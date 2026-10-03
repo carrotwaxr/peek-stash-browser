@@ -649,6 +649,32 @@ describe("useVideoPlayer", () => {
     // The watch history's resume point, not the Continue Watching one
     expect(options.resumeTime).toBe(300);
     expect(options.minimumPlayPercent).toBe(20);
+    // The scene's one viewing, whose senders the local tracker also uses
+    const viewing = must(options.viewing.current, "the viewing");
+    expect(player.trackActivity().saveActivity).toBe(viewing.save);
+    expect(player.trackActivity().incrementPlayCount).toBe(viewing.countPlay);
+  });
+
+  it("a scene change while connected leaves the local tracker disabled", () => {
+    const player = Object.assign(fakePlayer(), { peekCastConnected: true });
+    const { rerender } = renderPlayer(player, onA);
+    const plugin = player.trackActivity();
+
+    rerender({ current: onA2 });
+
+    expect(plugin.setEnabled).toHaveBeenCalled();
+    expect(plugin.setEnabled).not.toHaveBeenCalledWith(true);
+  });
+
+  it("a scene change while not connected enables the local tracker", () => {
+    const player = Object.assign(fakePlayer(), { peekCastConnected: false });
+    const { rerender } = renderPlayer(player, onA);
+    const plugin = player.trackActivity();
+    vi.mocked(plugin.setEnabled).mockClear();
+
+    rerender({ current: onA2 });
+
+    expect(vi.mocked(plugin.setEnabled).mock.lastCall).toEqual([true]);
   });
 
   it("a blocked autoplay retries muted", async () => {

@@ -2,13 +2,14 @@ import { useEffect, useRef } from "react";
 import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import videojs from "video.js";
-import { apiFetch, apiPost, redirectToLogin } from "../../api";
+import { redirectToLogin } from "../../api";
 import { usePlayerHotkeys } from "../../hooks/useMediaKeys";
 import { canDecode } from "../../utils/browserPlayback";
-import { newClientToken } from "../../utils/clientToken";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getSceneTitle } from "../../utils/format";
 import { mayTakeFocus } from "../../utils/pageFocus";
+import { type Viewing, createViewing } from "./activitySenders";
+import type { CastAwarePlayer } from "./cast/castMiddleware";
 import type { CastScene } from "./cast/castSession";
 import { useCast } from "./cast/useCast";
 import { buildPlayerSources } from "./playerSources";
@@ -28,37 +29,6 @@ import "./plugins/skip-buttons.js";
 import "./plugins/source-selector.js";
 import "./plugins/track-activity.js";
 import "./plugins/media-session.js";
-
-/**
- * Retry a function with exponential backoff
- * @param {Function} fn - Async function to retry
- * @param {number} maxAttempts - Maximum number of attempts (default: 3)
- * @param {number} baseDelay - Base delay in ms (default: 1000)
- * @returns {Promise} Result of the function or throws after all retries
- */
-async function retryWithBackoff(
-  fn: () => Promise<any>,
-  maxAttempts = 3,
-  baseDelay = 1000
-) {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error: unknown) {
-      lastError = error;
-      if (attempt < maxAttempts) {
-        const delay = baseDelay * Math.pow(2, attempt - 1);
-        console.warn(
-          `[RETRY] Attempt ${attempt} failed, retrying in ${delay}ms...`,
-          (error as Error).message
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  }
-  throw lastError;
-}
 
 /**
  * Focus the player, so its keys work, unless the user has moved focus to
@@ -141,6 +111,9 @@ export function useVideoPlayer({
 
   // Track previous scene for detecting changes
   const prevSceneKeyRef = useRef<string | null>(null);
+
+  // The scene's one viewing, shared by the local and the cast tracker
+  const viewingRef = useRef<Viewing | null>(null);
 
   // Keys video.js's controls stop go to the shortcut dispatcher (stable)
   const hotkeys = usePlayerHotkeys();
@@ -307,6 +280,7 @@ export function useVideoPlayer({
       (watchHistory as { resumeTime?: number | null } | null)?.resumeTime ??
       null,
     minimumPlayPercent,
+    viewing: viewingRef,
   });
 
   // ============================================================================
@@ -369,74 +343,25 @@ export function useVideoPlayer({
 
   useEffect(() => {
     const player = playerRef.current;
-    if (!player || !sceneId) return;
+    if (!player || !sceneId || !sceneInstanceId) return;
 
     const trackActivityPlugin = player.trackActivity();
     if (!trackActivityPlugin) return;
 
-    // Enable tracking
-    trackActivityPlugin.setEnabled(true);
+    // One viewing of this scene, for this tracker and the cast tracker: its
+    // play-count token is the same on every retry and the play counts once,
+    // whichever tracker reaches the threshold. Saves go every 10 s during
+    // playback, at a scene change, and with `keepalive` when the tab is
+    // hidden or the page closes.
+    const viewing = createViewing(sceneId, sceneInstanceId);
+    viewingRef.current = viewing;
+    trackActivityPlugin.saveActivity = viewing.save;
+    trackActivityPlugin.incrementPlayCount = viewing.countPlay;
     trackActivityPlugin.minimumPlayPercent = minimumPlayPercent;
-
-    // One token per viewing of this scene, the same on every retry of its
-    // play-count request: the server counts a token once, so a retry after
-    // a lost answer cannot count the play twice
-    const playToken = newClientToken();
-
-    // Connect plugin callbacks to API endpoints
-    // saveActivity is called periodically (every 10s) during playback, when
-    // the scene changes, and when the tab is hidden or the page closes. The
-    // last two send with `keepalive`, so the request outlives the page, and
-    // once: a retry timer would not.
-    trackActivityPlugin.saveActivity = async (
-      resumeTime: number,
-      playDuration: number,
-      options?: { keepalive?: boolean }
-    ) => {
-      const body = {
-        sceneId,
-        instanceId: sceneInstanceId,
-        resumeTime,
-        playDuration,
-      };
-      try {
-        if (options?.keepalive) {
-          await apiFetch("/watch-history/save-activity", {
-            method: "POST",
-            body: JSON.stringify(body),
-            keepalive: true,
-          });
-        } else {
-          await retryWithBackoff(() =>
-            apiPost("/watch-history/save-activity", body)
-          );
-        }
-      } catch (error) {
-        console.error("Failed to save activity:", error);
-      }
-    };
-
-    // incrementPlayCount is called once per session when threshold is reached
-    trackActivityPlugin.incrementPlayCount = async (options?: {
-      keepalive?: boolean;
-    }) => {
-      const body = { sceneId, instanceId: sceneInstanceId, playToken };
-      try {
-        if (options?.keepalive) {
-          await apiFetch("/watch-history/increment-play-count", {
-            method: "POST",
-            body: JSON.stringify(body),
-            keepalive: true,
-          });
-        } else {
-          await retryWithBackoff(() =>
-            apiPost("/watch-history/increment-play-count", body)
-          );
-        }
-      } catch (error) {
-        console.error("Failed to increment play count:", error);
-      }
-    };
+    // Off while a cast is attached: the cast tracker records the TV
+    trackActivityPlugin.setEnabled(
+      !(player as CastAwarePlayer).peekCastConnected
+    );
 
     return () => {
       trackActivityPlugin.setEnabled(false);

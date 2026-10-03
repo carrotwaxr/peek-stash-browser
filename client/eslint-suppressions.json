@@ -718,7 +718,7 @@
   },
   "src/components/video-player/useVideoPlayer.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 8
+      "count": 7
     },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 5
@@ -733,7 +733,7 @@
       "count": 66
     },
     "@typescript-eslint/no-unsafe-return": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 3

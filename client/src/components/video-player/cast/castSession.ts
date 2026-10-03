@@ -12,6 +12,8 @@
 import type { SceneMediaLinkResponse } from "@peek/shared-types";
 import { makeCompositeKey } from "../../../utils/compositeKey";
 import { getSceneTitle } from "../../../utils/format";
+import type { Viewing } from "../activitySenders";
+import { CastActivity } from "./castActivity";
 import type { CastAwarePlayer, CastRemote } from "./castMiddleware";
 import {
   type AddOrderedControl,
@@ -154,6 +156,8 @@ export interface CastPlayer extends CastControlsPlayer, CastAwarePlayer {
     trigger(event: string): void;
   } | null;
   isDisposed(): boolean;
+  /** The local tracker (absent where the plugin is not registered) */
+  trackActivity?(): { setEnabled(enabled: boolean): void };
 }
 
 export interface CastSessionOptions {
@@ -161,12 +165,15 @@ export interface CastSessionOptions {
   media: CastMedia;
   player: CastPlayer;
   /**
-   * The page now (it changes while the controller lives): its scene, and the
-   * user's resume point for that scene
+   * The page now (it changes while the controller lives): its scene, the
+   * user's resume point for that scene, and the scene's viewing (the local
+   * tracker's senders, which the cast tracker shares)
    */
   page(): {
     scene: CastScene | null;
     resumeTime: number | null | undefined;
+    viewing: { readonly current: Viewing | null };
+    minimumPlayPercent: number;
   };
   /** The scene's signed media link (C2's query) */
   fetchLink(scene: CastScene): Promise<SceneMediaLinkResponse>;
@@ -204,6 +211,8 @@ export class CastSessionController {
   private readonly remoteListeners: [string, () => void][];
   private button: CastButtonControl | null = null;
   private status: CastStatusControl | null = null;
+  /** Records the TV's progress while attached */
+  private tracker: CastActivity | null = null;
   private castState = "";
   /** The session this page follows; null while the local player plays */
   private attachedTo: cast.framework.CastSession | null = null;
@@ -272,9 +281,11 @@ export class CastSessionController {
       this.controller.removeEventListener(type, handler);
     }
     this.loads += 1;
+    const attached = this.attachedTo !== null;
     this.attachedTo = null;
     player.peekCastConnected = false;
     player.peekCastRemote = null;
+    if (attached) this.track(false);
     if (!player.isDisposed()) {
       this.button?.remove();
       this.status?.remove();
@@ -422,6 +433,8 @@ export class CastSessionController {
 
   private follow(session: cast.framework.CastSession) {
     const { player } = this.options;
+    // Before the flags: the local tracker's last save reads the local player
+    this.track(true);
     this.attachedTo = session;
     player.peekCastConnected = true;
     player.peekCastRemote = this.view;
@@ -438,13 +451,40 @@ export class CastSessionController {
     player.peekCastRemote = null;
     this.status?.show(null);
     this.publish();
-    if (player.isDisposed()) return;
+    if (player.isDisposed()) {
+      this.track(false);
+      return;
+    }
     player.pause();
     if (seekTo !== undefined) player.currentTime(seekTo);
+    // Once the local player is paused where the TV left it
+    this.track(false);
     // The control bar showed the receiver: it follows the local player again
     player.trigger("pause");
     player.trigger("timeupdate");
     this.durationChanged();
+  }
+
+  /**
+   * While attached the cast tracker records the TV's progress through the
+   * page's viewing and the local tracker is off (the player answers for the
+   * TV then); otherwise the local tracker is on again.
+   */
+  private track(attached: boolean) {
+    const { player, media } = this.options;
+    this.tracker?.stop();
+    this.tracker = null;
+    const { viewing, minimumPlayPercent } = this.options.page();
+    if (attached && viewing.current) {
+      this.tracker = new CastActivity({
+        remote: this.remote,
+        media,
+        viewing: viewing.current,
+        minimumPlayPercent,
+      });
+      this.tracker.start();
+    }
+    if (!player.isDisposed()) player.trackActivity?.().setEnabled(!attached);
   }
 
   /** `player.peekCastState` and `peek:caststate` for the player's readers */

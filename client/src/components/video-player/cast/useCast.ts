@@ -4,15 +4,17 @@
  * Loads Google's Cast sender where Cast can work (`loadCastSdk`: a secure
  * Chromium tab), never in TV mode, then the cast chunk, and hands the player
  * to a `CastSessionController`, which adds the Cast button and follows the
- * session. `useVideoPlayer` passes everything the cast features read (the
- * queue and controls are for the progress tracker and the queue steps that
- * build on this), so they need no other change to the player hook.
+ * session, which records the TV's progress while attached
+ * (`castActivity.ts`). `useVideoPlayer` passes everything the cast features
+ * read (the queue and controls are for the queue steps that build on this),
+ * so they need no other change to the player hook.
  */
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { sceneMediaLinkQuery } from "../../../api/hooks/useScenes";
 import { useTVMode } from "../../../hooks/useTVMode";
 import { showError } from "../../../utils/toast";
+import type { Viewing } from "../activitySenders";
 import { addOrderedControl } from "../controlBarOrder";
 import { loadCastSdk } from "./castSdk";
 import type { CastPlayer, CastScene } from "./castSession";
@@ -41,6 +43,12 @@ export interface UseCastOptions {
   /** The user's resume point for the scene (watch history), if any */
   resumeTime: number | null | undefined;
   minimumPlayPercent: number;
+  /**
+   * The scene's viewing (one per scene load, set by `useVideoPlayer`'s
+   * tracker effect): the cast tracker sends through it, so a play the local
+   * tracker counted is not counted again
+   */
+  viewing: { readonly current: Viewing | null };
 }
 
 export function useCast(options: UseCastOptions): void {
