@@ -2,6 +2,7 @@ import { type FocusEvent, forwardRef, memo, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
+import { clipTitle } from "../../utils/clipTitle";
 import { getScenePathWithTime } from "../../utils/entityLinks";
 import { formatDuration } from "../../utils/format";
 import { BaseCard } from "../ui/BaseCard";
@@ -59,8 +60,8 @@ const ClipCard = memo(
       const clipSettings = getSettings("clip");
       const { hasMultipleInstances } = useConfig();
 
-      // Title is the clip title
-      const title = clip.title || "Untitled";
+      // The clip title, else its primary tag's name
+      const title = clipTitle(clip);
 
       // Build subtitle from scene title, studio, date (respecting settings)
       const subtitle = useMemo(() => {

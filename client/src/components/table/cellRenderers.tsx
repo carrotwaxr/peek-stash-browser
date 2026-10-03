@@ -3,6 +3,7 @@
 import { Link } from "react-router-dom";
 import type { NormalizedGroup } from "@peek/shared-types";
 import { Heart } from "lucide-react";
+import { clipTitle } from "../../utils/clipTitle";
 import {
   getEntityPath as _getEntityPath,
   getScenePathWithTime as _getScenePathWithTime,
@@ -717,7 +718,7 @@ const TagLinkCell = ({ tag, hasMultipleInstances }: TagLinkCellProps) => {
 const clipRenderers: RendererMap = {
   title: (clip, options = {}) => (
     <LinkCell
-      text={clip.title || "Untitled"}
+      text={clipTitle(clip)}
       linkTo={getScenePathWithTime(
         { id: clip.sceneId, instanceId: clip.instanceId },
         clip.seconds,
@@ -733,7 +734,7 @@ const clipRenderers: RendererMap = {
     return (
       <ThumbnailCell
         src={src}
-        alt={clip.title}
+        alt={clipTitle(clip)}
         linkTo={getScenePathWithTime(
           { id: clip.sceneId, instanceId: clip.instanceId },
           clip.seconds,

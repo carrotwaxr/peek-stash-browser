@@ -75,6 +75,17 @@ describe("ClipCardPreview", () => {
     );
   });
 
+  it("the preview image of an untitled clip is named by its primary tag", async () => {
+    const clip: Clip = {
+      ...baseClip,
+      title: "",
+      screenshotUrl: "/api/proxy/stash?path=%2Fmarker-screenshot.jpg",
+    };
+    const { container } = render(<ClipCardPreview clip={clip} />);
+    await act(() => Promise.resolve());
+    expect(container.querySelector("img")).toHaveAttribute("alt", "Action");
+  });
+
   it("falls back to scene cover when no marker screenshot", async () => {
     const clip: Clip = { ...baseClip, screenshotUrl: null };
     const { container } = render(<ClipCardPreview clip={clip} />);

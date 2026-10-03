@@ -47,6 +47,12 @@ describe("ClipCard", () => {
     expect(screen.getByText("Test Clip")).toBeInTheDocument();
   });
 
+  it("the card of an untitled clip reads its primary tag's name", () => {
+    renderWithProviders(<ClipCard clip={{ ...mockClip, title: null }} />);
+    expect(screen.getByText("Action")).toBeInTheDocument();
+    expect(screen.queryByText("Untitled")).not.toBeInTheDocument();
+  });
+
   it("shows formatted duration", () => {
     renderWithProviders(<ClipCard clip={mockClip} />);
     // endSeconds (180) - seconds (120) = 60 seconds = 1:00

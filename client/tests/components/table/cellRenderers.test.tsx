@@ -40,6 +40,39 @@ describe("cellRenderers", () => {
     });
   });
 
+  describe("clip renderers", () => {
+    const untitled = {
+      id: "3",
+      instanceId: "inst-a",
+      sceneId: "9",
+      seconds: 12,
+      title: null,
+      primaryTag: { id: "t1", name: "Action" },
+      scene: { pathScreenshot: "/shot.jpg" },
+    };
+
+    it("the table cell of an untitled clip reads its primary tag's name", () => {
+      const TitleRenderer = getCellRenderer("title", "clip");
+      render(
+        <MemoryRouter>
+          <TitleRenderer {...untitled} />
+        </MemoryRouter>
+      );
+      expect(screen.getByText("Action")).toBeInTheDocument();
+      expect(screen.queryByText("Untitled")).not.toBeInTheDocument();
+    });
+
+    it("the thumbnail of an untitled clip is named by its primary tag", () => {
+      const ThumbnailRenderer = getCellRenderer("thumbnail", "clip");
+      render(
+        <MemoryRouter>
+          <ThumbnailRenderer {...untitled} />
+        </MemoryRouter>
+      );
+      expect(screen.getByAltText("Action")).toBeInTheDocument();
+    });
+  });
+
   describe("gallery cover renderer", () => {
     it("renders thumbnail from gallery.cover string URL", () => {
       const gallery = {
