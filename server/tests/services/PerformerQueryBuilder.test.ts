@@ -16,8 +16,8 @@ import type {
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
 import {
-  ageYearsSql,
   careerYearsSql,
+  dayNumberSql,
   fullDateSql,
 } from "../../utils/sqlClauses.js";
 import { jsonListArm } from "../../utils/sqlHelpers.js";
@@ -62,6 +62,8 @@ vi.mock("../../services/TooltipRelations.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 
 const ALLOWED = ["inst-a", "inst-b"];
+/** A performer's age: to their death date, else to today's day number, bound */
+const AGE = `CAST((CASE WHEN p.deathDate IS NULL THEN ? ELSE ${dayNumberSql("p.deathDate")} END) - ${dayNumberSql("p.birthdate")} AS INTEGER)`;
 const ref = (id: string, instanceId = "inst-a"): FilterRef => ({
   id,
   instanceId,
@@ -71,12 +73,17 @@ const bare = (id: string): FilterRef => ({ id, instanceId: undefined });
 /** Runs one list request for user 1 */
 async function run(
   overrides: Partial<ParsedListRequest<"performer">> = {},
-  options: { allowedInstanceIds?: string[]; applyExclusions?: boolean } = {}
+  options: {
+    allowedInstanceIds?: string[];
+    applyExclusions?: boolean;
+    timeZone?: string;
+  } = {}
 ) {
   const request = parsedListRequest("performer", overrides);
   return performerQueryBuilder.execute({
     userId: 1,
     allowedInstanceIds: options.allowedInstanceIds ?? ALLOWED,
+    ...(options.timeZone === undefined ? {} : { timeZone: options.timeZone }),
     ...(options.applyExclusions === undefined
       ? {}
       : { applyExclusions: options.applyExclusions }),
@@ -420,9 +427,7 @@ describe("PerformerQueryBuilder", () => {
       expect(sql).toContain(
         `(p.deathDate IS NOT NULL AND CAST(SUBSTR(${fullDateSql("p.deathDate")}, 1, 4) AS INTEGER) != ?)`
       );
-      expect(sql).toContain(
-        `(p.birthdate IS NOT NULL AND ${ageYearsSql("COALESCE(p.deathDate, date('now'))", "p.birthdate")} < ?)`
-      );
+      expect(sql).toContain(`(p.birthdate IS NOT NULL AND ${AGE} < ?)`);
     });
 
     it("weight has no COALESCE", async () => {
@@ -444,13 +449,31 @@ describe("PerformerQueryBuilder", () => {
       expect(params).toContain(60);
     });
 
+    it("age counts to today in the viewer's zone: at 03:00 UTC on 2 October it is still 1 October in Chicago", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-02T03:00:00Z"));
+      try {
+        await run(
+          { filter: { age: { modifier: "EQUALS", value: 30 } } },
+          { timeZone: "America/Chicago" }
+        );
+        const { params } = pageStatement();
+        // Today binds just before the age it is compared with
+        expect(params[params.indexOf("2026.1001") + 1]).toBe(30);
+
+        mockPrisma.$queryRawUnsafe.mockClear();
+        await run({ filter: { age: { modifier: "EQUALS", value: 30 } } });
+        expect(pageStatement().params).toContain("2026.1002");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("age not 30 leaves out performers with no birthdate", async () => {
       await run({ filter: { age: { modifier: "NOT_EQUALS", value: 30 } } });
 
       const { sql } = pageStatement();
-      expect(sql).toContain(
-        `(p.birthdate IS NOT NULL AND ${ageYearsSql("COALESCE(p.deathDate, date('now'))", "p.birthdate")} != ?)`
-      );
+      expect(sql).toContain(`(p.birthdate IS NOT NULL AND ${AGE} != ?)`);
       expect(sql).not.toContain("p.birthdate IS NULL OR");
     });
 

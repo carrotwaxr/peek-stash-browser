@@ -12,6 +12,7 @@ import {
   canonicalTimeZone,
   instantSpan,
   zonedDayStart,
+  zonedToday,
 } from "../../utils/zonedTime.js";
 
 const HOUR = 3_600_000;
@@ -139,6 +140,17 @@ function caseVariants(name: string, bits: number): string[] {
   }
   return variants;
 }
+
+describe("zonedToday", () => {
+  it("is the zone's calendar day at the instant", () => {
+    const at = Date.UTC(2026, 9, 2, 3);
+    expect(zonedToday("UTC", at)).toBe("2026-10-02");
+    expect(zonedToday("America/Chicago", at)).toBe("2026-10-01");
+    expect(zonedToday("Pacific/Kiritimati", Date.UTC(2026, 9, 1, 11))).toBe(
+      "2026-10-02"
+    );
+  });
+});
 
 describe("canonicalTimeZone", () => {
   it("an unknown, empty or over-long zone has no canonical name", () => {
