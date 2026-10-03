@@ -37,4 +37,14 @@ describe("requestTimeZone", () => {
       "America/Chicago"
     );
   });
+
+  it('"america/chicago" is its canonical name, "America/Chicago"', () => {
+    expect(zoneFor({ "X-Peek-Time-Zone": "america/chicago" })).toBe(
+      "America/Chicago"
+    );
+  });
+
+  it("an invalid zone in any case gives UTC", () => {
+    expect(zoneFor({ "X-Peek-Time-Zone": "NOT/AZONE" })).toBe("UTC");
+  });
 });

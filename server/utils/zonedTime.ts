@@ -17,35 +17,56 @@ const WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:?\d{2})$/i;
 /** Wide enough to hold both sides of any offset change around a wall time */
 const PROBE_MS = 6 * 3_600_000;
 
-/** One formatter per zone; the zones are IANA names, a bounded set */
+/**
+ * One formatter per canonical zone name. `Intl` accepts a zone in any
+ * letter case and links (`US/Eastern`), so the header can carry far more
+ * spellings than there are zones: the cache is keyed only by the canonical
+ * name `Intl` resolves, and holds at most `MAX_CACHED_ZONES`, the oldest
+ * dropped first, so no header value can grow it without limit.
+ */
+export const MAX_CACHED_ZONES = 500;
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
+/** How many formatters the cache holds (for tests) */
+export function cachedZoneCount(): number {
+  return formatters.size;
+}
+
+/** The zone's formatter; throws a RangeError for a zone `Intl` refuses */
 function formatterFor(timeZone: string): Intl.DateTimeFormat {
-  let formatter = formatters.get(timeZone);
-  if (formatter === undefined) {
-    formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      hourCycle: "h23",
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-      second: "numeric",
-    });
-    formatters.set(timeZone, formatter);
+  const cached = formatters.get(timeZone);
+  if (cached !== undefined) return cached;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+  });
+  const canonical = formatter.resolvedOptions().timeZone;
+  const existing = formatters.get(canonical);
+  if (existing !== undefined) return existing;
+  if (formatters.size >= MAX_CACHED_ZONES) {
+    const oldest = formatters.keys().next();
+    if (oldest.done !== true) formatters.delete(oldest.value);
   }
+  formatters.set(canonical, formatter);
   return formatter;
 }
 
-/** An IANA zone name `Intl` knows, at most 64 characters */
-export function isTimeZone(value: string): boolean {
-  if (value.length === 0 || value.length > MAX_ZONE_LENGTH) return false;
+/**
+ * The canonical name of a zone `Intl` knows (`america/chicago` is
+ * `America/Chicago`), else undefined; over 64 characters is undefined.
+ */
+export function canonicalTimeZone(value: string): string | undefined {
+  if (value.length === 0 || value.length > MAX_ZONE_LENGTH) return undefined;
   try {
-    formatterFor(value);
-    return true;
+    return formatterFor(value).resolvedOptions().timeZone;
   } catch {
-    return false;
+    return undefined;
   }
 }
 

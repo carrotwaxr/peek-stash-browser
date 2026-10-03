@@ -7,8 +7,10 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  MAX_CACHED_ZONES,
+  cachedZoneCount,
+  canonicalTimeZone,
   instantSpan,
-  isTimeZone,
   zonedDayStart,
 } from "../../utils/zonedTime.js";
 
@@ -119,16 +121,76 @@ describe("instantSpan", () => {
   });
 });
 
-describe("isTimeZone", () => {
-  it("an unknown zone is refused by isTimeZone", () => {
-    expect(isTimeZone("Not/AZone")).toBe(false);
-    expect(isTimeZone("")).toBe(false);
-    expect(isTimeZone(`America/${"x".repeat(60)}`)).toBe(false);
+/** Every upper/lower case mix of an ASCII name's first `bits` letters */
+function caseVariants(name: string, bits: number): string[] {
+  const lower = name.toLowerCase();
+  const variants: string[] = [];
+  for (let mask = 0; mask < 2 ** bits; mask++) {
+    let variant = "";
+    let bit = 0;
+    for (let at = 0; at < lower.length; at++) {
+      const ch = lower.charAt(at);
+      const isLetter = ch !== ch.toUpperCase();
+      variant +=
+        isLetter && bit < bits && mask & (1 << bit) ? ch.toUpperCase() : ch;
+      if (isLetter) bit++;
+    }
+    variants.push(variant);
+  }
+  return variants;
+}
+
+describe("canonicalTimeZone", () => {
+  it("an unknown, empty or over-long zone has no canonical name", () => {
+    expect(canonicalTimeZone("Not/AZone")).toBeUndefined();
+    expect(canonicalTimeZone("")).toBeUndefined();
+    expect(canonicalTimeZone(`America/${"x".repeat(60)}`)).toBeUndefined();
   });
 
-  it("an IANA zone and UTC are accepted", () => {
-    expect(isTimeZone("America/Chicago")).toBe(true);
-    expect(isTimeZone("Asia/Kolkata")).toBe(true);
-    expect(isTimeZone("UTC")).toBe(true);
+  it("an IANA zone and UTC are kept", () => {
+    expect(canonicalTimeZone("America/Chicago")).toBe("America/Chicago");
+    expect(canonicalTimeZone("UTC")).toBe("UTC");
+  });
+
+  it("a renamed zone is the name ICU keeps for it", () => {
+    // CLDR keeps the old name of a renamed zone; ICU versions differ
+    expect(canonicalTimeZone("Asia/Kolkata")).toMatch(
+      /^Asia\/(Kolkata|Calcutta)$/
+    );
+  });
+
+  it("any letter case of a zone is its canonical name", () => {
+    expect(canonicalTimeZone("america/new_york")).toBe("America/New_York");
+    expect(canonicalTimeZone("AMERICA/NEW_YORK")).toBe("America/New_York");
+    expect(canonicalTimeZone("utc")).toBe("UTC");
+  });
+});
+
+describe("the formatter cache", () => {
+  it("1024 case variants of one zone add at most one cached formatter", () => {
+    const variants = caseVariants("America/New_York", 10);
+    expect(new Set(variants).size).toBe(1024);
+    const before = cachedZoneCount();
+    for (const variant of variants) {
+      expect(zonedDayStart("2026-01-15", variant)).toBe(
+        Date.UTC(2026, 0, 15, 5)
+      );
+    }
+    expect(cachedZoneCount() - before).toBeLessThanOrEqual(1);
+  });
+
+  it("more distinct zones than the cap leave at most the cap cached", () => {
+    let count = 0;
+    for (let hour = -23; hour <= 23 && count <= MAX_CACHED_ZONES; hour++) {
+      for (let minute = 0; minute < 60 && count <= MAX_CACHED_ZONES; minute++) {
+        const sign = hour < 0 ? "-" : "+";
+        const hh = String(Math.abs(hour)).padStart(2, "0");
+        const mm = String(minute).padStart(2, "0");
+        zonedDayStart("2026-01-15", `${sign}${hh}:${mm}`);
+        count++;
+      }
+    }
+    expect(count).toBeGreaterThan(MAX_CACHED_ZONES);
+    expect(cachedZoneCount()).toBeLessThanOrEqual(MAX_CACHED_ZONES);
   });
 });
