@@ -392,3 +392,33 @@ describe("every control has a name", () => {
     });
   });
 });
+
+describe("two height editors on one page", () => {
+  it("share no id, and each label names its own input", () => {
+    const { container } = render(
+      <>
+        <Harness measure="height" label="Height (ft/in)" />
+        <FilterControl
+          type="imperial-height-range"
+          measure="height"
+          label="Height (ft/in)"
+          controlId="height-field"
+          value={{}}
+          onChange={() => {}}
+        />
+      </>
+    );
+
+    const ids = [...container.querySelectorAll("[id]")].map((each) => each.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // The field's own id stays on its first input, where a chip moves focus
+    expect(ids).toContain("height-field");
+    const labels = [...container.querySelectorAll("fieldset label[for]")];
+    expect(labels).toHaveLength(8);
+    for (const label of labels) {
+      const target = document.getElementById(label.getAttribute("for") ?? "");
+      expect(target?.tagName).toBe("INPUT");
+      expect(target?.closest("fieldset")).toBe(label.closest("fieldset"));
+    }
+  });
+});
