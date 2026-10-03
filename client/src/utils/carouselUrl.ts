@@ -9,10 +9,11 @@ import {
 import { buildSearchParams } from "./urlParams";
 
 /**
- * Build a "See More" URL for a custom carousel from its rules
+ * Build a "See More" URL for a custom carousel from its rules: the where
+ * tree the server serves, or the flat rules the builder sends
  */
 export const buildCustomCarouselUrl = (
-  rules: Record<string, unknown> | null | undefined,
+  rules: object | null | undefined,
   sort: string | undefined,
   direction: string | undefined
 ): string => {

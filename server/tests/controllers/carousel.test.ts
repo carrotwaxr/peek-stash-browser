@@ -31,6 +31,7 @@ import type { ParsedListRequest } from "../../types/parsedFilters.js";
 import type { PeekSceneFilter } from "../../types/peekFilters.js";
 import { logger } from "../../utils/logger.js";
 import { authenticated, libraryHandler } from "../../utils/routeHelpers.js";
+import { whereOfFlatFilter } from "../../utils/whereTree.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { userRow } from "../helpers/fixtures.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
@@ -72,6 +73,28 @@ const USER = { id: 1, username: "testuser", role: "USER" };
 /** A carousel's rules: the scene filter the client saves with it */
 const RULES: PeekSceneFilter = {
   rating100: { value: 80, modifier: CriterionModifier.GreaterThan },
+};
+
+/** RULES as the tree a carousel stores */
+const RULES_TREE = {
+  match: "all",
+  rules: [
+    { field: "rating100", criterion: { value: 80, modifier: "GREATER_THAN" } },
+  ],
+};
+
+/** A tree with a group: a favourite performer or a favourite tag */
+const ANY_TREE = {
+  match: "all",
+  rules: [
+    {
+      match: "any",
+      rules: [
+        { field: "performer_favorite", criterion: true },
+        { field: "tag_favorite", criterion: true },
+      ],
+    },
+  ],
 };
 
 /** Sample carousel record from the database */
@@ -178,6 +201,41 @@ describe("Carousel Controller", () => {
 
       const body = res._getOkBody();
       expect(body.carousel.id).toBe(SAMPLE_CAROUSEL.id);
+    });
+
+    it("GET serves a flat stored row as a tree, and a stored tree as it is", async () => {
+      // RULES as the JSON column holds it
+      const flat = { rating100: { value: 80, modifier: "GREATER_THAN" } };
+      for (const [stored, served] of [
+        [flat, RULES_TREE],
+        [ANY_TREE, ANY_TREE],
+      ] as const) {
+        mockPrisma.userCarousel.findFirst.mockResolvedValue({
+          ...SAMPLE_CAROUSEL,
+          rules: stored,
+        });
+        const req = reqFor(getCarousel, { params: { id: "1" }, user: USER });
+        const res = resFor(getCarousel);
+        await getCarousel(req, res);
+
+        expect(res._getOkBody().carousel.rules).toEqual(served);
+      }
+    });
+
+    it('GET serves stored rules of neither shape as { match: "all", rules: [] }', async () => {
+      for (const stored of [SAMPLE_CAROUSEL.rules, null, ["x"], 7]) {
+        mockPrisma.userCarousel.findMany.mockResolvedValue([
+          { ...SAMPLE_CAROUSEL, rules: stored },
+        ]);
+        const req = reqFor(getUserCarousels, { user: USER });
+        const res = resFor(getUserCarousels);
+        await getUserCarousels(req, res);
+
+        expect(
+          must(res._getOkBody().carousels[0]).rules,
+          JSON.stringify(stored)
+        ).toEqual({ match: "all", rules: [] });
+      }
     });
 
     it("a failure reaches the error handler: unexpected error", async () => {
@@ -348,7 +406,7 @@ describe("Carousel Controller", () => {
       expect(mockPrisma.userCarousel.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: objectContaining({
-            rules: RULES,
+            rules: RULES_TREE,
             sort: "title",
             direction: "ASC",
           }),
@@ -375,6 +433,71 @@ describe("Carousel Controller", () => {
         expect(mockPrisma.userCarousel.create).not.toHaveBeenCalled();
       }
     );
+
+    it("create stores the tree, from either shape", async () => {
+      for (const [body, stored] of [
+        [RULES, whereOfFlatFilter(RULES)],
+        [ANY_TREE, ANY_TREE],
+      ] as const) {
+        vi.clearAllMocks();
+        mockPrisma.userCarousel.count.mockResolvedValue(0);
+        mockPrisma.userCarousel.create.mockResolvedValue(SAMPLE_CAROUSEL);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          partialRow({ id: 1, carouselPreferences: null })
+        );
+        mockPrisma.user.update.mockResolvedValue(userRow());
+
+        const req = reqFor(createCarousel, {
+          body: { title: "Tree", rules: body },
+          user: USER,
+        });
+        const res = resFor(createCarousel);
+        await createCarousel(req, res);
+
+        expect(res._getStatus()).toBe(201);
+        expect(
+          must(mockPrisma.userCarousel.create.mock.calls[0])[0].data.rules
+        ).toEqual(stored);
+      }
+    });
+
+    it("a flat body naming ids or instance_id answers 400 and stores nothing: a tree cannot hold them", async () => {
+      for (const [rules, path] of [
+        [{ ...RULES, ids: { value: ["1:a"] } }, "rules.ids"],
+        [{ ...RULES, instance_id: "a" }, "rules.instance_id"],
+      ] as const) {
+        const req = reqFor(createCarousel, {
+          body: malformed({ title: "Ids", rules }),
+          user: USER,
+        });
+        await expect(
+          createCarousel(req, resFor(createCarousel))
+        ).rejects.toMatchObject({ statusCode: 400, issues: [{ path }] });
+      }
+      expect(mockPrisma.userCarousel.create).not.toHaveBeenCalled();
+    });
+
+    it("a tree over the limits is a 400", async () => {
+      const rules = {
+        match: "any",
+        rules: Array.from({ length: 21 }, () => ({
+          field: "favorite",
+          criterion: true,
+        })),
+      };
+      const req = reqFor(createCarousel, {
+        body: malformed({ title: "Big", rules }),
+        user: USER,
+      });
+
+      await expect(
+        createCarousel(req, resFor(createCarousel))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path: "rules", message: "At most 20 rows" }],
+      });
+      expect(mockPrisma.userCarousel.create).not.toHaveBeenCalled();
+    });
 
     it("auto-adds new carousel to user carouselPreferences", async () => {
       mockPrisma.userCarousel.count.mockResolvedValue(2);
@@ -529,7 +652,7 @@ describe("Carousel Controller", () => {
       expect(data).toMatchObject({
         title: "New",
         icon: "star",
-        rules: RULES,
+        rules: RULES_TREE,
         direction: "DESC",
       });
       expect(data).toHaveProperty("sort");
@@ -894,19 +1017,45 @@ describe("Carousel Controller", () => {
           userId: 1,
           allowedInstanceIds: ["inst-a", "inst-b"],
           request: objectContaining<ParsedListRequest<"scene">>({
-            filter: {
-              rating100: { value: 80, modifier: "GREATER_THAN" },
-              performers: {
-                refs: [{ id: "7", instanceId: "inst-a" }],
-                modifier: "INCLUDES",
-                depth: 0,
-              },
+            filter: {},
+            where: {
+              match: "all",
+              rules: [
+                {
+                  field: "rating100",
+                  criterion: { value: 80, modifier: "GREATER_THAN" },
+                },
+                {
+                  field: "performers",
+                  criterion: {
+                    refs: [{ id: "7", instanceId: "inst-a" }],
+                    modifier: "INCLUDES",
+                    depth: 0,
+                  },
+                },
+              ],
             },
             sort: { field: "title", direction: "ASC", seed: undefined },
             page: 1,
           }),
         })
       );
+    });
+
+    it("preview runs a group", async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
+      mockAddStashUrl.mockReturnValue([]);
+
+      const req = reqFor(previewCarousel, {
+        body: { rules: ANY_TREE, sort: "title", direction: "ASC" },
+        user: USER,
+        allowedInstanceIds: ["inst-a"],
+      });
+      await previewCarousel(req, resFor(previewCarousel));
+
+      const { request } = must(mockQueryBuilder.execute.mock.lastCall)[0];
+      expect(request.filter).toEqual({});
+      expect(request.where).toEqual(ANY_TREE);
     });
 
     it("a random carousel gets a new seed each load", async () => {
@@ -951,7 +1100,11 @@ describe("Carousel Controller", () => {
         expect.objectContaining({
           allowedInstanceIds: ["inst-a"],
           request: objectContaining<ParsedListRequest<"scene">>({
-            filter: { favorite: true },
+            filter: {},
+            where: {
+              match: "all",
+              rules: [{ field: "favorite", criterion: true }],
+            },
             sort: { field: "created_at", direction: "DESC", seed: undefined },
             perPage: 12,
           }),

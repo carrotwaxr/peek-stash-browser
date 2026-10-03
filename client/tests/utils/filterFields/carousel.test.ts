@@ -418,6 +418,62 @@ describe("carousel rules", () => {
   });
 });
 
+describe("carousel rules stored as a tree", () => {
+  /** The prod "Goddesses" carousel's rules, flat as stored before 9b */
+  const GODDESSES = { tags: { value: ["284"], modifier: "INCLUDES_ALL" } };
+  const leaf = (field: string, criterion: unknown) => ({ field, criterion });
+
+  it("carouselRulesToFilterState reads a root all tree as it read the flat rules", () => {
+    const flat = {
+      ...GODDESSES,
+      rating100: { modifier: "BETWEEN", value: 60, value2: 90 },
+      title: { value: "beach", modifier: "STARTS_WITH" },
+    };
+    const tree = {
+      match: "all",
+      rules: Object.entries(flat).map(([field, criterion]) =>
+        leaf(field, criterion)
+      ),
+    };
+
+    expect(carouselRulesToFilterState(tree)).toEqual(
+      carouselRulesToFilterState(flat)
+    );
+    expect(
+      carouselRulesToFilterState({
+        match: "all",
+        rules: [leaf("tags", GODDESSES.tags)],
+      })
+    ).toEqual({
+      state: { tagIds: ["284"], tagIdsModifier: "INCLUDES_ALL" },
+      kept: {},
+    });
+  });
+
+  it("a tree with a group, a repeated field or an any root is kept whole", () => {
+    const trees = [
+      {
+        match: "all",
+        rules: [
+          leaf("tags", GODDESSES.tags),
+          { match: "any", rules: [leaf("favorite", true)] },
+        ],
+      },
+      {
+        match: "all",
+        rules: [leaf("tags", GODDESSES.tags), leaf("tags", GODDESSES.tags)],
+      },
+      { match: "any", rules: [leaf("tags", GODDESSES.tags)] },
+    ];
+    for (const tree of trees) {
+      expect(carouselRulesToFilterState(tree)).toEqual({
+        state: {},
+        kept: tree,
+      });
+    }
+  });
+});
+
 describe("carousel rules of the F22b editors (the real Path and Playlists rows)", () => {
   const table = { rows: SCENE_ROWS, specs: SCENE_FIELDS };
 

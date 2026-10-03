@@ -31,12 +31,15 @@ import type {
 import type { NormalizedScene } from "../types/index.js";
 import type { ParsedListRequest } from "../types/parsedFilters.js";
 import {
+  carouselRulesToStore,
+  isPlainObject,
   logIgnoredStoredRule,
   parseCarouselRequest,
   parseStoredSceneQuery,
 } from "../utils/listRequest.js";
 import { logger } from "../utils/logger.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
+import { isWhereShape, whereOfFlatFilter } from "../utils/whereTree.js";
 import { addStashUrl } from "./library/scenes.js";
 
 // Maximum number of custom carousels per user
@@ -45,13 +48,28 @@ const MAX_CAROUSELS_PER_USER = 15;
 // Number of scenes to return for carousel preview/display
 const CAROUSEL_SCENE_LIMIT = 12;
 
-/** The row as the client receives it: the stored rules as saved, dates as ISO strings */
+/**
+ * The stored rules as the tree the client reads, whatever is stored: a tree
+ * as it is, a flat rule set (stored before 9b) as its root "all" tree, and
+ * anything else (which filters nothing) as the empty tree
+ */
+function servedRules(stored: unknown): CarouselData["rules"] {
+  const tree = isWhereShape(stored)
+    ? stored
+    : isPlainObject(stored)
+      ? whereOfFlatFilter(stored)
+      : { match: "all", rules: [] };
+  // The boundary cast: stored JSON, read leniently wherever it runs
+  return tree as unknown as CarouselData["rules"];
+}
+
+/** The row as the client receives it: the stored rules as a tree, dates as ISO strings */
 const toCarouselData = (row: UserCarousel): CarouselData => ({
   id: row.id,
   userId: row.userId,
   title: row.title,
   icon: row.icon,
-  rules: row.rules as unknown as CarouselData["rules"],
+  rules: servedRules(row.rules),
   sort: row.sort,
   direction: row.direction,
   createdAt: row.createdAt.toISOString(),
@@ -131,6 +149,9 @@ export const createCarousel = async (
     },
     { userId }
   );
+  // The tree, from either shape (the parser read it as an object); a flat
+  // ids or instance_id is a 400
+  const stored = carouselRulesToStore(rules as Record<string, unknown>);
 
   // Validate required fields
   if (!title || title.trim() === "") {
@@ -155,7 +176,7 @@ export const createCarousel = async (
       userId,
       title: title.trim(),
       icon: emptyToNull(icon) ?? "Film",
-      rules: rules as unknown as Prisma.InputJsonValue,
+      rules: stored as Prisma.InputJsonValue,
       // As the parser read them: a contract sort, direction upper-case
       sort: request.sort.field,
       direction: request.sort.direction,
@@ -211,6 +232,11 @@ export const updateCarousel = async (
   // The parts sent, against the scene contract; a ValidationError (400)
   // reaches the central error handler
   const request = parseCarouselRequest({ rules, sort, direction }, { userId });
+  // The tree, from either shape; a flat ids or instance_id is a 400
+  const stored =
+    rules === undefined
+      ? undefined
+      : carouselRulesToStore(rules as Record<string, unknown>);
 
   // Check ownership
   const existing = await prisma.userCarousel.findFirst({
@@ -236,8 +262,8 @@ export const updateCarousel = async (
     data: {
       ...(title !== undefined && { title: title.trim() }),
       ...(icon !== undefined && { icon }),
-      ...(rules !== undefined && {
-        rules: rules as unknown as Prisma.InputJsonValue,
+      ...(stored !== undefined && {
+        rules: stored as Prisma.InputJsonValue,
       }),
       ...(sort !== undefined && { sort: request.sort.field }),
       ...(direction !== undefined && { direction: request.sort.direction }),

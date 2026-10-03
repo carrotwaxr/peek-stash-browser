@@ -30,6 +30,7 @@ import type {
   CreateCarouselResponse,
   ExecuteCarouselByIdResponse,
   FindSimilarScenesResponse,
+  GetCarouselResponse,
   PreviewCarouselResponse,
 } from "../../types/api/index.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
@@ -63,7 +64,12 @@ interface Viewer {
   client: TestClient;
 }
 
-/** The scene rules every instance case uses: SAME on A and B, B_ONLY, ON_OFF */
+/**
+ * The scene rules every instance case uses: SAME on A and B, B_ONLY,
+ * ON_OFF. A preview takes them; a save refuses a flat `ids` (a stored tree
+ * cannot hold it), so a carousel holding them is seeded as a row stored
+ * before 9b, which runs with them in its filter.
+ */
 const IDS_RULES = {
   ids: {
     value: [FX_ID.SAME, FX_ID.B_ONLY, FX_ID.ON_OFF],
@@ -219,13 +225,17 @@ describe("carousel, recommended and similar requests", () => {
     });
 
     it("updating a carousel with an unknown rule key or direction sideways answers 400 and leaves it as it was", async () => {
-      const { client } = must(everyInstance, "the viewer");
-      const created = await client.post<CreateCarouselResponse>(
-        "/api/carousels",
-        { title: "Kept", rules: IDS_RULES, sort: "title", direction: "ASC" }
-      );
-      expect(created.status).toBe(201);
-      const { carousel } = created.data;
+      const { id, client } = must(everyInstance, "the viewer");
+      const carousel = await prisma.userCarousel.create({
+        data: {
+          userId: id,
+          title: "Kept",
+          icon: "Film",
+          rules: IDS_RULES,
+          sort: "title",
+          direction: "ASC",
+        },
+      });
 
       const response = await client.put(`/api/carousels/${carousel.id}`, {
         rules: { not_a_field: { value: 1 } },
@@ -238,6 +248,109 @@ describe("carousel, recommended and similar requests", () => {
       });
       expect(stored.rules).toEqual(IDS_RULES);
       expect(stored.direction).toBe("ASC");
+    });
+  });
+
+  describe("rules as a tree", () => {
+    /** One title row: the fixture's scenes are titled `<instance label>-<id>` */
+    const titled = (title: string) => ({
+      field: "title",
+      criterion: { value: title, modifier: "EQUALS" },
+    });
+    const anyOfTwo = {
+      match: "all",
+      rules: [
+        {
+          match: "any",
+          rules: [titled(`A-${FX_ID.SAME}`), titled(`B-${FX_ID.B_ONLY}`)],
+        },
+      ],
+    };
+
+    it("a carousel saved as a tree with an any group stores the tree and lists either side", async () => {
+      const { client } = must(everyInstance, "the viewer");
+
+      const created = await client.post<CreateCarouselResponse>(
+        "/api/carousels",
+        { title: "Any group", rules: anyOfTwo, sort: "title", direction: "ASC" }
+      );
+      expect(created.status).toBe(201);
+      expect(created.data.carousel.rules).toEqual(anyOfTwo);
+      const executed = await client.get<ExecuteCarouselByIdResponse>(
+        `/api/carousels/${created.data.carousel.id}/execute`
+      );
+      const preview = await client.post<PreviewCarouselResponse>(
+        "/api/carousels/preview",
+        { rules: anyOfTwo, sort: "title", direction: "ASC" }
+      );
+
+      const expected = [`${FX.A}/A-${FX_ID.SAME}`, `${FX.B}/B-${FX_ID.B_ONLY}`];
+      expect(executed.status).toBe(200);
+      expect(shown(executed.data.scenes)).toEqual(expected);
+      expect(preview.status).toBe(200);
+      expect(shown(preview.data.scenes)).toEqual(expected);
+      const stored = await prisma.userCarousel.findUniqueOrThrow({
+        where: { id: created.data.carousel.id },
+      });
+      expect(stored.rules).toEqual(anyOfTwo);
+    });
+
+    it("flat rules are saved as their tree, and a flat ids is refused", async () => {
+      const { id, client } = must(everyInstance, "the viewer");
+      const flat = { title: titled(`B-${FX_ID.B_ONLY}`).criterion };
+
+      const created = await client.post<CreateCarouselResponse>(
+        "/api/carousels",
+        { title: "Flat", rules: flat, sort: "title", direction: "ASC" }
+      );
+      const refused = await client.post("/api/carousels", {
+        title: "Flat ids",
+        rules: IDS_RULES,
+      });
+
+      expect(created.status).toBe(201);
+      const tree = { match: "all", rules: [titled(`B-${FX_ID.B_ONLY}`)] };
+      expect(created.data.carousel.rules).toEqual(tree);
+      expect(
+        (
+          await prisma.userCarousel.findUniqueOrThrow({
+            where: { id: created.data.carousel.id },
+          })
+        ).rules
+      ).toEqual(tree);
+      expectRefused(refused, ["rules.ids"]);
+      expect(
+        await prisma.userCarousel.count({
+          where: { userId: id, title: "Flat ids" },
+        })
+      ).toBe(0);
+    });
+
+    it("a stored flat row is served as its tree, and runs with its ids", async () => {
+      const { id, client } = must(everyInstance, "the viewer");
+      const carousel = await prisma.userCarousel.create({
+        data: {
+          userId: id,
+          title: "Stored flat",
+          icon: "Film",
+          rules: { ...IDS_RULES, title: titled(`B-${FX_ID.SAME}`).criterion },
+          sort: "title",
+          direction: "ASC",
+        },
+      });
+
+      const served = await client.get<GetCarouselResponse>(
+        `/api/carousels/${carousel.id}`
+      );
+      const executed = await client.get<ExecuteCarouselByIdResponse>(
+        `/api/carousels/${carousel.id}/execute`
+      );
+
+      expect(served.data.carousel.rules).toEqual({
+        match: "all",
+        rules: [titled(`B-${FX_ID.SAME}`)],
+      });
+      expect(shown(executed.data.scenes)).toEqual([`${FX.B}/B-${FX_ID.SAME}`]);
     });
   });
 
@@ -356,15 +469,20 @@ describe("carousel, recommended and similar requests", () => {
     });
 
     it("a carousel for a user who selected only instance A returns no B scenes", async () => {
-      const { client } = must(onlyA, "the A-only viewer");
-      const created = await client.post<CreateCarouselResponse>(
-        "/api/carousels",
-        { title: "Only A", rules: IDS_RULES, sort: "title", direction: "ASC" }
-      );
-      expect(created.status).toBe(201);
+      const { id, client } = must(onlyA, "the A-only viewer");
+      const carousel = await prisma.userCarousel.create({
+        data: {
+          userId: id,
+          title: "Only A",
+          icon: "Film",
+          rules: IDS_RULES,
+          sort: "title",
+          direction: "ASC",
+        },
+      });
 
       const executed = await client.get<ExecuteCarouselByIdResponse>(
-        `/api/carousels/${created.data.carousel.id}/execute`
+        `/api/carousels/${carousel.id}/execute`
       );
       const preview = await client.post<PreviewCarouselResponse>(
         "/api/carousels/preview",

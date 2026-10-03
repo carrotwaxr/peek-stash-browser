@@ -6,12 +6,15 @@ import {
   type GalleryFilterInput,
   type GroupFilterInput,
   type ImageFilterInput,
+  type ListKind,
   PANEL_FIELDS,
   type PanelField,
   type PerformerFilterInput,
   type SceneFilterInput,
   type StudioFilterInput,
   type TagFilterInput,
+  type WhereGroup,
+  isWhereGroup,
 } from "@peek/shared-types";
 import {
   type FilterOption,
@@ -279,13 +282,42 @@ export const CAROUSEL_FILTER_DEFINITIONS: FilterOption[] = filterOptionsOf(
   .sort((a, b) => (a.label ?? a.key).localeCompare(b.label ?? b.key));
 
 /**
- * A carousel's stored rules (the scene filter it saved) as the builder edits
- * them: `state` holds what the scene rows read back (each codec's
- * `fromCriterion`; bare ids stay bare, the old lone bounds read back as the
- * bound typed), `kept` every stored rule no row can edit, as stored.
+ * A root "all" tree of rows, each field once, as the flat filter it means
+ * (`{ [field]: criterion }`); undefined for a tree no flat filter holds (a
+ * group, a repeated field, an "any" root)
  */
-export const carouselRulesToFilterState = (rules: unknown): ReadPanelFilter =>
-  readPanelFilter("scene", rules, CAROUSEL_TABLE);
+function flatOfRootRows(
+  tree: WhereGroup<ListKind>
+): Record<string, unknown> | undefined {
+  if (tree.match !== "all") return undefined;
+  const flat: Record<string, unknown> = {};
+  for (const node of tree.rules) {
+    if (isWhereGroup(node) || !("field" in node) || node.field in flat) {
+      return undefined;
+    }
+    flat[node.field] = node.criterion;
+  }
+  return flat;
+}
+
+/**
+ * A carousel's stored rules as the builder edits them: `state` holds what
+ * the scene rows read back (each codec's `fromCriterion`; bare ids stay
+ * bare, the old lone bounds read back as the bound typed), `kept` every
+ * stored rule no row can edit, as stored. The server serves the rules as a
+ * where tree: a root "all" tree of rows, each field once, reads as the flat
+ * rules it means; any other tree is kept whole, for the builder to save as
+ * it is (slice A's builder edits groups). Flat rules read as they are.
+ */
+export const carouselRulesToFilterState = (rules: unknown): ReadPanelFilter => {
+  if (!isWhereGroup(rules)) {
+    return readPanelFilter("scene", rules, CAROUSEL_TABLE);
+  }
+  const flat = flatOfRootRows(rules);
+  return flat === undefined
+    ? { state: {}, kept: { match: rules.match, rules: rules.rules } }
+    : readPanelFilter("scene", flat, CAROUSEL_TABLE);
+};
 
 /**
  * The rules a carousel saves and previews: the builder's state built through
