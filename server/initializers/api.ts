@@ -17,6 +17,10 @@ import {
 } from "../middleware/auth.js";
 import { errorHandler } from "../middleware/errorHandler.js";
 import { requestTimeZone } from "../middleware/requestTimeZone.js";
+import {
+  isSignedMediaRequest,
+  signedMediaCors,
+} from "../middleware/signedMediaCors.js";
 import authRoutes from "../routes/auth.js";
 import carouselRoutes from "../routes/carousel.js";
 import clipsRoutes from "../routes/clips.js";
@@ -58,12 +62,21 @@ export const setupAPI = () => {
   // so rate limiting and lockout see each visitor's address
   app.set("trust proxy", resolveTrustProxy(process.env.TRUST_PROXY));
 
-  app.use(
-    cors({
-      credentials: true,
-      origin: ["http://localhost:5173", "http://localhost:6969"], // Add your client URLs
-    })
-  );
+  // Signed media (a Cast receiver's stream, caption and poster) gets `*` and
+  // no credentials; the credentialed cors() below must not see it, or it
+  // would add Access-Control-Allow-Credentials and replace `*`
+  app.use(signedMediaCors);
+  const corsMiddleware = cors({
+    credentials: true,
+    origin: ["http://localhost:5173", "http://localhost:6969"], // Add your client URLs
+  });
+  app.use((req, res, next) => {
+    if (isSignedMediaRequest(req)) {
+      next();
+      return;
+    }
+    corsMiddleware(req, res, next);
+  });
   app.use(express.json()); // Add JSON body parsing for POST/PUT requests
   app.use(cookieParser()); // Parse cookies for JWT
   // The viewer's time zone (X-Peek-Time-Zone, else UTC) on every API request

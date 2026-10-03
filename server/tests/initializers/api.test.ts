@@ -155,6 +155,105 @@ describe("health and version", () => {
   });
 });
 
+describe("CORS on the app stack", () => {
+  let server: Server | undefined;
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (server) {
+      await new Promise<void>((resolve) => must(server).close(() => resolve()));
+      server = undefined;
+    }
+    process.env = originalEnv;
+  });
+
+  const start = async (): Promise<string> => {
+    const { setupAPI } = await import("../../initializers/api.js");
+    server = setupAPI().listen(0);
+    await once(server, "listening");
+    const { port } = server.address() as AddressInfo;
+    return `http://127.0.0.1:${port}`;
+  };
+
+  // A malformed sig is refused by the stream guard before any database read
+  const SIGNED = "/api/scene/5/proxy-stream/stream?instanceId=a&uid=1&sig=x";
+
+  it("a signed GET and a signed OPTIONS carry no Access-Control-Allow-Credentials", async () => {
+    const base = await start();
+
+    const get = await fetch(`${base}${SIGNED}`, {
+      headers: { Origin: "https://receiver.example" },
+    });
+    const preflight = await fetch(`${base}${SIGNED}`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://receiver.example",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "range",
+      },
+    });
+
+    expect(get.status).toBe(401);
+    expect(get.headers.get("access-control-allow-origin")).toBe("*");
+    expect(get.headers.get("access-control-allow-credentials")).toBeNull();
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
+    expect(preflight.headers.get("access-control-allow-methods")).toBe(
+      "GET, HEAD"
+    );
+    expect(
+      preflight.headers.get("access-control-allow-credentials")
+    ).toBeNull();
+  });
+
+  it("a signed request with Origin: http://localhost:6969 still gets *, not the reflected origin", async () => {
+    const base = await start();
+
+    const get = await fetch(`${base}${SIGNED}`, {
+      headers: { Origin: "http://localhost:6969" },
+    });
+    const preflight = await fetch(`${base}/api/scene/5/poster?sig=x`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:6969",
+        "Access-Control-Request-Method": "GET",
+      },
+    });
+
+    for (const res of [get, preflight]) {
+      expect(res.headers.get("access-control-allow-origin")).toBe("*");
+      expect(res.headers.get("access-control-allow-credentials")).toBeNull();
+    }
+  });
+
+  it("an unsigned request from a dev origin keeps its credentialed CORS", async () => {
+    const base = await start();
+
+    const health = await fetch(`${base}/api/health`, {
+      headers: { Origin: "http://localhost:6969" },
+    });
+    const media = await fetch(
+      `${base}/api/scene/5/proxy-stream/stream?instanceId=a`,
+      { headers: { Origin: "http://localhost:5173" } }
+    );
+
+    expect(health.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:6969"
+    );
+    expect(health.headers.get("access-control-allow-credentials")).toBe("true");
+    expect(media.status).toBe(401);
+    expect(media.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:5173"
+    );
+    expect(media.headers.get("access-control-allow-credentials")).toBe("true");
+  });
+});
+
 describe("startServer", () => {
   const servers: Server[] = [];
 
