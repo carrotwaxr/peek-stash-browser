@@ -1,6 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import {
+  type Granularity,
+  timelineService,
+} from "../../services/TimelineService.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
+import { wholeDaySql } from "../../utils/sqlClauses.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { expectRefused } from "../helpers/refused.js";
 import {
@@ -240,7 +247,7 @@ describe("Timeline API", () => {
       const rows = await prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
         `SELECT COUNT(*) AS n FROM StashScene
          WHERE stashInstanceId = ? AND deletedAt IS NULL
-           AND date LIKE '____-__-__' AND date NOT LIKE '-%'`,
+           AND ${wholeDaySql("date")} LIKE '____-__-__' AND date NOT LIKE '-%'`,
         instanceId
       );
       const expected = Number(must(rows[0], "a count row").n);
@@ -551,6 +558,76 @@ describe("Timeline API", () => {
           await bars({ ids: [`${dated.id}:${instanceId}`] }, viewer)
         ).toEqual([]);
       }, 30_000);
+    });
+  });
+
+  /**
+   * Partial dates (`YYYY`, `YYYY-MM`) as the grid places them: on their
+   * first day. Seeded under a made-up instance and counted in process; every
+   * row is deleted.
+   */
+  describe("the bars place partial dates on their first day, as the grid does", () => {
+    const INSTANCE = "tl-partial";
+    const DATES: Record<string, string> = {
+      "1": "2019",
+      "2": "2019-03",
+      "3": "2019-03-15",
+      "4": "2019-01-01",
+    };
+    const options = {
+      userId: 0,
+      allowedInstanceIds: [INSTANCE],
+      timeZone: "UTC",
+    };
+
+    beforeAll(async () => {
+      await prisma.stashScene.createMany({
+        data: Object.entries(DATES).map(([id, date]) => ({
+          id,
+          stashInstanceId: INSTANCE,
+          date,
+        })),
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.stashScene.deleteMany({
+        where: { stashInstanceId: INSTANCE },
+      });
+    });
+
+    const barsBy = (granularity: Granularity) =>
+      timelineService.getDistribution("scene", parsedListRequest("scene"), {
+        ...options,
+        granularity,
+      });
+
+    const gridOn = (day: string) =>
+      sceneQueryBuilder.count({
+        ...options,
+        applyExclusions: false,
+        request: parsedListRequest("scene", {
+          filter: { date: { modifier: "EQUALS", value: day } },
+        }),
+      });
+
+    it("a YYYY and a YYYY-MM date each count in their first day's bar", async () => {
+      expect(await barsBy("years")).toEqual([{ period: "2019", count: 4 }]);
+      expect(await barsBy("months")).toEqual([
+        { period: "2019-01", count: 2 },
+        { period: "2019-03", count: 2 },
+      ]);
+      expect(await barsBy("days")).toEqual([
+        { period: "2019-01-01", count: 2 },
+        { period: "2019-03-01", count: 1 },
+        { period: "2019-03-15", count: 1 },
+      ]);
+    });
+
+    it("each day's bar counts what that day's grid lists", async () => {
+      for (const bar of await barsBy("days")) {
+        expect(await gridOn(bar.period), bar.period).toBe(bar.count);
+      }
     });
   });
 });

@@ -10,6 +10,7 @@ import type {
   TimelineGranularity,
 } from "@peek/shared-types/api/timeline.js";
 import type { ParsedListRequest } from "../types/parsedFilters.js";
+import { wholeDaySql } from "../utils/sqlClauses.js";
 import { galleryQueryBuilder } from "./GalleryQueryBuilder.js";
 import { imageQueryBuilder } from "./ImageQueryBuilder.js";
 import { sceneQueryBuilder } from "./SceneQueryBuilder.js";
@@ -55,7 +56,7 @@ const LISTS: {
 };
 
 /**
- * The period of a `YYYY-MM-DD` column, in the forms URLs carry
+ * The period of a `YYYY-MM-DD` day expression, in the forms URLs carry
  * (`period=2024`, `2024-03`, `2024-W12`, `2024-03-09`). A week is the ISO
  * week: Monday to Sunday, numbered in the year of its Thursday, so
  * 2024-12-30 is in 2025-W01 and 2021-01-03 in 2020-W53. The Thursday of a
@@ -89,10 +90,13 @@ export class TimelineService {
   ): Promise<DistributionItem[]> {
     const { builder, dateColumn } = LISTS[entityType];
     const { granularity, ...viewer } = options;
+    // The day the grid reads (`buildDayFilter`): a partial date is its first
+    // day, so a bar counts what the list it opens shows
+    const day = wholeDaySql(dateColumn);
     return builder.periodCounts(
       { ...viewer, request, applyExclusions: true },
-      periodSql(granularity, dateColumn),
-      dateColumn
+      periodSql(granularity, day),
+      day
     );
   }
 }

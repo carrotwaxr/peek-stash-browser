@@ -1052,6 +1052,15 @@ export function fullDateSql(col: string): string {
 }
 
 /**
+ * A text day column's day as the grid reads it (`buildDayFilter`) and the
+ * timeline's bars count it: `fullDateSql` cut to `YYYY-MM-DD`, so a partial
+ * date is its first day.
+ */
+export function wholeDaySql(col: string): string {
+  return `substr(${fullDateSql(col)}, 1, 10)`;
+}
+
+/**
  * The whole years from `birth` to `at`, Stash's arithmetic: the difference
  * of `YYYY.MMDD` read as a number, cut to its integer part. Both dates may
  * be partial (see fullDateSql).
@@ -1379,8 +1388,8 @@ export function performerCountSql(
 
 /**
  * A date criterion's clause on a text day column Stash keeps (`s.date`,
- * `p.birthdate`): each row's day is `fullDateSql(column)` cut to its first
- * 10 characters, so a `YYYY` or `YYYY-MM` value is its first day, compared
+ * `p.birthdate`): each row's day is `wholeDaySql(column)`, so a `YYYY` or
+ * `YYYY-MM` value is its first day, compared
  * as text with the criterion's day (a date-time value's first 10
  * characters, as written: a day column has no zone). EQUALS is the day,
  * NOT_EQUALS any other, GREATER_THAN after it, LESS_THAN before it; BETWEEN
@@ -1395,7 +1404,7 @@ export function buildDayFilter(
   criterion: DateCriterion,
   column: string
 ): FilterClause {
-  const day = `substr(${fullDateSql(column)}, 1, 10)`;
+  const day = wholeDaySql(column);
   const dayOf = (value: string) => value.slice(0, 10);
   switch (criterion.modifier) {
     case "IS_NULL":
