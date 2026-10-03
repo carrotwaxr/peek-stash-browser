@@ -71,7 +71,12 @@ interface ChipEditorProps {
   closeRef: RefObject<(() => void) | null>;
   /** Its row emptied: the editor now adds a new row of its field, here */
   onRowKeyChange: (at: RowKey) => void;
-  onClose: (reason: ChipEditorClose) => void;
+  /**
+   * It closed. `held`: its row has a value after its last commit, which a
+   * list still drawing the previous URL (a navigation in a transition) may
+   * not show yet
+   */
+  onClose: (reason: ChipEditorClose, held: boolean) => void;
 }
 
 /**
@@ -170,12 +175,18 @@ const ChipEditor = ({
       }
     }
     typing.cancel();
-    onCloseRef.current("outside");
+    onCloseRef.current(
+      "outside",
+      rowAt(filters.tree, atRef.current) !== undefined
+    );
   }, [kind, filters.tree, typing]);
 
   const close = useCallback(() => {
     typing.flush();
-    onCloseRef.current("closed");
+    onCloseRef.current(
+      "closed",
+      committedRef.current.at(-1)?.value !== undefined
+    );
   }, [typing]);
 
   useLayoutEffect(() => {
@@ -194,7 +205,7 @@ const ChipEditor = ({
         history: pushedRef.current ? "replace" : "push",
       });
     }
-    onCloseRef.current("removed");
+    onCloseRef.current("removed", false);
   };
 
   // Focus on the field's first control. This runs after the popover's own

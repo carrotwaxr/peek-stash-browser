@@ -20,8 +20,10 @@ test.describe("Scene Library", () => {
       timeout: 10_000,
     });
 
-    // Filters button should be present
-    await expect(page.getByText("Filters")).toBeVisible();
+    // + Filter should be present
+    await expect(
+      page.getByRole("button", { name: "Add filter" })
+    ).toBeVisible();
   });
 
   test("the scene grid shows cards", async ({ page }) => {

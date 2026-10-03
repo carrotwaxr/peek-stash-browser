@@ -193,12 +193,13 @@ function renderSearchControls(
     last = next.location;
     actions.push(next.historyAction);
   });
-  render(
+  const { container } = render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>
   );
   return {
+    container,
     onQueryChange,
     router,
     actions,
@@ -222,6 +223,38 @@ async function firstQuery(
 
 const sortSelect = () => must(screen.getAllByRole("combobox")[0], "sort");
 
+const addFilter = () => screen.getByRole("button", { name: "Add filter" });
+
+/** The open chip editor */
+const editor = () => screen.getByRole("dialog", { name: / filter$/ });
+
+/** Opens the editor of the chip whose text starts with `text` */
+async function openChip(text: string) {
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", {
+      name: new RegExp(`^Edit filter: ${text}`),
+    })
+  );
+  return { user, editor: editor() };
+}
+
+/** Opens + Filter and picks the field named `label` */
+async function addField(label: string) {
+  const user = userEvent.setup();
+  await user.click(addFilter());
+  await user.click(
+    within(screen.getByRole("listbox")).getByRole("option", { name: label })
+  );
+  return { user, editor: editor() };
+}
+
+/** Whether + Filter offers the field named `label` (the menu is open) */
+const offers = (label: string) =>
+  within(screen.getByRole("listbox")).queryByRole("option", {
+    name: label,
+  }) !== null;
+
 const perPageSelect = () =>
   must(
     screen
@@ -240,12 +273,59 @@ describe("SearchControls", () => {
   });
 
   describe("Initial Rendering", () => {
-    it("renders search input, sort control, and filters button", () => {
+    it("renders search input, sort control, and + Filter", () => {
       renderSearchControls();
 
       expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
       expect(screen.getAllByRole("combobox").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText("Filters")).toBeInTheDocument();
+      expect(addFilter()).toBeInTheDocument();
+    });
+
+    it("no Filters button, no panel and no Search & Filter header on desktop", async () => {
+      const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
+      await firstQuery(list.onQueryChange);
+
+      expect(
+        screen.queryByRole("button", { name: /^Filters/ })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Search & Filter" })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Search & Filter")).not.toBeInTheDocument();
+      expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
+      expect(screen.queryByText("Common Filters")).not.toBeInTheDocument();
+      // The filters show as chips, and + Filter adds one
+      expect(
+        screen.getByRole("button", {
+          name: "Edit filter: Favorite Scenes: Yes",
+        })
+      ).toBeInTheDocument();
+      expect(addFilter()).toBeInTheDocument();
+    });
+
+    it("the sort, direction and search keep their `data-tv-search-item` names", () => {
+      const { container } = renderSearchControls({
+        viewModes: [
+          { id: "grid", label: "Grid view" },
+          { id: "wall", label: "Wall view" },
+        ],
+      });
+      const item = (name: string) =>
+        container.querySelector(`[data-tv-search-item="${name}"]`);
+
+      expect(item("search-input")).toContainElement(
+        screen.getByPlaceholderText(/search/i)
+      );
+      expect(item("sort-control")).toContainElement(
+        screen.getByRole("combobox", { name: "Sort by" })
+      );
+      expect(item("sort-direction")).toContainElement(
+        screen.getByRole("button", { name: /^Sort direction/ })
+      );
+      expect(item("add-filter")).toContainElement(addFilter());
+      expect(item("view-mode")).not.toBeNull();
+      expect(item("context-settings")).not.toBeNull();
+      expect(item("filters-button")).toBeNull();
     });
 
     it("triggers initial query on mount", async () => {
@@ -303,109 +383,8 @@ describe("SearchControls", () => {
     });
   });
 
-  describe("Filter Panel", () => {
-    it("opens filter panel when Filters button is clicked", async () => {
-      const user = userEvent.setup();
-      renderSearchControls();
-
-      await user.click(must(screen.getByText("Filters").closest("button")));
-
-      expect(await screen.findByText("Apply Filters")).toBeInTheDocument();
-    });
-
-    it("closes filter panel when Apply Filters is clicked", async () => {
-      const user = userEvent.setup();
-      renderSearchControls();
-
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      await user.click(
-        must((await screen.findByText("Apply Filters")).closest("button"))
-      );
-
-      await waitFor(() => {
-        expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("Toggles and Cancel", () => {
-    const filtersButton = () =>
-      screen.getByRole("button", { name: /^Filters/ });
-
-    it("a collapsed section is a button with aria-expanded inside its heading", async () => {
-      const user = userEvent.setup();
-      renderSearchControls();
-      await user.click(filtersButton());
-
-      const toggle = await screen.findByRole("button", {
-        name: "Date Ranges",
-        expanded: false,
-      });
-      expect(toggle.closest("h3")).not.toBeNull();
-
-      toggle.focus();
-      await user.keyboard("{Enter}");
-      expect(
-        screen.getByRole("button", { name: "Date Ranges", expanded: true })
-      ).toBeInTheDocument();
-    });
-
-    it("the Search & Filter header is a button with aria-expanded", async () => {
-      const user = userEvent.setup();
-      renderSearchControls();
-
-      const header = screen.getByRole("button", {
-        name: "Search & Filter",
-        expanded: true,
-      });
-      expect(header.closest("h3")).not.toBeNull();
-      expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
-
-      header.focus();
-      await user.keyboard("{Enter}");
-      expect(
-        screen.getByRole("button", { name: "Search & Filter", expanded: false })
-      ).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
-    });
-
-    it("Cancel discards the edits: reopened, the panel shows the applied filters", async () => {
-      const user = userEvent.setup();
-      const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
-      await firstQuery(list.onQueryChange);
-
-      await user.click(filtersButton());
-      const favorite = () =>
-        document.getElementById("filter-favorite") as HTMLSelectElement;
-      expect(favorite()).toHaveDisplayValue("Yes");
-      await user.selectOptions(favorite(), "No");
-      expect(favorite()).toHaveDisplayValue("No");
-
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
-      expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
-      await user.click(filtersButton());
-
-      expect(favorite()).toHaveDisplayValue("Yes");
-      expect(list.params().get("favorite")).toBe("true");
-    });
-
-    it("after Apply or Cancel, focus is on the Filters button", async () => {
-      const user = userEvent.setup();
-      renderSearchControls();
-
-      await user.click(filtersButton());
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
-      expect(filtersButton()).toHaveFocus();
-
-      await user.click(filtersButton());
-      await user.click(screen.getByRole("button", { name: "Apply Filters" }));
-      expect(filtersButton()).toHaveFocus();
-    });
-  });
-
-  describe("Modifier dropdowns", () => {
+  describe("Chip editor conditions", () => {
     it("an untouched Performers modifier reads Has ANY, the modifier the request carries", async () => {
-      const user = userEvent.setup();
       const { onQueryChange } = renderSearchControls(
         {},
         { url: "/scenes?performerIds=7:server-a" }
@@ -417,51 +396,30 @@ describe("SearchControls", () => {
         performers: { value: ["7:server-a"], modifier: "INCLUDES" },
       });
 
-      await user.click(
-        must(screen.getByText("Filters").closest("button"), "Filters button")
-      );
-      const performers = must(
-        screen.getByText("Performers", { selector: "label" }).parentElement,
-        "the Performers control"
-      );
-      const modifier = within(performers).getAllByRole("combobox")[0];
+      const { editor } = await openChip("Performers");
+      const modifier = within(editor).getByRole("combobox", {
+        name: "Performers condition",
+      });
       expect(modifier).toHaveValue("INCLUDES");
       expect(modifier).toHaveDisplayValue("Has ANY of these");
     });
 
-    const tagsControl = () =>
-      must(
-        screen.getByText("Tags", { selector: "label" }).parentElement,
-        "the Tags control"
-      );
+    const tagsCondition = () =>
+      within(editor()).getByRole("combobox", { name: "Tags condition" });
 
-    it("ticking Include sub-tags keeps the condition", async () => {
-      const user = userEvent.setup();
+    it("Include sub-tags keeps the condition", async () => {
       const list = renderSearchControls({}, { url: "/scenes?tagIds=1:a" });
       await firstQuery(list.onQueryChange);
 
+      const { user } = await openChip("Tags");
+      await user.selectOptions(tagsCondition(), "EXCLUDES");
       await user.click(
-        must(screen.getByText("Filters").closest("button"), "Filters button")
-      );
-      const modifier = must(
-        within(tagsControl()).getAllByRole("combobox")[0],
-        "the modifier"
-      );
-      await user.selectOptions(modifier, "EXCLUDES");
-      await user.click(
-        within(tagsControl()).getByRole("checkbox", {
-          name: /Include sub-tags/,
-        })
+        within(editor()).getByRole("checkbox", { name: /Include sub-tags/ })
       );
 
-      const after = within(tagsControl()).getAllByRole("combobox")[0];
-      expect(after).toBeEnabled();
-      expect(after).toHaveValue("EXCLUDES");
-      expect(after).toHaveDisplayValue("Has NONE of these");
-
-      await user.click(
-        must(screen.getByText("Apply Filters").closest("button"))
-      );
+      expect(tagsCondition()).toBeEnabled();
+      expect(tagsCondition()).toHaveValue("EXCLUDES");
+      expect(tagsCondition()).toHaveDisplayValue("Has NONE of these");
       await waitFor(() =>
         expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
           tags: { value: ["1:a"], modifier: "EXCLUDES", depth: -1 },
@@ -470,7 +428,6 @@ describe("SearchControls", () => {
     });
 
     it("a URL with depth -1 and Has ALL shows Has ALL", async () => {
-      const user = userEvent.setup();
       const list = renderSearchControls(
         {},
         {
@@ -483,24 +440,17 @@ describe("SearchControls", () => {
         tags: { value: ["1:a"], modifier: "INCLUDES_ALL", depth: -1 },
       });
 
-      await user.click(
-        must(screen.getByText("Filters").closest("button"), "Filters button")
-      );
-      const modifier = within(tagsControl()).getAllByRole("combobox")[0];
-      expect(modifier).toHaveValue("INCLUDES_ALL");
-      expect(modifier).toHaveDisplayValue("Has ALL of these");
+      await openChip("Tags");
+      expect(tagsCondition()).toHaveValue("INCLUDES_ALL");
+      expect(tagsCondition()).toHaveDisplayValue("Has ALL of these");
     });
   });
 
   describe("Fields the page fixes", () => {
-    const openPanel = async () => {
+    const openMenu = async () => {
       const user = userEvent.setup();
-      await user.click(
-        must(screen.getByText("Filters").closest("button"), "Filters button")
-      );
+      await user.click(addFilter());
     };
-    const offers = (label: string) =>
-      screen.queryByText(label, { selector: "label" }) !== null;
 
     const PERFORMER = { value: ["1:abc"], modifier: "INCLUDES" };
     const TAG = { value: ["5:abc"], modifier: "INCLUDES", depth: 0 };
@@ -518,7 +468,7 @@ describe("SearchControls", () => {
       { id: "folder", label: "Folder view" },
     ];
 
-    it("on a performer's Scenes tab the panel offers Performers too (FILTERS-12)", async () => {
+    it("on a performer's Scenes tab + Filter offers Performers too (FILTERS-12)", async () => {
       const list = renderSearchControls(
         {
           context: "scene_performer",
@@ -528,7 +478,7 @@ describe("SearchControls", () => {
       );
       await firstQuery(list.onQueryChange);
 
-      await openPanel();
+      await openMenu();
 
       expect(offers("Performers")).toBe(true);
       expect(offers("Tags")).toBe(true);
@@ -558,7 +508,7 @@ describe("SearchControls", () => {
       });
     });
 
-    it("on a tag's Performers tab the panel offers Tags too", async () => {
+    it("on a tag's Performers tab + Filter offers Tags too", async () => {
       // SearchableGrid hands its locked filters over as they are: the
       // entity's own filter holds the fixed fields
       const list = renderSearchControls(
@@ -575,7 +525,7 @@ describe("SearchControls", () => {
       );
       await firstQuery(list.onQueryChange);
 
-      await openPanel();
+      await openMenu();
 
       expect(offers("Tags")).toBe(true);
       expect(offers("Gender")).toBe(true);
@@ -594,15 +544,13 @@ describe("SearchControls", () => {
       const query = await firstQuery(list.onQueryChange);
       expect(query.scene_filter).toMatchObject({ tags: TAG });
 
-      await openPanel();
+      await openMenu();
       expect(offers("Tags")).toBe(true);
-      // The date filters sit in a collapsed section
-      await userEvent.click(screen.getByText("Date Ranges"));
       expect(offers("Created Date")).toBe(true);
       expect(offers("Scene Date")).toBe(false);
     });
 
-    it("inside a folder the panel offers no Tags picker", async () => {
+    it("inside a folder + Filter offers no Tags picker", async () => {
       const list = renderSearchControls(
         { viewFilters, viewModes: VIEWS },
         { url: "/scenes?view=folder&folderPath=5:abc" }
@@ -611,7 +559,7 @@ describe("SearchControls", () => {
         tags: TAG,
       });
 
-      await openPanel();
+      await openMenu();
 
       expect(offers("Tags")).toBe(false);
       expect(offers("Performers")).toBe(true);
@@ -619,38 +567,35 @@ describe("SearchControls", () => {
   });
 
   describe("Filter Application", () => {
-    it("Apply resets the page to 1", async () => {
-      const user = userEvent.setup();
-      const list = renderSearchControls({}, { url: "/scenes?page=3" });
+    it("a chip edit resets the page to 1, with one history entry", async () => {
+      const list = renderSearchControls(
+        {},
+        { url: "/scenes?page=3&favorite=true" }
+      );
       expect((await firstQuery(list.onQueryChange)).filter.page).toBe(3);
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      await user.click(
-        must((await screen.findByText("Apply Filters")).closest("button"))
+      const { user, editor } = await openChip("Favorite Scenes");
+      await user.selectOptions(
+        within(editor).getByRole("combobox", { name: "Favorite Scenes" }),
+        "No"
       );
 
       await waitFor(() => expect(list.lastQuery().filter.page).toBe(1));
       expect(list.actions).toEqual(["PUSH"]);
     });
 
-    it("a filter set in the panel reaches the request on Apply, with one history entry", async () => {
-      const user = userEvent.setup();
+    it("a filter added from + Filter reaches the request at once, with one history entry", async () => {
       const list = renderSearchControls();
       await firstQuery(list.onQueryChange);
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      const favorite = must(
-        screen.getByText("Favorite Scenes", { selector: "label" })
-          .parentElement,
-        "the Favorite control"
-      );
-      // Three states: Yes, No and Any (Any is what an untouched panel holds)
-      expect(within(favorite).getByRole("combobox")).toHaveDisplayValue("Any");
-      await user.selectOptions(within(favorite).getByRole("combobox"), "Yes");
+      const { user, editor } = await addField("Favorite Scenes");
+      const favorite = within(editor).getByRole("combobox", {
+        name: "Favorite Scenes",
+      });
+      // Three states: Yes, No and Any (Any is what an unset field holds)
+      expect(favorite).toHaveDisplayValue("Any");
       expect(list.onQueryChange).toHaveBeenCalledTimes(1);
-      await user.click(
-        must(screen.getByText("Apply Filters").closest("button"))
-      );
+      await user.selectOptions(favorite, "Yes");
 
       await waitFor(() =>
         expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
@@ -661,19 +606,14 @@ describe("SearchControls", () => {
       expect(list.actions).toEqual(["PUSH"]);
     });
 
-    it("favourite No sends false, and Any sends nothing and leaves the URL", async () => {
-      const user = userEvent.setup();
+    it("favorite No sends false, and Any sends nothing and leaves the URL", async () => {
       const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
       await firstQuery(list.onQueryChange);
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      const favorite = screen.getByRole("combobox", {
-        name: "Favorite Scenes",
-      });
-      await user.selectOptions(favorite, "No");
-      await user.click(
-        must(screen.getByText("Apply Filters").closest("button"))
-      );
+      const { user, editor } = await openChip("Favorite Scenes");
+      const favorite = () =>
+        within(editor).getByRole("combobox", { name: "Favorite Scenes" });
+      await user.selectOptions(favorite(), "No");
       await waitFor(() =>
         expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
           favorite: false,
@@ -681,14 +621,7 @@ describe("SearchControls", () => {
       );
       expect(list.params().get("favorite")).toBe("false");
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      await user.selectOptions(
-        screen.getByRole("combobox", { name: "Favorite Scenes" }),
-        "Any"
-      );
-      await user.click(
-        must(screen.getByText("Apply Filters").closest("button"))
-      );
+      await user.selectOptions(favorite(), "Any");
       await waitFor(() =>
         expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({})
       );
@@ -696,7 +629,6 @@ describe("SearchControls", () => {
     });
 
     it("Orientation is a box for each value, and several send a list", async () => {
-      const user = userEvent.setup();
       // A link stored while Orientation took one value
       const list = renderSearchControls(
         {},
@@ -704,18 +636,12 @@ describe("SearchControls", () => {
       );
       await firstQuery(list.onQueryChange);
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      await user.click(
-        screen.getByRole("button", { name: "Video Properties" })
-      );
-      const group = screen.getByRole("group", { name: "Orientation" });
+      const { user, editor } = await openChip("Orientation");
+      const group = within(editor).getByRole("group", { name: "Orientation" });
       expect(
         within(group).getByRole("checkbox", { name: /Landscape$/ })
       ).toBeChecked();
       await user.click(within(group).getByRole("checkbox", { name: "Square" }));
-      await user.click(
-        must(screen.getByText("Apply Filters").closest("button"))
-      );
 
       await waitFor(() =>
         expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
@@ -726,7 +652,6 @@ describe("SearchControls", () => {
     });
 
     it('the default Performers preset `{ gender: "FEMALE" }` shows Female checked and sends it as a list', async () => {
-      const user = userEvent.setup();
       const list = renderSearchControls(
         { artifactType: "performer" },
         {
@@ -745,8 +670,8 @@ describe("SearchControls", () => {
         gender: { value: ["FEMALE"], modifier: "INCLUDES" },
       });
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      const group = screen.getByRole("group", { name: "Gender" });
+      const { user, editor } = await openChip("Gender");
+      const group = within(editor).getByRole("group", { name: "Gender" });
       expect(
         within(group).getByRole("checkbox", { name: "Female" })
       ).toBeChecked();
@@ -755,11 +680,8 @@ describe("SearchControls", () => {
       ).not.toBeChecked();
       await user.click(within(group).getByRole("checkbox", { name: "Male" }));
       await user.selectOptions(
-        screen.getByRole("combobox", { name: "Gender condition" }),
+        within(editor).getByRole("combobox", { name: "Gender condition" }),
         "Is NONE of these"
-      );
-      await user.click(
-        must(screen.getByText("Apply Filters").closest("button"))
       );
 
       await waitFor(() =>
@@ -770,7 +692,6 @@ describe("SearchControls", () => {
     });
 
     it("choosing Not rated hides the bounds and sends IS_NULL", async () => {
-      const user = userEvent.setup();
       const list = renderSearchControls({}, { url: "/scenes?rating_min=40" });
       expect(
         sentFilter(await firstQuery(list.onQueryChange), "scene_filter")
@@ -778,25 +699,18 @@ describe("SearchControls", () => {
         rating100: { modifier: "BETWEEN", value: 40 },
       });
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      const rating = must(
-        screen.getByText("Rating (0-100)", { selector: "label" }).parentElement,
-        "the Rating control"
-      );
-      expect(within(rating).getAllByRole("spinbutton")).toHaveLength(2);
-      const condition = within(rating).getByRole("combobox", {
+      const { user, editor } = await openChip("Rating");
+      expect(within(editor).getAllByRole("spinbutton")).toHaveLength(2);
+      const condition = within(editor).getByRole("combobox", {
         name: "Rating (0-100) condition",
       });
       expect(condition).toHaveDisplayValue("Between");
 
       await user.selectOptions(condition, "Not rated");
-      expect(within(rating).queryAllByRole("spinbutton")).toHaveLength(0);
+      expect(within(editor).queryAllByRole("spinbutton")).toHaveLength(0);
       await user.selectOptions(condition, "Between");
-      expect(within(rating).getAllByRole("spinbutton")).toHaveLength(2);
+      expect(within(editor).getAllByRole("spinbutton")).toHaveLength(2);
       await user.selectOptions(condition, "Not rated");
-      await user.click(
-        must(screen.getByText("Apply Filters").closest("button"))
-      );
 
       await waitFor(() =>
         expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
@@ -822,7 +736,7 @@ describe("SearchControls", () => {
       expect(list.params().has("favorite")).toBe(false);
     });
 
-    it("removing a chip moves focus to the next chip, else the previous, else the Filters button", async () => {
+    it("removing a chip moves focus to the next chip, else the previous, else + Filter", async () => {
       const user = userEvent.setup();
       const list = renderSearchControls(
         {},
@@ -843,33 +757,17 @@ describe("SearchControls", () => {
       await waitFor(() => expect(removeButtons()).toHaveLength(1));
       expect(second).toHaveFocus();
 
-      // The only chip's removal lands on the Filters button
+      // The only chip's removal lands on + Filter
       await user.click(must(second, "the only chip"));
       await waitFor(() =>
         expect(
           screen.queryByRole("button", { name: /^Remove filter:/ })
         ).not.toBeInTheDocument()
       );
-      expect(screen.getByRole("button", { name: /^Filters/ })).toHaveFocus();
+      expect(addFilter()).toHaveFocus();
     });
 
-    it("the badge counts one per filter, as the chips do", async () => {
-      const list = renderSearchControls(
-        {},
-        {
-          url: "/scenes?tagIds=1:a,2:a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1&favorite=true",
-        }
-      );
-      await firstQuery(list.onQueryChange);
-
-      expect(
-        screen.getAllByRole("button", { name: /^Remove filter:/ })
-      ).toHaveLength(2);
-      const filters = must(screen.getByText("Filters").closest("button"));
-      expect(within(filters).getByText("2")).toBeInTheDocument();
-    });
-
-    it("excludes with no includes count 1 in the badge and draw one chip", async () => {
+    it("excludes with no includes draw one chip", async () => {
       const list = renderSearchControls(
         {},
         { url: "/scenes?tagIdsExclude=2:a" }
@@ -883,33 +781,23 @@ describe("SearchControls", () => {
       expect(
         screen.getAllByRole("button", { name: /^Remove filter:/ })
       ).toHaveLength(1);
-      const filters = must(screen.getByText("Filters").closest("button"));
-      expect(within(filters).getByText("1")).toBeInTheDocument();
     });
 
-    it("Has none hides the picker, counts 1 and draws one chip", async () => {
-      const user = userEvent.setup();
+    it("Has none hides the picker and draws one chip", async () => {
       const list = renderSearchControls({}, { url: "/scenes?groupIds=1:a" });
       await firstQuery(list.onQueryChange);
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      const collections = must(
-        screen.getByText("Collections", { selector: "label" }).parentElement,
-        "the Collections control"
-      );
+      const { user, editor } = await openChip("Collections");
       expect(
-        within(collections).getByRole("button", { name: /^Collections/ })
+        within(editor).getByRole("button", { name: /^Collections/ })
       ).toBeInTheDocument();
-      const condition = within(collections).getByRole("combobox", {
+      const condition = within(editor).getByRole("combobox", {
         name: "Collections condition",
       });
       await user.selectOptions(condition, "In none");
       expect(
-        within(collections).queryByRole("button", { name: /^Collections/ })
+        within(editor).queryByRole("button", { name: /^Collections/ })
       ).toBeNull();
-      await user.click(
-        must(screen.getByText("Apply Filters").closest("button"))
-      );
 
       await waitFor(() =>
         expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
@@ -924,8 +812,6 @@ describe("SearchControls", () => {
       expect(chips.map((chip) => chip.getAttribute("aria-label"))).toEqual([
         "Remove filter: Collections: in none",
       ]);
-      const filters = must(screen.getByText("Filters").closest("button"));
-      expect(within(filters).getByText("1")).toBeInTheDocument();
     });
 
     it("activating a chip opens its editor under it, focus on the field's first control; another chip's closes it", async () => {
@@ -944,8 +830,6 @@ describe("SearchControls", () => {
       });
       expect(document.activeElement?.tagName).toBe("SELECT");
       expect(favorite).toContainElement(document.activeElement as HTMLElement);
-      // The panel stays closed
-      expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
 
       await user.click(
         screen.getByRole("button", { name: /^Edit filter: Tags/ })
@@ -962,8 +846,7 @@ describe("SearchControls", () => {
       );
     });
 
-    it("Apply keeps a folder's permanent tag", async () => {
-      const user = userEvent.setup();
+    it("a filter added inside a folder keeps the folder's permanent tag", async () => {
       const FOLDER_TAG = { value: ["5:abc"], modifier: "INCLUDES", depth: 0 };
       /** A folder page: the folder opens after the list mounted */
       function FolderPage(props: ListControlsProps) {
@@ -983,15 +866,19 @@ describe("SearchControls", () => {
       );
       await firstQuery(list.onQueryChange);
 
-      await user.click(screen.getByRole("button", { name: "Open folder" }));
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      await user.click(
-        must((await screen.findByText("Apply Filters")).closest("button"))
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "Open folder" }));
+      const { user, editor } = await addField("Favorite Scenes");
+      await user.selectOptions(
+        within(editor).getByRole("combobox", { name: "Favorite Scenes" }),
+        "Yes"
       );
 
       await waitFor(() => expect(list.lastQuery().filter.page).toBe(1));
       expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
         tags: FOLDER_TAG,
+        favorite: true,
       });
     });
   });
@@ -1191,6 +1078,23 @@ describe("SearchControls", () => {
         expect(sortValues()).toContain("scene_index");
       });
 
+      it("is offered beside a collection filter set in the chip bar", async () => {
+        vi.mocked(apiModule.libraryApi.findGroupsMinimal).mockResolvedValue([
+          { id: "7", instanceId: "inst", name: "Series" },
+        ]);
+        const list = renderSearchControls();
+        await firstQuery(list.onQueryChange);
+        expect(sortValues()).not.toContain("scene_index");
+
+        const { user, editor } = await addField("Collections");
+        await user.click(
+          await within(editor).findByRole("button", { name: /^Series/ })
+        );
+
+        await waitFor(() => expect(sortValues()).toContain("scene_index"));
+        expect(list.params().get("groupIds")).toBe("7:inst");
+      });
+
       it("is not offered when the collection filter excludes or is empty", () => {
         renderSearchControls(
           {},
@@ -1320,49 +1224,48 @@ describe("SearchControls", () => {
     );
   });
 
-  describe("Clear Filters", () => {
-    it("shows Clear All button when filters are active", async () => {
-      const user = userEvent.setup();
-      renderSearchControls({}, { url: "/scenes?favorite=true" });
+  describe("Clear all", () => {
+    it("shows in the chip bar only while filters are set", async () => {
+      const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
+      await firstQuery(list.onQueryChange);
+      expect(
+        screen.getByRole("button", { name: "Clear all" })
+      ).toBeInTheDocument();
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
+      await userEvent
+        .setup()
+        .click(
+          screen.getByRole("button", { name: /^Remove filter: Favorite/ })
+        );
 
-      expect(await screen.findByText("Clear All")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Clear all" })
+        ).not.toBeInTheDocument()
+      );
     });
 
-    it("Clear All asks for the unfiltered list", async () => {
+    it("Clear all asks for the unfiltered list and moves focus to + Filter", async () => {
       const user = userEvent.setup();
-      const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
+      const list = renderSearchControls(
+        {},
+        { url: "/scenes?favorite=true&tagIds=1:a&2.tagIds=2:a" }
+      );
       expect(
         sentFilter(await firstQuery(list.onQueryChange), "scene_filter")
-      ).toEqual({
+      ).toMatchObject({
         favorite: true,
       });
 
-      await user.click(must(screen.getByText("Filters").closest("button")));
-      await user.click(
-        must((await screen.findByText("Clear All")).closest("button"))
-      );
+      await user.click(screen.getByRole("button", { name: "Clear all" }));
 
       await waitFor(() =>
         expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({})
       );
       expect(list.params().has("favorite")).toBe(false);
-    });
-
-    it("Clear All moves focus to the Filters button", async () => {
-      const user = userEvent.setup();
-      renderSearchControls({}, { url: "/scenes?favorite=true" });
-      const filtersButton = () =>
-        screen.getByRole("button", { name: /^Filters/ });
-
-      await user.click(filtersButton());
-      await user.click(
-        must((await screen.findByText("Clear All")).closest("button"))
-      );
-
-      expect(screen.queryByText("Clear All")).not.toBeInTheDocument();
-      expect(filtersButton()).toHaveFocus();
+      expect(list.params().has("2.tagIds")).toBe(false);
+      expect(list.actions).toEqual(["PUSH"]);
+      expect(addFilter()).toHaveFocus();
     });
   });
 
@@ -1455,13 +1358,10 @@ describe("SearchControls text condition (F22b)", () => {
       path: { value: "/media", modifier: "INCLUDES" },
     });
 
-    await user.click(must(screen.getByText("Filters").closest("button")));
-    await user.click(screen.getByRole("button", { name: "Other Filters" }));
-    const path = must(
-      screen.getByText("Path", { selector: "label" }).parentElement,
-      "the Path control"
+    await user.click(
+      screen.getByRole("button", { name: /^Edit filter: Path/ })
     );
-    const condition = within(path).getByRole("combobox", {
+    const condition = within(editor()).getByRole("combobox", {
       name: "Path condition",
     });
     expect(condition).toHaveDisplayValue("Contains");
@@ -1469,7 +1369,6 @@ describe("SearchControls text condition (F22b)", () => {
       [...condition.querySelectorAll("option")].map((each) => each.text)
     ).toEqual(["Contains", "Excludes", "Equals", "Starts with"]);
     await user.selectOptions(condition, "Starts with");
-    await user.click(must(screen.getByText("Apply Filters").closest("button")));
 
     await waitFor(() =>
       expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({

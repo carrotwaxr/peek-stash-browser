@@ -36,6 +36,7 @@ import {
   CODECS,
   codecOf,
   filterOptionsOf,
+  removeRow,
   urlKeysOf,
 } from "@/utils/filterFields";
 import { sortOptionsFor, withoutLockedFilters } from "@/utils/listQuery";
@@ -1296,7 +1297,13 @@ describe("include or exclude per value (F22a)", () => {
 
     const chip = renderScenes(url);
     act(() => {
-      chip.state().removeFilter("tagIds");
+      chip.state().applyFilters(
+        removeRow("scene", chip.state().filters, {
+          group: 0,
+          occurrence: 1,
+          key: "tagIds",
+        })
+      );
     });
     expect(chip.params().has("tagIdsExclude")).toBe(false);
     expect(chip.params().has("tagIds")).toBe(false);
@@ -1304,7 +1311,13 @@ describe("include or exclude per value (F22a)", () => {
 
     const excludesAlone = renderScenes("/scenes?tagIdsExclude=2:b");
     act(() => {
-      excludesAlone.state().removeFilter("tagIds");
+      excludesAlone.state().applyFilters(
+        removeRow("scene", excludesAlone.state().filters, {
+          group: 0,
+          occurrence: 1,
+          key: "tagIds",
+        })
+      );
     });
     expect(excludesAlone.params().has("tagIdsExclude")).toBe(false);
 

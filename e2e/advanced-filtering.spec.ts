@@ -3,27 +3,31 @@ import { ListPage } from "./pages/ListPage";
 import { sentCriterion } from "./support/sentFilter";
 
 /**
- * E2E tests for the filter panel and for combining search with sort and view
- * mode in the URL.
+ * E2E tests for "+ Filter" and the chip editors, and for combining search
+ * with sort and view mode in the URL.
  */
 
 test.describe("Advanced Filtering", () => {
-  test("the filter panel opens and closes", async ({ page }) => {
+  test("+ Filter opens, lists the page's fields, closes on Escape with focus back", async ({
+    page,
+  }) => {
     const list = new ListPage(page);
     await list.goto("/scenes");
-    const applyFilters = page.getByRole("button", { name: "Apply Filters" });
 
-    // Filters toggles the panel open and closed
-    await list.openFilters();
-    await expect(applyFilters).toBeVisible();
-    await list.filtersButton.click();
-    await expect(applyFilters).toHaveCount(0);
+    await list.addFilterButton.click();
+    await expect(
+      page.getByRole("combobox", { name: "Find a filter" })
+    ).toBeFocused();
+    const fields = page.getByRole("listbox", { name: "Filters" });
+    await expect(
+      fields
+        .getByRole("group", { name: "Common Filters" })
+        .getByRole("option", { name: "Tags", exact: true })
+    ).toBeVisible();
 
-    // Cancel closes it too
-    await list.openFilters();
-    await expect(applyFilters).toBeVisible();
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
-    await expect(applyFilters).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(fields).toHaveCount(0);
+    await expect(list.addFilterButton).toBeFocused();
   });
 
   test("search and filter combined maintain URL state", async ({ page }) => {
@@ -50,17 +54,16 @@ test.describe("Advanced Filtering", () => {
     expect(new URL(page.url()).searchParams.get("q")).toBe("filter-test");
   });
 
-  test("the performers filter panel lists its own filters", async ({
-    page,
-  }) => {
+  test("+ Filter lists performer fields", async ({ page }) => {
     const list = new ListPage(page);
     await list.goto("/performers");
 
-    await list.openFilters();
+    await list.addFilterButton.click();
     await expect(
-      page.getByRole("button", { name: "Apply Filters" })
+      page
+        .getByRole("listbox", { name: "Filters" })
+        .getByRole("option", { name: "Gender", exact: true })
     ).toBeVisible();
-    await expect(page.locator("label", { hasText: /^Gender$/ })).toBeVisible();
   });
 
   test("Performers: a penis length range shows performers or the empty state, never an error", async ({
@@ -70,23 +73,20 @@ test.describe("Advanced Filtering", () => {
     await list.goto("/performers");
     await list.waitForResults("Performer");
 
-    await list.openFilters();
-    // The physical attributes sit in a section that starts collapsed
-    await page.getByRole("heading", { name: "Performer Attributes" }).click();
-    const range = page
-      .locator("label", { hasText: /^Penis Length/ })
-      .locator("xpath=..");
-    await range.getByPlaceholder("Min").fill("10");
-    await range.getByPlaceholder("Max").fill("20");
-
-    // The list request that carries the range, not the one before it
+    const range = await list.addFilter("Penis Length");
+    // The list request that carries the whole range, not the ones before it:
+    // typing applies once it pauses
     const filtered = page.waitForResponse(
       (r) =>
         new URL(r.url()).pathname === "/api/library/performers" &&
         r.request().method() === "POST" &&
-        !!sentCriterion(r.request().postDataJSON(), "penis_length")
+        sentCriterion<{ value?: number; value2?: number }>(
+          r.request().postDataJSON(),
+          "penis_length"
+        )?.value2 !== undefined
     );
-    await page.getByRole("button", { name: "Apply Filters" }).click();
+    await range.getByPlaceholder("Min").fill("10");
+    await range.getByPlaceholder("Max").fill("20");
     const response = await filtered;
     expect(response.status()).toBe(200);
     const { findPerformers } = (await response.json()) as {
@@ -104,17 +104,16 @@ test.describe("Advanced Filtering", () => {
     await expect(page.getByText("Failed to find performers")).toHaveCount(0);
   });
 
-  test("the tags filter panel lists its own filters", async ({ page }) => {
+  test("+ Filter lists tag fields", async ({ page }) => {
     const list = new ListPage(page);
     await list.goto("/tags");
 
-    await list.openFilters();
+    await list.addFilterButton.click();
+    // A tag filter the scene list does not have
     await expect(
-      page.getByRole("button", { name: "Apply Filters" })
-    ).toBeVisible();
-    // A tag filter the scene panel does not have
-    await expect(
-      page.locator("label", { hasText: /^Description Search$/ })
+      page
+        .getByRole("listbox", { name: "Filters" })
+        .getByRole("option", { name: "Description Search", exact: true })
     ).toBeVisible();
   });
 
