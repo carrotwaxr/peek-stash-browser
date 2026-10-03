@@ -918,11 +918,12 @@ describe("buildPerformerFilter", () => {
       const result = buildPerformerFilter({
         height: { feetMin: "5", inchesMin: "10", feetMax: "6", inchesMax: "2" },
       });
-      // 5'10" = 177.8 cm and 6'2" = 187.96 cm; the request keeps the decimals
+      // 5'10" = 177.8 cm, the request keeps the decimals; a maximum is the
+      // top of its inch, 6'2" up to 189 cm as the editor writes it
       expect(result.height).toEqual({
         modifier: "BETWEEN",
         value: 177.8,
-        value2: 187.96,
+        value2: 189,
       });
     });
   });

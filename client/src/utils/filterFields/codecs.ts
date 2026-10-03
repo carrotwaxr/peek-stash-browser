@@ -53,9 +53,11 @@ import type {
 } from "@peek/shared-types";
 import { makeCompositeKey, parseCompositeKey } from "../compositeKey";
 import {
+  type RangeSide,
   UNITS,
   cmToFeetInches,
   cmToLengthInches,
+  heightBoundToCm,
   kgToLbs,
 } from "../unitConversions";
 
@@ -351,12 +353,24 @@ const finiteBound = (value: unknown): string | number | undefined =>
     ? value
     : undefined;
 
-/** The old feet-and-inches height of a bound, as centimetres to two decimals; undefined when blank */
-const legacyHeightCm = (feet: unknown, inches: unknown): number | undefined => {
+/**
+ * The old feet-and-inches height of a bound, as centimetres; undefined when
+ * blank. A minimum is its exact length to two decimals; a maximum is the
+ * top of its inch, the highest whole cm that shows as it (6'2" is 189 cm),
+ * as the editor writes it, so an old link keeps the heights it matched
+ */
+const legacyHeightCm = (
+  feet: unknown,
+  inches: unknown,
+  side: RangeSide
+): number | undefined => {
   const whole = (value: unknown) =>
     finiteBound(value) === undefined ? 0 : Number(value);
   const total = whole(feet) * 12 + whole(inches);
-  return total > 0 ? Math.round(total * 2.54 * 100) / 100 : undefined;
+  if (total <= 0) return undefined;
+  return side === "max"
+    ? heightBoundToCm(whole(feet), whole(inches), "max")
+    : Math.round(total * 2.54 * 100) / 100;
 };
 
 /**
@@ -373,10 +387,14 @@ function normalizeMeasure(
   const legacy = measure === "height";
   const min =
     finiteBound(range.min) ??
-    (legacy ? legacyHeightCm(range.feetMin, range.inchesMin) : undefined);
+    (legacy
+      ? legacyHeightCm(range.feetMin, range.inchesMin, "min")
+      : undefined);
   const max =
     finiteBound(range.max) ??
-    (legacy ? legacyHeightCm(range.feetMax, range.inchesMax) : undefined);
+    (legacy
+      ? legacyHeightCm(range.feetMax, range.inchesMax, "max")
+      : undefined);
   if (min === undefined && max === undefined) return undefined;
   return {
     ...(min === undefined ? {} : { min }),

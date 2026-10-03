@@ -973,7 +973,12 @@ describe("body measures are metric in the URL (owner answer 12)", () => {
         feetMax: "6",
         inchesMax: "2",
       })
-    ).toEqual({ min: 177.8, max: 187.96 });
+    ).toEqual({ min: 177.8, max: 189 });
+    // A maximum is the top of its inch, as the editor writes it: 6'2" keeps
+    // the 188 and 189 cm performers an old link matched
+    expect(
+      CODECS.number.normalize(height, { feetMax: "6", inchesMax: "2" })
+    ).toEqual({ max: 189 });
     // A bound the state holds wins over a stale legacy one
     expect(
       CODECS.number.normalize(height, { min: "170", feetMin: "5" })
