@@ -534,6 +534,31 @@ describe("getErrorMessage", () => {
   });
 });
 
+describe("apiPatch", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("apiPatch sends PATCH with a JSON body", async () => {
+    const fetchMock = stubFetch(200, { success: true });
+    const { apiPatch } = await import("@/api/client");
+
+    const answer = await apiPatch("/user/filter-presets/scene/p1", {
+      name: "Renamed",
+    });
+
+    expect(answer).toEqual({ success: true });
+    const [url, init] = must(fetchMock.mock.calls[0]);
+    expect(url).toBe("/api/user/filter-presets/scene/p1");
+    expect(init?.method).toBe("PATCH");
+    expect(init?.body).toBe(JSON.stringify({ name: "Renamed" }));
+  });
+});
+
 describe("the library stamp (X-Peek-Library)", () => {
   type Modules = {
     client: typeof ApiClient;

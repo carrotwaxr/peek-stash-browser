@@ -11,6 +11,7 @@ export {
   apiGet,
   apiPost,
   apiPut,
+  apiPatch,
   apiDelete,
   ApiError,
   getErrorMessage,
