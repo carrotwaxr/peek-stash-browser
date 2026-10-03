@@ -282,7 +282,7 @@ export function updateRow(
 }
 
 /** Removes a row or kept row wherever it is */
-export function removeRow(tree: EditTree, rowId: string): EditTree {
+export function removeEditRow(tree: EditTree, rowId: string): EditTree {
   const at = containerOf(tree, rowId);
   return at === undefined
     ? tree
@@ -303,7 +303,7 @@ export function moveRow(
     ...tree.groups.flatMap((group) => group.rows),
   ].find((each) => each.id === rowId);
   if (item === undefined) return tree;
-  return withItems(removeRow(tree, rowId), to, (items) => [...items, item]);
+  return withItems(removeEditRow(tree, rowId), to, (items) => [...items, item]);
 }
 
 /** Adds an empty "all" group at the root; unchanged at the group limit */
@@ -316,7 +316,7 @@ export function addGroup(tree: EditTree): EditTree {
 }
 
 /** Removes a group with its rows */
-export function removeGroup(tree: EditTree, groupId: string): EditTree {
+export function removeEditGroup(tree: EditTree, groupId: string): EditTree {
   return {
     ...tree,
     groups: tree.groups.filter((group) => group.id !== groupId),
