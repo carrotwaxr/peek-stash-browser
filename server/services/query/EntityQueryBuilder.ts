@@ -15,7 +15,8 @@
  * The base owns what every list shares (server-sql.md, "Every list query"):
  * `deletedAt IS NULL`, the exclusion join with the instance, the allowed
  * instances (an empty list matches nothing), a detail page's one instance,
- * the `ids` filter as (id, instance) pairs, the random sort with its seed
+ * the `ids` filter as (id, instance) pairs, Recommended's ranked refs as a
+ * joined CTE (`rankedClause`), the random sort with its seed
  * bound, the primary key ending every order, the joined `COUNT(*)`. A
  * subclass declares its spec (table, alias,
  * user joins, columns, tiebreak), its filter clauses, its sort map, its row
@@ -51,7 +52,7 @@ import type {
   RefCriterion,
   RefFieldCriterion,
 } from "../../types/parsedFilters.js";
-import { entityKey, pairsJson } from "../../utils/entityRef.js";
+import { type EntityRef, entityKey, pairsJson } from "../../utils/entityRef.js";
 import {
   type HierarchyKind,
   expandRefs,
@@ -76,6 +77,7 @@ import {
   instanceClause,
   noClause,
   randomOrder,
+  rankedClause,
   refClause,
   refPresenceClause,
   specificInstanceClause,
@@ -141,6 +143,11 @@ export interface QueryContext {
    * clause may take the shape that suits it (the scene tag filter, L8).
    */
   readonly sortField: string;
+  /**
+   * Whether the list runs within ranked refs (`ListQueryOptions.ranked`):
+   * only then may a sort read the rank (`k.pos`, Recommended)
+   */
+  readonly ranked: boolean;
   /**
    * The viewer's IANA zone, which date filters on stored instants read
    * their days in (`buildInstantFilter`): the request's
@@ -339,6 +346,12 @@ export interface ListQueryOptions<K extends ListKind> {
   readonly applyExclusions?: boolean;
   /** The viewer's IANA zone (`req.timeZone`); default "UTC" */
   readonly timeZone?: string;
+  /**
+   * Recommended's ranked refs, best first: the list runs within them, a
+   * base clause outside the filter and the tree (`rankedClause`), and the
+   * sort may read their rank. An empty list matches nothing.
+   */
+  readonly ranked?: readonly EntityRef[];
 }
 
 export interface ByRefsOptions {
@@ -871,7 +884,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     const { request } = options;
     const ctx = this.context(options, request);
 
-    const built = await this.build(ctx, request);
+    const built = await this.build(ctx, request, { ranked: options.ranked });
     const { perPage, page } = request;
     const paging: Paging = {
       order: built.order,
@@ -920,7 +933,9 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
   async count(options: ListQueryOptions<K>): Promise<number> {
     const { request } = options;
     const ctx = this.context(options, request);
-    return this.countRows(await this.build(ctx, request));
+    return this.countRows(
+      await this.build(ctx, request, { ranked: options.ranked })
+    );
   }
 
   /**
@@ -941,7 +956,8 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
   ): Promise<PeriodCount[]> {
     const { request } = options;
     const ctx = this.context(options, request);
-    const parts = (await this.build(ctx, request)).count;
+    const parts = (await this.build(ctx, request, { ranked: options.ranked }))
+      .count;
     const sql = `${parts.with}SELECT period, COUNT(*) AS count FROM (
 SELECT ${periodSql} AS period
 ${parts.from}
@@ -971,7 +987,7 @@ ORDER BY period`;
 
     const request = this.emptyRequest(refs.length);
     const ctx = this.context(options, request);
-    const built = await this.build(ctx, request, refs);
+    const built = await this.build(ctx, request, { refs });
     const paging: Paging = {
       order: built.order,
       params: built.orderParams,
@@ -993,7 +1009,7 @@ ORDER BY period`;
   protected async readAll(options: ListQueryOptions<K>): Promise<Entity[]> {
     const { request } = options;
     const ctx = this.context(options, request);
-    const built = await this.build(ctx, request);
+    const built = await this.build(ctx, request, { ranked: options.ranked });
     const rows = await this.pageRows(built, {
       order: built.order,
       params: built.orderParams,
@@ -1027,6 +1043,7 @@ ORDER BY period`;
       allowedInstanceIds: readonly string[];
       applyExclusions?: boolean;
       timeZone?: string;
+      ranked?: readonly EntityRef[];
     },
     request: ListRequests[K]
   ): QueryContext {
@@ -1038,6 +1055,7 @@ ORDER BY period`;
       allowedInstanceIds: options.allowedInstanceIds,
       specificInstanceId: request.specificInstanceId,
       sortField: this.spec.defaultSort,
+      ranked: options.ranked !== undefined,
       timeZone: options.timeZone ?? "UTC",
       hasExclusionsOf: exclusionLookup(
         options.userId,
@@ -1084,12 +1102,19 @@ ORDER BY period`;
     } as unknown as ListRequests[K];
   }
 
-  /** The statement's parts, built once for the page and the count */
+  /**
+   * The statement's parts, built once for the page and the count: `refs`
+   * for a by-ref read, `ranked` for a list within ranked refs
+   */
   private async build(
     ctx: QueryContext,
     request: ListRequests[K],
-    refs?: readonly FilterRef[]
+    within: {
+      readonly refs?: readonly FilterRef[];
+      readonly ranked?: readonly EntityRef[] | undefined;
+    } = {}
   ): Promise<Built> {
+    const { refs, ranked } = within;
     const { spec } = this;
     const x = spec.alias;
 
@@ -1124,6 +1149,9 @@ ORDER BY period`;
             }),
           ]
         : []),
+      // Recommended's ranked refs: a base clause, so no "any" group widens
+      // past them; an empty list is `0`, never "no filter"
+      ...(ranked === undefined ? [] : [rankedClause(x, ranked)]),
       ...(await this.clausesOf(request.filter, top, ctx)),
       ...(await this.whereClauses(where, top, ctx)),
       ...(request.q === undefined ? [] : [this.searchClause(request.q, ctx)]),

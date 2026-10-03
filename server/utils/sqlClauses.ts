@@ -1981,3 +1981,39 @@ export function buildCountFilter(
     ...(count.ctes ? { ctes: count.ctes } : {}),
   };
 }
+
+// =============================================================================
+// RANKED REFS (Recommended)
+// =============================================================================
+
+/**
+ * The list's rows limited to ranked refs (Recommended's top 500), each with
+ * its position: a joined CTE, so the statement drives from the refs (about
+ * 1 ms at 207k scenes) and the sort can read `k.pos`. No refs match nothing:
+ * an empty ranked list never means "every row". A ref named twice is kept
+ * once, at its best position, so the join never repeats a row and the
+ * joined `COUNT(*)` stays exact.
+ */
+export function rankedClause(
+  alias: string,
+  refs: readonly EntityRef[]
+): FilterClause {
+  if (refs.length === 0) return { sql: "0", params: [] };
+  return {
+    sql: "",
+    params: [],
+    ctes: [
+      {
+        name: "ranked_refs",
+        sql: "ranked_refs(id, inst, pos) AS MATERIALIZED (SELECT json_extract(j.value, '$[0]'), json_extract(j.value, '$[1]'), j.key FROM json_each(?) j)",
+        params: [pairsJson(distinctRefs(refs))],
+      },
+    ],
+    joins: [
+      {
+        sql: `JOIN ranked_refs k ON k.id = ${alias}.id AND k.inst = ${alias}.stashInstanceId`,
+        params: [],
+      },
+    ],
+  };
+}

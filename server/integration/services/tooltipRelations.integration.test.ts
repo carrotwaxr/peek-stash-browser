@@ -591,6 +591,7 @@ describeWithDb("Tooltip relations (integration)", () => {
       allowedInstanceIds: [FX.A, FX.B],
       specificInstanceId: FX.A,
       sortField: "name",
+      ranked: false,
       timeZone: "UTC",
       hasExclusionsOf: () => Promise.resolve(false),
     };
