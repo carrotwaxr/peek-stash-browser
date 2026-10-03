@@ -276,24 +276,21 @@ describe("TagQueryBuilder", () => {
       // The parent is live and the viewer's exclusions (with the
       // every-instance arm) apply to it under its own alias, never `e`
       expect(sql).toContain(
-        `EXISTS (SELECT 1 FROM json_each(${jsonListOrEmpty("t.parentIds")}) tpj JOIN StashTag tpp ON tpp.id = tpj.value AND tpp.stashInstanceId = t.stashInstanceId LEFT JOIN UserExcludedEntity tpp_x ON tpp_x.userId = ? AND tpp_x.entityType = 'tag' AND tpp_x.entityId = tpp.id AND (tpp_x.instanceId = '' OR tpp_x.instanceId = tpp.stashInstanceId) WHERE tpp.deletedAt IS NULL AND tpp_x.id IS NULL AND ((tpp.id = ? AND tpp.stashInstanceId = ?) OR (tpp.id = ? AND tpp.stashInstanceId = ?) OR (tpp.id = ? AND tpp.stashInstanceId = ?) OR (tpp.id = ? AND tpp.stashInstanceId = ?) OR (tpp.id = ? AND tpp.stashInstanceId = ?)))`
+        `EXISTS (SELECT 1 FROM json_each(${jsonListOrEmpty("t.parentIds")}) tpj JOIN StashTag tpp ON tpp.id = tpj.value AND tpp.stashInstanceId = t.stashInstanceId LEFT JOIN UserExcludedEntity tpp_x ON tpp_x.userId = ? AND tpp_x.entityType = 'tag' AND tpp_x.entityId = tpp.id AND (tpp_x.instanceId = '' OR tpp_x.instanceId = tpp.stashInstanceId) WHERE tpp.deletedAt IS NULL AND tpp_x.id IS NULL AND ((tpp.stashInstanceId = ? AND tpp.id IN (?, ?, ?)) OR (tpp.stashInstanceId = ? AND tpp.id IN (?, ?))))`
       );
       expect(sql).not.toContain("LIKE");
-      // 10 and its descendant on inst-a; 20 and its descendant on each
-      // allowed instance
-      const first = params.indexOf("10") - 1;
-      expect(params.slice(first, first + 11)).toEqual([
+      // 10 and its descendant on inst-a, and 20 on it too; 20 and its
+      // descendant on inst-b: one id list per instance
+      const first = params.indexOf("10") - 2;
+      expect(params.slice(first, first + 8)).toEqual([
         1,
+        "inst-a",
         "10",
-        "inst-a",
         "99",
-        "inst-a",
-        "20",
-        "inst-a",
         "20",
         "inst-b",
+        "20",
         "99",
-        "inst-b",
       ]);
     });
 
@@ -372,7 +369,7 @@ describe("TagQueryBuilder", () => {
         .filter((sql) => sql.includes("ORDER BY"));
       const children = `FROM StashTag tcc CROSS JOIN json_each(${jsonListOrEmpty("tcc.parentIds")}) tcj LEFT JOIN UserExcludedEntity tcc_x ON tcc_x.userId = ? AND tcc_x.entityType = 'tag' AND tcc_x.entityId = tcc.id AND (tcc_x.instanceId = '' OR tcc_x.instanceId = tcc.stashInstanceId) WHERE tcc.deletedAt IS NULL AND tcc_x.id IS NULL`;
       expect(includes).toContain(
-        `(t.id, t.stashInstanceId) IN (SELECT tcj.value, tcc.stashInstanceId ${children} AND ((tcc.id = ? AND tcc.stashInstanceId = ?) OR (tcc.id = ? AND tcc.stashInstanceId = ?)))`
+        `(t.id, t.stashInstanceId) IN (SELECT tcj.value, tcc.stashInstanceId ${children} AND ((tcc.stashInstanceId = ? AND tcc.id IN (?, ?))))`
       );
       // One text key each, never a row-value NOT IN; no NULL in the set
       expect(excludes).toContain(

@@ -769,19 +769,19 @@ describe("EntityQueryBuilder", () => {
       expect(page.sql).toContain("LEFT JOIN UserExcludedEntity e");
       expect(page.sql).toContain("e.id IS NULL");
       expect(page.sql).toContain(
-        "((s.id = ? AND s.stashInstanceId = ?) OR (s.id = ? AND s.stashInstanceId = ?))"
+        "((s.stashInstanceId = ? AND s.id IN (?, ?)))"
       );
-      expect(page.sql).not.toContain("s.id IN (");
+      // The ids never match without their instance
+      expect(page.sql).not.toMatch(/\(s\.id IN \(/);
       expect(page.params).toEqual([
         "select:3",
         3,
         3,
         "inst-a",
         "inst-b",
+        "inst-a",
         "7",
-        "inst-a",
         "8",
-        "inst-a",
       ]);
       expect(page.sql).not.toContain("LIMIT");
     });

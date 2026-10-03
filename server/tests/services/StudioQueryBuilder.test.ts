@@ -288,11 +288,9 @@ describe("StudioQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toMatch(
-        /NOT EXISTS \(SELECT 1 FROM StudioTag (\w+) WHERE \1\.studioId = s\.id AND \1\.studioInstanceId = s\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \? AND \1\.tagInstanceId = \?\)\)\)/
+        /NOT EXISTS \(SELECT 1 FROM StudioTag (\w+) WHERE \1\.studioId = s\.id AND \1\.studioInstanceId = s\.stashInstanceId AND \(\(\1\.tagInstanceId = \? AND \1\.tagId IN \(\?, \?\)\)\)\)/
       );
-      expect(params).toEqual(
-        arrayContaining(["284", "inst-a", "99", "inst-a"])
-      );
+      expect(params).toEqual(arrayContaining(["inst-a", "284", "99"]));
       expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
@@ -550,7 +548,7 @@ const STUDIO_CLAUSES: Record<
   url: "s.url LIKE ?",
   stash_id: "= LOWER(?)",
   tags: "FROM StudioTag stt WHERE stt.studioId = s.id",
-  parents: "(s.parentId = ? AND s.stashInstanceId = ?)",
+  parents: "(s.stashInstanceId = ? AND s.parentId IN (?, ?))",
   rating100: "r.rating > ?",
   o_counter: "COALESCE(us.oCounter, 0) > ?",
   play_count: "COALESCE(us.playCount, 0) > ?",

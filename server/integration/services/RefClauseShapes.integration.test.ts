@@ -589,6 +589,42 @@ describeWithDb("Ref clause shapes", () => {
     expect(pagePlan).toContain("sqlite_autoindex_SceneInheritedTag_1");
   });
 
+  // F1: the favourite tags' count (49 tags and their descendants, inline)
+  // bound ORed (tagId, tagInstanceId) pairs, which SQLite read by a
+  // multi-index OR on SceneTag but a full scan of SceneInheritedTag; one
+  // `tagInstanceId = ? AND tagId IN (...)` per instance lets both arms
+  // search their tag index
+  it("the count of a 49-tag filter searches both junctions by their tag index, with no multi-index OR or scan", async () => {
+    const recorder = recordStatements();
+    try {
+      await sceneQueryBuilder.execute({
+        userId: u,
+        allowedInstanceIds: [A],
+        request: request({
+          tags: { refs: childRefs(49), modifier: "INCLUDES", depth: 0 },
+        }),
+      });
+    } finally {
+      recorder.restore();
+    }
+    const count = must(
+      recorder.statements.find((statement) =>
+        statement.sql.includes("SELECT COUNT(*) AS total")
+      )
+    );
+    const countPlan = (await scenePlanOf(count)).join("\n");
+
+    expect(countPlan).toContain(
+      "SEARCH st USING INDEX SceneTag_tagId_tagInstanceId_idx"
+    );
+    expect(countPlan).toContain(
+      "SEARCH sit USING INDEX SceneInheritedTag_tagId_tagInstanceId_idx"
+    );
+    expect(countPlan).not.toContain("SCAN sit");
+    expect(countPlan).not.toContain("SCAN st");
+    expect(countPlan).not.toContain("MULTI-INDEX OR");
+  });
+
   // L9: above the inline limit an indexed sort's page reads the refs list's
   // junction rows by the tag index (no matched set is built) and walks the
   // sort index; its count keeps the matched set

@@ -6,7 +6,7 @@
  * instance, since two Stash servers reuse small ids.
  *
  * A ref set has two shapes. Up to PAIR_INLINE_LIMIT refs are bound inline
- * as OR-ed pairs inside one correlated EXISTS (or on the row itself; or,
+ * as one id list per instance (`pairs`) inside one correlated EXISTS (or on the row itself; or,
  * for a junction INCLUDES read in no order, a count or a sort with no
  * index, one row-value IN over the junction's ref index: see
  * junctionInList). Above it the refs travel as one JSON parameter into a
@@ -76,9 +76,9 @@ export interface FilterClause {
 }
 
 /**
- * The most refs one clause matches inline as OR-ed pairs (two bound
- * parameters each): far below SQLite's expression depth, where a chain of
- * 1,000 pairs fails to prepare.
+ * The most refs one clause matches inline (an id list per instance, or
+ * OR-ed pairs for a lone ref of an instance): far below SQLite's expression
+ * depth, where a chain of 1,000 pairs fails to prepare.
  */
 export const PAIR_INLINE_LIMIT = 64;
 
@@ -105,25 +105,56 @@ function isBare(ref: FilterRef): boolean {
 }
 
 /**
- * The refs as OR-ed conditions on an id and an instance column:
- * `(idCol = ? AND instanceCol = ?)` for a ref with an instance, `(idCol = ?)`
- * for a bare one (an empty instance counts as bare). The caller wraps the
- * result in parentheses.
+ * The refs as OR-ed conditions on an id and an instance column, one group
+ * per instance: `(instanceCol = ? AND idCol IN (?, ?, ...))` for the refs
+ * of an instance, `(idCol IN (?, ?, ...))` for the bare ones (an empty
+ * instance counts as bare), the bare group last. A group of one is the
+ * pair `(idCol = ? AND instanceCol = ?)` or `(idCol = ?)`. The caller wraps
+ * the result in parentheses.
+ *
+ * Grouped, SQLite searches the junction's ref index once per instance with
+ * the id list, where the same refs as ORed pairs are one index search per
+ * pair (a multi-index OR) or, on a table it expects to read most of, a
+ * scan evaluating every pair per row. 49 favourite tags with their
+ * descendants: the scene count 499 ms against 385 at 207k scenes (F1).
  */
 export function pairs(
   idCol: string,
   instanceCol: string,
   refs: readonly FilterRef[]
 ): SqlFragment {
-  const params: string[] = [];
-  const terms = refs.map((ref) => {
-    params.push(ref.id);
+  const byInstance = new Map<string, string[]>();
+  const bareIds: string[] = [];
+  for (const ref of refs) {
     if (isBare(ref)) {
-      return `(${idCol} = ?)`;
+      bareIds.push(ref.id);
+      continue;
     }
-    params.push(ref.instanceId ?? "");
-    return `(${idCol} = ? AND ${instanceCol} = ?)`;
-  });
+    const instanceId = ref.instanceId ?? "";
+    const ids = byInstance.get(instanceId);
+    if (ids === undefined) byInstance.set(instanceId, [ref.id]);
+    else ids.push(ref.id);
+  }
+  const params: string[] = [];
+  const terms: string[] = [];
+  for (const [instanceId, ids] of byInstance) {
+    if (ids.length === 1) {
+      params.push(ids[0] as string, instanceId);
+      terms.push(`(${idCol} = ? AND ${instanceCol} = ?)`);
+    } else {
+      params.push(instanceId, ...ids);
+      terms.push(
+        `(${instanceCol} = ? AND ${idCol} IN (${ids.map(() => "?").join(", ")}))`
+      );
+    }
+  }
+  if (bareIds.length === 1) {
+    params.push(bareIds[0] as string);
+    terms.push(`(${idCol} = ?)`);
+  } else if (bareIds.length > 1) {
+    params.push(...bareIds);
+    terms.push(`(${idCol} IN (${bareIds.map(() => "?").join(", ")}))`);
+  }
   return { sql: terms.join(" OR "), params };
 }
 
