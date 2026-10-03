@@ -287,6 +287,157 @@ describe("parseListRequest: sort", () => {
   });
 });
 
+describe("parseListRequest: where", () => {
+  const groupsRow = { field: "groups", criterion: { value: ["7:inst"] } };
+  const playlistsRow = (...value: number[]) => ({
+    field: "playlists",
+    criterion: { value },
+  });
+  const sorted = (sort: string, where: Record<string, unknown>) => ({
+    filter: { sort },
+    where,
+  });
+
+  it("Scene Number accepts a collection row at the root of an all where", () => {
+    const parsed = parseListRequest(
+      "scene",
+      sorted("scene_index", { match: "all", rules: [groupsRow] }),
+      opts()
+    );
+    expect(parsed.sort.field).toBe("scene_index");
+    expect(parsed.filter).toEqual({});
+    expect(parsed.where).toEqual({
+      match: "all",
+      rules: [
+        {
+          field: "groups",
+          criterion: {
+            refs: [{ id: "7", instanceId: "inst" }],
+            modifier: "INCLUDES",
+            depth: 0,
+          },
+        },
+      ],
+    });
+  });
+
+  it("Scene Number refuses a collection row only inside a group or under an any root", () => {
+    const favorite = { field: "favorite", criterion: true };
+    for (const where of [
+      { match: "all", rules: [{ match: "all", rules: [groupsRow] }] },
+      { match: "any", rules: [groupsRow, favorite] },
+    ]) {
+      expect(
+        issuesOf(() =>
+          parseListRequest("scene", sorted("scene_index", where), opts())
+        )
+      ).toEqual([
+        {
+          path: "filter.sort",
+          message: "Scene Number needs a collection filter",
+        },
+      ]);
+    }
+  });
+
+  it("Playlist order accepts one playlist row at the root", () => {
+    expect(
+      parseListRequest(
+        "scene",
+        sorted("playlist_position", {
+          match: "all",
+          rules: [playlistsRow(12)],
+        }),
+        opts()
+      ).sort.field
+    ).toBe("playlist_position");
+  });
+
+  it("a second playlist row with one id does not enable Playlist order when the first has two", () => {
+    expect(
+      issuesOf(() =>
+        parseListRequest(
+          "scene",
+          sorted("playlist_position", {
+            match: "all",
+            rules: [playlistsRow(1, 2), playlistsRow(3)],
+          }),
+          opts()
+        )
+      )
+    ).toEqual([
+      { path: "filter.sort", message: "Playlist order needs one playlist" },
+    ]);
+  });
+
+  it("Collection order accepts a parent row at the root", () => {
+    expect(
+      parseListRequest(
+        "group",
+        sorted("sub_group_order", {
+          match: "all",
+          rules: [
+            { field: "containing_groups", criterion: { value: ["7:inst"] } },
+          ],
+        }),
+        opts()
+      ).sort.field
+    ).toBe("sub_group_order");
+  });
+
+  it("where is a 400 on a list request and ignored leniently on a stored query", () => {
+    const bad = {
+      match: "all",
+      rules: [{ field: "ids", criterion: { value: ["1:a"] } }],
+    };
+    expect(
+      issuesOf(() => parseListRequest("scene", { where: bad }, opts()))
+    ).toEqual([{ path: "where.rules[0].field", message: "Not a row field" }]);
+    // parseStoredSceneQuery takes a tree from W5 on
+  });
+
+  it("a request without where, or with an empty one, carries no where", () => {
+    expect(parseListRequest("scene", {}, opts())).not.toHaveProperty("where");
+    expect(
+      parseListRequest("scene", { where: { match: "all", rules: [] } }, opts())
+    ).not.toHaveProperty("where");
+  });
+
+  it("a clip request takes where", () => {
+    const tags = (value: string) => ({
+      field: "tags",
+      criterion: { value: [value] },
+    });
+    expect(
+      parseListRequest(
+        "clip",
+        { where: { match: "any", rules: [tags("1:a"), tags("2:b")] } },
+        opts()
+      ).where
+    ).toEqual({
+      match: "any",
+      rules: [
+        {
+          field: "tags",
+          criterion: {
+            refs: [{ id: "1", instanceId: "a" }],
+            modifier: "INCLUDES",
+            depth: 0,
+          },
+        },
+        {
+          field: "tags",
+          criterion: {
+            refs: [{ id: "2", instanceId: "b" }],
+            modifier: "INCLUDES",
+            depth: 0,
+          },
+        },
+      ],
+    });
+  });
+});
+
 describe("parseListRequest: filter fields", () => {
   it("an unknown scene_filter key fails with its path (reject)", () => {
     const issues = issuesOf(() =>

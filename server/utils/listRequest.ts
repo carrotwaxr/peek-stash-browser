@@ -69,6 +69,7 @@ import type {
   ParsedSceneClipsQuery,
   ParsedSimilarScenesQuery,
   ParsedSort,
+  ParsedWhereGroup,
   PlaylistCriterion,
   RefCriterion,
   RefFieldCriterion,
@@ -78,6 +79,7 @@ import { shouldLogOnce } from "./logThrottle.js";
 import { logger } from "./logger.js";
 import { generateDailySeed } from "./seededRandom.js";
 import { INSTANCE_ID_PATTERN } from "./stashMediaPath.js";
+import { parseWhere, topLevelCriteria } from "./whereTree.js";
 
 const PER_PAGE_DEFAULT = 40;
 const CLIP_PER_PAGE_DEFAULT = 24;
@@ -151,7 +153,7 @@ export function logIgnoredStoredRule(
 // =============================================================================
 
 /** The problems found so far: thrown as one 400, or returned as records for a stored rule */
-class Problems {
+export class Problems {
   private readonly issues: ApiErrorIssue[] = [];
 
   add(path: string, message: string): void {
@@ -179,7 +181,9 @@ class Problems {
   }
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(
+  value: unknown
+): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -200,7 +204,7 @@ function requireObject(value: unknown, path: string): Record<string, unknown> {
  * its handler, an unknown key is a problem. Handlers live in a Map, so
  * `constructor` and `__proto__` are simply not members.
  */
-function walk(
+export function walk(
   input: Record<string, unknown>,
   prefix: string,
   handlers: ReadonlyMap<string, (raw: unknown, path: string) => void>,
@@ -754,7 +758,7 @@ function buildSchema(spec: FieldSpec): z.ZodType {
 /** Field specs are module constants, so each builds its schema once */
 const schemaCache = new WeakMap<FieldSpec, z.ZodType>();
 
-function schemaFor(spec: FieldSpec): z.ZodType {
+export function schemaFor(spec: FieldSpec): z.ZodType {
   let schema = schemaCache.get(spec);
   if (!schema) {
     schema = buildSchema(spec);
@@ -777,7 +781,7 @@ function isEmptyValue(value: unknown): boolean {
  * excludes, and no presence modifier, which needs none. Omitted without a
  * record.
  */
-function isEmptyCriterion(raw: unknown): boolean {
+export function isEmptyCriterion(raw: unknown): boolean {
   if (raw === undefined || raw === null) return true;
   if (!isPlainObject(raw)) return false;
   if (typeof raw.modifier === "string" && isPresence(raw.modifier)) {
@@ -985,6 +989,7 @@ export function parseListRequest<E extends ListKind>(
     specificInstanceId: undefined,
   };
   let ids: readonly FilterRef[] = [];
+  let where: ParsedWhereGroup<E> | undefined;
 
   const pageHandlers = new Map<string, (raw: unknown, path: string) => void>([
     ["page", (raw, path) => (state.page = parseInteger(raw, path, problems))],
@@ -1040,14 +1045,21 @@ export function parseListRequest<E extends ListKind>(
         fields = parseFields(LIST_FIELDS[entity], raw, path, problems);
       },
     ],
+    // The user's rows, AND-ed after the filter (every list, clips included)
+    ["where", (raw, path) => (where = parseWhere(entity, raw, path, problems))],
   ]);
 
   walk(input, "", handlers, problems, "Unknown request field");
   mergeIds(fields.criteria, ids, filterKey, problems);
+  // A sort reads the filter object, then the root rows of an "all" where
+  const top: Record<string, unknown> = topLevelCriteria(
+    fields.criteria as ParsedFilter<E>,
+    where
+  );
   if (entity === "scene") {
     sortField = requireSortContext(
       sortField as SortField<"scene"> | undefined,
-      fields.criteria,
+      top,
       "filter.sort",
       problems
     ) as typeof sortField;
@@ -1056,7 +1068,7 @@ export function parseListRequest<E extends ListKind>(
   if (entity === "group") {
     sortField = requireParentForSubGroupOrder(
       sortField as SortField<"group"> | undefined,
-      fields.criteria,
+      top,
       "filter.sort",
       problems
     ) as typeof sortField;
@@ -1074,6 +1086,7 @@ export function parseListRequest<E extends ListKind>(
     sort: resolveSort(entity, sortField, state.direction, options.userId),
     // The one boundary cast: each criterion was validated by its field's schema
     filter: fields.criteria as ParsedFilter<E>,
+    ...(where === undefined ? {} : { where }),
     specificInstanceId: fields.specificInstanceId,
     ...(state.count === undefined ? {} : { count: state.count }),
   };
