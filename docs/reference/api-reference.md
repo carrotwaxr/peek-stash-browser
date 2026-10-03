@@ -2247,6 +2247,70 @@ type FindClipsRequest = ClipListRequestInput;
 
 ---
 
+### POST /api/library/scenes/count
+
+**Authentication:** Session
+
+**Handler:** inline in `server/routes/library/counts.ts`
+
+---
+
+### POST /api/library/performers/count
+
+**Authentication:** Session
+
+**Handler:** inline in `server/routes/library/counts.ts`
+
+---
+
+### POST /api/library/studios/count
+
+**Authentication:** Session
+
+**Handler:** inline in `server/routes/library/counts.ts`
+
+---
+
+### POST /api/library/tags/count
+
+**Authentication:** Session
+
+**Handler:** inline in `server/routes/library/counts.ts`
+
+---
+
+### POST /api/library/groups/count
+
+**Authentication:** Session
+
+**Handler:** inline in `server/routes/library/counts.ts`
+
+---
+
+### POST /api/library/galleries/count
+
+**Authentication:** Session
+
+**Handler:** inline in `server/routes/library/counts.ts`
+
+---
+
+### POST /api/library/images/count
+
+**Authentication:** Session
+
+**Handler:** inline in `server/routes/library/counts.ts`
+
+---
+
+### POST /api/library/clips/count
+
+**Authentication:** Session
+
+**Handler:** inline in `server/routes/library/counts.ts`
+
+---
+
 ## Clips
 
 Clips (scene markers from Stash).

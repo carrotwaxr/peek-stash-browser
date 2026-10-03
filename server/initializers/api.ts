@@ -27,6 +27,7 @@ import exclusionsRoutes from "../routes/exclusions.js";
 import groupRoutes from "../routes/groups.js";
 import imageViewHistoryRoutes from "../routes/imageViewHistory.js";
 import libraryClipsRoutes from "../routes/library/clips.js";
+import libraryCountsRoutes from "../routes/library/counts.js";
 import libraryGalleriesRoutes from "../routes/library/galleries.js";
 import libraryGroupsRoutes from "../routes/library/groups.js";
 import libraryImagesRoutes from "../routes/library/images.js";
@@ -187,6 +188,8 @@ export const setupAPI = () => {
   app.use("/api/library", libraryGalleriesRoutes);
   app.use("/api/library", libraryImagesRoutes);
   app.use("/api/library", libraryClipsRoutes);
+  // Count-only list requests (the filter sheet)
+  app.use("/api/library", libraryCountsRoutes);
 
   // Video routes (playback, sessions, HLS streaming)
   app.use("/api", videoRoutes);

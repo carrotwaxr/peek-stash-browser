@@ -19,6 +19,7 @@ import {
   type EntityKind,
   FIELDS,
   FILTER_BODY_KEYS,
+  type ListKind,
 } from "@peek/shared-types/filters/index.js";
 import { makeEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import type { ParsedListRequest } from "../types/parsedFilters.js";
@@ -75,16 +76,19 @@ const PAGE_TABS: {
   },
 };
 
-interface CountOptions<E extends EntityKind> {
+interface CountOptions<E extends ListKind> {
   readonly userId: number;
   readonly allowedInstanceIds: readonly string[];
   readonly request: ParsedListRequest<E>;
   readonly timeZone: string;
 }
 
-/** Each list's builder, as far as a count needs it */
-const COUNTERS: {
-  readonly [E in EntityKind]: {
+/**
+ * Each list's builder, as far as a count needs it: the seven entity lists
+ * and the clip list (`POST /api/library/<list>/count` counts all eight)
+ */
+export const COUNTERS: {
+  readonly [E in ListKind]: {
     count(options: CountOptions<E>): Promise<number>;
   };
 } = {
@@ -95,6 +99,7 @@ const COUNTERS: {
   group: groupQueryBuilder,
   gallery: galleryQueryBuilder,
   image: imageQueryBuilder,
+  clip: clipQueryBuilder,
 };
 
 export interface RelationCountOptions {
