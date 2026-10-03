@@ -384,7 +384,7 @@ describe("ClipQueryBuilder", () => {
       ]);
     });
 
-    it("tags Has NONE above the inline limit is the AND of two matched-set NOT INs", async () => {
+    it("tags Has NONE above the negative inline limit probes the refs: the primary tag's key, then the clip's tag rows", async () => {
       const many = Array.from({ length: 65 }, (_, i) => ref(String(i + 1)));
       await run({ filter: { tagIds: criterion(many, "EXCLUDES") } });
 
@@ -395,12 +395,11 @@ describe("ClipQueryBuilder", () => {
       expect(params.slice(0, 2)).toEqual([refsJson, refsJson]);
       positions(sql, [
         "WITH primary_tag_refs(id, inst) AS MATERIALIZED",
-        "primary_tag_matched(id, inst) AS MATERIALIZED",
         "clip_tags_refs(id, inst) AS MATERIALIZED",
-        "clip_tags_matched(id, inst) AS MATERIALIZED",
         "FROM StashClip c",
-        "((c.id || ':' || c.stashInstanceId) NOT IN (SELECT id || ':' || inst FROM primary_tag_matched) AND (c.id || ':' || c.stashInstanceId) NOT IN (SELECT id || ':' || inst FROM clip_tags_matched))",
+        "((c.primaryTagId IS NULL OR (c.primaryTagId || ':' || c.primaryTagInstanceId) NOT IN (SELECT id || ':' || inst FROM primary_tag_refs)) AND NOT EXISTS (SELECT 1 FROM ClipTag ct WHERE ct.clipId = c.id AND ct.clipInstanceId = c.stashInstanceId AND (+ct.tagId, ct.tagInstanceId) IN (SELECT id, inst FROM clip_tags_refs)))",
       ]);
+      expect(sql).not.toContain("_matched");
     });
 
     it("scene tags and performers take Has ALL and Has NONE on the clip's scene; Has NONE holds the tag neither directly nor inherited", async () => {
