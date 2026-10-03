@@ -563,6 +563,169 @@ describe("Video Controller", () => {
     });
 
     // -----------------------------------------------------------------------
+    // A playlist fetched with a media link signs every URL it lists, so a
+    // player with no cookie can follow it (Cast receiver, VLC)
+    // -----------------------------------------------------------------------
+    describe("signed HLS playlist", () => {
+      const EXP = Math.floor(Date.now() / 1000) + STREAM_LINK_TTL_SECONDS;
+      const claims = {
+        userId: 7,
+        sceneId: "123",
+        instanceId: "inst-a",
+        exp: EXP,
+        passwordChangedAtMs: 0,
+        scope: "media" as const,
+      };
+      const SIG = signStreamLink(claims, deriveStreamLinkKey("test-secret"));
+
+      /** The playlist for a request carrying the verified link `sig`. */
+      async function signedPlaylist(
+        upstream: string,
+        sig: string = SIG
+      ): Promise<string> {
+        vi.mocked(global.fetch).mockResolvedValue(makeFetchResponse(upstream));
+        const res = resFor(proxyStashStream);
+        res.locals.streamLink = { uid: 7, exp: EXP, scope: "media", sig };
+        await proxyStashStream(createMockReq(), res);
+        return sentText(res);
+      }
+
+      /** Every URL a playlist lists: URI lines and tag URI attributes. */
+      function listedUrls(playlist: string): string[] {
+        return playlist.split("\n").flatMap((line) => {
+          if (!line.trim()) return [];
+          if (!line.startsWith("#")) return [line];
+          return [...line.matchAll(/URI="([^"]*)"/g)].map((m) => m[1] ?? "");
+        });
+      }
+
+      function expectSigned(url: string, sig: string = SIG): void {
+        const params = new URL(url, "http://x").searchParams;
+        for (const key of ["uid", "exp", "scope", "sig", "instanceId"]) {
+          expect(params.getAll(key), `${key} in ${url}`).toHaveLength(1);
+        }
+        expect(params.get("uid")).toBe("7");
+        expect(params.get("exp")).toBe(String(EXP));
+        expect(params.get("scope")).toBe("media");
+        expect(params.get("sig")).toBe(sig);
+        expect(params.get("instanceId")).toBe("inst-a");
+      }
+
+      it("a playlist fetched with a media link lists segments carrying uid, exp, scope, sig and instanceId", async () => {
+        const playlist = await signedPlaylist(
+          [
+            "#EXTM3U",
+            '#EXT-X-MAP:URI="init.mp4?apikey=SECRET"',
+            "#EXTINF:10.0,",
+            "http://stash:9999/scene/123/stream.m3u8/0.ts?apikey=SECRET&resolution=LOW",
+            "#EXTINF:10.0,",
+            "/scene/123/stream.m3u8/1.ts?apikey=SECRET&resolution=LOW",
+            "#EXTINF:10.0,",
+            "stream.m3u8/2.ts?resolution=LOW",
+            "#EXTINF:10.0,",
+            "3.ts?resolution=LOW&instanceId=other&uid=9&sig=x",
+            "",
+          ].join("\n")
+        );
+
+        const urls = listedUrls(playlist);
+        expect(urls).toHaveLength(5);
+        for (const url of urls) expectSigned(url);
+        expect(playlist).not.toMatch(/apikey/i);
+        expect(playlist).toContain(
+          `/api/scene/123/proxy-stream/stream.m3u8/0.ts?resolution=LOW&instanceId=inst-a&uid=7&exp=${EXP}&scope=media&sig=${SIG}`
+        );
+      });
+
+      it("a session playlist lists segments with no sig", async () => {
+        const playlist = await rewrittenPlaylist(
+          [
+            "#EXTM3U",
+            '#EXT-X-MAP:URI="init.mp4"',
+            "http://stash:9999/scene/123/stream.m3u8/0.ts?apikey=SECRET",
+            "stream.m3u8/1.ts",
+          ].join("\n")
+        );
+
+        expect(playlist).not.toMatch(/sig=|uid=|exp=|scope=/);
+        expect(playlist).toContain("instanceId=inst-a");
+      });
+
+      it("a master playlist's variants are signed, and each variant signs its own segments", async () => {
+        const master = await signedPlaylist(
+          [
+            "#EXTM3U",
+            '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",NAME="en",URI="stream.m3u8?resolution=LOW"',
+            "#EXT-X-STREAM-INF:BANDWIDTH=1000",
+            "stream.m3u8?resolution=LOW",
+            "",
+          ].join("\n")
+        );
+        const variants = listedUrls(master);
+        expect(variants).toHaveLength(2);
+
+        for (const variant of variants) {
+          expectSigned(variant);
+          const url = new URL(variant, "http://x");
+          expect(url.pathname).toBe("/api/scene/123/proxy-stream/stream.m3u8");
+
+          // The route accepts the variant as stream.m3u8 on its signature
+          vi.mocked(global.fetch).mockResolvedValue(
+            makeFetchResponse(
+              "#EXTM3U\n#EXTINF:10.0,\n/scene/123/stream.m3u8/0.ts?resolution=LOW\n"
+            )
+          );
+          mockPrisma.user.findUnique.mockResolvedValue(
+            partialRow({ id: 7, username: "u", role: "USER" })
+          );
+          const query = Object.fromEntries(url.searchParams);
+          const req = reqFor(authenticateStreamRequest, {
+            params: { sceneId: "123", streamPath: "stream.m3u8" },
+            query,
+            url: variant,
+          });
+          const res = resFor(proxyStashStream);
+          await runRoute(
+            videoRouter,
+            "get",
+            "/scene/:sceneId/proxy-stream/:streamPath",
+            req,
+            res
+          );
+
+          expect(res.status).not.toHaveBeenCalledWith(401);
+          const segments = listedUrls(sentText(res));
+          expect(segments).toHaveLength(1);
+          for (const segment of segments) expectSigned(segment);
+          vi.mocked(global.fetch).mockClear();
+        }
+      });
+
+      it("a forged sig containing ApiKey still yields signed segment lines, and a real apikey is still dropped", async () => {
+        const forged = `ApiKey${"x".repeat(37)}`;
+        const playlist = await signedPlaylist(
+          [
+            "#EXTM3U",
+            "#EXTINF:10.0,",
+            "stream.m3u8/0.ts?resolution=LOW",
+            '#EXT-X-MAP:URI="init.mp4"',
+            "#EXTINF:10.0,",
+            "/scene/123/apikey=SECRET/1.ts",
+            "",
+          ].join("\n"),
+          forged
+        );
+
+        const lines = playlist.split("\n");
+        expectSigned(must(lines[2]), forged);
+        expectSigned(listedUrls(must(lines[3]))[0] ?? "", forged);
+        // The line naming apikey is gone, the sig on the others is not
+        expect(lines[5]).toBe("");
+        expect(playlist).not.toContain("SECRET");
+      });
+    });
+
+    // -----------------------------------------------------------------------
     // DASH manifest. Stash echoes apikey into segment templates when the key
     // arrives as a query parameter; Peek sends it as a header, but the
     // manifest must never carry it whatever Stash does.

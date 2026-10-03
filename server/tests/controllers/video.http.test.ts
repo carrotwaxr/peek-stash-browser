@@ -19,11 +19,19 @@ import {
 } from "vitest";
 import { proxyStashStream } from "../../controllers/video.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
+import prisma from "../../prisma/singleton.js";
+import videoRouter from "../../routes/video.js";
 import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
 import type * as mediaAccessModule from "../../utils/mediaAccess.js";
 import { authenticated } from "../../utils/routeHelpers.js";
+import {
+  STREAM_LINK_TTL_SECONDS,
+  deriveStreamLinkKey,
+  signStreamLink,
+} from "../../utils/streamLink.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 const state = vi.hoisted(() => ({ stashUrl: "" }));
 
@@ -49,6 +57,10 @@ vi.mock("../../services/StashInstanceManager.js", async (importOriginal) => {
     },
   };
 });
+
+vi.mock("../../utils/jwtSecret.js", () => ({
+  getJwtSecret: vi.fn().mockReturnValue("test-secret"),
+}));
 
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -304,5 +316,100 @@ describe("a HEAD on the stream proxy", () => {
 
     expect(res.status).toBe(200);
     expect((await res.arrayBuffer()).byteLength).toBe(FILE_BYTES);
+  });
+});
+
+/**
+ * A playlist fetched with a media link and no cookie: every URL it lists
+ * must open on the link's signature alone, through the real stream guard.
+ */
+describe("a signed HLS playlist over HTTP", () => {
+  let stashServer: http.Server;
+  let peekUrl: string;
+  let closePeek: () => Promise<void>;
+
+  const exp = Math.floor(Date.now() / 1000) + STREAM_LINK_TTL_SECONDS;
+  const claims = {
+    userId: 7,
+    sceneId: "1",
+    instanceId: "inst-a",
+    exp,
+    passwordChangedAtMs: 0,
+    scope: "media" as const,
+  };
+  const sig = signStreamLink(claims, deriveStreamLinkKey("test-secret"));
+  const playlistUrl = (): string =>
+    `${peekUrl}/api/scene/1/proxy-stream/stream.m3u8?instanceId=inst-a&uid=7&exp=${exp}&scope=media&sig=${sig}`;
+
+  beforeAll(async () => {
+    stashServer = http.createServer((req, res) => {
+      const path = new URL(req.url ?? "/", "http://stash").pathname;
+      if (path === "/scene/1/stream.m3u8") {
+        res.writeHead(200, { "content-type": "application/vnd.apple.mpegurl" });
+        res.end(
+          [
+            "#EXTM3U",
+            "#EXTINF:2.000,",
+            `${state.stashUrl}/scene/1/stream.m3u8/0.ts?apikey=test-key&resolution=STANDARD`,
+            "#EXTINF:2.000,",
+            "/scene/1/stream.m3u8/0.ts?resolution=STANDARD",
+            "#EXT-X-ENDLIST",
+            "",
+          ].join("\n")
+        );
+        return;
+      }
+      if (path === "/scene/1/stream.m3u8/0.ts") {
+        res.writeHead(200, { "content-type": "video/MP2T" });
+        res.end(Buffer.alloc(1024, 1));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) =>
+      stashServer.listen(0, "127.0.0.1", resolve)
+    );
+    state.stashUrl = `http://127.0.0.1:${(stashServer.address() as AddressInfo).port}`;
+
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      partialRow({ id: 7, username: "u", role: "USER" })
+    );
+    const peek = await startTestApp((app) => {
+      app.use("/api", videoRouter);
+    });
+    peekUrl = peek.baseUrl;
+    closePeek = peek.close;
+  });
+
+  afterAll(async () => {
+    await closePeek();
+    stashServer.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      stashServer.close((err) => (err ? reject(err) : resolve()))
+    );
+  });
+
+  it("each segment URL from a signed playlist answers 200 with no cookie", async () => {
+    const playlist = await fetch(playlistUrl());
+    expect(playlist.status).toBe(200);
+    const segments = (await playlist.text())
+      .split("\n")
+      .filter((line) => line.trim() && !line.startsWith("#"));
+    expect(segments).toHaveLength(2);
+
+    for (const segment of segments) {
+      const res = await fetch(`${peekUrl}${segment}`);
+      expect(res.status, segment).toBe(200);
+      expect((await res.arrayBuffer()).byteLength).toBe(1024);
+    }
+  });
+
+  it("the same playlist without its signature answers 401", async () => {
+    const res = await fetch(
+      `${peekUrl}/api/scene/1/proxy-stream/stream.m3u8/0.ts?instanceId=inst-a`
+    );
+
+    expect(res.status).toBe(401);
   });
 });

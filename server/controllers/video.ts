@@ -31,9 +31,11 @@ import {
 import {
   STREAM_LINK_TTL_SECONDS,
   type StreamLinkClaims,
+  applySignedQuery,
   buildStreamLinkPath,
   getStreamLinkKey,
   signStreamLink,
+  signedQuery,
 } from "../utils/streamLink.js";
 import {
   HEAD_PROBE_RANGE,
@@ -161,12 +163,15 @@ function deleteApiKeyParams(params: URLSearchParams): void {
 
 /**
  * One URI from a Stash HLS playlist as a Peek proxy-stream path, without
- * apikey and with instanceId. Null when the URI cannot be parsed.
+ * apikey and with instanceId. With `signed` (the media link the playlist was
+ * fetched with) each of its keys is set after instanceId, so a player with
+ * no cookie can follow the URI. Null when the URI cannot be parsed.
  */
 function rewriteStashUri(
   uri: string,
   sceneId: string,
-  instanceId: string
+  instanceId: string,
+  signed?: URLSearchParams
 ): string | null {
   if (!uri.trim()) {
     return null;
@@ -193,6 +198,7 @@ function rewriteStashUri(
 
     // Every segment names the instance, as the playlist request did
     queryParams.set("instanceId", instanceId);
+    if (signed) applySignedQuery(queryParams, signed);
 
     // Extract the stream path (everything after /scene/{id}/)
     let streamPath: string;
@@ -227,7 +233,8 @@ const API_KEY_ANYWHERE = /apikey/i;
 function rewriteHlsLine(
   line: string,
   sceneId: string,
-  instanceId: string
+  instanceId: string,
+  signed?: URLSearchParams
 ): string {
   if (!line.trim()) {
     return line;
@@ -238,7 +245,7 @@ function rewriteHlsLine(
     const rewritten = line.replace(
       HLS_URI_ATTRIBUTE,
       (match, separator: string, uri: string) => {
-        const proxied = rewriteStashUri(uri, sceneId, instanceId);
+        const proxied = rewriteStashUri(uri, sceneId, instanceId, signed);
         if (proxied === null) {
           rewrite.unparsable = true;
           return match;
@@ -253,7 +260,7 @@ function rewriteHlsLine(
     return rewritten;
   }
 
-  const proxied = rewriteStashUri(line, sceneId, instanceId);
+  const proxied = rewriteStashUri(line, sceneId, instanceId, signed);
   if (proxied === null) {
     // Never return the raw line: Stash's playlist lines can carry apikey
     logger.warn(`[PROXY] Failed to rewrite HLS line: ${redactUrl(line)}`);
@@ -275,20 +282,27 @@ function rewriteHlsLine(
  *
  * All are rewritten to: /api/scene/{sceneId}/proxy-stream/{path}?{params without apikey}&instanceId=xxx,
  * which proxyStashStream serves again (isAllowedStreamPath admits stream.m3u8/{n}.ts).
- * URI attributes in tags are rewritten the same way. A line that cannot be
- * rewritten, or that still names apikey afterwards, is replaced by "".
+ * URI attributes in tags are rewritten the same way. With `signed`, every
+ * rewritten URI also carries the media link's `uid`, `exp`, `scope` and `sig`.
+ * A line that cannot be rewritten, or that still names apikey afterwards (not
+ * counting the link's own `sig`, which may spell it by chance), is replaced
+ * by "".
  */
 function rewriteHlsPlaylist(
   content: string,
   sceneId: string,
   _stashBaseUrl: string,
-  instanceId: string
+  instanceId: string,
+  signed?: URLSearchParams
 ): string {
+  const sig = signed?.get("sig");
   return content
     .split("\n")
     .map((line, index) => {
-      const rewritten = rewriteHlsLine(line, sceneId, instanceId);
-      if (API_KEY_ANYWHERE.test(rewritten)) {
+      const rewritten = rewriteHlsLine(line, sceneId, instanceId, signed);
+      // A 43-character sig can spell "apikey" in any case; mask it for the guard
+      const checked = sig ? rewritten.split(sig).join("SIG") : rewritten;
+      if (API_KEY_ANYWHERE.test(checked)) {
         // The line has a shape redactUrl may not know, so log only where it was
         const kind = line.startsWith("#")
           ? (line.match(/^#[A-Z0-9-]+/)?.[0] ?? "a tag")
@@ -333,12 +347,15 @@ function stripDashApiKeys(manifest: string): string {
  *
  * This lets Stash handle all codec detection, transcoding, and quality selection.
  *
- * SECURITY: authenticateStreamRequest runs first (a session, or a signed link
- * on the direct stream). The path must be one of Stash's stream files
+ * SECURITY: authenticateStreamRequest runs first (a session, or a signed link:
+ * a v1 link opens only the direct stream, a media link also the HLS playlist
+ * and its segments). The path must be one of Stash's stream files
  * (isAllowedStreamPath), the scene must be visible to the user, and only
  * `resolution` and `start` go upstream. For HLS playlists (.m3u8), internal
  * URLs are rewritten to strip the Stash API key and route segment requests
- * through Peek's proxy. A DASH manifest (.mpd) has its apikey parameters
+ * through Peek's proxy; when the playlist was fetched with a media link
+ * (res.locals.streamLink), each rewritten URL carries that link's signature,
+ * so a player with no cookie can follow it. A DASH manifest (.mpd) has its apikey parameters
  * stripped, and is refused if it still names apikey. Manifests are fetched
  * whole, never by Range.
  */
@@ -458,11 +475,27 @@ export const proxyStashStream = async (
       readStashText(response, abort, STREAM_IDLE_TIMEOUT_MS)
     );
     if (playlistContent === undefined) return;
+    // A playlist fetched with a media link signs every URL it lists
+    const link = res.locals.streamLink;
+    const signed = link
+      ? signedQuery(
+          {
+            userId: link.uid,
+            sceneId,
+            instanceId,
+            exp: link.exp,
+            passwordChangedAtMs: 0,
+            ...(link.scope !== undefined && { scope: link.scope }),
+          },
+          link.sig
+        )
+      : undefined;
     const rewrittenContent = rewriteHlsPlaylist(
       playlistContent,
       sceneId,
       stashBaseUrl,
-      instanceId
+      instanceId,
+      signed
     );
 
     // Set headers for the rewritten playlist
