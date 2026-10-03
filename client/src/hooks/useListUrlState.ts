@@ -67,7 +67,7 @@ export interface ListDefaults {
 
 type SortOptions = readonly { value: string }[];
 
-/** What loading a preset applies: a saved preset, or the Load Preset menu's copy of one */
+/** What loading a View applies: a saved View without its id and name */
 export type PresetToLoad = Omit<SavedPreset, "id" | "name">;
 
 export interface UseListUrlStateOptions {
