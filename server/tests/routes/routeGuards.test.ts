@@ -6,8 +6,9 @@
  * (router-level ones registered before it, and the app's that match its path).
  *
  * - Every route ending in an `authenticated()` handler runs `authenticate`
- *   (or, on the direct stream, `authenticateStreamRequest`) before it.
- * - Every route without either is on PUBLIC_ROUTES.
+ *   (or, on the stream and caption routes, `authenticateStreamRequest` or
+ *   `authenticateCaptionRequest`) before it.
+ * - Every route without one of them is on PUBLIC_ROUTES.
  * - The routes behind `requireAdmin` are exactly ADMIN_ROUTES, each after a
  *   session check.
  * - Every route ending in a `libraryHandler()` handler runs requireCacheReady,
@@ -26,7 +27,10 @@ import {
   withAllowedInstances,
 } from "../../middleware/auth.js";
 import { requireAdminOnceSetupStarted } from "../../middleware/setupGuards.js";
-import { authenticateStreamRequest } from "../../middleware/streamAuth.js";
+import {
+  authenticateCaptionRequest,
+  authenticateStreamRequest,
+} from "../../middleware/streamAuth.js";
 import { LIBRARY_HANDLER } from "../../utils/routeHelpers.js";
 import type * as routeHelpersModule from "../../utils/routeHelpers.js";
 import { ADMIN_ROUTES } from "../helpers/adminRoutes.js";
@@ -316,7 +320,8 @@ describe("route guards", () => {
     const guarded = routes.filter(
       (route) =>
         route.before.includes(authenticate) ||
-        route.before.includes(authenticateStreamRequest)
+        route.before.includes(authenticateStreamRequest) ||
+        route.before.includes(authenticateCaptionRequest)
     );
     const unguarded = routes
       .filter((route) => typeof route.handler === "function")
@@ -335,7 +340,8 @@ describe("route guards", () => {
       .filter(
         (route) =>
           !route.before.includes(authenticate) &&
-          !route.before.includes(authenticateStreamRequest)
+          !route.before.includes(authenticateStreamRequest) &&
+          !route.before.includes(authenticateCaptionRequest)
       )
       .map((route) => route.key);
     expect(open.sort()).toEqual([...PUBLIC_ROUTES].sort());

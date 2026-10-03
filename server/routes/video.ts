@@ -5,13 +5,18 @@ import {
   proxyStashStream,
 } from "../controllers/video.js";
 import { authenticate } from "../middleware/auth.js";
-import { authenticateStreamRequest } from "../middleware/streamAuth.js";
+import {
+  authenticateCaptionRequest,
+  authenticateStreamRequest,
+} from "../middleware/streamAuth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
-// Every route here needs a Peek session, or on the direct stream a signed
-// link (authenticateStreamRequest). Guarded per route rather than with
+// Every route here needs a Peek session, or on the stream and caption routes
+// a signed link (authenticateStreamRequest, authenticateCaptionRequest; see
+// middleware/streamAuth.ts for what each link opens). Guarded per route
+// rather than with
 // router.use: this router is mounted on /api last, so a router-wide
 // authenticate would turn every unmatched /api/* 404 into a 401.
 
@@ -31,7 +36,11 @@ router.get(
 );
 
 // Caption/subtitle proxy
-router.get("/scene/:sceneId/caption", authenticate, authenticated(getCaption));
+router.get(
+  "/scene/:sceneId/caption",
+  authenticateCaptionRequest,
+  authenticated(getCaption)
+);
 
 // Personal signed link for the external player button
 router.post(

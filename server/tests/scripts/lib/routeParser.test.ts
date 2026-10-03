@@ -143,8 +143,29 @@ router.post(
       route(routes, "GET", "/api/scene/:sceneId/proxy-stream/:streamPath").auth
     ).toBe("Session or signed link");
     expect(route(routes, "GET", "/api/scene/:sceneId/caption").auth).toBe(
-      "Session"
+      "Session or signed link"
     );
+  });
+
+  it("names each stream guard a session or a signed link", () => {
+    const file = fixture(
+      "signed.ts",
+      `const router = express.Router();
+router.get("/s", authenticateStreamRequest, authenticated(s));
+router.get("/c", authenticateCaptionRequest, authenticated(c));
+router.get("/p", authenticatePosterRequest, authenticated(p));
+router.get("/x", authenticate, authenticated(x));
+`
+    );
+
+    const routes = parseRouteFile(file, "/api", { serverDir: tmpDir });
+
+    expect(routes.map((r) => r.auth)).toEqual([
+      "Session or signed link",
+      "Session or signed link",
+      "Session or signed link",
+      "Session",
+    ]);
   });
 
   it("a handler defined in the route file points at the route file", () => {

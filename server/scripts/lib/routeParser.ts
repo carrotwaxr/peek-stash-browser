@@ -9,8 +9,9 @@ const DEFAULT_SERVER_DIR = path.resolve(import.meta.dirname, "..", "..");
  * - None: anyone
  * - Session: a signed-in Peek user
  * - Admin: a signed-in admin
- * - Session or signed link: a session, or the personal signed link the
- *   external player gets (the direct stream)
+ * - Session or signed link: a session, or a signed link (the external
+ *   player's, or a scene's media link for a Cast receiver) on the stream,
+ *   caption and poster routes
  * - None until setup starts, then Admin: open while Peek has no user and no
  *   Stash server (the setup wizard), admin only after
  */
@@ -303,7 +304,13 @@ function authFor(middleware: string[]): RouteAuth {
   if (has("requireAdminOnceSetupStarted")) {
     return "None until setup starts, then Admin";
   }
-  if (has("authenticateStreamRequest")) return "Session or signed link";
+  if (
+    has("authenticateStreamRequest") ||
+    has("authenticateCaptionRequest") ||
+    has("authenticatePosterRequest")
+  ) {
+    return "Session or signed link";
+  }
   if (has("authenticate")) return "Session";
   return "None";
 }

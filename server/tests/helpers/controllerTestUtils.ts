@@ -215,8 +215,8 @@ export function reqFor<H extends Handler>(
 /**
  * The mock response `resFor` builds: a `Response` whose `status`, `json`,
  * `send`, `end`, `cookie`, `setHeader` and `on` are spies (chainable, as in
- * `res.status(400).json(...)`), with no headers sent yet, plus readers for
- * what the handler sent with `json()`.
+ * `res.status(400).json(...)`), with no headers sent yet and empty `locals`,
+ * plus readers for what the handler sent with `json()`.
  */
 export type MockRes<B> = Response<B> & {
   status: Mock<(code: number) => MockRes<B>>;
@@ -305,6 +305,7 @@ function mockResponse<B>(): MockRes<B> {
     setHeader,
     on,
     headersSent: false,
+    locals: {},
     ...readers,
   } as MockRes<B>;
   return res;

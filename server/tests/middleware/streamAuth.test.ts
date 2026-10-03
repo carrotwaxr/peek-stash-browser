@@ -3,13 +3,18 @@
  *
  * A stream request without `sig` needs the session like any other route.
  * With `sig`, the link's claims are checked against the user's current
- * passwordChangedAt and the request is accepted for the direct stream only.
+ * passwordChangedAt. A v1 link (no `scope`) opens the direct stream only; a
+ * `media` link opens its one scene's direct stream, HLS playlist, segments
+ * and captions.
  */
 import type { User } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticate } from "../../middleware/auth.js";
-import { authenticateStreamRequest } from "../../middleware/streamAuth.js";
+import {
+  authenticateCaptionRequest,
+  authenticateStreamRequest,
+} from "../../middleware/streamAuth.js";
 import prisma from "../../prisma/singleton.js";
 import {
   STREAM_LINK_TTL_SECONDS,
@@ -264,5 +269,239 @@ describe("authenticateStreamRequest", () => {
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
+  });
+
+  describe("media links", () => {
+    const media = (overrides: Partial<StreamLinkClaims> = {}) =>
+      claimsFor({ scope: "media", ...overrides });
+
+    function mediaReq(
+      claims: StreamLinkClaims,
+      overrides: {
+        params?: Record<string, string>;
+        query?: Record<string, string | string[]>;
+      } = {}
+    ) {
+      return signedReq(claims, {
+        ...overrides,
+        query: { scope: "media", ...overrides.query },
+      });
+    }
+
+    it("a v1 link still opens only `stream`", async () => {
+      const ok = signedReq(claimsFor());
+      const okRes = createMockRes();
+      const okNext = vi.fn();
+      await authenticateStreamRequest(ok, okRes, okNext);
+      expect(okNext).toHaveBeenCalledTimes(1);
+
+      for (const params of [
+        { streamPath: "stream.m3u8" },
+        { streamPath: "stream.m3u8", subPath: "0.ts" },
+        { streamPath: "stream.mp4" },
+      ]) {
+        const req = signedReq(claimsFor(), { params });
+        const res = createMockRes();
+        const next = vi.fn();
+        await authenticateStreamRequest(req, res, next);
+        expect(res.status, JSON.stringify(params)).toHaveBeenCalledWith(401);
+        expect(next, JSON.stringify(params)).not.toHaveBeenCalled();
+      }
+    });
+
+    it("a media link opens `stream`, `stream.m3u8` and `stream.m3u8/<n>.ts`", async () => {
+      for (const params of [
+        { streamPath: "stream" },
+        { streamPath: "stream.m3u8" },
+        { streamPath: "stream.m3u8", subPath: "0.ts" },
+        { streamPath: "stream.m3u8", subPath: "17.ts" },
+      ]) {
+        const req = mediaReq(media(), { params });
+        const res = createMockRes();
+        const next = vi.fn();
+        await authenticateStreamRequest(req, res, next);
+        expect(next, JSON.stringify(params)).toHaveBeenCalledTimes(1);
+        expect(res.status, JSON.stringify(params)).not.toHaveBeenCalled();
+        expect(req.user).toEqual({ id: 7, username: "u", role: "USER" });
+      }
+    });
+
+    it("a media link is refused on `stream.mpd`, `stream.mp4`, `stream.webm` and `stream.mkv` (401)", async () => {
+      for (const params of [
+        { streamPath: "stream.mpd" },
+        { streamPath: "stream.mp4" },
+        { streamPath: "stream.webm" },
+        { streamPath: "stream.mkv" },
+        { streamPath: "stream", subPath: "0.ts" },
+      ]) {
+        const req = mediaReq(media(), { params });
+        const res = createMockRes();
+        const next = vi.fn();
+        await authenticateStreamRequest(req, res, next);
+        expect(res.status, JSON.stringify(params)).toHaveBeenCalledWith(401);
+        expect(next, JSON.stringify(params)).not.toHaveBeenCalled();
+      }
+    });
+
+    it("`scope=` (empty) is 401, not read as v1", async () => {
+      // A valid v1 signature, so reading the empty scope as absent would pass
+      const req = signedReq(claimsFor(), { query: { scope: "" } });
+      const res = createMockRes();
+      const next = vi.fn();
+
+      await authenticateStreamRequest(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: "Invalid stream link" });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it("a repeated `scope` is 401", async () => {
+      const req = mediaReq(media(), {
+        query: { scope: ["media", "media"] },
+      });
+      const res = createMockRes();
+      const next = vi.fn();
+
+      await authenticateStreamRequest(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: "Invalid stream link" });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it("an unknown `scope` value is 401", async () => {
+      for (const scope of ["MEDIA", "download", "v1", "media "]) {
+        const req = mediaReq(media(), { query: { scope } });
+        const res = createMockRes();
+        const next = vi.fn();
+        await authenticateStreamRequest(req, res, next);
+        expect(res.status, scope).toHaveBeenCalledWith(401);
+        expect(res.json, scope).toHaveBeenCalledWith({
+          error: "Invalid stream link",
+        });
+        expect(next, scope).not.toHaveBeenCalled();
+      }
+    });
+
+    it("a media link for scene 5 is refused on scene 6, and on scene 5 of another instance", async () => {
+      const sig = signStreamLink(media({ sceneId: "5" }), KEY);
+      for (const target of [
+        { sceneId: "6", instanceId: "inst-a" },
+        { sceneId: "5", instanceId: "inst-b" },
+      ]) {
+        const req = mediaReq(media({ sceneId: "5" }), {
+          params: { sceneId: target.sceneId, streamPath: "stream.m3u8" },
+          query: { instanceId: target.instanceId, sig },
+        });
+        const res = createMockRes();
+        const next = vi.fn();
+        await authenticateStreamRequest(req, res, next);
+        expect(res.status, JSON.stringify(target)).toHaveBeenCalledWith(401);
+        expect(next, JSON.stringify(target)).not.toHaveBeenCalled();
+      }
+
+      // The same link on its own scene and instance passes
+      const own = mediaReq(media({ sceneId: "5" }), {
+        params: { sceneId: "5", streamPath: "stream.m3u8" },
+      });
+      const next = vi.fn();
+      await authenticateStreamRequest(own, createMockRes(), next);
+      expect(next).toHaveBeenCalledTimes(1);
+    });
+
+    it("a v1 signature does not pass as a media link, nor the reverse", async () => {
+      const v1AsMedia = signedReq(claimsFor(), { query: { scope: "media" } });
+      const res = createMockRes();
+      await authenticateStreamRequest(v1AsMedia, res, vi.fn());
+      expect(res.status).toHaveBeenCalledWith(401);
+
+      const mediaSig = signStreamLink(media(), KEY);
+      const mediaAsV1 = signedReq(claimsFor(), { query: { sig: mediaSig } });
+      const res2 = createMockRes();
+      await authenticateStreamRequest(mediaAsV1, res2, vi.fn());
+      expect(res2.status).toHaveBeenCalledWith(401);
+    });
+
+    it("a media link opens the caption route; a v1 link does not", async () => {
+      const claims = media();
+      const sig = signStreamLink(claims, KEY);
+      const query = {
+        lang: "en",
+        type: "vtt",
+        instanceId: claims.instanceId,
+        uid: String(claims.userId),
+        exp: String(claims.exp),
+        scope: "media",
+        sig,
+      };
+      const req = reqFor(authenticateCaptionRequest, {
+        params: { sceneId: claims.sceneId },
+        query,
+      });
+      const res = resFor(authenticateCaptionRequest);
+      const next = vi.fn();
+      await authenticateCaptionRequest(req, res, next);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).toEqual({ id: 7, username: "u", role: "USER" });
+
+      const v1 = claimsFor();
+      const v1Req = reqFor(authenticateCaptionRequest, {
+        params: { sceneId: v1.sceneId },
+        query: {
+          lang: "en",
+          type: "vtt",
+          instanceId: v1.instanceId,
+          uid: String(v1.userId),
+          exp: String(v1.exp),
+          sig: signStreamLink(v1, KEY),
+        },
+      });
+      const v1Res = resFor(authenticateCaptionRequest);
+      const v1Next = vi.fn();
+      await authenticateCaptionRequest(v1Req, v1Res, v1Next);
+      expect(v1Res.status).toHaveBeenCalledWith(401);
+      expect(v1Next).not.toHaveBeenCalled();
+
+      // Without sig the caption route needs the session, as before
+      const plain = reqFor(authenticateCaptionRequest, {
+        params: { sceneId: "123" },
+        query: { lang: "en", type: "vtt", instanceId: "inst-a" },
+      });
+      const plainRes = resFor(authenticateCaptionRequest);
+      const plainNext = vi.fn();
+      await authenticateCaptionRequest(plain, plainRes, plainNext);
+      expect(mockAuthenticate).toHaveBeenCalledWith(plain, plainRes, plainNext);
+    });
+
+    it("the verified claims are on `res.locals.streamLink`", async () => {
+      const claims = media();
+      const sig = signStreamLink(claims, KEY);
+      const req = mediaReq(claims, { params: { streamPath: "stream.m3u8" } });
+      const res = createMockRes();
+      const next = vi.fn();
+
+      await authenticateStreamRequest(req, res, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.locals.streamLink).toEqual({
+        uid: 7,
+        exp: claims.exp,
+        scope: "media",
+        sig,
+      });
+    });
+
+    it("a session request leaves `res.locals.streamLink` unset", async () => {
+      const req = reqFor(authenticateStreamRequest, {
+        params: { sceneId: "123", streamPath: "stream.m3u8" },
+        query: { instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      await authenticateStreamRequest(req, res, vi.fn());
+
+      expect(res.locals.streamLink).toBeUndefined();
+    });
   });
 });

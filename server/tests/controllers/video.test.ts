@@ -14,14 +14,18 @@ import {
   GatewayTimeoutError,
   NotFoundError,
 } from "../../middleware/errorHandler.js";
+import { authenticateStreamRequest } from "../../middleware/streamAuth.js";
 import prisma from "../../prisma/singleton.js";
+import videoRouter from "../../routes/video.js";
 import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { logger } from "../../utils/logger.js";
 import { isAllowedStreamPath } from "../../utils/stashMediaPath.js";
 import {
+  STREAM_LINK_TTL_SECONDS,
   deriveStreamLinkKey,
   isStreamLinkSignatureValid,
+  signStreamLink,
 } from "../../utils/streamLink.js";
 import type * as streamProxyModule from "../../utils/streamProxy.js";
 import {
@@ -34,6 +38,7 @@ import {
   malformed,
   reqFor,
   resFor,
+  runRoute,
 } from "../helpers/controllerTestUtils.js";
 import { stashInstanceRow } from "../helpers/fixtures.js";
 import { anyOf } from "../helpers/matchers.js";
@@ -793,6 +798,58 @@ describe("Video Controller", () => {
 
         await proxyStashStream(req, res);
 
+        expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+          7,
+          "scene",
+          "123",
+          "inst-a"
+        );
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(global.fetch).not.toHaveBeenCalled();
+      });
+
+      it("a hidden scene answers 404 to a valid media link", async () => {
+        // Hidden or restricted mid-cast: the link verifies, the access check
+        // still refuses, at the next playlist or segment request
+        mockCanUserAccessEntity.mockResolvedValue(false);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          partialRow({ id: 7, username: "u", role: "USER" })
+        );
+        const claims = {
+          userId: 7,
+          sceneId: "123",
+          instanceId: "inst-a",
+          exp: Math.floor(Date.now() / 1000) + STREAM_LINK_TTL_SECONDS,
+          passwordChangedAtMs: 0,
+          scope: "media" as const,
+        };
+        const sig = signStreamLink(claims, deriveStreamLinkKey("test-secret"));
+        const req = reqFor(authenticateStreamRequest, {
+          params: {
+            sceneId: "123",
+            streamPath: "stream.m3u8",
+            subPath: "0.ts",
+          },
+          query: {
+            instanceId: "inst-a",
+            uid: "7",
+            exp: String(claims.exp),
+            scope: "media",
+            sig,
+          },
+          url: "/api/scene/123/proxy-stream/stream.m3u8/0.ts",
+        });
+        const res = resFor(proxyStashStream);
+
+        await runRoute(
+          videoRouter,
+          "get",
+          "/scene/:sceneId/proxy-stream/:streamPath/:subPath",
+          req,
+          res
+        );
+
+        expect(req.user).toEqual({ id: 7, username: "u", role: "USER" });
         expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
           7,
           "scene",
