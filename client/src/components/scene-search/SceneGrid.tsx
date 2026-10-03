@@ -148,10 +148,6 @@ const SceneGrid = ({
     setSelection((prev) => ({ scenes: scenes || [], anchor: prev.anchor }));
   };
 
-  const handleDeselectAll = () => {
-    setSelection(NO_SELECTION);
-  };
-
   const handleClearSelection = () => {
     setSelection(NO_SELECTION);
   };
@@ -197,28 +193,6 @@ const SceneGrid = ({
 
   return (
     <div className="space-y-6">
-      {/* Selection Controls - Only shown when items are selected */}
-      {selectedScenes.length > 0 && (
-        <div className="flex items-center justify-end gap-3">
-          <Button
-            onClick={handleSelectAll}
-            variant="primary"
-            size="sm"
-            className="font-medium"
-          >
-            Select All ({scenes?.length || 0})
-          </Button>
-          <Button
-            onClick={handleDeselectAll}
-            variant="secondary"
-            size="sm"
-            className="font-medium"
-          >
-            Deselect All
-          </Button>
-        </div>
-      )}
-
       {/* Grid */}
       <div ref={gridRef} className={gridClasses}>
         {scenes.map((scene: NormalizedScene) => (
@@ -252,6 +226,8 @@ const SceneGrid = ({
           <BulkActionBar
             selectedScenes={selectedScenes}
             onClearSelection={handleClearSelection}
+            onSelectAll={handleSelectAll}
+            selectAllCount={scenes.length}
             actions={
               <>
                 <Button

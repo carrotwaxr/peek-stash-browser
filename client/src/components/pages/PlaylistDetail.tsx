@@ -990,26 +990,6 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
                 you are finished.
               </div>
             )}
-            {selectedScenes.length > 0 && !isEditing && !reorderMode && (
-              <div className="flex items-center justify-end gap-3">
-                <Button
-                  onClick={handleSelectAll}
-                  variant="primary"
-                  size="sm"
-                  className="font-medium"
-                >
-                  Select All ({items.length})
-                </Button>
-                <Button
-                  onClick={handleDeselectAll}
-                  variant="secondary"
-                  size="sm"
-                  className="font-medium"
-                >
-                  Deselect All
-                </Button>
-              </div>
-            )}
             {rows.length === 0 && (
               <p
                 className="text-center py-8"
@@ -1123,6 +1103,8 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
           <BulkActionBar
             selectedScenes={selectedScenes}
             onClearSelection={handleDeselectAll}
+            onSelectAll={handleSelectAll}
+            selectAllCount={items.length}
             actions={
               <>
                 <AddToPlaylistButton

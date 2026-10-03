@@ -6,6 +6,13 @@ interface Props {
   selectedScenes: NormalizedScene[];
   onClearSelection: () => void;
   actions: ReactNode;
+  /**
+   * Selects the whole page. It lives in the bar, which is fixed to the
+   * screen, so the first selection never pushes the grid down.
+   */
+  onSelectAll?: (() => void) | undefined;
+  /** How many the page holds, shown on Select All */
+  selectAllCount?: number | undefined;
 }
 
 /**
@@ -16,6 +23,8 @@ const BulkActionBar = ({
   selectedScenes,
   onClearSelection,
   actions,
+  onSelectAll,
+  selectAllCount,
 }: Props) => {
   const selectedCount = selectedScenes.length;
 
@@ -62,6 +71,19 @@ const BulkActionBar = ({
                   {selectedCount === 1 ? "scene" : "scenes"}
                 </span>
               </div>
+
+              {selectedCount > 0 && onSelectAll && (
+                <Button
+                  onClick={onSelectAll}
+                  variant="tertiary"
+                  size="sm"
+                  className="text-xs sm:text-sm underline hover:no-underline !p-0 !border-0 whitespace-nowrap"
+                  style={{ color: "var(--accent-primary)" }}
+                >
+                  Select All
+                  {selectAllCount === undefined ? "" : ` (${selectAllCount})`}
+                </Button>
+              )}
 
               {selectedCount > 0 && (
                 <Button

@@ -32,6 +32,49 @@ test.describe("Scene Library", () => {
     requireData(await list.waitForResults("Scene"), "scenes");
   });
 
+  test("the first selection moves no card, and Select All is in the bottom bar", async ({
+    page,
+  }) => {
+    const list = new ListPage(page);
+    await list.goto("/scenes");
+    const count = requireData(
+      (await list.waitForResults("Scene")) >= 3 ? 3 : null,
+      "3 scenes"
+    );
+    const cards = list.cards("Scene");
+    // Layout offsets: a hovered or selected card scales (a transform), which
+    // moves its bounding box but not its place in the grid
+    const tops = async () =>
+      Promise.all(
+        Array.from({ length: count }, (_, i) =>
+          cards
+            .nth(i)
+            .evaluate((el) => [
+              (el as HTMLElement).offsetLeft,
+              (el as HTMLElement).offsetTop,
+            ])
+        )
+      );
+    const before = await tops();
+
+    await cards
+      .first()
+      .getByRole("button", { name: "Select scene", exact: true })
+      .click();
+    const selectAll = page.getByRole("button", {
+      name: /^Select All \(\d+\)$/,
+    });
+    await expect(selectAll).toBeVisible();
+
+    expect(await tops()).toEqual(before);
+
+    await selectAll.click();
+    await expect(
+      cards.first().getByRole("button", { name: "Deselect scene" })
+    ).toBeVisible();
+    expect(await tops()).toEqual(before);
+  });
+
   test("search input accepts text and updates URL", async ({ page }) => {
     await page.goto("/scenes");
     await expect(page.getByPlaceholder("Search...")).toBeVisible({

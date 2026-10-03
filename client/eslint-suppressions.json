@@ -155,7 +155,7 @@
   },
   "src/components/scene-search/SceneGrid.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/scene/SceneMetadata.tsx": {

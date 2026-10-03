@@ -70,6 +70,33 @@ describe("BulkActionBar", () => {
     expect(defaultProps.onClearSelection).toHaveBeenCalled();
   });
 
+  it("shows Select All with the page's count in the bar, and calls it", () => {
+    const onSelectAll = vi.fn();
+    render(
+      <MemoryRouter>
+        <BulkActionBar
+          {...defaultProps}
+          onSelectAll={onSelectAll}
+          selectAllCount={24}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select All (24)" }));
+
+    expect(onSelectAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no Select All unless the page gives one", () => {
+    render(
+      <MemoryRouter>
+        <BulkActionBar {...defaultProps} />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole("button", { name: /Select All/ })).toBeNull();
+  });
+
   it("renders provided actions when scenes are selected", () => {
     render(
       <MemoryRouter>

@@ -180,6 +180,20 @@ describe("SceneGrid selection", () => {
     expect(pressed()).toHaveLength(6);
   });
 
+  it("the first selection puts nothing above the grid, so no card moves", () => {
+    renderGrid({ selectionScope: "p1" });
+    const grid = must(screen.getByTestId("card-1-a").parentElement);
+    const above = () => grid.previousElementSibling;
+    expect(above()).toBeNull();
+
+    fireEvent.click(screen.getByTestId("card-1-a"));
+
+    expect(above()).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Select All (6)" })
+    ).toBeVisible();
+  });
+
   it("click card 2's checkbox, shift-click card 5's: cards 2 to 5 are selected", () => {
     renderGrid({ selectionScope: "p1" });
     fireEvent.click(screen.getByTestId("card-2-a"));
