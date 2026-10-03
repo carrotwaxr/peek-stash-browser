@@ -40,7 +40,7 @@ One Peek can sit in front of several Stash servers. Each user picks which of the
 
 ## Media through Peek
 
-Streams, captions and images all go through Peek, so a user needs to be signed in to get them. Users never receive Stash's address or API key. An external player such as VLC gets a personal signed link that works for 12 hours. See [External Player](user-guide/external-player.md).
+Streams, captions and images all go through Peek, so a user needs to be signed in to get them. Users never receive Stash's address or API key. An external player such as VLC, or a Chromecast you cast to, gets a personal signed link that works for 12 hours. See [External Player](user-guide/external-player.md) and [Casting](user-guide/casting.md).
 
 To reach Peek from outside your network, put it behind a reverse proxy. See [Behind a reverse proxy](getting-started/configuration.md#behind-a-reverse-proxy).
 

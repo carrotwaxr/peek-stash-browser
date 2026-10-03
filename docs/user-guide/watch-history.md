@@ -145,7 +145,7 @@ Watch history is stored in Peek's database:
 - **No video file access logs** - Peek doesn't log file system access
 - **No analytics or tracking services** - Peek reports your viewing to no outside service
 
-Your history stays in Peek, with one exception. If an admin has turned on **Sync to Stash** for your account (see [Sync to Stash](user-management.md#sync-to-stash-export)), Peek also sends your plays, watch time, resume points and O counts to your Stash server as you watch. Stash keeps one set of these for everyone who syncs to it, so with several users syncing, their activity adds up there. Without Sync to Stash, nothing about what you watch leaves Peek.
+Your history stays in Peek, with one exception. If an admin has turned on **Sync to Stash** for your account (see [Sync to Stash](user-management.md#sync-to-stash-export)), Peek also sends your plays, watch time, resume points and O counts to your Stash server as you watch. Stash keeps one set of these for everyone who syncs to it, so with several users syncing, their activity adds up there. Without Sync to Stash, nothing about what you watch leaves Peek, with one exception you start yourself: when you cast a scene to a Chromecast, Peek sends the cast device the scene's title, its performers, its poster and a link that works for 12 hours (see [Casting](casting.md)). The history of what the TV plays is recorded in Peek like any other watching.
 
 ### Privacy Controls
 

@@ -133,7 +133,7 @@ describe("PlaybackTab", () => {
     expect(screen.getByRole("button", { name: "Save Settings" })).toBeEnabled();
   });
 
-  it("the Playback tab offers no casting toggle", async () => {
+  it("the Playback tab says Chromecast needs HTTPS and offers no casting toggle", async () => {
     mockApiGet.mockResolvedValue({ settings: STORED });
     mockApiPut.mockResolvedValue({ success: true });
     renderTab();
@@ -142,8 +142,11 @@ describe("PlaybackTab", () => {
       await screen.findByRole("button", { name: "Save Settings" })
     );
 
-    expect(screen.queryByText(/Chromecast|AirPlay/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("casting-help")).toHaveTextContent(
+      "Chromecast needs Peek on HTTPS"
+    );
     expect(screen.queryByLabelText(/Chromecast|AirPlay/)).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
     await waitFor(() => expect(mockApiPut).toHaveBeenCalled());
     expect(mockApiPut.mock.calls[0]?.[1]).not.toHaveProperty("enableCast");
   });

@@ -13,7 +13,7 @@ A self-hosted, multi-user front end for one or more [Stash](https://github.com/s
 - **Content Restrictions** - Admins give a user show-only or always-hide lists of collections, tags, studios and galleries, applied everywhere ([Learn more](user-guide/content-restrictions.md))
 - **Hidden Items** - Hide anything for yourself ([Learn more](user-guide/hidden-items.md))
 - **Several Stash Servers** - One Peek in front of several Stash servers; each user chooses which they see ([Learn more](getting-started/configuration.md#multi-instance-support))
-- **Media Through Peek** - Streams, captions and images are proxied through Peek, so users never get Stash's address or API key. Stash's own transcodes mean no duplicate transcoding. External players get a personal signed link ([Learn more](user-guide/external-player.md))
+- **Media Through Peek** - Streams, captions and images are proxied through Peek, so users never get Stash's address or API key. Stash's own transcodes mean no duplicate transcoding. External players and cast devices get a personal signed link ([Learn more](user-guide/external-player.md))
 - **Playlists and Sharing** - Create, organize and play named playlists, and share them with groups ([Learn more](user-guide/playlists.md))
 - **Browsing** - TV mode, timeline and folder views, recommendations and similar scenes from your own history ([Learn more](user-guide/recommendations.md))
 - **Downloads** - Scene files and playlist zips with NFO files, for the users and groups you allow ([Learn more](user-guide/downloads.md))

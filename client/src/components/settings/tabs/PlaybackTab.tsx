@@ -62,6 +62,17 @@ const PlaybackForm = ({ storedPercent }: { storedPercent: number }) => {
             </p>
           </div>
 
+          {/* Casting: no setting, only what it needs */}
+          <p
+            className="text-sm"
+            style={{ color: "var(--text-muted)" }}
+            data-testid="casting-help"
+          >
+            Chromecast needs Peek on HTTPS: on a plain http address the Cast
+            button does not show. Cast from Chrome or Edge; in Safari, use
+            AirPlay.
+          </p>
+
           {/* Save Button */}
           <div
             className="flex justify-end pt-4 border-t"

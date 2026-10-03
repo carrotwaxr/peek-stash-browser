@@ -152,7 +152,7 @@ The image trusts its own nginx, so sign-in lockouts and rate limits see each vis
 
 The bundled nginx sends a Content Security Policy and four other security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` and `Permissions-Policy`) on every response. A reverse proxy in front should pass them through unchanged. Peek sends no HSTS header, because it usually runs over plain HTTP on a LAN: if you serve it over HTTPS, set HSTS on that proxy.
 
-Peek serves its own fonts. The browser loads nothing from third parties, apart from the admin-only update check, which asks the GitHub API for the latest release.
+Peek serves its own fonts. The browser loads nothing from third parties, apart from two things: the admin-only update check, which asks the GitHub API for the latest release, and, on the Scene page of a Chromium browser (Chrome, Edge, Brave and others) over HTTPS, Google's Cast sender script from `www.gstatic.com`, which is how casting works. TV mode and other browsers (Firefox, Safari) do not load it, and neither does a plain `http://` address. See [Casting](../user-guide/casting.md).
 
 ## Proxy Authentication
 
@@ -199,7 +199,7 @@ Without `PROXY_AUTH_TRUSTED_IPS`, Peek honours the header from any address, as e
 
 ### External player links
 
-External players (VLC, Android video apps) cannot pass your single-sign-on login to the proxy. The external player button therefore gives each user a personal, signed link, and Peek checks the signature itself. Let requests to `GET /api/scene/*/proxy-stream/stream` that carry a `sig` query parameter through the proxy without authentication; everything else stays behind it. Peek still rejects an expired, tampered or foreign link with 401, and applies that user's hidden items and content restrictions.
+External players (VLC, Android video apps) and cast devices cannot pass your single-sign-on login to the proxy. The external player button and casting therefore give each user a personal, signed link, and Peek checks the signature itself. Let requests to `/api/scene/*/proxy-stream/...`, `/api/scene/*/caption` and `/api/scene/*/poster` that carry a `sig` query parameter through the proxy without authentication; everything else stays behind it. Peek still rejects an expired, tampered or foreign link with 401, and applies that user's hidden items and content restrictions. The methods, an example pattern and what the bypass does and does not allow are in [Behind a login proxy](../user-guide/external-player.md#behind-a-login-proxy).
 
 ### Security Requirements
 

@@ -296,6 +296,21 @@ interface GetStashInstanceResponse {
     priority: number;
     createdAt: string;
     updatedAt: string;
+    /**
+     * The VR tag the admin chose for this server, a bare tag id on it; null
+     * uses Stash's own
+     */
+    vrTagId: string | null;
+    /**
+     * The chosen tag's name; null when none is chosen or the tag was deleted in
+     * Stash (Peek then uses Stash's tag)
+     */
+    vrTagName: string | null;
+    /**
+     * Stash's own VR tag (its `ui.vrTag` setting) by name, as last read by a
+     * sync; null when Stash has none
+     */
+    stashVrTag: string | null;
   } | null;
   instanceCount: number;
 }
@@ -372,6 +387,11 @@ interface UpdateStashInstanceRequest {
   apiKey?: string;
   enabled?: boolean;
   priority?: number;
+  /**
+   * The server's VR tag: a bare id of a live tag on it (400 otherwise), or
+   * null to use Stash's own. A new `url` clears it.
+   */
+  vrTagId?: string | null;
 }
 ```
 
@@ -2771,7 +2791,7 @@ The stream and caption proxy, and the external player's personal signed link.
 
 Caption/subtitle proxy
 
-**Authentication:** Session
+**Authentication:** Session or signed link
 
 **Request Body:** `never`
 
@@ -2788,6 +2808,30 @@ Caption/subtitle proxy
 ```
 
 **Handler:** `getCaption` in `server/controllers/video.ts`
+
+---
+
+### GET /api/scene/:sceneId/poster
+
+Scene poster (Stash's screenshot), for a Cast receiver's media link too
+
+**Authentication:** Session or signed link
+
+**Request Body:** `never`
+
+**URL Parameters:**
+
+```typescript
+{ sceneId: string }
+```
+
+**Query Parameters:**
+
+```typescript
+{ instanceId?: string }
+```
+
+**Handler:** `proxyScenePoster` in `server/controllers/proxy.ts`
 
 ---
 
@@ -2828,6 +2872,45 @@ interface ExternalPlayerLinkResponse {
 ```
 
 **Handler:** `createExternalPlayerLink` in `server/controllers/video.ts`
+
+---
+
+### POST /api/scene/:sceneId/media-link
+
+One signed media link per scene: Direct and HLS, captions and poster, for a Cast receiver or Safari's native player
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+interface SceneMediaLinkRequest {
+  instanceId: string;
+}
+```
+
+**URL Parameters:**
+
+```typescript
+{ sceneId: string }
+```
+
+**Response:**
+
+```typescript
+interface SceneMediaLinkResponse {
+  /** ISO timestamp, 12 hours after minting. */
+  expiresAt: string;
+  /** Direct and the HLS tiers only, in `buildSceneStreams`' order. */
+  streams: { url: string; mime_type: string; label: string }[];
+  /** The one source a Cast receiver is given; null when none plays there. */
+  cast: { url: string; contentType: string; kind: "direct" | "hls" } | null;
+  captions: { url: string; lang: string; type: string }[];
+  poster: string | null;
+}
+```
+
+**Handler:** `createSceneMediaLink` in `server/controllers/video.ts`
 
 ---
 

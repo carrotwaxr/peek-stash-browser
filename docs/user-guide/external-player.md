@@ -12,8 +12,8 @@ Peek allows you to open scenes in external media players like VLC for enhanced p
 | **Windows (Firefox)** | ⚠️ Limited | May not work due to Firefox's protocol handling |
 | **macOS** | 🔬 Untested | Should work with protocol handler |
 | **Linux** | 🔬 Untested | Should work with protocol handler |
-| **Chromecast** | ❌ Not supported | The Chromecast button and the "Enable Chromecast/AirPlay" setting are gone: casting needs your Peek login, which a cast device cannot pass on. Casting returns in a later release; use this button on the device instead |
-| **AirPlay (Safari to Apple TV)** | ❌ Not supported | Removed with Chromecast, for the same reason. It returns with casting in a later release; use this button on the device instead |
+| **Chromecast** | ✅ Works | Casting, not the external player button: see [Casting](casting.md). Needs Peek on HTTPS, in Chrome, Edge or Chrome on Android |
+| **AirPlay (Safari to Apple TV)** | ✅ Works | See [Casting](casting.md#airplay). Safari shows an AirPlay button in the player when an Apple TV is nearby |
 
 !!! note "Help Us Test"
     We need community feedback on platform compatibility. If you test on a platform not marked as "Works", please [report your results on GitHub](https://github.com/carrotwaxr/peek-stash-browser/issues) so we can update this documentation.
@@ -44,6 +44,34 @@ The link behind the button belongs to you. Peek creates it when you open the sce
 - shows only what your account may see, so hidden items and content restrictions still apply
 
 Don't share it: anyone who has it can watch that scene as you until it expires. If a link stops working, reopen the scene page and copy a fresh one.
+
+## Behind a login proxy
+
+If a reverse proxy with its own login (Authelia, Authentik, or any front end that sets `PROXY_AUTH_HEADER`) sits in front of Peek, an external player and a cast device cannot pass that login: VLC and a Chromecast cannot sign in. Both get a personal signed link instead, and Peek checks the link itself. Let these requests through the proxy without authentication, and keep everything else behind it:
+
+- the methods `GET`, `HEAD` and `OPTIONS` (the last is a Cast device's cross-origin preflight)
+- on the paths `/api/scene/<id>/proxy-stream/...`, `/api/scene/<id>/caption` and `/api/scene/<id>/poster`
+- only when the query string has a `sig` parameter
+
+As a regular expression on the path and query, for a proxy that matches that way (Authelia's `resources`, for example):
+
+```text
+^/api/scene/[0-9]+/(proxy-stream/.*|caption|poster)[?](.*&)?sig=.*$
+```
+
+Adapt it to your proxy's own syntax, and let the proxy pass Peek's `Access-Control-*` headers and the browser's `Range` header on those requests unchanged. A proxy that adds its own CORS headers there breaks casting.
+
+What this lets through is narrow:
+
+- **Peek checks every signed request itself:** the signature, the user it names, its expiry, and that user's access to the scene. An expired, tampered or foreign link is refused with 401, a scene the user has hidden or may not see answers 404, and the link opens only the one scene it was made for. The bypass lets no one past Peek's own checks.
+- **A link works for 12 hours.** Logging out does not revoke it. Only a password change or reset (or a change of the server's `JWT_SECRET`) does.
+- **The external player button's link opens only the direct stream** (`proxy-stream/stream`). The link Peek makes for casting also opens the HLS playlist and its segments, the captions and the scene's poster, and nothing else.
+- **Safari now asks Peek for a signed link every time it plays a scene,** not only when you press a link button, so a login proxy that blocks signed requests can affect Safari playback too. If Safari fails to play behind such a proxy, apply the bypass.
+
+!!! warning "Only the signed requests"
+    Do not let `/api/scene/...` through without the `sig` condition. A request without `sig` needs a Peek session, and the proxy's login is what protects the rest of Peek.
+
+[Casting](casting.md) needs this bypass behind a login proxy, and [Configuration](../getting-started/configuration.md#external-player-links) lists it with the other proxy settings.
 
 ## Setting Up VLC Protocol Handler (Desktop)
 
@@ -172,6 +200,7 @@ Firefox handles custom protocols differently from Edge/Chrome and may not respec
 
 - Ensure VLC is up to date (version 3.0 or later recommended)
 - A link older than 12 hours, or from before a password change, returns 401: reopen the scene page and copy a fresh one
+- Behind a login proxy, the link needs the bypass in [Behind a login proxy](#behind-a-login-proxy)
 - Try the "Copy Stream URL" method to verify the URL works
 
 ### Android: No app found to handle the link

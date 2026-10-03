@@ -132,6 +132,7 @@ nav:
       - FAQ: getting-started/faq.md
   - User Guide:
       - Browse and Display: user-guide/browse-and-display.md
+      - Casting: user-guide/casting.md
       - Clips: user-guide/clips.md
       - Content Restrictions: user-guide/content-restrictions.md
       - Custom Carousels: user-guide/custom-carousels.md
