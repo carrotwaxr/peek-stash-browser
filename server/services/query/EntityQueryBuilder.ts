@@ -737,9 +737,10 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
    * timeline's bars. The statement is the count's (its clauses' count
    * forms), so exclusions, instances, `deletedAt`, the search and every
    * filter are the list's and the bars equal the grid by construction.
-   * `periodSql` is the period of `dateColumn`, a whole-day text date
-   * (`YYYY-MM-DD`); rows without one, and periods before year 0, have no
-   * bar. Page and sort are not read, except for the shape a clause takes
+   * `periodSql` is the period of `dateColumn`, an expression for the row's
+   * whole-day text date (`YYYY-MM-DD`; the timeline passes `wholeDaySql`, so
+   * a partial date is its first day, as the grid reads it); rows without
+   * one, and periods before year 0, have no bar. Page and sort are not read, except for the shape a clause takes
    * for its count.
    */
   async periodCounts(

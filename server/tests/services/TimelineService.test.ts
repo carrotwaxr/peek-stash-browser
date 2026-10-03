@@ -14,6 +14,7 @@ import {
   TimelineService,
   periodSql,
 } from "../../services/TimelineService.js";
+import { wholeDaySql } from "../../utils/sqlClauses.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
 
@@ -76,7 +77,7 @@ describe("TimelineService.getDistribution", () => {
     ["gallery", galleryQueryBuilder, "g.date"],
     ["image", imageQueryBuilder, "i.date"],
   ] as const)(
-    "%s bars are its list builder's period counts over the request, on its date column",
+    "%s bars are its list builder's period counts over the request, on its date column's whole day",
     async (entity, builder, column) => {
       const counts = vi
         .spyOn(builder, "periodCounts")
@@ -91,8 +92,8 @@ describe("TimelineService.getDistribution", () => {
       expect(bars).toEqual([{ period: "2024", count: 2 }]);
       expect(counts).toHaveBeenCalledWith(
         { ...options, request, applyExclusions: true },
-        periodSql("years", column),
-        column
+        periodSql("years", wholeDaySql(column)),
+        wholeDaySql(column)
       );
     }
   );
