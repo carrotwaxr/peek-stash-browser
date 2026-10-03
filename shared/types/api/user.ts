@@ -55,6 +55,9 @@ export interface FilterPreset {
  * A View as a validated write stores it (the lenient `FilterPreset` stays the
  * type for reading stored rows)
  */
+/** The 409 message for a View name already used in its list; the client tells it from a stale write by this text */
+export const VIEW_NAME_TAKEN = "Another View of this list has that name";
+
 export interface SavedView {
   id: string;
   /** 1 to 100 characters, trimmed, unique per list (case-insensitive) */

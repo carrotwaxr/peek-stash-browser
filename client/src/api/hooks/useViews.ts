@@ -6,19 +6,20 @@ import type {
   SaveFilterPresetResponse,
   SetDefaultFilterPresetResponse,
 } from "@peek/shared-types";
+import { VIEW_NAME_TAKEN } from "@peek/shared-types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiPatch, apiPost, apiPut } from "..";
 import { ApiError } from "../client";
 import { invalidatePresets } from "./usePresets";
 
 /**
- * The server's message for a name another View of the list has
- * (`DUPLICATE_NAME` in `server/controllers/user.ts`). Its other 409, a write
+ * The server's message for a name another View of the list has (shared, so
+ * both sides read one string). Its other 409, a write
  * that lost the compare-and-set to another tab's (`updateUserJson`), says
  * something else; both are `errorType: "CONFLICT"`, so the message tells
  * them apart.
  */
-export const VIEW_NAME_TAKEN = "Another View of this list has that name";
+export { VIEW_NAME_TAKEN };
 
 /**
  * Why a Views write was refused with a 409: `nameTaken`, another View of the
