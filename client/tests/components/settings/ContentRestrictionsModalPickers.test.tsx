@@ -4,7 +4,7 @@
  * whichever servers they browse, so each picker asks the `/minimal`
  * endpoints with `scope: "allEnabled"`, for its options and for the names
  * of the stored ids (a stored id on another server shows its name). The
- * carousel rule picker sends no scope (tests/components/carousel-builder).
+ * carousel rule picker sends no scope (tests/components/filter-rows).
  */
 import type { MinimalEntity, MinimalRequest } from "@peek/shared-types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";

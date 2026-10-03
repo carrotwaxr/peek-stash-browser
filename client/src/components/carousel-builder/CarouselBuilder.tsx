@@ -1,29 +1,30 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { PanelField, PreviewCarouselResponse } from "@peek/shared-types";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Eye,
-  Loader2,
-  Plus,
-  Save,
-  Trash2,
-} from "lucide-react";
+import type { PreviewCarouselResponse } from "@peek/shared-types";
+import { AlertCircle, ArrowLeft, Eye, Loader2, Save } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useSaveCarousel } from "../../api/hooks/useCarousels";
 import {
   CAROUSEL_FIELDS,
-  CAROUSEL_FILTER_DEFINITIONS,
   buildCarouselRules,
   carouselRulesToFilterState,
 } from "../../utils/filterConfig";
-import { type PanelState, codecOf, valuesOf } from "../../utils/filterFields";
+import {
+  type EditTree,
+  type KeptLeaf,
+  type PanelTable,
+  countRows,
+  editTreeOf,
+  panelTableOf,
+  panelTreeOf,
+  stateOf,
+  treeOf,
+} from "../../utils/filterFields";
 import { sortOptionsFor } from "../../utils/listQuery";
+import FilterRowsEditor from "../filter-rows/FilterRowsEditor";
 import { Button, StatusMessage } from "../ui/index";
 import CarouselPreview from "./CarouselPreview";
 import IconPickerButton from "./IconPickerButton";
-import RuleEditor from "./RuleEditor";
 import { getCarouselIcon } from "./carouselIcons";
 
 /** Why a sort the rules no longer allow is replaced, by the sort's value */
@@ -32,81 +33,68 @@ const SORT_NEEDS: Readonly<Record<string, string>> = {
   scene_index: "Scene Number needs a collection rule",
 };
 
-// Simple ID generator for rule keys (doesn't need to be cryptographically secure)
-let ruleIdCounter = 0;
-const generateRuleId = () => `rule-${++ruleIdCounter}`;
+/** The scene rows a carousel offers */
+const CAROUSEL_TABLE: PanelTable = {
+  ...panelTableOf("scene"),
+  rows: CAROUSEL_FIELDS,
+};
 
-interface CarouselRule {
-  id: string;
-  filterKey: string;
-  value: unknown;
-  /** A picker's excluded ids, where its field takes them */
-  excludes?: string[];
-  modifier?: string;
-  depth?: number;
-}
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** A modifier as a rule holds it: a string, else none */
-const modifierOf = (value: unknown): string | undefined =>
-  typeof value === "string" ? value : undefined;
+/**
+ * The stored rules no row can edit, as kept rows at the root: one per
+ * field, or one for a stored tree the interim reader keeps whole (A6 reads
+ * trees). Each leaf is the part of the stored rules it stands for.
+ */
+const keptLeavesOf = (kept: Readonly<Record<string, unknown>>): KeptLeaf[] =>
+  "match" in kept && "rules" in kept
+    ? [{ group: 0, leaf: kept }]
+    : Object.entries(kept).map(([field, criterion]) => ({
+        group: 0,
+        leaf: { [field]: criterion },
+      }));
 
-/** A depth as a rule holds it: a number, else none */
-const depthOf = (value: unknown): number | undefined =>
-  typeof value === "number" ? value : undefined;
+/** The kept rows' rules, as `buildCarouselRules` lays them under the rows */
+const keptRulesOf = (tree: EditTree): Record<string, unknown> =>
+  Object.assign(
+    {},
+    ...panelTreeOf(tree).kept.flatMap((each) =>
+      isRecord(each.leaf) ? [each.leaf] : []
+    )
+  ) as Record<string, unknown>;
 
-/** A picker's excluded ids as a rule holds them: a list, else none */
-const excludesOf = (row: PanelField, state: PanelState) => {
-  if (row.editor !== "ref" || row.excludeKey === undefined) return undefined;
-  const ids = valuesOf(state[row.excludeKey]);
-  return ids.length === 0 ? undefined : ids;
+/** The editing tree of a carousel's stored rules: its rows and the rules kept as they are */
+const editTreeOfRules = (rules: unknown): EditTree => {
+  const stored = carouselRulesToFilterState(rules);
+  return editTreeOf(
+    "scene",
+    treeOf("scene", stored.state),
+    keptLeavesOf(stored.kept)
+  );
 };
 
 /**
- * The builder's rules from the scene rows' state: one rule per row that
- * filters, with its modifier, depth and exclude companions
+ * A row now edits a field a kept rule holds: the kept rule goes, as the
+ * save would overwrite it
  */
-function convertFilterStateToRules(state: PanelState): CarouselRule[] {
-  return CAROUSEL_FIELDS.filter((row) => codecOf(row).isActive(row, state)).map(
-    (row) => ({
-      id: generateRuleId(),
-      filterKey: row.key,
-      value: state[row.key] ?? (row.editor === "ref" && row.multi ? [] : ""),
-      excludes: excludesOf(row, state),
-      modifier:
-        row.modifierKey === undefined
-          ? undefined
-          : modifierOf(state[row.modifierKey]),
-      depth:
-        row.hierarchyKey === undefined
-          ? undefined
-          : depthOf(state[row.hierarchyKey]),
-    })
+const withoutReplacedKept = (tree: EditTree): EditTree => {
+  const edited = new Set(
+    tree.rows.flatMap((item) => (item.kind === "row" ? [item.field.field] : []))
   );
-}
-
-/** The scene rows' state from the builder's rules, for `buildCarouselRules` */
-function convertRulesToFilterState(rules: readonly CarouselRule[]): PanelState {
-  const state: Record<string, unknown> = {};
-  for (const rule of rules) {
-    const row = CAROUSEL_FIELDS.find((each) => each.key === rule.filterKey);
-    if (row === undefined) continue;
-    state[row.key] = rule.value;
-    if (row.modifierKey !== undefined && rule.modifier !== undefined) {
-      state[row.modifierKey] = rule.modifier;
-    }
-    if (row.hierarchyKey !== undefined && rule.depth !== undefined) {
-      state[row.hierarchyKey] = rule.depth;
-    }
-    if (
-      row.editor === "ref" &&
-      row.excludeKey !== undefined &&
-      rule.excludes !== undefined
-    ) {
-      state[row.excludeKey] = rule.excludes;
-    }
-  }
-  return state;
-}
+  const replaced = (leaf: unknown) =>
+    isRecord(leaf) &&
+    !("match" in leaf && "rules" in leaf) &&
+    Object.keys(leaf).every((field) => edited.has(field));
+  return tree.rows.some((item) => item.kind === "kept" && replaced(item.leaf))
+    ? {
+        ...tree,
+        rows: tree.rows.filter(
+          (item) => item.kind !== "kept" || !replaced(item.leaf)
+        ),
+      }
+    : tree;
+};
 
 /**
  * CarouselBuilder Component
@@ -122,9 +110,9 @@ const CarouselBuilder = () => {
   // Form state
   const [title, setTitle] = useState("");
   const [icon, setIcon] = useState("Film");
-  const [rules, setRules] = useState<CarouselRule[]>([]); // Array of rule objects
-  // Stored rules no row can edit: saved and previewed as they are
-  const [kept, setKept] = useState<Readonly<Record<string, unknown>>>({});
+  // The rules as an editing tree (root rows only until A6), with the
+  // stored rules no row can edit as kept rows
+  const [tree, setTree] = useState<EditTree>(() => editTreeOfRules({}));
   const [sort, setSort] = useState("random");
   const [direction, setDirection] = useState("DESC");
 
@@ -152,10 +140,8 @@ const CarouselBuilder = () => {
         setSort(carousel.sort);
         setDirection(carousel.direction);
 
-        // Convert stored rules back to editable format, keeping the rest
-        const stored = carouselRulesToFilterState(carousel.rules);
-        setRules(convertFilterStateToRules(stored.state));
-        setKept(stored.kept);
+        // The stored rules as rows, keeping the rest as they are
+        setTree(editTreeOfRules(carousel.rules));
       } catch (err) {
         setError((err as Error).message || "Failed to load carousel");
       } finally {
@@ -166,82 +152,20 @@ const CarouselBuilder = () => {
     void loadCarousel();
   }, [id, isEditing]);
 
+  // The rows' state, and the rules a preview and a save send
+  const filterState = stateOf("scene", panelTreeOf(tree).tree);
+  const ruleCount = countRows(tree, "scene");
+  const apiRules = () => buildCarouselRules(filterState, keptRulesOf(tree));
+
   // A sort the rules do not offer (its rule was removed) reads as Random
-  const filterState = convertRulesToFilterState(rules);
   const sortOptions = sortOptionsFor("scene", filterState);
   const effectiveSort = sortOptions.some((option) => option.value === sort)
     ? sort
     : "random";
 
-  /**
-   * A rule now edits this field: the kept rule of the same field goes, as
-   * the save would overwrite it
-   */
-  const replaceKept = (filterKey: string) => {
-    const field = CAROUSEL_FIELDS.find((row) => row.key === filterKey)?.field;
-    if (field === undefined) return;
-    setKept((current) => {
-      if (!(field in current)) return current;
-      const { [field]: _replaced, ...rest } = current;
-      return rest;
-    });
-  };
-
-  /**
-   * Add a new rule
-   */
-  const addRule = () => {
-    const usedKeys = new Set(rules.map((r) => r.filterKey));
-    const availableFilter = CAROUSEL_FILTER_DEFINITIONS.find(
-      (f) => !usedKeys.has(f.key)
-    );
-
-    if (!availableFilter) {
-      return; // All filters already used
-    }
-
-    const newRule = {
-      id: generateRuleId(),
-      filterKey: availableFilter.key,
-      value:
-        availableFilter.type === "checkbox"
-          ? true
-          : availableFilter.multi
-            ? []
-            : "",
-      modifier: availableFilter.defaultModifier,
-    };
-
-    setRules([...rules, newRule]);
-    replaceKept(newRule.filterKey);
-    setPreviewValid(false);
-    setPreviewScenes(null);
-  };
-
-  /**
-   * Update a rule
-   */
-  const updateRule = (ruleId: string, updates: Partial<CarouselRule>) => {
-    setRules(rules.map((r) => (r.id === ruleId ? { ...r, ...updates } : r)));
-    if (updates.filterKey !== undefined) replaceKept(updates.filterKey);
-    setPreviewValid(false);
-    setPreviewScenes(null);
-  };
-
-  /**
-   * Remove a rule
-   */
-  const removeRule = (ruleId: string) => {
-    setRules(rules.filter((r) => r.id !== ruleId));
-    setPreviewValid(false);
-    setPreviewScenes(null);
-  };
-
-  /**
-   * Drop the stored rules the editor cannot show
-   */
-  const removeKept = () => {
-    setKept({});
+  /** A rule changed: the preview is stale */
+  const changeTree = (next: EditTree) => {
+    setTree(withoutReplacedKept(next));
     setPreviewValid(false);
     setPreviewScenes(null);
   };
@@ -250,7 +174,7 @@ const CarouselBuilder = () => {
    * Preview the carousel results
    */
   const handlePreview = async () => {
-    if (rules.length === 0) {
+    if (ruleCount === 0) {
       setPreviewError("Add at least one rule to preview");
       return;
     }
@@ -259,13 +183,8 @@ const CarouselBuilder = () => {
     setPreviewError(null);
 
     try {
-      const apiRules = buildCarouselRules(
-        convertRulesToFilterState(rules),
-        kept
-      );
-
       const result = await libraryApi.previewCarousel({
-        rules: apiRules,
+        rules: apiRules(),
         sort: effectiveSort,
         direction,
       });
@@ -290,7 +209,7 @@ const CarouselBuilder = () => {
       return;
     }
 
-    if (rules.length === 0) {
+    if (ruleCount === 0) {
       setError("Add at least one rule");
       return;
     }
@@ -304,15 +223,10 @@ const CarouselBuilder = () => {
     setError(null);
 
     try {
-      const apiRules = buildCarouselRules(
-        convertRulesToFilterState(rules),
-        kept
-      );
-
       const carouselData = {
         title: title.trim(),
         icon,
-        rules: apiRules,
+        rules: apiRules(),
         sort: effectiveSort,
         direction,
       };
@@ -329,11 +243,7 @@ const CarouselBuilder = () => {
   };
 
   const IconComponent = getCarouselIcon(icon);
-  const canSave = title.trim() && rules.length > 0 && previewValid;
-  const usedFilterKeys = new Set(rules.map((r) => r.filterKey));
-  const hasMoreFilters = CAROUSEL_FILTER_DEFINITIONS.some(
-    (f) => !usedFilterKeys.has(f.key)
-  );
+  const canSave = title.trim() && ruleCount > 0 && previewValid;
 
   if (loading) {
     return (
@@ -382,7 +292,7 @@ const CarouselBuilder = () => {
             <Button
               variant="secondary"
               onClick={() => void handlePreview()}
-              disabled={previewing || rules.length === 0}
+              disabled={previewing || ruleCount === 0}
               icon={
                 previewing ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -490,70 +400,21 @@ const CarouselBuilder = () => {
             borderColor: "var(--border-color)",
           }}
         >
-          <div className="flex items-center justify-between">
-            <h2
-              className="text-sm font-semibold"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Filter Rules (ALL must match)
-            </h2>
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {rules.length} rule{rules.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-
-          {/* Rule List */}
-          <div className="space-y-3">
-            {rules.map((rule) => (
-              <RuleEditor
-                key={rule.id}
-                rule={rule}
-                usedFilterKeys={usedFilterKeys}
-                onChange={(updates) => updateRule(rule.id, updates)}
-                onRemove={() => removeRule(rule.id)}
-              />
-            ))}
-
-            {rules.length === 0 && (
-              <div
-                className="text-center py-8 text-sm"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                No rules added yet. Click &quot;Add Rule&quot; to get started.
-              </div>
-            )}
-          </div>
-
-          {/* Stored rules no row can edit: kept until removed */}
-          {Object.keys(kept).length > 0 && (
-            <div
-              className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
-              style={{
-                backgroundColor: "var(--bg-secondary)",
-                borderColor: "var(--border-color)",
-                color: "var(--text-secondary)",
-              }}
-            >
-              <span>
-                {Object.keys(kept).length} more{" "}
-                {Object.keys(kept).length === 1 ? "rule" : "rules"} this editor
-                can&apos;t show
-              </span>
-              <Button variant="secondary" size="sm" onClick={removeKept}>
-                Remove
-              </Button>
-            </div>
-          )}
-
-          {/* Add Rule Button */}
-          <Button
-            variant="secondary"
-            onClick={addRule}
-            disabled={!hasMoreFilters}
-            icon={<Plus className="w-4 h-4" />}
+          <h2
+            className="text-sm font-semibold"
+            style={{ color: "var(--text-secondary)" }}
           >
-            Add Rule
-          </Button>
+            Filter Rules (ALL must match)
+          </h2>
+
+          <FilterRowsEditor
+            kind="scene"
+            table={CAROUSEL_TABLE}
+            tree={tree}
+            onChange={changeTree}
+            allowGroups={false}
+            pickFromAll
+          />
         </div>
 
         {/* Sort Options */}
@@ -648,7 +509,7 @@ const CarouselBuilder = () => {
         />
 
         {/* Save Hint */}
-        {!previewValid && rules.length > 0 && (
+        {!previewValid && ruleCount > 0 && (
           <p
             className="text-center text-sm"
             style={{ color: "var(--text-muted)" }}
