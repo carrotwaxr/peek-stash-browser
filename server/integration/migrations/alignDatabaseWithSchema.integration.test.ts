@@ -21,6 +21,7 @@ import {
   type MigrationSandbox,
   PRISMA_DIR,
   createDatabaseAt,
+  insertUser,
 } from "../helpers/migrationSandbox.js";
 
 /** The newest migration before this one */
@@ -266,22 +267,20 @@ describe("align database with schema migration", () => {
 
     // Kept: a user with JSON preferences, their image views, exclusions,
     // hidden entity, visible count and a rating (a table not rebuilt)
-    const user = await client.user.create({
-      data: {
-        username: "u",
-        password: "x",
-        carouselPreferences: [{ id: "recent", enabled: true, order: 1 }],
-        filterPresets: { scene: [{ name: "4k", filter: { width: 3840 } }] },
-        tableColumnDefaults: {
-          scene: { visible: ["title"], order: ["title"] },
-        },
-        cardDisplaySettings: { scene: { showCodeOnCard: true } },
-        landingPagePreference: { pages: ["home", "scenes"], randomize: true },
+    const userId = await insertUser(client, {
+      username: "u",
+      password: "x",
+      carouselPreferences: [{ id: "recent", enabled: true, order: 1 }],
+      filterPresets: { scene: [{ name: "4k", filter: { width: 3840 } }] },
+      tableColumnDefaults: {
+        scene: { visible: ["title"], order: ["title"] },
       },
+      cardDisplaySettings: { scene: { showCodeOnCard: true } },
+      landingPagePreference: { pages: ["home", "scenes"], randomize: true },
     });
     await client.imageViewHistory.create({
       data: {
-        userId: user.id,
+        userId,
         instanceId: "default",
         imageId: "1",
         viewCount: 2,
@@ -292,7 +291,7 @@ describe("align database with schema migration", () => {
     });
     await client.userExcludedEntity.create({
       data: {
-        userId: user.id,
+        userId,
         entityType: "scene",
         entityId: "1",
         instanceId: "inst-b",
@@ -301,7 +300,7 @@ describe("align database with schema migration", () => {
     });
     await client.userHiddenEntity.create({
       data: {
-        userId: user.id,
+        userId,
         entityType: "scene",
         entityId: "1",
         instanceId: "inst-b",
@@ -310,7 +309,7 @@ describe("align database with schema migration", () => {
     // Raw SQL: the app's client no longer has the model (20260930000100
     // drops the table)
     await insert(client, "UserEntityStats", {
-      userId: user.id,
+      userId,
       entityType: "scene",
       instanceId: "default",
       visibleCount: 1,
@@ -318,7 +317,7 @@ describe("align database with schema migration", () => {
     });
     await client.sceneRating.create({
       data: {
-        userId: user.id,
+        userId,
         instanceId: "default",
         sceneId: "1",
         rating: 80,
@@ -453,27 +452,30 @@ describe("align database with schema migration", () => {
     sandbox = db;
     const { client } = db;
 
-    const kept = await client.user.create({
-      data: { username: "kept", password: "x" },
+    const keptId = await insertUser(client, {
+      username: "kept",
+      password: "x",
     });
-    const deleted = await client.user.create({
-      data: { username: "deleted", password: "x" },
+    const deletedId = await insertUser(client, {
+      username: "deleted",
+      password: "x",
     });
-    await client.user.delete({ where: { id: deleted.id } });
+    await client.$executeRaw`DELETE FROM "User" WHERE id = ${deletedId}`;
     // A per-user table that is empty at migration time keeps its counter too
     const hidden = await client.userHiddenEntity.create({
-      data: { userId: kept.id, entityType: "scene", entityId: "1" },
+      data: { userId: keptId, entityType: "scene", entityId: "1" },
     });
     await client.userHiddenEntity.delete({ where: { id: hidden.id } });
 
     await migrate(db);
 
-    const created = await client.user.create({
-      data: { username: "new", password: "x" },
+    const createdId = await insertUser(client, {
+      username: "new",
+      password: "x",
     });
-    expect(created.id).toBeGreaterThan(deleted.id);
+    expect(createdId).toBeGreaterThan(deletedId);
     const hiddenAgain = await client.userHiddenEntity.create({
-      data: { userId: created.id, entityType: "scene", entityId: "1" },
+      data: { userId: createdId, entityType: "scene", entityId: "1" },
     });
     expect(hiddenAgain.id).toBeGreaterThan(hidden.id);
   });
