@@ -21,6 +21,8 @@ export interface FieldEditorProps {
   readonly isHighlighted?: boolean;
   /** The label stays for assistive technology only, where the surface names the field itself */
   readonly hideLabel?: boolean;
+  /** B3: a ref row opens its list at once (a chip's editor) */
+  readonly openPicker?: boolean;
 }
 
 /** Nothing to show: the option's default stands in */
@@ -100,6 +102,7 @@ const FieldEditor = forwardRef<HTMLDivElement, FieldEditorProps>(
       autoFocus = false,
       isHighlighted = false,
       hideLabel = false,
+      openPicker = false,
     },
     ref
   ) => {
@@ -144,6 +147,7 @@ const FieldEditor = forwardRef<HTMLDivElement, FieldEditorProps>(
       controlId: id,
       hideLabel,
       isHighlighted,
+      openPicker,
       value: isBlank(stored) ? option.defaultValue : stored,
       onChange: (value) => change({ [option.key]: rowValueOf(option, value) }),
       ...(option.options === undefined ? {} : { options: option.options }),

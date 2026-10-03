@@ -10,6 +10,7 @@ import {
 } from "@peek/shared-types";
 import { type ChipParts, type PanelState, codecOf } from "./codecs";
 import { SPECS } from "./options";
+import type { PanelRow } from "./tree";
 
 /** A chip's row key and its parts */
 export interface FilterChip {
@@ -39,6 +40,21 @@ export function chipsOf(
     const parts = codecOf(row).chip(row, spec, state, unitPreference);
     return parts === null ? [] : [{ key: row.key, parts }];
   });
+}
+
+/**
+ * One row's chip (a row of the state's tree, its keys unprefixed), or null
+ * when it does not filter: the chip bar draws one per root row, repeats
+ * included. Body measures read in `unitPreference`.
+ */
+export function rowChip(
+  kind: ListKind,
+  row: PanelRow,
+  unitPreference?: string
+): ChipParts | null {
+  const spec = SPECS[kind][row.field.field];
+  if (spec === undefined) return null;
+  return codecOf(row.field).chip(row.field, spec, row.state, unitPreference);
 }
 
 /**

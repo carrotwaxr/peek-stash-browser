@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import deepEqual from "fast-deep-equal";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
 import { type ColumnConfig, presetColumnsOf } from "../../config/tableColumns";
@@ -21,8 +15,8 @@ import {
 } from "../../utils/filterFields";
 import { sortOptionsFor } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
+import FilterBar from "../filter-bar/FilterBar";
 import {
-  ActiveFilterChips,
   Button,
   ContextSettings,
   FieldEditor,
@@ -105,17 +99,9 @@ const SearchControls = ({
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [highlightedFilterKey, setHighlightedFilterKey] = useState<
-    string | null
-  >(null);
-  // The field a chip opened: its first control takes focus once drawn
-  const [focusRequest, setFocusRequest] = useState<{ key: string } | null>(
-    null
-  );
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const topPaginationRef = useRef<HTMLDivElement>(null); // Ref for top pagination element
   const filtersButtonRef = useRef<HTMLDivElement>(null); // The Filters button's wrapper
-  const filterRefs = useRef<Record<string, HTMLElement | null>>({}); // Refs for filter controls (for scroll-to-highlight)
 
   const { isTVMode } = useTVMode();
   // The panel and the chips offer every field the view leaves free: a field
@@ -138,7 +124,6 @@ const SearchControls = ({
     viewMode,
     zoomLevel,
     gridDensity,
-    removeFilter,
     setSort,
     setPage,
     setPerPage,
@@ -237,55 +222,6 @@ const SearchControls = ({
     setIsFilterPanelOpen(false);
     focusFiltersButton();
   }, [focusFiltersButton]);
-
-  // Handle clicking on a filter chip to highlight that filter
-  const handleFilterChipClick = useCallback(
-    (filterKey: string) => {
-      // Open filter panel if not already open
-      setIsFilterPanelOpen(true);
-
-      // Find which section this filter belongs to
-      let sectionKey = null;
-      for (const option of filterOptions) {
-        if (option.type === "section-header") {
-          sectionKey = option.key;
-        } else if (option.key === filterKey) {
-          break;
-        }
-      }
-
-      // Expand the section if it's collapsed
-      if (sectionKey && collapsedSections[sectionKey]) {
-        setCollapsedSections((prev) => ({
-          ...prev,
-          [sectionKey]: false,
-        }));
-      }
-
-      // Set the highlighted filter key (triggers scroll and animation)
-      setHighlightedFilterKey(filterKey);
-      // And focus its first control, drawn by the next render
-      setFocusRequest({ key: filterKey });
-    },
-    [filterOptions, collapsedSections]
-  );
-
-  useEffect(() => {
-    if (focusRequest) {
-      document.getElementById(`filter-${focusRequest.key}`)?.focus();
-    }
-  }, [focusRequest]);
-
-  // Clear highlight after animation completes
-  useEffect(() => {
-    if (highlightedFilterKey) {
-      const timer = setTimeout(() => {
-        setHighlightedFilterKey(null);
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [highlightedFilterKey]);
 
   // Only loading a preset from the menu shows its table columns; a default
   // preset applied on a visit leaves the user's saved columns alone
@@ -551,15 +487,11 @@ const SearchControls = ({
               </div>
             </div>
 
-            {/* Active Filter Chips */}
+            {/* The filter chips */}
             {filterable ? (
-              <ActiveFilterChips
-                kind={artifactType as ListEntity}
-                filters={filters}
-                filterOptions={filterOptions}
-                onRemoveFilter={removeFilter}
+              <FilterBar
+                filters={listFilters}
                 onFocusLeave={focusFiltersButton}
-                onChipClick={handleFilterChipClick}
                 permanentFilters={permanentFilters}
                 permanentFiltersMetadata={permanentFiltersMetadata}
               />
@@ -598,8 +530,6 @@ const SearchControls = ({
         onClear={handleClearFilters}
         onSubmit={handleFilterSubmit}
         hasActiveFilters={hasActiveFilters}
-        highlightedFilterKey={highlightedFilterKey}
-        filterRefs={filterRefs}
       >
         {filterOptions.map((opt, index) => {
           const { key, type } = opt;
@@ -692,10 +622,6 @@ const SearchControls = ({
           return (
             <FieldEditor
               key={`FilterControl-${key}`}
-              ref={(el: HTMLDivElement | null) => {
-                if (el) filterRefs.current[key] = el;
-              }}
-              isHighlighted={highlightedFilterKey === key}
               option={opt}
               state={panelFilters}
               onChange={(next) => handleRowChange(opt, next)}

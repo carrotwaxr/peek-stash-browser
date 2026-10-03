@@ -1,7 +1,6 @@
 // Barrel export file for UI components
 // Alphabetically sorted for easy maintenance
 
-export { default as ActiveFilterChips } from "./ActiveFilterChips";
 export { default as AddToPlaylistButton } from "./AddToPlaylistButton";
 export { BaseCard } from "./BaseCard";
 export { default as BulkActionBar } from "./BulkActionBar";
