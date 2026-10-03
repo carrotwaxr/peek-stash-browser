@@ -9,15 +9,32 @@ Create personalized homepage carousels using a visual query builder. Custom caro
 3. Configure your carousel:
    - **Title**: Give your carousel a descriptive name
    - **Icon**: Choose from a selection of icons
-   - **Filter Rules**: Add one or more rules to define which scenes appear
-   - **Sort**: Choose how scenes are ordered (Random, Recently Added, etc.). Playlist order needs exactly one playlist rule, and Scene Number needs a collection rule; without that rule the sort is not offered, and removing the rule puts the sort back to Random
+   - **Filter Rules**: Add one or more rules, and optionally groups of rules, to define which scenes appear
+   - **Sort**: Choose how scenes are ordered (Random, Recently Added, etc.). Playlist order needs exactly one playlist rule, and Scene Number needs a collection rule, each at the top level (not inside a group) with the top level set to Match all; without that rule the sort is not offered, and removing the rule puts the sort back to Random
 
 4. Click **Preview** to see matching scenes
 5. Click **Save** once you're satisfied with the preview
 
 ## Filter Rules
 
-Each rule consists of a filter type, comparison operator, and value. All rules must match (AND logic) for a scene to appear in the carousel.
+Rules are edited in the same row editor as the **Advanced** view of the lists (see [Advanced Filters](browse-and-display.md#advanced-filters)). Each rule is a row with a filter, a condition and a value. The **Match** select at the top says whether a scene needs every rule (**Match all**, the default) or any one of them (**Match any**).
+
+- The row at the end, "Add a filter...", adds a rule.
+- A row's actions menu (the three dots) moves it to another group or the top level, or removes it.
+- **Add group** adds a box of rules with its own Match select. Groups go one level deep.
+- The same filter can be used twice, as in two Tags rows: one "has all of" and one "has any of".
+- In a Match any group, rows on the same filter that each say "has any of" combine into one rule when you save, and a line under the group says so.
+- A saved rule the editor has no row for shows as "A rule this editor can't show" with a **Remove** button. It stays in the carousel, as it is, until you remove it.
+
+### Favourites of Any Kind
+
+To show scenes you favorited in any way, whether the scene, a performer, a studio or a tag:
+
+1. Click **Add group** and set the group to **Match any of these**.
+2. In the group, add **Favorite Scenes**, **Favorite Performers**, **Favorite Studios** and **Favorite Tags**, and set each to Yes.
+3. Title it, for example "Favourites of any kind", then Preview and Save.
+
+A scene appears when it matches at least one of the four. Add rules at the top level to narrow it further, such as **Watched** set to No for the favorites you have not seen.
 
 ### Available Filters
 
@@ -87,7 +104,7 @@ Click the eye icon to show/hide individual carousels. Hidden carousels remain sa
 
 ### Editing
 
-Click the pencil icon on any custom carousel to modify its rules, title, or icon. A saved rule the editor cannot show is kept as it is when you save.
+Click the pencil icon on any custom carousel to modify its rules, title, or icon. A saved rule the editor cannot show is kept as it is when you save, until you remove it. **Back** with changes you have not saved asks **Discard changes?** first.
 
 ### Deleting
 
@@ -97,15 +114,18 @@ Click the trash icon to delete a custom carousel. This action cannot be undone.
 
 - Maximum of **15 custom carousels** per user
 - Each carousel displays up to **12 scenes**
-- All filter rules use AND logic (scenes must match all rules)
+- Up to **20 rules** and **5 groups** per carousel (rules that combine in a Match any group count once)
+- The top level and each group are Match all (every rule) or Match any (one rule is enough)
 
 ## Tips
 
 - **Start simple**: Begin with one or two rules and add more as needed
+- **"Or" needs a group**: To mix "this or that", put those rules in a Match any group, or set the top level to Match any
 - **Use Preview**: Always preview before saving to ensure your rules work as expected
 - **Random sort**: Great for variety - shows different scenes each time you visit
 - **Combine with favorites**: Create carousels for "Highly rated scenes with favorite performers"
-- **Content restrictions**: Custom carousels respect your hidden items and content restrictions
+- **Content restrictions**: Custom carousels respect your hidden items and content restrictions, in every group: a Match any group never shows something you hid
+- **See More**: A carousel's See More opens the Scenes page with the same rules, groups included
 
 ## Troubleshooting
 

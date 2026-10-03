@@ -247,7 +247,21 @@ A list you have not pinned anything on starts with a few:
 
 ### Advanced Filters
 
-**Advanced** (at the end of the bar) opens a view of the same filters as rules, one per row, where a filter can appear more than once and rules can be joined in **Match all** and **Match any** groups. Changes there apply when you press Apply. A group shows in the bar as one chip, such as "Any of: Favorite Tags, Favorite Performers"; click it to open Advanced at that group, and its **x** removes the whole group. A "Match any" chip at the start of the bar means the top level of the filters is joined with any.
+**Advanced** (at the end of the bar, and in the filter sheet) opens a view of the same filters as rules, one per row. Use it for what the chip bar cannot say: rules joined with "match any" (a favorite tag **or** a favorite performer), and the same filter twice (scenes with all of these tags **and** any of those). A group shows in the bar as one chip, such as "Any of: Favorite Tags, Favorite Performers"; click it to open Advanced at that group, and its **x** removes the whole group. A "Match any" chip at the start of the bar means the top level of the filters is joined with any.
+
+**Rows.** Each rule is a row with a **Filter** select (grouped like the lists in [Filters by Page](#filters-by-page)), its **Condition**, its **Value** and, where the filter has them, **Sub-items**. The row at the end of each list is a waiting row reading "Add a filter...": pick a field in it and a new row appears with the cursor in its value. A row's actions menu (the three dots) offers **Move to** each other group or the top level, and **Remove**. A saved rule the editor has no row for reads "A rule this editor can't show" with a **Remove** button, and is kept as it is until you remove it.
+
+**Match all and Match any.** The select at the top says whether the top level needs every rule (**Match all**) or any one of them (**Match any**). **Add group** adds a box of its own rules with its own Match select, and a group can sit beside the top-level rules. Groups go one level deep: a group does not hold another group. With **Match all** at the top and a **Match any** group, the list shows what matches every top-level rule and also at least one rule of the group.
+
+**Same filter twice.** In a Match all group a field can appear as many times as you like. In a Match any group, rows on the same field that each say "has any of" combine into one rule over all their values (two Tags rows with "any of A, B" and "any of C" are one rule, "any of A, B, C"); a line under the group says so, and the rows combine when you press Apply. Rows that cannot combine, such as "has all of" two or more values, stay apart.
+
+**Limits.** A list holds up to 20 rules and 5 groups, counted as the rows that will filter after any rows have combined. At the limit **Add group** and the waiting row say so, and **Apply** says how many rules or groups to remove.
+
+**Apply and discard.** Nothing changes in the list while you edit. **Apply** puts all the rules on the list at once and closes the view (in the filter sheet it also closes the sheet). **Cancel**, Escape or the close button leave the list as it was; with edits you have not applied, Peek first asks **Discard changes?** (**Discard** or **Keep editing**). If the list's filters changed while the view was open, for example with Back, a note says that Apply replaces them. On a phone or in TV mode the view takes the whole screen, with **Apply** and **Cancel** always in view.
+
+**Fixed by the page.** A filter a page sets itself, such as the studio on a studio's page, shows above the rules as "Fixed by this page" and cannot be edited. It applies to every rule and group.
+
+**Your exclusions still apply.** Rules and groups only narrow within what you are allowed to see: your hidden items and any content restrictions are applied to the whole result, outside every group. A Match any group never shows something you hid.
 
 ### On a Phone or in TV Mode
 

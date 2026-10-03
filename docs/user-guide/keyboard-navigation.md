@@ -183,11 +183,33 @@ The filter bar is ordinary buttons, so `Tab` and `Shift+Tab` move through it in 
 | The menu's search box | `↓` | Move into the list; `↑` from the first entry goes back to the box, and `Home` and `End` jump |
 | The menu's list | `Enter` | Pick the highlighted filter or name |
 | The menu | `Escape` | Close it, with focus back on **+ Filter** |
-| **Advanced** | `Enter` | Open the rule view |
+| **Advanced** | `Enter` | Open the rule view (see [The Advanced View](#the-advanced-view)) |
 
 A filter you pick opens under its chip. In the filter's own field, a typed number or date applies when you stop typing, and everything in one open filter is one Back step in the browser.
 
 The pickers (performers, tags, studios, collections, galleries) work the same inside a chip's filter, in the filter sheet, in the carousel builder and in the Content Restrictions editor: a picker's list opens with the cursor in its search box, `Enter` on the picker opens its list, `Escape` closes an open list (focus returns to the picker), and `Tab` or an arrow that leaves the picker closes it. Each picked value has an include or exclude button and a remove button, both reached with `Tab`.
+
+### The Advanced View
+
+The Advanced view (and the carousel builder, which uses the same rows) is ordinary form controls, so `Tab` and `Shift+Tab` move through them in order: the top-level **Match** select, then each row (**Filter**, **Condition**, **Value**, **Sub-items**, the row's actions button), the waiting row **Add a filter...**, then each group's header (its **Match** select and **Remove group**), its rows and its waiting row, then **Add group**, **Cancel** and **Apply**.
+
+| Where | Key | Action |
+|-------|-----|--------|
+| A **Filter**, **Condition** or **Match** select | `Space` (`Enter` in TV mode) | Open its list; `↑` and `↓` choose and `Enter` picks |
+| The waiting row | `Space` (`Enter` in TV mode), then `↑` or `↓` and `Enter` | Pick a field: a new row is added and focus moves to its value |
+| A row's actions button | `Enter` | Open the menu (**Move to** each other group or the top level, **Remove**); `↑` and `↓` move, `Enter` picks, `Escape` closes it with focus back on the button |
+| After **Remove** | | Focus moves to the next row, or the container's waiting row |
+| The view | `Escape` | Close it; with edits you have not applied, ask **Discard changes?** first (`Enter` on **Discard** or **Keep editing**) |
+| **Apply** | `Enter` | Apply every rule at once and close |
+
+Nothing applies until **Apply**. At 20 rules or 5 groups, the waiting row and **Add group** say so and **Apply** names what to remove.
+
+In TV mode, with the D-pad:
+
+- `↑` and `↓` move between rows, landing on the same column of the next row (**Filter** to **Filter**, **Value** to **Value**); `←` and `→` move within a row.
+- `Enter` (the remote's OK) on a select opens it; `↑` and `↓` choose and `Enter` picks. OK on a row's actions button opens its menu, which keeps the arrow keys until you close it.
+- The view takes the whole screen, so `↓` from the last row reaches **Add group**, **Cancel** and **Apply**.
+- `Escape` asks before discarding, as above.
 
 ### Filters on a Phone and in TV Mode
 
@@ -236,6 +258,8 @@ Turn it on or off from the user menu (**TV Mode**). Peek remembers the choice in
 3. Use a **wireless keyboard** (e.g., Logitech K400) - recommended for best experience
 4. Enable TV Mode from the user menu
 5. Use the arrow keys to move around, Enter to open, Page Up/Page Down to change pages
+
+In the Advanced view and the carousel builder's rules, `↑` and `↓` move between rows, `←` and `→` move within a row, and OK opens a select (see [The Advanced View](#the-advanced-view)).
 
 **Alternative remotes** (limited support):
 
