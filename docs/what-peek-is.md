@@ -20,7 +20,7 @@ Peek keeps these per account, and separately for each Stash server:
 - ratings and favorites, on all seven kinds of item (scenes, performers, studios, tags, collections, galleries and images)
 - watch history, play counts and resume points
 - O counts and image views
-- statistics, hidden items, saved filter presets, carousels and your theme and other preferences
+- statistics, hidden items, saved Views (filters, sort and display settings), pinned filters, carousels and your theme and other preferences
 
 The rating, favorite, O count and play numbers you see in Peek are yours, not Stash's. Nobody else's activity changes them.
 

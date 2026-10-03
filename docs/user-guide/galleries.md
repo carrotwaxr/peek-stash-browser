@@ -59,7 +59,7 @@ The detail page has two tabs:
 
 **Images**
 
-The Images page's list, kept to this gallery: the same sort, filters, search, Grid, Wall, Table and Timeline views and page size (see [Images Tabs](browse-and-display.md#images-tabs)). It opens in the gallery's file order (sorted by path), on the wall. The timeline counts this gallery's images only. The tab has its own filter presets and default, shared by every gallery's Images tab. Click any image to open the lightbox viewer.
+The Images page's list, kept to this gallery: the same sort, filters, search, Grid, Wall, Table and Timeline views and page size (see [Images Tabs](browse-and-display.md#images-tabs)). It opens in the gallery's file order (sorted by path), on the wall. The timeline counts this gallery's images only. The tab has its own Views and default, shared by every gallery's Images tab. Click any image to open the lightbox viewer.
 
 **Play Slideshow** opens the viewer on the first image of the list's page and starts the slideshow; from the Scenes tab it opens the Images tab first.
 

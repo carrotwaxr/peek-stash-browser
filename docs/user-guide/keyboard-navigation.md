@@ -153,37 +153,56 @@ In fullscreen, your browser's own `Escape` exits it.
 | `Shift+N` | Next scene in playlist |
 | `Shift+P` | Previous scene in playlist |
 
-## Search & Filtering
+## Search and Filtering
 
-### Search Box
-
-| Key | Action |
-|-----|--------|
-| `/` or `Ctrl+F` | Focus search box (from anywhere) |
-| `Escape` | Clear search and exit search box |
-| `Enter` | Submit search / apply filters |
-| `↓` | Move to search results (from search box) |
-
-### Filter Controls
-
-**While using filters:**
+These keys work on every list page (Scenes, Performers, Clips, Recommended, and the tabs of detail pages that list items). They don't run while you are typing in a field, inside an open dialog or popover, or with the video player focused.
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Move between filter options |
-| `Space` | Toggle checkbox filters |
-| `Enter` | Apply filters; on a performer, tag, studio or collection picker, open its list |
-| `Escape` | Close an open picker list (focus returns to the picker); otherwise close the filter panel |
+| `/` | Focus the search box |
+| `f` | Open **+ Filter** (on a phone or in TV mode, the filter sheet with its list of filters open); not offered where the view takes no filters, such as the Tags hierarchy |
+| `↓` | Leave the search box for the controls and chips below it (TV mode) |
+| `Page Up` / `Page Down` | Previous / next page (TV mode) |
 
-The filter sections' headings, and the Search & Filter header above them, are buttons: `Enter` or `Space` opens or closes one.
+Search applies as you type, a moment after you stop; there is nothing to submit. `Shift+F` is left free.
 
-A picker's list opens with the cursor in its search box. `Tab` or an arrow that leaves the picker closes the list. The same pickers work in the carousel builder and the Content Restrictions editor.
+### The Filter Bar
 
-In TV mode the D-pad reaches every picker: arrows move between the fields, `Enter` opens a picker, `Down` goes from the search box to the options, `Enter` picks one, and `Escape` closes the list. Every other filter control is reachable too:
+The filter bar is ordinary buttons, so `Tab` and `Shift+Tab` move through it in order: pinned filters, chips, **+ Filter**, **Advanced**, **Clear all**.
 
+| Where | Key | Action |
+|-------|-----|--------|
+| A chip | `Enter` or `Space` | Open its filter under the chip; again to close it |
+| A chip's **x** | `Enter` or `Space` | Remove the filter; focus moves to the next chip's **x** |
+| An open filter | `Tab` | Move through its fields and its header buttons (**Pin**, **Pin as quick filter**, **Remove**) |
+| An open filter | `Escape` | Close it, with focus back on the chip |
+| A pinned filter | `Enter` or `Space` | Turn it on or off |
+| **+ Filter** | `Enter`, `Space` or `f` | Open the menu with the cursor in its search box |
+| The menu's search box | Letters | Narrow the filters; with two letters or more, also find tags, performers, studios and collections by name |
+| The menu's search box | `Enter` | Pick the first match |
+| The menu's search box | `↓` | Move into the list; `↑` from the first entry goes back to the box, and `Home` and `End` jump |
+| The menu's list | `Enter` | Pick the highlighted filter or name |
+| The menu | `Escape` | Close it, with focus back on **+ Filter** |
+| **Advanced** | `Enter` | Open the rule view |
+
+A filter you pick opens under its chip. In the filter's own field, a typed number or date applies when you stop typing, and everything in one open filter is one Back step in the browser.
+
+The pickers (performers, tags, studios, collections, galleries) work the same inside a chip's filter, in the filter sheet, in the carousel builder and in the Content Restrictions editor: a picker's list opens with the cursor in its search box, `Enter` on the picker opens its list, `Escape` closes an open list (focus returns to the picker), and `Tab` or an arrow that leaves the picker closes it. Each picked value has an include or exclude button and a remove button, both reached with `Tab`.
+
+### Filters on a Phone and in TV Mode
+
+On a phone and in TV mode, **Filters (n)**, a chip and **+ Filter** (and `f`) open the filter sheet, a full-height dialog. `Tab` (or the arrows in TV mode) moves through the pinned filters, each filter's editor, **Advanced**, **Clear all**, the list of filters to add, and last the button **Show N results**. Nothing applies until `Enter` on **Show N results**, which applies everything as one step; `Escape` closes the sheet and drops the edits.
+
+In TV mode, with the D-pad:
+
+- The chip row sits right under the search box and sort controls. `↓` from the search box lands on the first pinned filter. Left to right the row holds the pinned filters, the pinned fields, your chips and groups, **Filters (n)**, **Views**, **+ Filter**, **Advanced** and **Clear all**.
+- **Views** opens a dialog: its Views are buttons (the one you are on is pressed, and focused first) with the actions (**Save changes**, **Save as new view**, **Rename view**, **Delete view**, set or stop using as default) below. `Enter` on a View loads it and `Escape` closes the dialog.
+- In the sheet, **+ Filter** is a button over its menu (`Enter` opens it, the arrows move through the filters, `Enter` picks, `Escape` closes it), so `↓` from the last filter reaches **Show N results**.
+- An open menu or filter panel keeps the arrow keys until you close it: they never move focus to the page behind.
 - `Left` and `Right` leave a text field once the cursor is at that end of the text, and leave a number or date field at once, so no field traps the D-pad.
-- `Enter` (the remote's OK) ticks a checkbox or radio button, in the filter panel and in dialogs; `Space` still does as well.
-- A picked value's include or exclude toggle and its remove button are buttons the arrows reach, like the rest of the panel.
+- `Enter` (the remote's OK) ticks a checkbox or radio button, in the filter sheet and in dialogs; `Space` still does as well.
+- A picked value's include or exclude button and its remove button are buttons the arrows reach.
+- A filter's header buttons (**Pin**, **Pin as quick filter**, **Remove**) are reached by the arrows in each filter of the sheet. This is where you pin in TV mode.
 
 ## Playlists
 
@@ -203,6 +222,8 @@ TV Mode makes Peek work from the couch with arrow keys and Enter:
 - **Large Focus Indicators** - the focused card is enlarged and outlined, easy to see from across the room
 - **Auto-Scroll** - the page scrolls just enough to keep the focused item visible
 - **Page keys** - `Page Up` and `Page Down` change the page of a list
+- **Filters lead the list** - on a list, your pinned filters come right under the search box, one `↓` away, and filtering happens in a sheet you can use with the D-pad (see [Filters on a Phone and in TV Mode](#filters-on-a-phone-and-in-tv-mode))
+- **List keys** - `/` focuses the search box and `f` opens the filter sheet
 
 Turn it on or off from the user menu (**TV Mode**). Peek remembers the choice in this browser.
 
@@ -301,7 +322,7 @@ Basic screen reader support:
 
 ### Speed Navigation
 
-1. **Use `/` to search instantly** from any page
+1. **Use `/` to search instantly** on any list page, and `f` to add a filter
 2. **Use number keys (0-9) to scrub through videos** quickly
 3. **Use `Tab` then `Enter`** to press the focused button without the mouse
 

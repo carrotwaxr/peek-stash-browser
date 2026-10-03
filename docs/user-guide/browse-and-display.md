@@ -53,7 +53,7 @@ A high-density tabular layout for scanning metadata across many items.
 3. Use arrows to reorder columns
 4. Or right-click any column header → **Hide column**
 
-A table remembers your columns for each type: a change on the Scenes table is saved as your scene columns and is there the next time you open it, on any device. **Settings > Customization > Table Columns** shows and edits the same setting. A preset saved in table view shows its own columns when you load it from **Load Preset**; a default preset applied when you open a page leaves your saved columns alone; your next column change saves the columns then shown as yours.
+A table remembers your columns for each type: a change on the Scenes table is saved as your scene columns and is there the next time you open it, on any device. **Settings > Customization > Table Columns** shows and edits the same setting. A View saved in table view shows its own columns when you load it from **Views**; a default View applied when you open a page leaves your saved columns alone; your next column change saves the columns then shown as yours.
 
 ### Timeline View
 
@@ -95,7 +95,7 @@ Navigate content through your tag hierarchy as folders.
 - The root level lists the top-level folders only, no items
 - Opening a folder lists its sub-folders first, then the items that carry the folder's tag directly, paged like any list ("12 galleries in this folder"). An item tagged with the folder and with one of its sub-folders shows in both
 - The root ends with an **Untagged** folder while any item of the page's type is in no other folder; its badge counts them, and opening it lists them, paged like any folder. A scene that inherits a tag (from its performers or studio) is in that tag's folder, not in Untagged, and an image's tags include the ones its galleries give it. On a performer, studio or collection page, Untagged holds that page's scenes with no tag
-- Inside a folder, including Untagged, the filter panel offers no **Tags** filter; inside Untagged it offers no **Tag Count** either
+- Inside a folder, including Untagged, **+ Filter** offers no **Tags** filter; inside Untagged it offers no **Tag Count** either
 
 ### Tag Hierarchy View
 
@@ -107,7 +107,7 @@ A tree view showing parent/child tag relationships (Tags page only).
 - **Expand All** / **Collapse All** buttons for quick navigation
 - With several Stash servers, each server's tags stay in their own branches
 - A tag whose parent tags are all hidden from you shows at the top level
-- Filters don't apply to the tree; the Filters button is hidden there
+- Filters don't apply to the tree: the filter bar is replaced by a note saying so (it shows while filters are set), and **Views** still works
 
 **Navigation:**
 
@@ -204,9 +204,60 @@ Every word you type must match, in any order and anywhere the search looks: a sc
 
 ## Filters
 
-Click **Filters** in the search toolbar to open the filter panel, set the filters, and click **Apply Filters**.
+The filter bar sits under the search toolbar. Only the filters you use take space: each one shows as a chip, **+ Filter** adds another from a list of every filter the page has, and your pinned filters wait in the bar for one click.
 
-Each active filter shows as a chip under the toolbar that names its picks and its condition, such as "Tags: none of Anal, with sub-tags" or "Rating: 40 to 80"; a pick that is no longer visible to you reads as "unavailable". Click a chip, or press Enter on it, to open its filter; the **x** on a chip removes it. The count on the **Filters** button is the number of chips.
+### Chips
+
+Each active filter shows as a chip that names its picks and its condition, such as "Tags: none of Anal, with sub-tags" or "Rating: 40 to 80"; a pick that is no longer visible to you reads as "unavailable". Click a chip, or press Enter on it, to open its filter in a panel right under it. The **x** on a chip removes the filter.
+
+- **Changes apply as you make them.** Picking a tag, an option or a Yes / No applies at once; typing a number, a date or text applies a moment after you stop, so a rating typed as `60` is one search, not two. Close the panel with Escape, with a click outside it, or by clicking the chip again.
+- **Back undoes the whole edit.** Everything you changed in one open panel is one step in your browser history, so Back returns to how the list was before you opened it.
+- The panel's header names the filter and offers **Remove** and the pin buttons (see [Pinned Filters](#pinned-filters)).
+- A page's own filter, such as the studio on a studio's page, shows as a dimmed label before the chips and has no **x**.
+- **Clear all** at the end of the bar removes every filter. Back brings them back.
+
+### Adding a Filter
+
+Click **+ Filter** (or press `f`) to open a search box over the list of filters the page offers, grouped in the same sections as [Filters by Page](#filters-by-page), with your pinned fields first. Type to narrow the list: `res` finds Resolution. Press Enter to pick the first match, or Down to move into the list; Enter or a click picks one. Picking a field opens its filter under a new chip, where you set a condition and values.
+
+To filter by a name directly, type two letters or more of it (`outd` for a tag called Outdoor). The names of matching tags, performers, studios and collections (and galleries, on the lists that filter by them) appear under **Values** as "Tags: Outdoor"; picking one adds it to that filter and applies it at once.
+
+A list holds up to 20 filters, counting those inside groups. At the limit the menu says so and offers only the filters already in use. For the same filter twice, or filters joined with "match any", use [Advanced](#advanced-filters).
+
+### Pinned Filters
+
+A pin keeps something you use often in the bar, whether or not it is set. There are two kinds:
+
+- A **pinned field** is an empty chip with a dashed outline and the filter's name (**Tags**, **Rating**). Click it to open that filter without going through **+ Filter**; once the filter is set, the chip shows its values in the same place.
+- A **pinned filter** is a one-tap button for a filter with a fixed value, such as **Unwatched** or **Favorites**. Tap it to turn the filter on (the button fills with colour) and tap it again to turn it off. Each tap is one step in your history, so Back undoes it. While a pinned filter is on, it takes the place of that filter's own chip.
+
+To pin, open a filter's chip: **Pin** (the pin icon in its header) pins the field to the bar, and **Pin as quick filter** (the bookmark icon, offered once the filter has a value) pins that value as a one-tap button. Both show the opposite action when pinned. In **+ Filter**, a mouse also gets a pin icon on each field. On a phone or a TV the same buttons are in each filter's header in the sheet. A pinned button has a small pin-off icon to unpin it.
+
+A list keeps up to 10 pins (fields and filters together); at the limit the pin buttons are disabled and say "Up to 10 pins". Pins are yours, kept for each kind of list (Scenes, Performers and so on, the same ones on a detail page's tab of that kind), and saved as soon as you change them.
+
+A list you have not pinned anything on starts with a few:
+
+| List | Pinned fields | Pinned filters |
+| --- | --- | --- |
+| Scenes | Performers, Tags, Rating | Unwatched, Favorites |
+| Performers | Tags, Gender, Rating | Favorites |
+| Studios, Collections, Galleries, Images | Tags, Rating | Favorites |
+| Tags | Rating | Favorites |
+| Clips | Clip Tags | none |
+
+### Advanced Filters
+
+**Advanced** (at the end of the bar) opens a view of the same filters as rules, one per row, where a filter can appear more than once and rules can be joined in **Match all** and **Match any** groups. Changes there apply when you press Apply. A group shows in the bar as one chip, such as "Any of: Favorite Tags, Favorite Performers"; click it to open Advanced at that group, and its **x** removes the whole group. A "Match any" chip at the start of the bar means the top level of the filters is joined with any.
+
+### On a Phone or in TV Mode
+
+On a phone, and in [TV Mode](keyboard-navigation.md#tv-mode), the chips don't open a panel under themselves. The search box and a **Filters** button (**Filters (3)** with three filters in use) sit at the top; the chip row scrolls sideways; and **Filters**, a chip or **+ Filter** opens a full-height sheet instead.
+
+- The sheet lists your pinned filters, then one editor per filter in use, then the list of filters to add (the same search box as **+ Filter**).
+- Nothing applies while you edit. The button at the bottom counts the results of your choices as you make them and reads "Show 1,204 results" (or "Show results" while it counts). Press it to apply everything as one step and close the sheet. Escape, the close button or a tap outside discards the edits.
+- **Advanced** and **Clear all** are in the sheet too.
+
+In TV mode the chip row comes right under the search box, led by your pinned filters and fields, so one press of Down from the search box reaches the first; then the chips and groups, **Filters (n)** and **Views**, and **+ Filter**, **Advanced** and **Clear all** after them. Everything is reached with the arrows and Enter: see [Keyboard Navigation](keyboard-navigation.md#search-and-filtering).
 
 ### Modifier Dropdowns
 
@@ -223,7 +274,7 @@ A filter that picks performers, tags, studios, collections or galleries has a dr
 
 ### Include or Exclude Each Value
 
-Every Tags, Performers and Studios picker (and Performer Tags, and a clip's tags and studio) lets you decide per value. Each value you pick has an include or exclude toggle beside its remove button; press it to turn a pick from "include" into "exclude" and back. A filter can then say "Tags: Anal and Outdoor, but not Redhead" in one go. The chip reads "Tags: any of Anal, Outdoor; not Redhead", and excluded values alone read "Tags: not Redhead". Include and exclude are kept in the address (for example `tagIds=1:a&tagIdsExclude=2:a`), in saved presets and in custom carousels.
+Every Tags, Performers and Studios picker (and Performer Tags, and a clip's tags and studio) lets you decide per value. Each value you pick has an include or exclude toggle beside its remove button; press it to turn a pick from "include" into "exclude" and back. A filter can then say "Tags: Anal and Outdoor, but not Redhead" in one go. The chip reads "Tags: any of Anal, Outdoor; not Redhead", and excluded values alone read "Tags: not Redhead". Include and exclude are kept in the address (for example `tagIds=1:a&tagIdsExclude=2:a`), in saved Views and in custom carousels.
 
 - The toggle is offered under **Has ANY** and **Has ALL**. Under **Has NONE** every pick already excludes, so there is no toggle.
 - With **Include sub-tags** (or sub-studios) on, an excluded tag also leaves out items that have one of its sub-tags.
@@ -251,7 +302,7 @@ On the Scenes list, **Favorite Tags** lists the scenes that have one of your fav
 
 A number range (rating, height, weight, duration and the like) never matches an item with no value: "rating at most 40" lists only items you rated 40 or less, not the ones you have not rated, and "weight at most 60 kg" only performers with a weight.
 
-Ranges take decimals (a penis length of 14.5 cm, a frame rate of 29.97) and a minimum or a maximum on its own includes that value: "at least 10" lists 10 and up. Heights, weights and penis lengths are stored and linked in metric, so an address or preset means the same to everyone; with imperial units on, the boxes and chips show feet, inches and pounds and the address still holds centimetres and kilograms.
+Ranges take decimals (a penis length of 14.5 cm, a frame rate of 29.97) and a minimum or a maximum on its own includes that value: "at least 10" lists 10 and up. Heights, weights and penis lengths are stored and linked in metric, so an address or View means the same to everyone; with imperial units on, the boxes and chips show feet, inches and pounds and the address still holds centimetres and kilograms.
 
 #### Unknown values
 
@@ -279,7 +330,7 @@ Your own exclusions still apply: a scene you hid, or a restriction removes, is n
 
 - **Performer Age** matches a scene when any of its performers was that age on the scene's date, as Stash does. A scene with no date never matches. A performer's birthdate given as a year or a year and month counts from its first day, and a performer who has died keeps the age they reached. On one library "under 26" found 2,260 scenes before this change and finds 11,985 now.
 - **Resolution** uses Stash's ranges on the shorter side of the file, so a portrait 1080p video counts as 1080p. Image Resolution works the same way.
-- **Gender** (Performers) and **Orientation** (Scenes and Images) take several values at once, **Has ANY** of them, and Gender can also be "not set". A preset saved with a single gender or orientation still means that one.
+- **Gender** (Performers) and **Orientation** (Scenes and Images) take several values at once, **Has ANY** of them, and Gender can also be "not set". A View saved with a single gender or orientation still means that one.
 
 ### Hidden Scenes and Related Filters
 
@@ -287,7 +338,7 @@ Filtering performers, collections, galleries or tags by a studio, a scene or ano
 
 ### Filters by Page
 
-Every list's panel offers these filters, grouped in sections; the ones that take a picker also take **Has none / Has any** and include or exclude where described above.
+Every list's **+ Filter** menu offers these filters, grouped in sections; the ones that take a picker also take **Has none / Has any** and include or exclude where described above.
 
 - **Scenes:** Title and Details Search; Performers, Studios, Tags, Performer Tags, Collections (with sub-collections), Galleries and Playlists; Rating, O Count, Duration; the favorites above; **In any of my playlists**; Scene, Created, Updated and Last Played dates; Resolution, Bitrate, Framerate, Orientation, Video and Audio Codec; Director, Path, URL, Code, Captions; Organized, Has Markers, Duplicated, Watched and In Progress; Play Duration, Play Count, Performer Count, Performer Age and Tag Count.
 - **Images:** Title, Details, Code, Photographer, Path and URL; Performers, Studios, Tags, Performer Tags and Galleries; Rating, O Count, Tag Count, Performer Count and Performer Age; the favorites; Organized; Resolution and Orientation; Image, Created and Updated dates.
@@ -313,11 +364,11 @@ A studio with sub-studios, or a tag with sub-tags, shows **Include sub-studios**
 - On a tag page: every tab (Scenes, Galleries, Images, Performers, Studios and Collections).
 - On a studio page: Scenes, Galleries, Images and Collections. The Performers tab lists the performers of this studio's own scenes, so the box is hidden there.
 
-Filters you set on a tab narrow what that tab lists, on top of the page's studio or tag. The page's own studio or tag is not offered as a filter on its tabs (nor a performer's or collection's own on theirs), so the panel cannot turn the list inside out. Inside a folder, the Tags filter is hidden for the same reason, and in the timeline the date filter is.
+Filters you set on a tab narrow what that tab lists, on top of the page's studio or tag. The page's own studio or tag shows as a dimmed label in the bar, and the same field is offered in **+ Filter** (and can be pinned) like any other: a filter you add on it is combined with the page's by AND, so a tag page's Scenes tab filtered by another tag lists the scenes that have both, and a studio's Performers tab filtered by another studio lists the performers who have scenes in both studios. A View, including your default View, never brings that field to such a page: a "Fave Studios" default does not empty a studio's Performers tab. Inside a folder, the Tags filter is hidden because the folder fixes it, and in the timeline the date filter is.
 
 ### Images Tabs
 
-The Images tab of a performer, studio, tag or gallery page is the Images page's list, kept to that page's item: the same sort, filters, search, Grid, Wall, Table and Timeline views and page size, and the same viewer. It opens sorted by title (a gallery's in file order, on the wall). The tab has its own filter presets and default: a default saved on a tag's Images tab applies to every tag's Images tab and never to the Images page, nor the Images page's default to the tab.
+The Images tab of a performer, studio, tag or gallery page is the Images page's list, kept to that page's item: the same sort, filters, search, Grid, Wall, Table and Timeline views and page size, and the same viewer. It opens sorted by title (a gallery's in file order, on the wall). The tab has its own Views and default: a default saved on a tag's Images tab applies to every tag's Images tab and never to the Images page, nor the Images page's default to the tab.
 
 A rating or favorite you set on a detail page, or on a card or in the viewer there, shows on the lists and carousels you go back to without a reload.
 
@@ -327,33 +378,39 @@ The Clips page's **Has Preview** filter lists clips **With preview only** until 
 
 ---
 
-## Filter Presets
+## Views
 
-Save your current view configuration for quick access later.
+A View is a saved set of filters, sort and display settings for one list, for quick access later. Views are yours, and each belongs to one list: Scenes, Performers, the Scenes tab of a tag page, and so on. Your saved filter presets from earlier versions are your Views.
 
 ### What Gets Saved
 
-- All active filters
+- All active filters, groups included (never the page's own filters, such as a studio's, nor the search text or your pins)
 - Sort field and direction
 - View mode (Grid/Wall/Table/Hierarchy)
 - Grid density (for Grid view)
 - Zoom level (for Wall view)
-- Table column configuration (in table view; loading the preset shows its columns)
+- Items per page
+- Table column configuration (in table view; loading the View shows its columns)
 
-### Creating a Preset
+### The Views Menu
 
-1. Configure your filters and view settings
-2. Click **Presets** → **Save current as preset**
-3. Enter a name
-4. Optionally set as default for this page
+The **Views** button in the toolbar names the View the list shows (**Views: Fave Ladies**), or just **Views** when none is loaded. A dot on it means the list has changed since: you changed a filter or the sort. Changing the sort direction or the filters marks it; a different view mode, density, page size or columns doesn't, but **Save changes** saves them. Click it to open the menu: your Views for this list, with a check on the one you are on and a **Default** badge on the default, then the actions below them:
 
-### Using Presets
+| Action | What it does |
+| --- | --- |
+| **Save changes** | Saves what the list shows into the View you are on (offered once it has changed) |
+| **Save as new view** | Asks for a name and saves the list as a new View; tick **Set as default for ...** to make it the page's default at the same time |
+| **Rename view** | Renames the View you are on |
+| **Delete view** | Deletes it after asking |
+| **Set as default for ...** / **Stop using as default for ...** | Makes the View you are on the page's default, or takes the default away |
 
-- Click **Presets** to see saved presets
-- Click a preset name to apply it
-- Star icon indicates the default preset
-- Presets are per-entity-type (Scene presets, Performer presets, etc.)
-- A default is kept per page: the Scenes tab of a performer, studio, tag, collection or gallery each has its own default, as does the Clips page
+The actions apply to the View you are on; to rename or delete another, click its name first. View names are unique for a list ("A view named ... already exists"). If your Views changed in another tab or window, the menu reloads them and asks you to try again.
+
+- Clicking a View name loads it: its filters, sort and display settings replace the list's, as one step in your history.
+- **A default View** applies whenever the address names no filter. A default is kept per page: the Scenes tab of a performer, studio, tag, collection or gallery each has its own default, as does the Clips page. Changing a filter on the default View keeps its name on the button (with the dot), so it can be saved back.
+- On a studio, tag, performer or collection page, a View never applies the filter the page itself fixes (see [Studio and Tag Pages](#studio-and-tag-pages)).
+- On a phone, **Views** is in the second toolbar row. In TV mode it is in the chip row, next to **Filters (n)**, and opens as a dialog: the Views as buttons, then the actions, all reached with the arrows and Enter.
+- The Tags page's Hierarchy view has **Views** too.
 
 ---
 
@@ -363,7 +420,8 @@ Your browse state is reflected in the URL, making it easy to bookmark or share s
 
 - **Back and Forward** step through filters, sort, pages and folders.
 - **Search text, per page, view, zoom and density** replace the current history entry, so they add no Back steps.
-- **A default preset** applies whenever the URL names no filter. Clearing the filters (Clear All, removing the last chip, or loading a preset without filters) writes `filters=none`, so the list stays unfiltered and Back brings the filters back; a plain list link, such as the sidebar's, gets the default preset again.
+- **A default View** applies whenever the URL names no filter. Clearing the filters (Clear all, removing the last chip, or loading a View without filters) writes `filters=none`, so the list stays unfiltered and Back brings the filters back; a plain list link, such as the sidebar's, gets the default View again.
+- **A filter chip's panel** adds one history entry for the whole edit, a pinned filter's tap one entry, and **Show N results** on a phone one entry.
 - **Random order** keeps its seed in the URL (`sort=random_12345678`), so coming back from a scene shows the same order.
 
 **URL parameters include:**
@@ -372,6 +430,7 @@ Your browse state is reflected in the URL, making it easy to bookmark or share s
 - `page` and `per_page` - the page and its size
 - `sort` and `dir` - current sort settings
 - `view` - grid, wall, table, timeline, folder or hierarchy
+- `savedView` - the View the list is on, so the **Views** button keeps its name. It holds the id of one of your own Views; an id you don't have is ignored
 - `grid_density` - small, medium, or large (grid view)
 - `zoom` - small, medium, or large (wall view)
 - `timeline_period` - the selected period (timeline view)
@@ -388,7 +447,7 @@ Sharing a URL shares your exact view configuration.
 
 - Use **Table View** to quickly scan metadata across hundreds of items
 - Use **Wall View with Small zoom** for visual overview
-- Create **Filter Presets** for common browsing patterns
+- Save **Views** for common browsing patterns, and pin the filters you reach for most
 
 ### For Tag Organization
 
