@@ -8,9 +8,9 @@ Choose which page to land on after logging in, instead of always starting at Hom
 
 ### Setting Your Landing Page
 
-1. Go to **Settings** → **Navigation**
+1. Go to **Settings** → **User Preferences** → **Navigation**
 2. Under **Landing Page After Login**, select your preferred page
-3. Click **Save**
+3. Click **Save** (it appears once you change something)
 
 ### Available Landing Pages
 
@@ -25,7 +25,8 @@ Choose which page to land on after logging in, instead of always starting at Hom
 | **Galleries** | Gallery browse page |
 | **Images** | Image browse page |
 | **Playlists** | Your playlists |
-| **Recommended** | AI-recommended scenes |
+| **Clips** | Clip browse page |
+| **Recommended** | Scenes picked from your own ratings, favorites and watching |
 | **Watch History** | Your viewing history |
 | **User Stats** | Your statistics dashboard |
 
@@ -35,7 +36,7 @@ For variety, enable **Random one of selected pages** to land on a different page
 
 1. Toggle on **Random one of selected pages**
 2. Select 2 or more pages (checkboxes appear)
-3. Click **Save**
+3. Click **Save** (with fewer than two pages, Peek asks for at least 2)
 
 Each time you log in, Peek randomly picks one of your selected pages.
 
@@ -70,11 +71,11 @@ Reorder or hide items in the main navigation sidebar to prioritize the pages you
 
 ### Customizing the Menu
 
-1. Go to **Settings** → **Navigation**
+1. Go to **Settings** → **User Preferences** → **Navigation**
 2. Under **Navigation Menu**, you'll see all available menu items
-3. Use the drag handles (⋮⋮) to reorder items
+3. Use the up and down arrow buttons to reorder items
 4. Toggle the eye icon to show/hide items
-5. Click **Save** to apply changes
+5. Click **Save Changes** to apply them (**Cancel** drops your edits)
 
 ### Available Navigation Items
 
@@ -87,13 +88,14 @@ Reorder or hide items in the main navigation sidebar to prioritize the pages you
 - Galleries
 - Images
 - Playlists
+- Clips
 
 ### Tips
 
 - **Hide rarely-used items** to declutter the sidebar
 - **Put your most-used pages at the top** for faster access
 - Hidden items are still accessible via direct URL
-- Changes take effect as soon as you save
+- Changes take effect as soon as you save, on every device you sign in on
 
 ---
 
@@ -103,21 +105,22 @@ The homepage displays carousels of content. You can customize which carousels ap
 
 ### Managing Carousels
 
-1. Go to **Settings** → **Navigation**
+1. Go to **Settings** → **User Preferences** → **Navigation**
 2. Under **Homepage Carousels**, you'll see all available carousels
-3. Use arrows to reorder carousels
+3. Use the up and down arrow buttons to reorder carousels
 4. Toggle visibility with the eye icon
-5. Changes save automatically
+5. Click **Save Changes** to apply them (**Cancel** drops your edits)
 
 ### Default Carousels
 
 | Carousel | Content |
 |----------|---------|
 | **Continue Watching** | Scenes you've started but not finished |
-| **Recently Watched** | Your recent viewing history |
-| **Recommended** | AI-generated suggestions |
-| **Favorites** | Your favorited scenes |
 | **Recently Added** | Newest scenes in your library |
+| **High Rated** | Scenes you rated above 8.0, in random order |
+| **Favorite Performers** | Scenes with your favorite performers, in random order |
+| **Favorite Tags** | Scenes with your favorite tags, in random order |
+| **Favorite Studios** | Scenes from your favorite studios, in random order |
 
 ### Custom Carousels
 

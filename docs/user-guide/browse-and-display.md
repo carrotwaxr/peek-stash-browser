@@ -27,15 +27,15 @@ A justified gallery layout that preserves aspect ratios.
 - Images and videos fill rows naturally without letterboxing
 - All visible previews can play simultaneously
 - Three zoom levels: Small, Medium, Large
-- Available for: Scenes, Galleries, Images, Performers, Studios, Groups
+- Available for: Scenes, Galleries, Images and Clips
 
-**Wall playback modes** (Settings → Display):
+**Wall playback modes** (Settings → User Preferences → Customization → **Wall View Preview Behavior**; in Wall view on Scenes and Clips, also the cog in the toolbar):
 
 | Mode         | Behavior                                                           |
 | ------------ | ------------------------------------------------------------------ |
-| **Autoplay** | Videos play when visible, up to six at once; hover controls volume |
-| **Hover**    | Static thumbnail until hover, then plays                           |
-| **Static**   | Thumbnails only, no video playback                                 |
+| **Autoplay All** | Videos play when visible, up to six at once; hover controls volume |
+| **Play on Hover Only** | Static thumbnail until hover, then plays                           |
+| **Static Thumbnails** | Thumbnails only, no video playback                                 |
 
 ### Table View
 
@@ -53,7 +53,7 @@ A high-density tabular layout for scanning metadata across many items.
 3. Use arrows to reorder columns
 4. Or right-click any column header → **Hide column**
 
-A table remembers your columns for each type: a change on the Scenes table is saved as your scene columns and is there the next time you open it, on any device. **Settings > Customization > Table Columns** shows and edits the same setting. A View saved in table view shows its own columns when you load it from **Views**; a default View applied when you open a page leaves your saved columns alone; your next column change saves the columns then shown as yours.
+A table remembers your columns for each type: a change on the Scenes table is saved as your scene columns and is there the next time you open it, on any device. **Settings → User Preferences → Customization → Table Columns** shows and edits the same setting. A View saved in table view shows its own columns when you load it from **Views**; a default View applied when you open a page leaves your saved columns alone; your next column change saves the columns then shown as yours.
 
 ### Timeline View
 
@@ -151,7 +151,7 @@ Customize what information appears on cards and detail pages.
 ### Accessing Settings
 
 **Full settings:**
-Settings → Customization → Card Display
+Settings → User Preferences → Customization → Card Display
 
 **Quick access:**
 Click the ⚙️ icon in the search toolbar for current entity type settings.
@@ -164,7 +164,7 @@ Settings vary by entity type. Common options include:
 | ---------------------- | -------------------------------- |
 | **Show studio**        | Display studio name on cards     |
 | **Show date**          | Display date on cards            |
-| **Show rating**        | Display star rating badge        |
+| **Show rating**        | Display the rating badge, a number from 0 to 10 |
 | **Show favorite**      | Display favorite button          |
 | **Show O-counter**     | Display O-counter badge          |
 | **Show description**   | Display description text         |
@@ -401,7 +401,7 @@ A View is a saved set of filters, sort and display settings for one list, for qu
 
 - All active filters, groups included (never the page's own filters, such as a studio's, nor the search text or your pins)
 - Sort field and direction
-- View mode (Grid/Wall/Table/Hierarchy)
+- View mode (Grid, Wall, Table, Timeline, Folder or Hierarchy)
 - Grid density (for Grid view)
 - Zoom level (for Wall view)
 - Items per page
