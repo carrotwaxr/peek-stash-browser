@@ -1,6 +1,8 @@
 /**
  * The Views write hooks: each calls its route, marks both preset queries
- * stale, and a 409 comes back as `{ conflict: true }`, not a thrown error.
+ * stale, and a 409 comes back as `{ conflict: true, reason }`, not a thrown
+ * error: `nameTaken` for a name another View has, `stale` for a write another
+ * tab beat.
  */
 import { type ReactNode, createElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -9,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as api from "@/api";
 import { ApiError } from "@/api/client";
 import {
+  VIEW_NAME_TAKEN,
   useDeleteView,
   useOverwriteView,
   useRenameView,
@@ -162,9 +165,12 @@ describe("the Views write hooks", () => {
     expect(invalidatedKeys(invalidate)).toHaveLength(4);
   });
 
-  it("a 409 resolves as { conflict: true } and still marks the queries stale", async () => {
+  it("a 409 for a name another View has resolves as { conflict: true, reason: nameTaken } and still marks the queries stale", async () => {
     mockApiPatch.mockRejectedValue(
-      new ApiError("A view named Fave already exists", 409)
+      new ApiError(VIEW_NAME_TAKEN, 409, {
+        error: VIEW_NAME_TAKEN,
+        errorType: "CONFLICT",
+      })
     );
     const { wrapper, invalidate } = setup();
     const { result } = renderHook(() => useRenameView(), { wrapper });
@@ -178,14 +184,17 @@ describe("the Views write hooks", () => {
       });
     });
 
-    expect(answer).toEqual({ conflict: true });
+    expect(answer).toEqual({ conflict: true, reason: "nameTaken" });
     expect(result.current.isError).toBe(false);
     expect(invalidatedKeys(invalidate)).toHaveLength(2);
   });
 
-  it("Save as new reports a 409 the same way", async () => {
-    mockApiPost.mockRejectedValue(new ApiError("duplicate", 409));
-    const { wrapper } = setup();
+  it("a 409 from a write another tab beat resolves as reason stale, and the Views are read again", async () => {
+    const STALE = "Your settings changed while saving; try again";
+    mockApiPost.mockRejectedValue(
+      new ApiError(STALE, 409, { error: STALE, errorType: "CONFLICT" })
+    );
+    const { wrapper, invalidate } = setup();
     const { result } = renderHook(() => useSaveView(), { wrapper });
 
     let answer: unknown;
@@ -193,7 +202,8 @@ describe("the Views write hooks", () => {
       answer = await result.current.mutateAsync(BODY);
     });
 
-    expect(answer).toEqual({ conflict: true });
+    expect(answer).toEqual({ conflict: true, reason: "stale" });
+    expect(invalidatedKeys(invalidate)).toHaveLength(2);
   });
 
   it("any other failure still rejects", async () => {

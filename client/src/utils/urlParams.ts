@@ -255,6 +255,13 @@ export type ListEntity = ListKind;
 const NO_FILTERS_KEY = "filters";
 const NO_FILTERS_VALUE = "none";
 
+/**
+ * `savedView=<id>`: the View the list shows (a loaded one, or the default
+ * View once a filter or sort changes). List-owned, never a filter key and
+ * never sent: an id the user does not have names nothing.
+ */
+const SAVED_VIEW_KEY = "savedView";
+
 /** The keys every list owns beside its filters */
 const LIST_STATE_KEYS = [
   NO_FILTERS_KEY,
@@ -268,6 +275,7 @@ const LIST_STATE_KEYS = [
   "grid_density",
   "timeline_period",
   "folderPath",
+  SAVED_VIEW_KEY,
 ] as const;
 
 const filterKeysCache = new Map<ListEntity, readonly string[]>();
@@ -291,10 +299,10 @@ const listFilterKeys = (entity: ListEntity): readonly string[] => {
 
 /**
  * Every URL key a list writes at the root: its filter keys, `q`, sort,
- * paging and presentation, the timeline period and the folder path. A list
- * rewrites only these, the prefixed filter keys, `match` and `gN`
- * (`isListOwnedKey`), and keeps every other key (`tab`, `instance`,
- * `includeSubTags`, `includeSubStudios`, `image`, `savedView`).
+ * paging and presentation, the timeline period, the folder path and the
+ * active View (`savedView`). A list rewrites only these, the prefixed
+ * filter keys, `match` and `gN` (`isListOwnedKey`), and keeps every other
+ * key (`tab`, `instance`, `includeSubTags`, `includeSubStudios`, `image`).
  */
 export const listOwnedKeys = (entity: ListEntity): readonly string[] => [
   ...listFilterKeys(entity),
@@ -323,7 +331,7 @@ export const LIST_OWNED_KEYS: readonly string[] = [
 /**
  * The URL a detail page's tab switch goes to: every key a list owns
  * (filters, prefixed ones included, search, sort, paging, presentation,
- * folder path) and the open image go, since each tab is its own list; `tab`
+ * folder path, the active View) and the open image go, since each tab is its own list; `tab`
  * is set, or removed for the default tab; every other key (`instance`,
  * `includeSubTags`, `includeSubStudios`) stays. Returns a new object.
  */
@@ -369,6 +377,8 @@ export interface ListUrlParams {
   gridDensity: string | null;
   timelinePeriod: string | null;
   folderPath: string[];
+  /** The active View's id (`savedView`), unchecked: the hook resolves it */
+  savedView: string | null;
 }
 
 /**
@@ -408,6 +418,7 @@ export const readListParams = (
     gridDensity: param("grid_density"),
     timelinePeriod: param("timeline_period"),
     folderPath: folderPath ? folderPath.split(",").filter(Boolean) : [],
+    savedView: param(SAVED_VIEW_KEY),
   };
 };
 
@@ -426,6 +437,8 @@ export interface ListParamsPatch {
   gridDensity?: string;
   timelinePeriod?: string | null;
   folderPath?: readonly string[];
+  /** The active View's id, or null to name none */
+  savedView?: string | null;
 }
 
 export interface WriteListContext {
@@ -503,6 +516,9 @@ export const writeListParams = (
   }
   if (patch.folderPath !== undefined) {
     setOrDelete(next, "folderPath", patch.folderPath.join(","));
+  }
+  if (patch.savedView !== undefined) {
+    setOrDelete(next, SAVED_VIEW_KEY, patch.savedView);
   }
   return next;
 };

@@ -377,14 +377,6 @@
       "count": 7
     }
   },
-  "src/components/ui/FilterPresets.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 5
-    }
-  },
   "src/components/ui/HelpModal.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1

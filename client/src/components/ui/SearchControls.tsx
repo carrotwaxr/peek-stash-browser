@@ -1,19 +1,19 @@
 import React, { useCallback, useMemo, useRef } from "react";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
-import { type ColumnConfig, presetColumnsOf } from "../../config/tableColumns";
+import type { ColumnConfig } from "../../config/tableColumns";
 import { useListFilters } from "../../hooks/useListFilters";
 import { useFilterOptions } from "../../hooks/useListOptions";
-import type { ListUrlState, PresetToLoad } from "../../hooks/useListUrlState";
+import type { ListUrlState } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
 import { activeFieldCount } from "../../utils/filterFields";
 import { sortOptionsFor } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
 import FilterBar from "../filter-bar/FilterBar";
+import ViewsMenu from "../filter-bar/ViewsMenu";
 import {
   Button,
   ContextSettings,
-  FilterPresets,
   Pagination,
   SearchInput,
   SortControl,
@@ -47,8 +47,8 @@ interface SearchControlsProps {
   currentTableColumns?: Record<string, unknown> | null;
   tableColumnsPopover?: React.ReactNode;
   /**
-   * Shows a preset's table columns, or null for the user's own: called on
-   * each Load Preset and when the default preset resolves or changes
+   * Shows a View's table columns, or null for the user's own: called each
+   * time a View is loaded from the Views menu
    */
   onPresetColumns?: (columns: ColumnConfig | null) => void;
   contextSettings?: SettingConfig[];
@@ -67,7 +67,7 @@ const NO_FILTERS: Record<string, unknown> = {};
 const NO_SETTINGS: SettingConfig[] = [];
 
 /**
- * The list's controls: search, sort, presets and the view in row 1, the
+ * The list's controls: search, sort, Views and the view in row 1, the
  * filter chips with "+ Filter" in row 2, and paging. Every control writes
  * the URL through the list state; nothing here holds a copy of it.
  */
@@ -120,20 +120,9 @@ const SearchControls = ({
     setViewMode,
     setZoomLevel,
     setGridDensity,
-    loadPreset,
   } = listState;
   const sortField = sort.field;
   const sortDirection = sort.direction;
-
-  // Only loading a preset from the menu shows its table columns; a default
-  // preset applied on a visit leaves the user's saved columns alone
-  const handleLoadPreset = useCallback(
-    (preset: PresetToLoad) => {
-      loadPreset(preset);
-      onPresetColumns?.(presetColumnsOf(preset.tableColumns));
-    },
-    [loadPreset, onPresetColumns]
-  );
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -248,23 +237,16 @@ const SearchControls = ({
             </div>
           </div>
 
-          {/* The saved filters (the Views menu's place) */}
-          <div data-tv-search-item="filter-presets">
-            <FilterPresets
-              artifactType={artifactType}
-              context={effectiveContext}
-              currentFilters={filters}
-              currentSort={sortField}
-              currentDirection={sortDirection}
-              currentViewMode={viewMode}
-              currentZoomLevel={zoomLevel}
-              currentGridDensity={gridDensity}
-              currentTableColumns={currentTableColumns}
-              currentPerPage={perPage}
-              permanentFilters={permanentFilters}
-              onLoadPreset={handleLoadPreset}
-            />
-          </div>
+          {/* Views: only loading one from the menu shows its table columns;
+              a default View applied on a visit leaves the user's saved
+              columns alone */}
+          <ViewsMenu
+            listState={listState}
+            context={effectiveContext}
+            permanentFilters={permanentFilters}
+            currentTableColumns={currentTableColumns}
+            {...(onPresetColumns ? { onViewColumns: onPresetColumns } : {})}
+          />
 
           {/* View Mode Toggle - Show if the page has views */}
           {viewModes && (

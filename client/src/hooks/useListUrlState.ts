@@ -17,6 +17,13 @@
  * page, view, zoom, density, timeline period, `setPage(n, { history:
  * "replace" })` and `applyFilters(next, { history: "replace" })` (a chip's
  * popover, whose later edits replace its first).
+ *
+ * The active View is the URL's `savedView` when the user has a View of that
+ * id, else the default View while the URL names no filter. A filter or sort
+ * change keeps `savedView`, so the View stays named and shows as modified;
+ * on the default View it writes the default's id, which would otherwise stop
+ * applying with the first filter. Clear all drops it, and any write drops an
+ * id the user does not have.
  */
 import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -28,7 +35,7 @@ import {
   useFilterPresets,
 } from "../api/hooks/usePresets";
 import type { FilterOption } from "../utils/filterConfig";
-import { normalizePanelState } from "../utils/filterFields";
+import { normalizePanelState, viewModified } from "../utils/filterFields";
 import {
   buildListQuery,
   freshSeed,
@@ -138,6 +145,17 @@ export interface ListUrlState {
   viewLockedFields: readonly string[];
   /** The default preset for this context, whichever of its fields applied */
   activePreset: SavedPreset | null;
+  /**
+   * The View the list shows: the URL's `savedView` if the user has it, else
+   * the default View while the URL names no filter, else null
+   */
+  activeView: SavedPreset | null;
+  /**
+   * The list's filters or sort differ from the active View's (`viewModified`),
+   * the View read as loading it would apply it here: without the fields the
+   * page fixes, its sort as this page falls back from it
+   */
+  activeViewModified: boolean;
   /** Presets resolved (cached after the first visit) and a random order seeded */
   ready: boolean;
   /** The serialised list query, page included; "" until ready */
@@ -158,7 +176,12 @@ export interface ListUrlState {
   setGridDensity: (density: string) => void;
   setTimelinePeriod: (period: string | null) => void;
   setFolderPath: (path: string[]) => void;
+  /** Applies a preset's state, naming no View */
   loadPreset: (preset: PresetToLoad) => void;
+  /** Applies a View's state and names it (`savedView`), one history entry */
+  loadView: (view: SavedPreset) => void;
+  /** Names the View the list shows, or none, changing nothing else (replace) */
+  setActiveView: (id: string | null) => void;
 }
 
 const NO_FILTERS: Record<string, unknown> = {};
@@ -179,6 +202,16 @@ const sortedQuery = (params: URLSearchParams): string => {
   sorted.sort();
   return sorted.toString();
 };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** The sorts the list offers beside these filters */
+const offeredSorts = (
+  sortOptions: UseListUrlStateOptions["sortOptions"],
+  filters: Record<string, unknown>
+): SortOptions =>
+  typeof sortOptions === "function" ? sortOptions(filters) : sortOptions;
 
 /** A preset's sort as the list reads it: a preset never carries a seed */
 const presetSort = (preset: SavedPreset | null) =>
@@ -206,20 +239,33 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   const presetsResolved =
     !presetsQuery.isPending && !defaultPresetsQuery.isPending;
 
+  const contextViews = useMemo(
+    () => presetsForContext(presetsQuery.data, presetContext),
+    [presetsQuery.data, presetContext]
+  );
+
   const activePreset = useMemo(() => {
     const id = defaultPresetsQuery.data?.defaults[presetContext];
     if (!id) return null;
-    return (
-      presetsForContext(presetsQuery.data, presetContext).find(
-        (preset) => preset.id === id
-      ) ?? null
-    );
-  }, [defaultPresetsQuery.data, presetsQuery.data, presetContext]);
+    return contextViews.find((preset) => preset.id === id) ?? null;
+  }, [defaultPresetsQuery.data, contextViews, presetContext]);
 
   const url = useMemo(
     () => readListParams(searchParams, entityType, filterOptions),
     [searchParams, entityType, filterOptions]
   );
+
+  // Only the user's own Views name one: another user's id names nothing
+  const urlView = useMemo(
+    () =>
+      url.savedView === null
+        ? null
+        : (contextViews.find((view) => view.id === url.savedView) ?? null),
+    [url.savedView, contextViews]
+  );
+  // The default View is on while the URL names no filter
+  const defaultViewShown = activePreset !== null && !url.hasFilters;
+  const activeView = urlView ?? (defaultViewShown ? activePreset : null);
 
   // What the page shows for a presentation field the URL does not name
   const shown = useMemo<WriteListContext["shown"]>(() => {
@@ -286,10 +332,10 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
       viewLockedFields
     );
 
-    const offered =
-      typeof sortOptions === "function"
-        ? sortOptions({ ...filters, ...permanentFilters })
-        : sortOptions;
+    const offered = offeredSorts(sortOptions, {
+      ...filters,
+      ...permanentFilters,
+    });
     const isOffered = (field: string) =>
       offered.some((option) => option.value === field);
     const sort = [
@@ -343,16 +389,40 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     [entityType, filterOptions, shown]
   );
 
+  // What a write does to `savedView` when it does not name it: a filter or
+  // sort edit on the default View names the default (its filters stop
+  // applying once the URL names one); an id the user does not have goes
+  const savedViewOf = useCallback(
+    (patch: ListParamsPatch, edit: boolean): string | null | undefined => {
+      if (patch.savedView !== undefined) return patch.savedView;
+      if (urlView !== null) return undefined;
+      if (
+        edit &&
+        defaultViewShown &&
+        (patch.filters !== undefined || patch.sort !== undefined)
+      ) {
+        return activePreset.id;
+      }
+      return url.savedView !== null && presetsResolved ? null : undefined;
+    },
+    [urlView, defaultViewShown, activePreset, url.savedView, presetsResolved]
+  );
+
   // A write that leaves the address as it is (its keys in any order)
   // navigates nowhere: the router would still add a history entry, a Back
-  // step that changes nothing
+  // step that changes nothing. `edit`: the user changed a filter or the sort
   const write = useCallback(
-    (patch: ListParamsPatch, history: "push" | "replace") => {
-      const next = writeListParams(searchParams, patch, writeContext);
+    (patch: ListParamsPatch, history: "push" | "replace", edit = false) => {
+      const savedView = savedViewOf(patch, edit);
+      const next = writeListParams(
+        searchParams,
+        savedView === undefined ? patch : { ...patch, savedView },
+        writeContext
+      );
       if (sortedQuery(next) === sortedQuery(searchParams)) return;
       setSearchParams(next, { replace: history === "replace" });
     },
-    [searchParams, setSearchParams, writeContext]
+    [searchParams, setSearchParams, writeContext, savedViewOf]
   );
 
   useEffect(() => {
@@ -363,12 +433,13 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
 
   const applyFilters = useCallback(
     (next: Record<string, unknown>, opts?: { history?: "push" | "replace" }) =>
-      write({ filters: next, page: 1 }, opts?.history ?? "push"),
+      write({ filters: next, page: 1 }, opts?.history ?? "push", true),
     [write]
   );
 
+  // Clear all leaves no View: the list is unfiltered, whatever was named
   const clearFilters = useCallback(
-    () => write({ filters: {}, page: 1 }, "push"),
+    () => write({ filters: {}, page: 1, savedView: null }, "push"),
     [write]
   );
 
@@ -386,7 +457,8 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
             : freshSeed();
       write(
         { sort: sortValue(field, seed), direction: nextDirection, page: 1 },
-        "push"
+        "push",
+        true
       );
     },
     [sort, write]
@@ -446,8 +518,8 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     [write]
   );
 
-  const loadPreset = useCallback(
-    (preset: PresetToLoad) => {
+  const loadState = useCallback(
+    (preset: PresetToLoad, savedView: string | null) => {
       const field = parseSortValue(preset.sort || defaults.sort).field;
       write(
         {
@@ -469,12 +541,79 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
           zoomLevel: nonEmpty(preset.zoomLevel) ?? defaults.zoomLevel,
           gridDensity: nonEmpty(preset.gridDensity) ?? defaults.gridDensity,
           timelinePeriod: null,
+          savedView,
         },
         "push"
       );
     },
     [write, defaults, derived.perPage, entityType, pageLockedFields]
   );
+
+  const loadPreset = useCallback(
+    (preset: PresetToLoad) => loadState(preset, null),
+    [loadState]
+  );
+
+  const loadView = useCallback(
+    (view: SavedPreset) => loadState(view, view.id),
+    [loadState]
+  );
+
+  const setActiveView = useCallback(
+    (id: string | null) => write({ savedView: id }, "replace"),
+    [write]
+  );
+
+  // The View as loading it here would apply it: its rows on a field the page
+  // fixes dropped, its sort the one this page falls back to when it does
+  // not offer the View's (a View sorted by Recommended, opened on Scenes)
+  const activeViewModified = useMemo(() => {
+    if (activeView === null) return false;
+    const isOffered = (field: string) =>
+      offeredSorts(sortOptions, {
+        ...derived.filters,
+        ...permanentFilters,
+      }).some((option) => option.value === field);
+    const viewField =
+      typeof activeView.sort === "string" && activeView.sort !== ""
+        ? parseSortValue(activeView.sort).field
+        : "";
+    const sortOnPage =
+      viewField === ""
+        ? ""
+        : ([viewField, presetSort(activePreset)?.field, defaults.sort].find(
+            (field) => field !== undefined && isOffered(field)
+          ) ?? DEFAULT_SORT[entityType].field);
+    return viewModified(
+      entityType,
+      {
+        filters: withoutLockedFilters(
+          entityType,
+          normalizePanelState(
+            entityType,
+            isRecord(activeView.filters) ? activeView.filters : NO_FILTERS
+          ),
+          pageLockedFields
+        ),
+        sort: sortOnPage,
+        direction: activeView.direction,
+      },
+      {
+        filters: derived.filtersBeforeView,
+        sort: derived.sort.field,
+        direction: derived.sort.direction,
+      }
+    );
+  }, [
+    activeView,
+    activePreset,
+    sortOptions,
+    derived,
+    permanentFilters,
+    defaults.sort,
+    entityType,
+    pageLockedFields,
+  ]);
 
   const query = useMemo(
     () => buildListQuery(entityType, { ...derived, ready }, permanentFilters),
@@ -486,6 +625,8 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     permanentFilters,
     viewLockedFields,
     activePreset,
+    activeView,
+    activeViewModified,
     ready,
     listKey: listKeyOf(query),
     listKeyWithoutPage: listKeyWithoutPageOf(query),
@@ -501,5 +642,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     setTimelinePeriod,
     setFolderPath,
     loadPreset,
+    loadView,
+    setActiveView,
   };
 }

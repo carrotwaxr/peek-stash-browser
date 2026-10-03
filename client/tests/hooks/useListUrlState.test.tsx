@@ -910,3 +910,201 @@ describe("useListUrlState", () => {
     });
   });
 });
+
+describe("the active View (`savedView`)", () => {
+  const FAVES = preset({
+    id: "v1",
+    name: "Faves",
+    filters: { favorite: "true" },
+    sort: "rating",
+    direction: "DESC",
+  });
+  const TAGGED = preset({
+    id: "v2",
+    name: "Tagged",
+    filters: { tagIds: ["1:abc"] },
+    sort: "date",
+    direction: "ASC",
+  });
+
+  /** The list at `url` with the scene Views and the scene context's default */
+  function renderViews(
+    url: string,
+    {
+      views = [FAVES, TAGGED],
+      defaultId = null,
+      options = SCENE_OPTIONS,
+    }: {
+      views?: FilterPreset[];
+      defaultId?: string | null;
+      options?: UseListUrlStateOptions;
+    } = {}
+  ) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(presetsQueryOptions.queryKey, {
+      presets: { scene: views },
+    });
+    queryClient.setQueryData(defaultPresetsQueryOptions.queryKey, {
+      defaults: defaultId ? { scene: defaultId } : {},
+    });
+    const current: { state: ListUrlState | null } = { state: null };
+    const Probe = () => {
+      current.state = useListUrlState(options);
+      return null;
+    };
+    const router = createMemoryRouter([{ path: "*", element: <Probe /> }], {
+      initialEntries: [url],
+    });
+    const actions: string[] = [];
+    let last = router.state.location;
+    router.subscribe((next) => {
+      if (next.location === last) return;
+      last = next.location;
+      actions.push(next.historyAction);
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    );
+    return {
+      get state() {
+        return must(current.state, "list state");
+      },
+      router,
+      actions,
+      params: () => new URLSearchParams(router.state.location.search),
+    };
+  }
+
+  it("`activeView` is the URL's savedView, else the default view while the URL names no filter, else null", () => {
+    expect(
+      renderViews("/scenes?savedView=v2&tagIds=1:abc", { defaultId: "v1" })
+        .state.activeView?.id
+    ).toBe("v2");
+    expect(
+      renderViews("/scenes", { defaultId: "v1" }).state.activeView?.id
+    ).toBe("v1");
+    expect(
+      renderViews("/scenes?sort=title", { defaultId: "v1" }).state.activeView
+        ?.id
+    ).toBe("v1");
+    expect(
+      renderViews("/scenes?favorite=true", { defaultId: "v1" }).state.activeView
+    ).toBeNull();
+    expect(renderViews("/scenes").state.activeView).toBeNull();
+    // An id the user does not have names nothing
+    expect(
+      renderViews("/scenes?savedView=someone-else&favorite=true").state
+        .activeView
+    ).toBeNull();
+  });
+
+  it("loadView writes the View's state and savedView in one history entry", async () => {
+    const list = renderViews("/scenes");
+    await actAsync(() => list.state.loadView(TAGGED));
+    expect(list.params().get("savedView")).toBe("v2");
+    expect(list.params().get("tagIds")).toBe("1:abc");
+    expect(list.params().get("sort")).toBe("date");
+    expect(list.params().get("dir")).toBe("ASC");
+    expect(list.actions).toEqual(["PUSH"]);
+    expect(list.state.activeView?.id).toBe("v2");
+    expect(list.state.activeViewModified).toBe(false);
+  });
+
+  it("changing a filter keeps savedView (so the mark shows); Clear all and a sidebar link drop it", async () => {
+    const list = renderViews(
+      "/scenes?savedView=v2&tagIds=1:abc&sort=date&dir=ASC",
+      { defaultId: "v1" }
+    );
+    expect(list.state.activeViewModified).toBe(false);
+
+    await actAsync(() =>
+      list.state.applyFilters({ tagIds: ["1:abc"], favorite: "true" })
+    );
+    expect(list.params().get("savedView")).toBe("v2");
+    expect(list.state.activeView?.id).toBe("v2");
+    expect(list.state.activeViewModified).toBe(true);
+
+    await actAsync(() => list.state.clearFilters());
+    expect(list.params().has("savedView")).toBe(false);
+    expect(list.state.activeView).toBeNull();
+
+    await actAsync(() => list.state.loadView(TAGGED));
+    expect(list.params().get("savedView")).toBe("v2");
+    // The sidebar's link is the bare list: the default View again
+    await act(() => list.router.navigate("/scenes"));
+    expect(list.params().has("savedView")).toBe(false);
+    expect(list.state.activeView?.id).toBe("v1");
+  });
+
+  it("changing a filter on a page showing its default View writes savedView=<default id>", async () => {
+    const list = renderViews("/scenes", { defaultId: "v1" });
+    expect(list.state.activeView?.id).toBe("v1");
+    expect(list.state.activeViewModified).toBe(false);
+
+    await actAsync(() =>
+      list.state.applyFilters({ favorite: "true", tagIds: ["5:abc"] })
+    );
+    expect(list.params().get("savedView")).toBe("v1");
+    expect(list.state.activeView?.id).toBe("v1");
+    expect(list.state.activeViewModified).toBe(true);
+  });
+
+  it("a sort change on the default View writes it too", async () => {
+    const list = renderViews("/scenes", { defaultId: "v1" });
+    await actAsync(() => list.state.setSort("title"));
+    expect(list.params().get("savedView")).toBe("v1");
+    expect(list.state.activeViewModified).toBe(true);
+  });
+
+  it("a savedView the user does not have is dropped on the next write", async () => {
+    const list = renderViews("/scenes?savedView=someone-else&favorite=true");
+    await actAsync(() => list.state.setPage(2));
+    expect(list.params().has("savedView")).toBe(false);
+    expect(list.params().get("page")).toBe("2");
+  });
+
+  it("view mode, density and page size do not mark the View modified", async () => {
+    const list = renderViews("/scenes", { defaultId: "v1" });
+    await actAsync(() => list.state.setViewMode("wall"));
+    await actAsync(() => list.state.setGridDensity("small"));
+    await actAsync(() => list.state.setPerPage(48));
+    expect(list.state.activeView?.id).toBe("v1");
+    expect(list.state.activeViewModified).toBe(false);
+  });
+
+  it("a View naming the page's locked field, loaded on that page, is not modified", async () => {
+    const performers = preset({
+      id: "v3",
+      name: "Fave performers",
+      filters: { performerIds: ["9:abc"], favorite: "true" },
+      sort: "rating",
+      direction: "DESC",
+    });
+    const list = renderViews("/performer/1", {
+      views: [performers],
+      options: { ...SCENE_OPTIONS, lockedFields: ["performers"] },
+    });
+    await actAsync(() => list.state.loadView(performers));
+    expect(list.params().has("performerIds")).toBe(false);
+    expect(list.state.activeView?.id).toBe("v3");
+    expect(list.state.activeViewModified).toBe(false);
+  });
+
+  it("a View sorted by a sort the page does not offer compares with the sort the page falls back to", async () => {
+    const recommended = preset({
+      id: "v4",
+      name: "Best",
+      filters: {},
+      sort: "recommended",
+      direction: "DESC",
+    });
+    const list = renderViews("/scenes", { views: [recommended] });
+    await actAsync(() => list.state.loadView(recommended));
+    expect(list.state.sort.field).toBe("o_counter");
+    expect(list.state.activeViewModified).toBe(false);
+  });
+});
