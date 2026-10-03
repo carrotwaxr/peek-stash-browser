@@ -239,7 +239,7 @@ class GroupQueryBuilder extends EntityQueryBuilder<
 
   protected sortMap(
     dir: SortDirection,
-    _filter: ParsedFilter<"group">,
+    filter: ParsedFilter<"group">,
     ctx: QueryContext
   ): Record<string, SortExpr> {
     const column = (sql: string): SortExpr => ({
@@ -260,9 +260,55 @@ class GroupQueryBuilder extends EntityQueryBuilder<
       ),
       duration: column("g.duration"),
 
+      // The collection's tags the viewer can see, and the viewer's own O
+      // count over its visible scenes: the values the filters read
+      tag_count: this.countSort(tagCount(ctx), dir),
+      o_counter: this.countSort(historySum("oCount", ctx), dir),
+      ...this.subGroupOrderSort(dir, filter),
+
       // The viewer's rating (GroupRating)
       rating: column("COALESCE(r.rating, 0)"),
       rating100: column("COALESCE(r.rating, 0)"),
+    };
+  }
+
+  /**
+   * Sub-collection order: the collection's index in the first collection
+   * the filter's `containing_groups` includes, collections without one
+   * (the filter's depth reaches collections further down) last. The LEFT
+   * JOIN reads the one (containing, sub) row by GroupRelation's primary
+   * key, on the collection's own instance, so the count is unchanged. A
+   * collection has no expression without an including criterion: the key
+   * falls back to the default sort (the parser refuses it first).
+   */
+  private subGroupOrderSort(
+    dir: SortDirection,
+    filter: ParsedFilter<"group">
+  ): Record<string, SortExpr> {
+    const criterion = filter.containing_groups;
+    const first = criterion?.refs[0];
+    if (
+      criterion === undefined ||
+      first === undefined ||
+      (criterion.modifier !== "INCLUDES" &&
+        criterion.modifier !== "INCLUDES_ALL")
+    ) {
+      return {};
+    }
+    return {
+      sub_group_order: {
+        sql: `sgo.orderIndex IS NULL, sgo.orderIndex ${dir}`,
+        params: [],
+        joins: [
+          {
+            sql: `LEFT JOIN GroupRelation sgo ON sgo.containingId = ? AND sgo.containingInstanceId = ${first.instanceId === undefined ? "g.stashInstanceId" : "?"} AND sgo.subId = g.id AND sgo.subInstanceId = g.stashInstanceId`,
+            params:
+              first.instanceId === undefined
+                ? [first.id]
+                : [first.id, first.instanceId],
+          },
+        ],
+      },
     };
   }
 

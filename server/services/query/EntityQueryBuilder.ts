@@ -1006,6 +1006,14 @@ ORDER BY period`;
   }
 
   /**
+   * A count over related rows (a scalar subquery with its own parameters)
+   * as a sort: the value the filter of the same name compares
+   */
+  protected countSort(count: SqlFragment, dir: SortDirection): SortExpr {
+    return { sql: `${count.sql} ${dir}`, params: count.params };
+  }
+
+  /**
    * One sort key's expression with the direction in it, and its joins: the
    * random order with its seed bound (the default seed when none), else the
    * sort map's expression, the default sort's for a key the map lacks

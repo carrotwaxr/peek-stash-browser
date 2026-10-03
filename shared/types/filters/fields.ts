@@ -595,6 +595,14 @@ export const SORTS = {
     "o_counter",
     "resume_time",
     "last_o_at",
+    /** The shorter side of the file */
+    "resolution",
+    /** The studio's name, scenes without one last */
+    "studio",
+    "code",
+    /** The youngest performer ascending, the oldest descending, at the scene's date */
+    "performer_age",
+    "organized",
     /** Order within the one group the `groups` filter names */
     "scene_index",
     /** Order within the one playlist the `playlists` filter names */
@@ -622,6 +630,8 @@ export const SORTS = {
     "play_count",
     "last_played_at",
     "last_o_at",
+    "tag_count",
+    "marker_count",
     "random",
   ],
   studio: [
@@ -634,6 +644,8 @@ export const SORTS = {
     "gallery_count",
     "performer_count",
     "group_count",
+    "child_count",
+    "tag_count",
     "rating",
     "rating100",
     "o_counter",
@@ -652,6 +664,8 @@ export const SORTS = {
     "studio_count",
     "group_count",
     "scene_marker_count",
+    "child_count",
+    "parent_count",
     "rating",
     "rating100",
     "o_counter",
@@ -666,6 +680,10 @@ export const SORTS = {
     "scene_count",
     "performer_count",
     "duration",
+    "tag_count",
+    "o_counter",
+    /** Order within the one collection the `containing_groups` filter names */
+    "sub_group_order",
     "rating",
     "rating100",
     "random",
@@ -677,6 +695,8 @@ export const SORTS = {
     "updated_at",
     "path",
     "image_count",
+    "tag_count",
+    "performer_count",
     "rating",
     "rating100",
     "random",
@@ -688,6 +708,9 @@ export const SORTS = {
     "updated_at",
     "path",
     "filesize",
+    "resolution",
+    "tag_count",
+    "performer_count",
     "rating",
     "rating100",
     "o_counter",

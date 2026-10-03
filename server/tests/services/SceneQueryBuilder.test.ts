@@ -478,6 +478,53 @@ describe("SceneQueryBuilder", () => {
       ).toEqual([]);
     });
 
+    it.each([
+      ["resolution", "MIN(s.fileWidth, s.fileHeight) ASC, s.id ASC"],
+      ["code", "s.code ASC, s.id ASC"],
+      ["organized", "s.organized ASC, s.id ASC"],
+    ] as const)(
+      "the %s sort reads the column, without a join",
+      async (field, order) => {
+        await run({ sort: { field, direction: "ASC", seed: undefined } });
+
+        expect(pageStatement().sql).toContain(`ORDER BY ${order}`);
+        expect(pageStatement().sql).not.toContain("StashStudio");
+      }
+    );
+
+    it("the studio sort is a scalar subquery on the studio's key that leaves out a deleted or hidden studio, scenes without one last, and no join reaches the count", async () => {
+      await run({
+        sort: { field: "studio", direction: "DESC", seed: undefined },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "ORDER BY (SELECT sso.name FROM StashStudio sso WHERE sso.id = s.studioId AND sso.stashInstanceId = s.stashInstanceId AND sso.deletedAt IS NULL AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity ssx WHERE ssx.userId = ? AND ssx.entityType = 'studio' AND ssx.entityId = sso.id AND (ssx.instanceId = '' OR ssx.instanceId = sso.stashInstanceId))) COLLATE NOCASE DESC NULLS LAST, s.id DESC"
+      );
+      // The viewer binds in the order, before the page's limit and offset
+      expect(params.slice(-3)).toEqual([1, 10, 0]);
+      expect(countSql()).not.toContain("StashStudio");
+    });
+
+    it("the performer_age sort is the youngest performer's age ascending and the oldest's descending, undated or performer-less scenes last", async () => {
+      await run({
+        sort: { field: "performer_age", direction: "ASC", seed: undefined },
+      });
+      await run({
+        sort: { field: "performer_age", direction: "DESC", seed: undefined },
+      });
+
+      const [asc, desc] = mockPrisma.$queryRawUnsafe.mock.calls
+        .map(([sql]) => sql)
+        .filter((sql) => sql.includes("ORDER BY"));
+      expect(asc).toContain("- MAX(pa.day) AS INTEGER)");
+      expect(asc).toContain("NULLS LAST, s.id ASC, s.stashInstanceId ASC");
+      expect(desc).toContain("- MIN(pa.day) AS INTEGER)");
+      expect(desc).toContain("NULLS LAST, s.id DESC, s.stashInstanceId DESC");
+      expect(asc).toContain("FROM ScenePerformer sp JOIN pa ON");
+      expect(asc).toContain("pax.id IS NULL");
+    });
+
     it("ends the order with the primary key for stable paging", async () => {
       await run({ sort: { field: "date", direction: "ASC", seed: undefined } });
 

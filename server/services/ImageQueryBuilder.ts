@@ -18,6 +18,7 @@ import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type { ImageListItem } from "../types/index.js";
 import type { ImageQueryRow } from "../types/internal/queryRows.js";
 import type {
+  ParsedFilter,
   RefCriterion,
   RefFieldCriterion,
 } from "../types/parsedFilters.js";
@@ -38,6 +39,7 @@ import {
   orientationClause,
   performerAgeExists,
   performerCountClause,
+  performerCountSql,
   performerTagsFieldClause,
   refClause,
   resolutionClause,
@@ -174,7 +176,11 @@ class ImageQueryBuilder extends EntityQueryBuilder<
 > {
   protected readonly spec = IMAGE_SPEC;
 
-  protected sortMap(dir: SortDirection): Record<string, SortExpr> {
+  protected sortMap(
+    dir: SortDirection,
+    _filter: ParsedFilter<"image">,
+    ctx: QueryContext
+  ): Record<string, SortExpr> {
     const column = (sql: string): SortExpr => ({
       sql: `${sql} ${dir}`,
       params: [],
@@ -190,6 +196,19 @@ class ImageQueryBuilder extends EntityQueryBuilder<
       updated_at: column("i.stashUpdatedAt"),
       path: column("i.filePath"),
       filesize: column("COALESCE(i.fileSize, 0)"),
+      // The shorter side of the file, an image without one first ascending
+      resolution: column("MIN(i.width, i.height)"),
+
+      // The image's tag rows, and the performers the viewer can see: the
+      // values the filters of the same names read
+      tag_count: column(IMAGE_TAG_COUNT),
+      performer_count: this.countSort(
+        performerCountSql(
+          IMAGE_PERFORMERS,
+          ctx.applyExclusions ? ctx.userId : null
+        ),
+        dir
+      ),
 
       // The viewer's rating and O count
       rating: column(USER_RATING),

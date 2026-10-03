@@ -43,6 +43,7 @@ import {
   noClause,
   performerAgeExists,
   performerCountClause,
+  performerCountSql,
   performerTagsFieldClause,
   refClause,
   searchAll,
@@ -219,6 +220,17 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
 
       // The count, as the viewer sees it
       image_count: column(visibleCount(ctx, "g.imageCount", "images")),
+
+      // The gallery's tag rows, and the performers the viewer can see: the
+      // values the filters of the same names read
+      tag_count: column(GALLERY_TAG_COUNT),
+      performer_count: this.countSort(
+        performerCountSql(
+          GALLERY_PERFORMERS,
+          ctx.applyExclusions ? ctx.userId : null
+        ),
+        dir
+      ),
 
       // The viewer's rating (GalleryRating)
       rating: column("COALESCE(r.rating, 0)"),

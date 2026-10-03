@@ -224,6 +224,74 @@ describe("GroupQueryBuilder", () => {
       );
     });
 
+    it("sub_group_order joins the one (containing, sub) row of the first including parent, on the collection's own instance, and keeps the join in the count", async () => {
+      const sort = {
+        field: "sub_group_order",
+        direction: "ASC",
+        seed: undefined,
+      } as never;
+      await run({
+        sort,
+        filter: {
+          containing_groups: {
+            refs: [bare("9"), ref("10")],
+            modifier: "INCLUDES",
+            depth: 0,
+          },
+        },
+      });
+
+      const page = pageStatement();
+      expect(page.sql).toContain(
+        "LEFT JOIN GroupRelation sgo ON sgo.containingId = ? AND sgo.containingInstanceId = g.stashInstanceId AND sgo.subId = g.id AND sgo.subInstanceId = g.stashInstanceId"
+      );
+      expect(page.sql).toContain(
+        "ORDER BY sgo.orderIndex IS NULL, sgo.orderIndex ASC, g.name COLLATE NOCASE ASC"
+      );
+      // The sort's join binds the first ref (the filter binds both)
+      expect(page.params).toContain("9");
+      expect(countStatement().sql).toContain("LEFT JOIN GroupRelation sgo");
+    });
+
+    it("sub_group_order with a parent on an instance names it, and without an including parent falls back to the default sort", async () => {
+      const sort = {
+        field: "sub_group_order",
+        direction: "DESC",
+        seed: undefined,
+      } as never;
+      await run({
+        sort,
+        filter: {
+          containing_groups: {
+            refs: [ref("9", "inst-b")],
+            modifier: "INCLUDES_ALL",
+            depth: 0,
+          },
+        },
+      });
+      expect(pageStatement().sql).toContain(
+        "sgo.containingInstanceId = ? AND sgo.subId = g.id"
+      );
+      expect(pageStatement().params).toContain("inst-b");
+
+      vi.clearAllMocks();
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+      await run({
+        sort,
+        filter: {
+          containing_groups: {
+            refs: [ref("9")],
+            modifier: "EXCLUDES",
+            depth: 0,
+          },
+        },
+      });
+      expect(pageStatement().sql).not.toContain("GroupRelation sgo");
+      expect(pageStatement().sql).toContain(
+        "ORDER BY g.name COLLATE NOCASE DESC"
+      );
+    });
+
     it("binds a random sort's seed and never interpolates it", async () => {
       await run({
         sort: { field: "random", direction: "DESC", seed: 87654321 },

@@ -90,7 +90,7 @@ const FALLBACK_SORT: Readonly<Record<ListKind, string>> = {
  * The panel state a sort is offered with: the client lists Scene Number only
  * beside a collection filter (`SearchControls`), as the collection page's
  * scene list sends it (`GroupDetail`), and Playlist order only beside one
- * playlist (F23). Any playlist id reaches the sort: one the viewer cannot
+ * playlist, and Sub-collection order beside one parent collection (F23). Any playlist id reaches the sort: one the viewer cannot
  * read holds no scenes.
  */
 const SORT_CONTEXT: Partial<
@@ -102,6 +102,12 @@ const SORT_CONTEXT: Partial<
     }),
     playlist_position: () => ({
       playlists: { value: [1], modifier: "INCLUDES" },
+    }),
+  },
+  // Sub-collection order is offered only beside one parent collection
+  group: {
+    sub_group_order: (refs) => ({
+      groupIds: { value: [refs("groups")[0]], modifier: "INCLUDES" },
     }),
   },
 };

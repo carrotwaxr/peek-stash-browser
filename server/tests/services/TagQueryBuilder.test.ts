@@ -397,7 +397,7 @@ describe("TagQueryBuilder", () => {
       const { sql } = pageStatement();
       for (const fragment of [
         `(SELECT COUNT(DISTINCT tpp.id) FROM json_each(${jsonListOrEmpty("t.parentIds")}) tpj JOIN StashTag tpp`,
-        "child_count_children(pid, inst, n) AS MATERIALIZED (SELECT tcj.value, tcc.stashInstanceId, COUNT(DISTINCT tcc.id) FROM StashTag tcc",
+        "child_count_children(pid, inst, n) AS MATERIALIZED (SELECT tcj.value AS pid, tcc.stashInstanceId AS inst, COUNT(DISTINCT tcc.id) AS n FROM StashTag tcc",
         "GROUP BY tcj.value, tcc.stashInstanceId)",
         "COALESCE((SELECT k.n FROM child_count_children k WHERE k.pid = t.id AND k.inst = t.stashInstanceId), 0) > ?",
         "MAX(t.imageCount - COALESCE(d.images, 0), 0) = ?",
