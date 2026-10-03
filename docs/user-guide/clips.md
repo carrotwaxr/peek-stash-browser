@@ -26,7 +26,7 @@ All view modes support adjustable density controls.
 
 ## Filtering Clips
 
-Click the filter icon in the toolbar to open the filter panel. Available filters:
+Click **+ Filter** in the bar under the search box (or press `f`) to add a filter; the filters in use show as chips, and you can pin the ones you use most. On a phone, **Filters** opens a sheet instead. See [Filters](browse-and-display.md#filters). Available filters:
 
 | Filter | Description |
 |--------|-------------|
