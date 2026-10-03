@@ -115,36 +115,35 @@ test.describe("Filters in step with Stash", () => {
       await list.goto("/scenes");
       await list.waitForResults("Scene");
 
-      // Pick both tags in the panel, then turn the second into an exclusion
-      await list.openFilters();
-      const picker = page.getByRole("button", { name: /^Tags/ }).first();
-      await picker.click();
-      const search = page.getByPlaceholder("Type to search...");
+      // Pick both tags in the Tags chip's editor (its list opens with it),
+      // then turn the second into an exclusion; each change applies at once
+      const editor = await list.addFilter("Tags");
+      const search = editor.getByPlaceholder("Type to search...");
       for (const tag of [included, excluded]) {
         await search.fill(tag.name);
-        await page
+        await editor
           .getByRole("button", { name: tag.name, exact: true })
           .first()
           .click();
       }
       await page.keyboard.press("Escape");
-      await page
-        .getByRole("button", { name: `Exclude ${excluded.name}`, exact: true })
-        .click();
-      await expect(
-        page.getByRole("button", { name: `Exclude ${excluded.name}` })
-      ).toHaveAttribute("aria-pressed", "true");
-      await expect(
-        page.getByRole("button", { name: `Exclude ${included.name}` })
-      ).toHaveAttribute("aria-pressed", "false");
-
+      await expect(search).toHaveCount(0);
       const applied = page.waitForResponse(
         (r) =>
           new URL(r.url()).pathname === "/api/library/scenes" &&
           r.request().method() === "POST" &&
           (r.request().postData() ?? "").includes('"excludes"')
       );
-      await page.getByRole("button", { name: "Apply Filters" }).click();
+      await editor
+        .getByRole("button", { name: `Exclude ${excluded.name}`, exact: true })
+        .click();
+      await expect(
+        editor.getByRole("button", { name: `Exclude ${excluded.name}` })
+      ).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        editor.getByRole("button", { name: `Exclude ${included.name}` })
+      ).toHaveAttribute("aria-pressed", "false");
+      await list.closeEditor();
 
       // 1. The request says include X, exclude Y
       const sent = sentCriterion<{ value?: string[]; excludes?: string[] }>(
@@ -154,7 +153,7 @@ test.describe("Filters in step with Stash", () => {
       expect(sent?.value).toEqual([includedRef]);
       expect(sent?.excludes).toEqual([excludedRef]);
 
-      // 2. The URL carries both, the chip and the badge show the filter
+      // 2. The URL carries both, the chip shows the filter
       const params = new URL(page.url()).searchParams;
       expect(params.get("tagIds")).toBe(includedRef);
       expect(params.get("tagIdsExclude")).toBe(excludedRef);

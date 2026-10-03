@@ -20,12 +20,7 @@
  */
 import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import {
-  DEFAULT_SORT,
-  PANEL_FIELDS,
-  type PanelField,
-  Q_MAX_LENGTH,
-} from "@peek/shared-types";
+import { DEFAULT_SORT, Q_MAX_LENGTH } from "@peek/shared-types";
 import {
   type SavedPreset,
   presetsForContext,
@@ -33,7 +28,7 @@ import {
   useFilterPresets,
 } from "../api/hooks/usePresets";
 import type { FilterOption } from "../utils/filterConfig";
-import { codecOf, normalizePanelState } from "../utils/filterFields";
+import { normalizePanelState } from "../utils/filterFields";
 import {
   buildListQuery,
   freshSeed,
@@ -153,7 +148,6 @@ export interface ListUrlState {
     filters: Record<string, unknown>,
     opts?: { history?: "push" | "replace" }
   ) => void;
-  removeFilter: (key: string) => void;
   clearFilters: () => void;
   setSort: (field: string, direction?: Direction) => void;
   setPage: (page: number, opts?: { history?: "push" | "replace" }) => void;
@@ -365,27 +359,12 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     if (needsSeed) write({ sort: sortValue("random", freshSeed()) }, "replace");
   }, [needsSeed, write]);
 
-  const { filters, sort } = derived;
+  const { sort } = derived;
 
   const applyFilters = useCallback(
     (next: Record<string, unknown>, opts?: { history?: "push" | "replace" }) =>
       write({ filters: next, page: 1 }, opts?.history ?? "push"),
     [write]
-  );
-
-  // A chip's field goes with its companions: its condition and depth
-  const removeFilter = useCallback(
-    (key: string) => {
-      const row = (PANEL_FIELDS[entityType] as readonly PanelField[]).find(
-        (each) => each.key === key
-      );
-      const removed = new Set(row ? codecOf(row).keys(row) : [key]);
-      const rest = Object.fromEntries(
-        Object.entries(filters).filter(([name]) => !removed.has(name))
-      );
-      write({ filters: rest, page: 1 }, "push");
-    },
-    [entityType, filters, write]
   );
 
   const clearFilters = useCallback(
@@ -511,7 +490,6 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     listKey: listKeyOf(query),
     listKeyWithoutPage: listKeyWithoutPageOf(query),
     applyFilters,
-    removeFilter,
     clearFilters,
     setSort,
     setPage,

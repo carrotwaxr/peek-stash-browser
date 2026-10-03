@@ -1,5 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import deepEqual from "fast-deep-equal";
+import React, { useCallback, useMemo, useRef } from "react";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
 import { type ColumnConfig, presetColumnsOf } from "../../config/tableColumns";
 import { useListFilters } from "../../hooks/useListFilters";
@@ -7,20 +6,13 @@ import { useFilterOptions } from "../../hooks/useListOptions";
 import type { ListUrlState, PresetToLoad } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
-import {
-  type FilterOption,
-  type PanelState,
-  activeFieldCount,
-  rowKeysOf,
-} from "../../utils/filterFields";
+import { activeFieldCount } from "../../utils/filterFields";
 import { sortOptionsFor } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
 import FilterBar from "../filter-bar/FilterBar";
 import {
   Button,
   ContextSettings,
-  FieldEditor,
-  FilterPanel,
   FilterPresets,
   Pagination,
   SearchInput,
@@ -64,8 +56,8 @@ interface SearchControlsProps {
   isRefreshing?: boolean;
   /**
    * The current view takes the list's filters (false for the Tags hierarchy):
-   * the Filters button, the panel and the chips are hidden, and a note says so
-   * while filters are set
+   * the chip bar and "+ Filter" are hidden, and a note says so while filters
+   * are set
    */
   filterable?: boolean;
 }
@@ -75,9 +67,9 @@ const NO_FILTERS: Record<string, unknown> = {};
 const NO_SETTINGS: SettingConfig[] = [];
 
 /**
- * The list's controls: search, sort, filters, presets, view and paging. Every
- * control writes the URL through the list state; nothing here holds a copy
- * of it (the filter panel keeps only the draft being edited).
+ * The list's controls: search, sort, presets and the view in row 1, the
+ * filter chips with "+ Filter" in row 2, and paging. Every control writes
+ * the URL through the list state; nothing here holds a copy of it.
  */
 const SearchControls = ({
   artifactType = "scene",
@@ -98,14 +90,11 @@ const SearchControls = ({
 }: SearchControlsProps) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const topPaginationRef = useRef<HTMLDivElement>(null); // Ref for top pagination element
-  const filtersButtonRef = useRef<HTMLDivElement>(null); // The Filters button's wrapper
 
   const { isTVMode } = useTVMode();
-  // The panel and the chips offer every field the view leaves free: a field
-  // the page fixes is offered, its rows AND-ed with the page's criterion
+  // The chip bar offers every field the view leaves free: a field the page
+  // fixes is offered, its rows AND-ed with the page's criterion
   // (FILTERS-12), but not the timeline's date or the open folder's tags
   const allFilterOptions = useFilterOptions(artifactType);
   const listFilters = useListFilters(
@@ -135,93 +124,6 @@ const SearchControls = ({
   } = listState;
   const sortField = sort.field;
   const sortDirection = sort.direction;
-
-  // Track collapsed state for each filter section
-  const [collapsedSections, setCollapsedSections] = useState<
-    Record<string, boolean>
-  >(() => {
-    const initial: Record<string, boolean> = {};
-    filterOptions.forEach((opt) => {
-      if (opt.type === "section-header" && opt.collapsible) {
-        initial[opt.key] = !opt.defaultOpen;
-      }
-    });
-    return initial;
-  });
-
-  // The panel's draft: edits not yet applied, over the filters they started
-  // from. Once the list's filters change (Back, a chip, a preset) the draft
-  // is dropped and the panel shows the list's filters again.
-  const [draft, setDraft] = useState<{
-    base: Record<string, unknown>;
-    values: Record<string, unknown>;
-  } | null>(null);
-  const draftIsCurrent = draft !== null && deepEqual(draft.base, filters);
-  const panelFilters = draft && draftIsCurrent ? draft.values : filters;
-
-  // The controls each collapsible section holds: its toggle's aria-controls
-  const sectionControlIds = useMemo(() => {
-    const ids: Record<string, string> = {};
-    let current: string | null = null;
-    for (const opt of filterOptions) {
-      if (opt.type === "section-header") {
-        current = opt.key;
-        ids[current] = "";
-      } else if (current) {
-        ids[current] = `${ids[current]} filter-${opt.key}`.trim();
-      }
-    }
-    return ids;
-  }, [filterOptions]);
-
-  // A row edited in the panel (before submit): the row's keys are replaced
-  // by its next state, the rest of the draft stays
-  const handleRowChange = useCallback(
-    (option: FilterOption, next: PanelState) => {
-      const owned = new Set(rowKeysOf(option));
-      setDraft((prev) => ({
-        base: filters,
-        values: {
-          ...Object.fromEntries(
-            Object.entries(
-              prev && deepEqual(prev.base, filters) ? prev.values : filters
-            ).filter(([key]) => !owned.has(key))
-          ),
-          ...next,
-        },
-      }));
-    },
-    [filters]
-  );
-
-  // Closing the panel unmounts the button that had focus: it goes back to the
-  // Filters button that opened the panel
-  const focusFiltersButton = useCallback(() => {
-    filtersButtonRef.current?.querySelector("button")?.focus();
-  }, []);
-
-  // Apply the draft and close the panel
-  const handleFilterSubmit = useCallback(() => {
-    listFilters.commit(panelFilters);
-    setDraft(null);
-    setIsFilterPanelOpen(false);
-    focusFiltersButton();
-  }, [listFilters, panelFilters, focusFiltersButton]);
-
-  // Clear All drops every filter and closes the panel
-  const handleClearFilters = useCallback(() => {
-    listFilters.clear();
-    setDraft(null);
-    setIsFilterPanelOpen(false);
-    focusFiltersButton();
-  }, [listFilters, focusFiltersButton]);
-
-  // Cancel drops the draft and closes the panel
-  const handleFilterCancel = useCallback(() => {
-    setDraft(null);
-    setIsFilterPanelOpen(false);
-    focusFiltersButton();
-  }, [focusFiltersButton]);
 
   // Only loading a preset from the menu shows its table columns; a default
   // preset applied on a visit leaves the user's saved columns alone
@@ -280,17 +182,12 @@ const SearchControls = ({
     [setSort]
   );
 
-  const handleToggleFilterPanel = useCallback(() => {
-    setIsFilterPanelOpen((prev) => !prev);
-  }, []);
-
-  // How many filters are active, one per field as the chips draw them: the
-  // Filters button's badge
-  const activeFilterCount = useMemo(
-    () => activeFieldCount(artifactType as ListEntity, filters, filterOptions),
+  // Whether any filter is set: the hierarchy view says they don't apply
+  const hasActiveFilters = useMemo(
+    () =>
+      activeFieldCount(artifactType as ListEntity, filters, filterOptions) > 0,
     [artifactType, filters, filterOptions]
   );
-  const hasActiveFilters = activeFilterCount > 0;
 
   // The sorts this list offers: Scene Number only beside a collection filter
   // that includes, the page's permanent one or the panel's
@@ -303,208 +200,132 @@ const SearchControls = ({
 
   return (
     <div>
-      {/* Collapsible Search Controls Container */}
       <div
-        className="rounded-lg mb-4"
+        className="rounded-lg mb-4 p-3"
         style={{
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-color)",
         }}
       >
-        {/* Header */}
-        <h3
-          className="font-semibold text-sm uppercase tracking-wide"
-          style={{
-            color: "var(--text-primary)",
-            borderBottom: isControlsCollapsed
-              ? "none"
-              : "1px solid var(--border-color)",
-          }}
-        >
-          <button
-            type="button"
-            className="flex w-full items-center justify-between px-3 py-2 text-left uppercase tracking-wide hover:opacity-80 transition-opacity"
-            aria-expanded={!isControlsCollapsed}
-            aria-controls="search-controls-content"
-            onClick={() => setIsControlsCollapsed(!isControlsCollapsed)}
+        {/* Row 1: search, sort, Views, then how to show the list */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div
+            data-tv-search-item="search-input"
+            className="w-full sm:w-auto sm:flex-1 sm:min-w-[180px] sm:max-w-sm"
           >
-            <span>Search &amp; Filter</span>
-            <span aria-hidden="true" style={{ color: "var(--text-secondary)" }}>
-              {isControlsCollapsed ? "▶" : "▼"}
-            </span>
-          </button>
-        </h3>
-
-        {/* Collapsible controls content */}
-        {!isControlsCollapsed && (
-          <div id="search-controls-content" className="p-3">
-            {/* Row 1: Search, Sort, Filters - "What to show" */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-center gap-3 mb-3">
-              {/* Search Input - Flexible width with min-width */}
-              <div
-                data-tv-search-item="search-input"
-                className="w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm"
-              >
-                <SearchInput
-                  placeholder="Search..."
-                  value={searchText}
-                  onSearch={setQuery}
-                  className="w-full"
-                />
-              </div>
-
-              {/* Sort, Filter */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-nowrap">
-                {/* Sort Control - No label, just dropdown + direction button */}
-                <div className="flex items-center gap-1">
-                  <div data-tv-search-item="sort-control">
-                    <SortControl
-                      options={sortOptions}
-                      value={sortField}
-                      onChange={handleSortChange}
-                    />
-                  </div>
-                  <div data-tv-search-item="sort-direction">
-                    <Button
-                      onClick={() => handleSortChange(sortField)}
-                      aria-label={`Sort direction: ${sortDirection === "ASC" ? "ascending" : "descending"}`}
-                      variant="secondary"
-                      size="sm"
-                      className="py-1"
-                      icon={
-                        sortDirection === "ASC" ? (
-                          <LucideArrowUp size={22} />
-                        ) : (
-                          <LucideArrowDown size={22} />
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-
-                {/* Filters Toggle Button */}
-                {filterable && (
-                  <div
-                    ref={filtersButtonRef}
-                    data-tv-search-item="filters-button"
-                  >
-                    <Button
-                      onClick={handleToggleFilterPanel}
-                      variant={isFilterPanelOpen ? "primary" : "secondary"}
-                      size="sm"
-                      className="flex items-center space-x-2 font-medium"
-                      icon={
-                        <svg
-                          className="w-4 h-4"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      }
-                    >
-                      <span>Filters</span>
-                      {hasActiveFilters && !isFilterPanelOpen && (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full ml-1"
-                          style={{
-                            backgroundColor: "var(--accent-secondary)",
-                            color: "white",
-                          }}
-                        >
-                          {activeFilterCount}
-                        </span>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Row 2: Presets, View Mode, Zoom, Settings - "How to show it" */}
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-4">
-              {/* Filter Presets */}
-              <div data-tv-search-item="filter-presets">
-                <FilterPresets
-                  artifactType={artifactType}
-                  context={effectiveContext}
-                  currentFilters={filters}
-                  currentSort={sortField}
-                  currentDirection={sortDirection}
-                  currentViewMode={viewMode}
-                  currentZoomLevel={zoomLevel}
-                  currentGridDensity={gridDensity}
-                  currentTableColumns={currentTableColumns}
-                  currentPerPage={perPage}
-                  permanentFilters={permanentFilters}
-                  onLoadPreset={handleLoadPreset}
-                />
-              </div>
-
-              {/* View Mode Toggle - Show if the page has views */}
-              {viewModes && (
-                <div data-tv-search-item="view-mode">
-                  <ViewModeToggle
-                    modes={viewModes}
-                    value={viewMode}
-                    onChange={setViewMode}
-                  />
-                </div>
-              )}
-
-              {/* Table Columns Popover - Only shown in table mode */}
-              {viewMode === "table" && tableColumnsPopover && (
-                <div>{tableColumnsPopover}</div>
-              )}
-
-              {/* Zoom Slider - Only shown in wall mode */}
-              {viewModes?.some((m) => m.id === "wall") &&
-                viewMode === "wall" && (
-                  <div data-tv-search-item="zoom-level">
-                    <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
-                  </div>
-                )}
-
-              {/* Grid Density Slider - Shown in grid, folder, and timeline modes */}
-              {(viewMode === "grid" ||
-                viewMode === "folder" ||
-                viewMode === "timeline") && (
-                <div data-tv-search-item="grid-density">
-                  <ZoomSlider value={gridDensity} onChange={setGridDensity} />
-                </div>
-              )}
-
-              {/* Context Settings Cog */}
-              <div data-tv-search-item="context-settings">
-                <ContextSettings
-                  entityType={artifactType}
-                  settings={contextSettings}
-                />
-              </div>
-            </div>
-
-            {/* The filter chips */}
-            {filterable ? (
-              <FilterBar
-                filters={listFilters}
-                onFocusLeave={focusFiltersButton}
-                permanentFilters={permanentFilters}
-                permanentFiltersMetadata={permanentFiltersMetadata}
-              />
-            ) : (
-              hasActiveFilters && (
-                <StatusMessage
-                  variant="info"
-                  title={null}
-                  message="Filters don't apply to the hierarchy view. Switch to Grid or Table to use them."
-                />
-              )
-            )}
+            <SearchInput
+              placeholder="Search..."
+              value={searchText}
+              onSearch={setQuery}
+              className="w-full"
+            />
           </div>
+
+          {/* Sort: the field, then its direction */}
+          <div className="flex items-center gap-1">
+            <div data-tv-search-item="sort-control">
+              <SortControl
+                options={sortOptions}
+                value={sortField}
+                onChange={handleSortChange}
+              />
+            </div>
+            <div data-tv-search-item="sort-direction">
+              <Button
+                onClick={() => handleSortChange(sortField)}
+                aria-label={`Sort direction: ${sortDirection === "ASC" ? "ascending" : "descending"}`}
+                variant="secondary"
+                size="sm"
+                className="py-1"
+                icon={
+                  sortDirection === "ASC" ? (
+                    <LucideArrowUp size={22} />
+                  ) : (
+                    <LucideArrowDown size={22} />
+                  )
+                }
+              />
+            </div>
+          </div>
+
+          {/* The saved filters (the Views menu's place) */}
+          <div data-tv-search-item="filter-presets">
+            <FilterPresets
+              artifactType={artifactType}
+              context={effectiveContext}
+              currentFilters={filters}
+              currentSort={sortField}
+              currentDirection={sortDirection}
+              currentViewMode={viewMode}
+              currentZoomLevel={zoomLevel}
+              currentGridDensity={gridDensity}
+              currentTableColumns={currentTableColumns}
+              currentPerPage={perPage}
+              permanentFilters={permanentFilters}
+              onLoadPreset={handleLoadPreset}
+            />
+          </div>
+
+          {/* View Mode Toggle - Show if the page has views */}
+          {viewModes && (
+            <div data-tv-search-item="view-mode">
+              <ViewModeToggle
+                modes={viewModes}
+                value={viewMode}
+                onChange={setViewMode}
+              />
+            </div>
+          )}
+
+          {/* Table Columns Popover - Only shown in table mode */}
+          {viewMode === "table" && tableColumnsPopover && (
+            <div>{tableColumnsPopover}</div>
+          )}
+
+          {/* Zoom Slider - Only shown in wall mode */}
+          {viewModes?.some((m) => m.id === "wall") && viewMode === "wall" && (
+            <div data-tv-search-item="zoom-level">
+              <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
+            </div>
+          )}
+
+          {/* Grid Density Slider - Shown in grid, folder, and timeline modes */}
+          {(viewMode === "grid" ||
+            viewMode === "folder" ||
+            viewMode === "timeline") && (
+            <div data-tv-search-item="grid-density">
+              <ZoomSlider value={gridDensity} onChange={setGridDensity} />
+            </div>
+          )}
+
+          {/* Context Settings Cog */}
+          <div data-tv-search-item="context-settings">
+            <ContextSettings
+              entityType={artifactType}
+              settings={contextSettings}
+            />
+          </div>
+        </div>
+
+        {/* Row 2: the filter chips, + Filter and Clear all */}
+        {filterable ? (
+          <div className="mt-3">
+            <FilterBar
+              filters={listFilters}
+              permanentFilters={permanentFilters}
+              permanentFiltersMetadata={permanentFiltersMetadata}
+            />
+          </div>
+        ) : (
+          hasActiveFilters && (
+            <div className="mt-3">
+              <StatusMessage
+                variant="info"
+                title={null}
+                message="Filters don't apply to the hierarchy view. Switch to Grid or Table to use them."
+              />
+            </div>
+          )
         )}
       </div>
 
@@ -523,112 +344,6 @@ const SearchControls = ({
         </div>
       )}
 
-      {/* Filter Panel */}
-      <FilterPanel
-        isOpen={filterable && isFilterPanelOpen}
-        onCancel={handleFilterCancel}
-        onClear={handleClearFilters}
-        onSubmit={handleFilterSubmit}
-        hasActiveFilters={hasActiveFilters}
-      >
-        {filterOptions.map((opt, index) => {
-          const { key, type } = opt;
-
-          // Render section header
-          if (type === "section-header") {
-            const isCollapsed = collapsedSections[key] || false;
-            const toggleSection = () => {
-              setCollapsedSections((prev) => ({
-                ...prev,
-                [key]: !prev[key],
-              }));
-            };
-
-            const headerStyle = {
-              backgroundColor: "var(--bg-secondary)",
-              borderBottom: isCollapsed
-                ? "none"
-                : "2px solid var(--accent-primary)",
-            };
-            const headerClass =
-              "font-semibold text-sm uppercase tracking-wide mb-3 rounded-md";
-
-            return (
-              <div
-                key={`section-${key}`}
-                className="col-span-full"
-                style={{ gridColumn: "1 / -1" }}
-              >
-                {opt.collapsible ? (
-                  <h3 className={headerClass} style={headerStyle}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between py-2 px-3 rounded-md text-left uppercase tracking-wide hover:opacity-80 transition-opacity"
-                      style={{ color: "var(--text-primary)" }}
-                      aria-expanded={!isCollapsed}
-                      aria-controls={sectionControlIds[key]}
-                      onClick={toggleSection}
-                    >
-                      <span>{opt.label}</span>
-                      <svg
-                        aria-hidden="true"
-                        className={`w-4 h-4 transition-transform ${
-                          isCollapsed ? "" : "rotate-180"
-                        }`}
-                        style={{ color: "var(--text-muted)" }}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </button>
-                  </h3>
-                ) : (
-                  <h3
-                    className={`${headerClass} py-2 px-3`}
-                    style={{ ...headerStyle, color: "var(--text-primary)" }}
-                  >
-                    {opt.label}
-                  </h3>
-                )}
-              </div>
-            );
-          }
-
-          // Check if this filter should be hidden (if in a collapsed section)
-          let currentSectionKey = null;
-          for (let i = index - 1; i >= 0; i--) {
-            const option = filterOptions[i];
-            if (option?.type === "section-header") {
-              currentSectionKey = option.key;
-              break;
-            }
-          }
-
-          const isInCollapsedSection =
-            currentSectionKey && collapsedSections[currentSectionKey];
-
-          if (isInCollapsedSection) {
-            return null;
-          }
-
-          // Render regular filter control
-          return (
-            <FieldEditor
-              key={`FilterControl-${key}`}
-              option={opt}
-              state={panelFilters}
-              onChange={(next) => handleRowChange(opt, next)}
-            />
-          );
-        })}
-      </FilterPanel>
       {/* The results. Stale results stay clickable but dim while the next
           ones load. The important flag lets reduced motion override the
           inline transition. */}

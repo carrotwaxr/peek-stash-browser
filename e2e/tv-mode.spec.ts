@@ -373,50 +373,41 @@ test.describe("TV mode", () => {
     await expect(list.viewModeButton).toBeFocused();
   });
 
-  test("with the D-pad, open Filters, open Tags, pick a tag and apply", async ({
+  test("with the D-pad, open + Filter, pick Tags, pick a tag; it applies at once", async ({
     page,
   }) => {
     const { list } = await openScenes(page, "/scenes");
-    const tagCondition = page.locator("#filter-tagIds");
-    const tagPicker = page.getByRole("button", { name: /^Tags/ });
 
-    // Enter on the Filters button opens the panel
-    await list.filtersButton.locator("button").focus();
+    // Enter on + Filter opens the menu with focus in its search box
+    await list.addFilterButton.focus();
     await page.keyboard.press("Enter");
-    await expect(tagCondition).toBeVisible();
+    await expect(
+      page.getByRole("combobox", { name: "Find a filter" })
+    ).toBeFocused();
 
-    // Down reaches the panel's first section header; Down from there walks
-    // the first column: Title, the Tags condition, then the Tags picker,
-    // whose right neighbour is the Performer Tags picker (the arrows move by
-    // position)
-    const sectionHeader = page.getByRole("button", { name: "Common Filters" });
-    const reachedHeader = await pressUntil(
+    // Down moves into the list of fields, and on through it
+    const fields = page.getByRole("listbox", { name: "Filters" });
+    await page.keyboard.press("ArrowDown");
+    await expect(fields.getByRole("option").first()).toBeFocused();
+    const tags = fields.getByRole("option", { name: "Tags", exact: true });
+    const reachedTags = await pressUntil(
       page,
       "ArrowDown",
-      () => sectionHeader.evaluate((el) => el === document.activeElement),
+      () => tags.evaluate((el) => el === document.activeElement),
       10
     );
-    expect(reachedHeader, "Down reaches the panel's section header").toBe(true);
-    await page.keyboard.press("ArrowDown");
-    await expect(page.locator("#filter-title")).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-    await expect(tagCondition).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-    await expect(tagPicker).toBeFocused();
-    await page.keyboard.press("ArrowRight");
-    await expect(
-      page.getByRole("button", { name: /^Performer Tags/ })
-    ).toBeFocused();
-    await page.keyboard.press("ArrowLeft");
-    await expect(tagPicker).toBeFocused();
+    expect(reachedTags, "Down reaches Tags in the list").toBe(true);
 
-    // Enter opens the list with focus in its search box; Down reaches an option
+    // Enter picks it: the Tags editor opens under a new chip, its list open
+    // with focus in the list's search box; Down reaches an option
     await page.keyboard.press("Enter");
-    await expect(page.getByPlaceholder("Type to search...")).toBeFocused();
-    await expect(tagPicker).toHaveAttribute("aria-expanded", "true");
-    const dropdown = page
-      .getByPlaceholder("Type to search...")
-      .locator("xpath=ancestor::div[contains(@class, 'absolute')]");
+    const editor = list.chipEditor("Tags");
+    await expect(editor).toBeVisible();
+    const search = editor.getByPlaceholder("Type to search...");
+    await expect(search).toBeFocused();
+    const dropdown = search.locator(
+      "xpath=ancestor::div[contains(@class, 'absolute')][1]"
+    );
     await expect(dropdown.getByRole("button").first()).toBeVisible({
       timeout: 15_000,
     });
@@ -427,68 +418,46 @@ test.describe("TV mode", () => {
     await page.keyboard.press("Enter");
     await expect(option).toHaveAttribute("aria-pressed", "true");
 
-    // Escape closes the list, not the panel, and returns focus to the picker
-    await page.keyboard.press("Escape");
-    await expect(page.getByPlaceholder("Type to search...")).toHaveCount(0);
-    await expect(tagPicker).toBeFocused();
-    await expect(tagCondition).toBeVisible();
-
-    // Down to the panel's buttons, then Apply
-    const apply = page.getByRole("button", { name: "Apply Filters" });
-    const reachedButtons = await pressUntil(
-      page,
-      "ArrowDown",
-      async () =>
-        ["Cancel", "Apply Filters"].includes(
-          await focused(page).evaluate((el) => el.textContent?.trim() ?? "")
-        ),
-      40
-    );
-    expect(reachedButtons, "arrows reach the panel's buttons").toBe(true);
-    if (!(await apply.evaluate((el) => el === document.activeElement))) {
-      await page.keyboard.press("ArrowRight");
-    }
-    await expect(apply).toBeFocused();
-    await page.keyboard.press("Enter");
-
-    // The filter is applied, and its chip names the tag
+    // The pick applies at once
     await expect(page).toHaveURL(/[?&]tagIds=/);
-    await expect(
-      page.getByRole("button", { name: /^Edit filter: Tags/ })
-    ).toContainText(tagName);
+
+    // Escape closes the list, then the editor, with focus on the chip
+    await page.keyboard.press("Escape");
+    await expect(search).toHaveCount(0);
+    await expect(editor).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(editor).toHaveCount(0);
+    const chip = page.getByRole("button", { name: /^Edit filter: Tags/ });
+    await expect(chip).toContainText(tagName);
+    await expect(chip).toBeFocused();
   });
 
-  test("Right crosses the number fields of a filter row to the Orientation boxes; Space and Enter (a remote's OK) tick them", async ({
+  test("in a chip's editor, Left and Right cross a range's number fields; Space and Enter (a remote's OK) tick the Orientation boxes", async ({
     page,
   }) => {
     const { list } = await openScenes(page, "/scenes");
-    await list.filtersButton.locator("button").focus();
-    await page.keyboard.press("Enter");
-    const section = page.getByRole("button", {
-      name: "Video Properties",
-      exact: true,
-    });
-    await section.focus();
-    if ((await section.getAttribute("aria-expanded")) === "false") {
-      await page.keyboard.press("Enter");
-    }
 
-    // Resolution, then Bitrate's Min and Max, Frame Rate's Min and Max:
-    // an empty number field hands Left and Right on
-    await page.keyboard.press("ArrowDown");
-    await expect(page.locator("#filter-resolution")).toBeFocused();
-    const landscape = page.getByRole("checkbox", { name: "Landscape" });
-    const reached = await pressUntil(
-      page,
-      "ArrowRight",
-      () => landscape.evaluate((el) => el === document.activeElement),
-      6
-    );
-    expect(reached, "Right reaches the Orientation boxes").toBe(true);
+    // An empty number field hands Left and Right on
+    const bitrate = await list.addFilter("Bitrate");
+    const min = bitrate.getByPlaceholder("Min");
+    const max = bitrate.getByPlaceholder("Max");
+    await expect(min).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(max).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(min).toBeFocused();
+    await list.closeEditor();
+
+    // The Orientation editor opens on its first box
+    const orientation = await list.addFilter("Orientation");
+    const landscape = orientation.getByRole("checkbox", { name: "Landscape" });
+    await expect(landscape).toBeFocused();
     await page.keyboard.press("Space");
     await expect(landscape).toBeChecked();
+    await expect(page).toHaveURL(/[?&]orientation=LANDSCAPE(&|$)/);
 
-    const portrait = page.getByRole("checkbox", { name: "Portrait" });
+    // Down reaches the next box; Enter ticks and unticks it
+    const portrait = orientation.getByRole("checkbox", { name: "Portrait" });
     await page.keyboard.press("ArrowDown");
     await expect(portrait).toBeFocused();
     await page.keyboard.press("Enter");

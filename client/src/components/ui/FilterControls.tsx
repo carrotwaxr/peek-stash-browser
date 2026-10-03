@@ -1,5 +1,4 @@
-import { type ReactNode, type RefObject, forwardRef, useEffect } from "react";
-import Button from "./Button";
+import { forwardRef } from "react";
 import CheckboxGroup from "./CheckboxGroup";
 import {
   ImperialHeightRange,
@@ -113,7 +112,6 @@ export interface FilterControlProps {
   hierarchyLabel?: string;
   hierarchyValue?: number | undefined;
   onHierarchyChange?: (value: number | undefined) => void;
-  isHighlighted?: boolean;
   /** The id of the field's first control, where a chip moves focus */
   controlId?: string;
   /** The label stays for assistive technology only (a surface that names the field elsewhere) */
@@ -156,7 +154,6 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
       hierarchyLabel = "Include children",
       hierarchyValue,
       onHierarchyChange,
-      isHighlighted = false,
       controlId,
       hideLabel = false,
       excluded,
@@ -586,10 +583,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
     };
 
     return (
-      <div
-        ref={ref}
-        className={`flex flex-col ${isHighlighted ? "filter-highlight" : ""}`}
-      >
+      <div ref={ref} className="flex flex-col">
         <label
           htmlFor={controlId}
           className={hideLabel ? "sr-only" : "text-sm font-medium mb-2"}
@@ -604,125 +598,3 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
 );
 
 FilterControl.displayName = "FilterControl";
-
-/**
- * Collapsible Filter Panel Component with manual submit
- */
-interface FilterPanelProps {
-  children: ReactNode;
-  onClear: () => void;
-  hasActiveFilters: boolean;
-  isOpen: boolean;
-  /** Drops the edits not yet applied and closes the panel */
-  onCancel: () => void;
-  onSubmit: () => void;
-  highlightedFilterKey?: string | null;
-  filterRefs?: RefObject<Record<string, HTMLElement | null>>;
-}
-
-export const FilterPanel = ({
-  children,
-  onClear,
-  hasActiveFilters,
-  isOpen,
-  onCancel,
-  onSubmit,
-  highlightedFilterKey,
-  filterRefs,
-}: FilterPanelProps) => {
-  // Scroll to highlighted filter when it changes
-  useEffect(() => {
-    if (highlightedFilterKey && filterRefs?.current?.[highlightedFilterKey]) {
-      const element = filterRefs.current[highlightedFilterKey];
-
-      // Small delay to ensure panel is rendered
-      setTimeout(() => {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 100);
-    }
-  }, [highlightedFilterKey, filterRefs]);
-
-  if (!isOpen) {
-    return null; // Don't render when closed
-  }
-
-  return (
-    <div className="mb-6">
-      {/* Filter Panel - Collapsible */}
-      <div
-        className="p-4 border rounded-md"
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
-        }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-2">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span
-              className="font-medium"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Filters
-            </span>
-            {hasActiveFilters && (
-              <span
-                className="text-xs px-2 py-1 rounded-full"
-                style={{
-                  backgroundColor: "var(--accent-primary)",
-                  color: "white",
-                }}
-              >
-                Active
-              </span>
-            )}
-          </div>
-
-          {/* Clear Filters Button */}
-          {hasActiveFilters && (
-            <Button
-              onClick={onClear}
-              variant="secondary"
-              size="sm"
-              className="px-3 py-1 text-sm"
-            >
-              Clear All
-            </Button>
-          )}
-        </div>
-
-        {/* Each field is a cell TV focus moves between (spatialFocus) */}
-        <div
-          data-tv-cells=""
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4"
-        >
-          {children}
-        </div>
-
-        {/* Action Buttons */}
-        <div
-          className="flex items-center justify-end space-x-3 pt-4 border-t"
-          style={{ borderColor: "var(--border-color)" }}
-        >
-          <Button onClick={onCancel} variant="secondary" size="sm">
-            Cancel
-          </Button>
-          <Button
-            onClick={onSubmit}
-            variant="primary"
-            size="sm"
-            className="px-6"
-          >
-            Apply Filters
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};

@@ -270,7 +270,7 @@ describe("DetailImagesTab", () => {
     });
   });
 
-  it("the tab's locked field is offered in the filter panel (FILTERS-12) and the lock shows no chip", async () => {
+  it("the tab's locked field is offered in + Filter (FILTERS-12) and the lock shows no chip", async () => {
     tagTab();
     await waitFor(() => expect(cards()).toHaveLength(PER_PAGE));
 
@@ -279,14 +279,15 @@ describe("DetailImagesTab", () => {
 
     await userEvent
       .setup()
-      .click(
-        must(screen.getByText("Filters").closest("button"), "Filters button")
-      );
+      .click(screen.getByRole("button", { name: "Add filter" }));
+    const fields = screen.getByRole("listbox");
     expect(
-      await screen.findByText("Performers", { selector: "label" })
+      within(fields).getByRole("option", { name: "Performers" })
     ).toBeInTheDocument();
     // A Tags row narrows the page's tag: both apply
-    expect(screen.getByText("Tags", { selector: "label" })).toBeInTheDocument();
+    expect(
+      within(fields).getByRole("option", { name: "Tags" })
+    ).toBeInTheDocument();
   });
 
   it("a default Images-page preset does not apply on a detail Images tab", async () => {

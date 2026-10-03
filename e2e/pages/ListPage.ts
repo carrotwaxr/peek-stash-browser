@@ -7,7 +7,10 @@ import { type Locator, type Page, expect } from "@playwright/test";
 export class ListPage {
   readonly page: Page;
   readonly searchInput: Locator;
-  readonly filtersButton: Locator;
+  /** The filter chips' row: the chips, "+ Filter" and "Clear all" */
+  readonly filterBar: Locator;
+  /** "+ Filter", which opens the list of fields to filter by */
+  readonly addFilterButton: Locator;
   readonly sortControl: Locator;
   readonly sortDirection: Locator;
   readonly viewModeButton: Locator;
@@ -22,7 +25,8 @@ export class ListPage {
   constructor(page: Page) {
     this.page = page;
     this.searchInput = page.getByPlaceholder("Search...");
-    this.filtersButton = page.locator('[data-tv-search-item="filters-button"]');
+    this.addFilterButton = page.getByRole("button", { name: "Add filter" });
+    this.filterBar = page.getByRole("group", { name: "Filters", exact: true });
     this.sortControl = page.locator('[data-tv-search-item="sort-control"]');
     this.sortDirection = page.locator('[data-tv-search-item="sort-direction"]');
     this.viewModeButton = page.locator('button[aria-label*="View mode"]');
@@ -67,8 +71,53 @@ export class ListPage {
     await this.searchInput.clear();
   }
 
-  async openFilters() {
-    await this.filtersButton.click();
+  /**
+   * Adds a filter on the field named `label`: opens "+ Filter", types the
+   * label and picks the first match with Enter, then waits for the field's
+   * editor under its chip
+   */
+  async addFilter(label: string): Promise<Locator> {
+    await this.addFilterButton.click();
+    await this.page
+      .getByRole("combobox", { name: "Find a filter" })
+      .fill(label);
+    await expect(
+      this.page
+        .getByRole("listbox", { name: "Filters" })
+        .getByRole("option")
+        .filter({ hasText: label })
+        .first()
+    ).toBeVisible();
+    await this.page.keyboard.press("Enter");
+    const editor = this.chipEditor(label);
+    await expect(editor).toBeVisible();
+    return editor;
+  }
+
+  /**
+   * The open editor of the chip on the field named `label`; a unit the
+   * label shows ("Penis Length (cm)") may follow
+   */
+  chipEditor(label: string): Locator {
+    const name = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return this.page.getByRole("dialog", {
+      name: new RegExp(`^${name}( \\(.+\\))? filter$`),
+    });
+  }
+
+  /**
+   * Closes the open chip editor with Escape, applying what it still waits
+   * on; an open picker list takes the first Escape
+   */
+  async closeEditor() {
+    const editor = this.page.getByRole("dialog", { name: / filter$/ });
+    const pickerSearch = editor.getByPlaceholder("Type to search...");
+    if (await pickerSearch.isVisible()) {
+      await this.page.keyboard.press("Escape");
+      await expect(pickerSearch).toHaveCount(0);
+    }
+    await this.page.keyboard.press("Escape");
+    await expect(editor).toHaveCount(0);
   }
 
   async toggleSortDirection() {

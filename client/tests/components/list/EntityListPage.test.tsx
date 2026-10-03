@@ -446,7 +446,7 @@ describe("EntityListPage", () => {
     expect(api.findTags).not.toHaveBeenCalled();
   });
 
-  it("the Tags hierarchy view shows no Filters button, no panel and no chips, and says when filters are set", async () => {
+  it("the Tags hierarchy view shows no + Filter and no chips, and says when filters are set", async () => {
     api.findTagTree.mockResolvedValue({ tags: [] });
     api.findTags.mockResolvedValue({ findTags: { count: 0, tags: [] } });
 
@@ -456,9 +456,8 @@ describe("EntityListPage", () => {
 
     await screen.findByTestId("hierarchy-view");
     expect(
-      screen.queryByRole("button", { name: /^Filters/ })
+      screen.queryByRole("button", { name: "Add filter" })
     ).not.toBeInTheDocument();
-    expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^Edit filter/ })
     ).not.toBeInTheDocument();
@@ -472,7 +471,7 @@ describe("EntityListPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /^View mode/ }));
     fireEvent.click(screen.getByRole("option", { name: /Grid/ }));
     expect(
-      await screen.findByRole("button", { name: /^Filters/ })
+      await screen.findByRole("button", { name: "Add filter" })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /^Edit filter/ })

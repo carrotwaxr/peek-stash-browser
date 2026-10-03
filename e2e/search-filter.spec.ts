@@ -63,10 +63,12 @@ test.describe("Search and Filter", () => {
     await list.goto("/scenes");
     requireData(await list.waitForResults("Scene"), "scenes");
 
-    // A title no scene has
-    await list.openFilters();
-    await page.getByPlaceholder("Search title...").fill(`zzzz-${runPrefix()}`);
-    await page.getByRole("button", { name: "Apply Filters" }).click();
+    // A title no scene has, applied once typing pauses
+    const editor = await list.addFilter("Title Search");
+    await editor
+      .getByPlaceholder("Search title...")
+      .fill(`zzzz-${runPrefix()}`);
+    await list.closeEditor();
 
     await expect(page.getByText("No scenes found")).toBeVisible({
       timeout: 15_000,
@@ -106,12 +108,12 @@ test.describe("Search and Filter", () => {
 
     const list = new ListPage(page);
     await list.goto("/scenes");
-    await list.openFilters();
-    await page.getByText("Select performers...", { exact: true }).click();
+    // The picker's list opens with the editor
+    await list.addFilter("Performers");
     const input = page.getByPlaceholder("Type to search...");
     await expect(input).toBeVisible();
     const dropdown = input.locator(
-      "xpath=ancestor::div[contains(@class, 'absolute')]"
+      "xpath=ancestor::div[contains(@class, 'absolute')][1]"
     );
     const options = dropdown.getByRole("button");
     await expect(options.first()).toBeVisible({ timeout: 15_000 });
@@ -151,18 +153,18 @@ test.describe("Search and Filter", () => {
     await list.goto("/scenes");
     requireData(await list.waitForResults("Scene"), "scenes");
 
-    await list.openFilters();
-    await page.getByText("Select performers...", { exact: true }).click();
+    await list.addFilter("Performers");
     const input = page.getByPlaceholder("Type to search...");
     const dropdown = input.locator(
-      "xpath=ancestor::div[contains(@class, 'absolute')]"
+      "xpath=ancestor::div[contains(@class, 'absolute')][1]"
     );
     const option = dropdown.getByRole("button").first();
     await expect(option).toBeVisible({ timeout: 15_000 });
     const name = ((await option.textContent()) ?? "").trim();
     expect(name).not.toBe("");
+    // A pick applies at once
     await option.click();
-    await page.getByRole("button", { name: "Apply Filters" }).click();
+    await list.closeEditor();
 
     // The chip names the pick and its condition, never its id
     await expect(

@@ -2,7 +2,13 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PANEL_FIELDS, type RowKey, rowKeyOf } from "@peek/shared-types";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import type { ListFilters } from "../../hooks/useListFilters";
-import { type ChipParts, rowChip } from "../../utils/filterFields";
+import {
+  type ChipParts,
+  type FilterOption,
+  rowChip,
+} from "../../utils/filterFields";
+import Button from "../ui/Button";
+import AddFilterMenu from "./AddFilterMenu";
 import ChipEditor, { type ChipEditorClose } from "./ChipEditor";
 import FilterChip from "./FilterChip";
 
@@ -19,11 +25,6 @@ interface FilterBarProps {
   permanentFilters?: Record<string, unknown>;
   /** Their names, drawn as dimmed labels before the chips */
   permanentFiltersMetadata?: PermanentFiltersMetadata;
-  /**
-   * Moves focus out of the bar when the last chip goes (the Filters
-   * button): a removed chip's button unmounts with focus on it
-   */
-  onFocusLeave?: (() => void) | undefined;
 }
 
 /**
@@ -34,6 +35,8 @@ interface FilterBarProps {
 interface OpenEditor {
   readonly session: string;
   readonly at: RowKey;
+  /** Opened from "+ Filter": closed with no row, focus goes back there */
+  readonly fromMenu: boolean;
 }
 
 /** A chip the bar draws: a root row's, or the row an open editor adds */
@@ -54,20 +57,22 @@ const sameAt = (a: RowKey, b: RowKey): boolean =>
 /**
  * The list's filter chips: the page's permanent filters as dimmed labels,
  * then one chip per root row of the filters (a field twice is two chips),
- * in the panel's order. A chip's body opens its editor in a popover under
- * it (`ChipEditor`), whose changes apply as they are made; its button
- * removes the row.
+ * in the panel's order, then "+ Filter" and, while a filter is set,
+ * "Clear all". A chip's body opens its editor in a popover under it
+ * (`ChipEditor`), whose changes apply as they are made; its button removes
+ * the row. A field picked in "+ Filter" opens its chip's editor, or, when
+ * it is not in use, a pending chip's that leaves nothing if closed empty.
  */
 const FilterBar = ({
   filters,
   permanentFilters = NONE,
   permanentFiltersMetadata = NONE,
-  onFocusLeave,
 }: FilterBarProps) => {
   const { kind, tree, options } = filters;
   const { unitPreference } = useUnitPreference();
   const barRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<(() => void) | null>(null);
   const [editor, setEditor] = useState<OpenEditor | null>(null);
 
@@ -153,9 +158,9 @@ const FilterBar = ({
         wrapper?.querySelector<HTMLElement>("[data-chip-remove]") ??
         wrapper?.querySelector<HTMLElement>("[data-chip-edit]");
       if (button) button.focus();
-      else onFocusLeave?.();
+      else addRef.current?.focus();
     },
-    [items, onFocusLeave]
+    [items]
   );
 
   const removeChip = (at: RowKey) => {
@@ -164,21 +169,28 @@ const FilterBar = ({
   };
 
   // A chip whose editor closed takes focus back once drawn under its own
-  // key: a row renumbered while its editor was open is drawn anew
+  // key: a row renumbered while its editor was open is drawn anew, and a
+  // row the list does not show yet (its navigation still pending) is drawn
+  // on a later render. Focus that moved on meanwhile stays where it is.
   const refocus = useRef<string | null>(null);
   useLayoutEffect(() => {
     const row = refocus.current;
     if (row === null) return;
-    refocus.current = null;
     const active = document.activeElement;
-    if (active !== null && active !== document.body) return;
-    barRef.current
-      ?.querySelector<HTMLElement>(`[data-chip-row="${row}"] [data-chip-edit]`)
-      ?.focus();
+    if (active !== null && active !== document.body) {
+      refocus.current = null;
+      return;
+    }
+    const chip = barRef.current?.querySelector<HTMLElement>(
+      `[data-chip-row="${row}"] [data-chip-edit]`
+    );
+    if (!chip) return;
+    refocus.current = null;
+    chip.focus();
   });
 
   const closeEditor = useCallback(
-    (reason: ChipEditorClose) => {
+    (reason: ChipEditorClose, held: boolean) => {
       if (editor === null) return;
       const anchor = anchorRef.current;
       const active = document.activeElement;
@@ -186,8 +198,12 @@ const FilterBar = ({
         active === null ||
         active === document.body ||
         (anchor?.closest("[data-chip]")?.contains(active) ?? false);
-      const stays = chips.some((chip) => sameAt(chip.at, editor.at));
-      if (reason === "removed" || (hadFocus && !stays)) {
+      // The editor's own word: the list may still draw the URL before its
+      // last commit
+      const stays = held || chips.some((chip) => sameAt(chip.at, editor.at));
+      if (hadFocus && !stays && reason !== "removed" && editor.fromMenu) {
+        addRef.current?.focus();
+      } else if (reason === "removed" || (hadFocus && !stays)) {
         focusNeighbour(editor.at, reason === "removed");
       } else if (hadFocus) {
         anchor?.focus();
@@ -203,7 +219,27 @@ const FilterBar = ({
     // An open editor closes first, applying what waits
     if (editor !== null) closeRef.current?.();
     if (isOpen) return;
-    setEditor({ session: keyOf(at), at });
+    setEditor({ session: keyOf(at), at, fromMenu: false });
+  };
+
+  // A field picked in "+ Filter": its first chip's editor, else a pending
+  // chip's for a new row of the field
+  const pick = (option: FilterOption) => {
+    if (editor !== null) closeRef.current?.();
+    const chip = chips.find((each) => each.at.key === option.key);
+    const at = chip?.at ?? {
+      group: 0,
+      occurrence:
+        tree.rows.filter((row) => row.field.key === option.key).length + 1,
+      key: option.key,
+    };
+    setEditor({ session: keyOf(at), at, fromMenu: chip === undefined });
+  };
+
+  const clearAll = () => {
+    if (editor !== null) setEditor(null);
+    filters.clear();
+    addRef.current?.focus();
   };
 
   const moveEditor = useCallback((at: RowKey) => {
@@ -221,12 +257,15 @@ const FilterBar = ({
     ...(permanentFiltersMetadata.tags ?? []).map((tag) => `Tag: ${tag.name}`),
   ];
 
-  if (permanentLabels.length === 0 && items.length === 0) {
-    return null;
-  }
+  const hasFilters = tree.rows.length > 0 || tree.groups.length > 0;
 
   return (
-    <div ref={barRef} className="flex flex-wrap gap-2 mb-4">
+    <div
+      ref={barRef}
+      role="group"
+      aria-label="Filters"
+      className="flex flex-wrap items-center gap-2"
+    >
       {permanentLabels.map((label, index) => (
         <div
           key={`${index}-${label}`}
@@ -276,6 +315,12 @@ const FilterBar = ({
           </FilterChip>
         );
       })}
+      <AddFilterMenu filters={filters} onPick={pick} triggerRef={addRef} />
+      {hasFilters && (
+        <Button variant="tertiary" size="sm" onClick={clearAll}>
+          Clear all
+        </Button>
+      )}
     </div>
   );
 };

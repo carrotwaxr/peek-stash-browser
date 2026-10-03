@@ -27,7 +27,14 @@ import {
   SCENE_FILTER_OPTIONS,
   TAG_FILTER_OPTIONS,
 } from "@/utils/filterConfig";
+import { removeRow } from "@/utils/filterFields";
 import { sortOptionsFor } from "@/utils/listQuery";
+
+/** A chip's removal: its root row goes with its companions (`filters.removeRow`) */
+const removeChip = (state: ListUrlState, key: string) =>
+  state.applyFilters(
+    removeRow("scene", state.filters, { group: 0, occurrence: 1, key })
+  );
 
 // Presets come from the query cache; a request only happens in the
 // "presets still loading" case, which never answers
@@ -356,7 +363,7 @@ describe("useListUrlState", () => {
         favoritePreset
       );
 
-      await actAsync(() => list.state.removeFilter("rating"));
+      await actAsync(() => removeChip(list.state, "rating"));
       expect(list.params().has("rating_min")).toBe(false);
       expect(list.state.filters).toEqual({});
 
@@ -376,7 +383,7 @@ describe("useListUrlState", () => {
         tagIdsDepth: -1,
       });
 
-      await actAsync(() => list.state.removeFilter("tagIds"));
+      await actAsync(() => removeChip(list.state, "tagIds"));
 
       expect(list.state.filters).toEqual({ favorite: "true" });
       expect(list.params().has("tagIdsModifier")).toBe(false);
@@ -397,7 +404,7 @@ describe("useListUrlState", () => {
       });
       expect(list.state.filters).toMatchObject({ tagIdsDepth: -1 });
 
-      await actAsync(() => list.state.removeFilter("tagIds"));
+      await actAsync(() => removeChip(list.state, "tagIds"));
 
       expect(list.state.filters).toEqual({ favorite: "true" });
     });
@@ -638,7 +645,7 @@ describe("useListUrlState", () => {
         "/scenes?performerIds=9:abc&performerIdsModifier=EXCLUDES&favorite=true",
         { ...SCENE_OPTIONS, lockedFields: ["performers"] }
       );
-      await actAsync(() => list.state.removeFilter("favorite"));
+      await actAsync(() => removeChip(list.state, "favorite"));
       expect(list.params().get("performerIds")).toBe("9:abc");
       expect(list.params().get("performerIdsModifier")).toBe("EXCLUDES");
       expect(list.params().has("favorite")).toBe(false);
@@ -745,7 +752,7 @@ describe("useListUrlState", () => {
       await actAsync(() => list.state.applyFilters({ favorite: true }));
       await actAsync(() => list.state.clearFilters());
       await actAsync(() => list.state.applyFilters({ favorite: true }));
-      await actAsync(() => list.state.removeFilter("favorite"));
+      await actAsync(() => removeChip(list.state, "favorite"));
       await actAsync(() => list.state.setSort("rating"));
       await actAsync(() => list.state.setPage(2));
       await actAsync(() => list.state.setFolderPath(["5:abc"]));
@@ -784,14 +791,14 @@ describe("useListUrlState", () => {
       expect(list.state.sort.direction).toBe("ASC");
     });
 
-    it("applyFilters and removeFilter reset the page", async () => {
+    it("applyFilters and a chip's removal reset the page", async () => {
       const list = renderList("/scenes?page=3");
       await actAsync(() => list.state.applyFilters({ favorite: true }));
       expect(list.state.filters).toEqual({ favorite: "true" });
       expect(list.state.page).toBe(1);
 
       await actAsync(() => list.state.setPage(3));
-      await actAsync(() => list.state.removeFilter("favorite"));
+      await actAsync(() => removeChip(list.state, "favorite"));
       expect(list.state.filters).toEqual({});
       expect(list.params().has("favorite")).toBe(false);
       expect(list.params().has("page")).toBe(false);

@@ -17,8 +17,6 @@ export interface FieldEditorProps {
   /** The id of the first control (default `filter-<key>`), for a chip or a row to move focus to */
   readonly controlId?: string;
   readonly autoFocus?: boolean;
-  /** The panel's highlight on a field a chip opened */
-  readonly isHighlighted?: boolean;
   /** The label stays for assistive technology only, where the surface names the field itself */
   readonly hideLabel?: boolean;
   /** B3: a ref row opens its list at once (a chip's editor) */
@@ -100,7 +98,6 @@ const FieldEditor = forwardRef<HTMLDivElement, FieldEditorProps>(
       onChange,
       controlId,
       autoFocus = false,
-      isHighlighted = false,
       hideLabel = false,
       openPicker = false,
     },
@@ -146,7 +143,6 @@ const FieldEditor = forwardRef<HTMLDivElement, FieldEditorProps>(
       label: option.label ?? option.key,
       controlId: id,
       hideLabel,
-      isHighlighted,
       openPicker,
       value: isBlank(stored) ? option.defaultValue : stored,
       onChange: (value) => change({ [option.key]: rowValueOf(option, value) }),

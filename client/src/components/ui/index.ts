@@ -34,7 +34,7 @@ export { default as ExternalPlayerButton } from "./ExternalPlayerButton";
 export { default as FavoriteButton } from "./FavoriteButton";
 export { default as FieldEditor } from "./FieldEditor";
 export { default as HideConfirmationDialog } from "./HideConfirmationDialog";
-export { FilterControl, FilterPanel, SortControl } from "./FilterControls";
+export { FilterControl, SortControl } from "./FilterControls";
 export { default as FilterPresets } from "./FilterPresets";
 export { default as GenderIcon } from "./GenderIcon";
 export { default as GlobalLayout } from "./GlobalLayout";

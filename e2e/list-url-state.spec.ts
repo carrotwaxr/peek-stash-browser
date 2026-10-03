@@ -61,15 +61,14 @@ test.describe("List state in the URL", () => {
       name: /^Remove filter: Favorite/,
     });
 
-    await list.openFilters();
-    await page
-      .locator("label", { hasText: /^Favorite Scenes$/ })
-      .locator("..")
-      .getByRole("combobox")
+    // A pick in the chip's editor applies at once, as one history entry
+    const editor = await list.addFilter("Favorite Scenes");
+    await editor
+      .getByRole("combobox", { name: "Favorite Scenes" })
       .selectOption("Yes");
-    await page.getByRole("button", { name: "Apply Filters" }).click();
     await expect(page).toHaveURL(/[?&]favorite=true(&|$)/);
     await expect(chip).toBeVisible();
+    await list.closeEditor();
 
     await page.goBack();
     await expect(page).not.toHaveURL(/favorite=/);
@@ -77,13 +76,11 @@ test.describe("List state in the URL", () => {
     await expect(titleOf(cards.first())).toHaveText(unfilteredTitle);
   });
 
-  test("a Resolution 'Greater Than' filter survives Apply and a reload", async ({
+  test("a Resolution 'Greater Than' filter survives a reload", async ({
     page,
   }) => {
     const { list } = await openScenes(page, "/scenes?per_page=12");
-    const resolution = page
-      .locator("label", { hasText: /^Resolution$/ })
-      .locator("..");
+    const resolution = list.chipEditor("Resolution");
     const sceneRequest = () =>
       page.waitForRequest(
         (request) =>
@@ -94,12 +91,10 @@ test.describe("List state in the URL", () => {
       sentCriterion<{ modifier?: string }>(request.postDataJSON(), "resolution")
         ?.modifier;
 
-    await list.openFilters();
-    await page.getByRole("heading", { name: "Video Properties" }).click();
+    await list.addFilter("Resolution");
     await resolution.locator("select").nth(0).selectOption("GREATER_THAN");
-    await resolution.locator("select").nth(1).selectOption("FULL_HD");
     const applied = sceneRequest();
-    await page.getByRole("button", { name: "Apply Filters" }).click();
+    await resolution.locator("select").nth(1).selectOption("FULL_HD");
     await expect(page).toHaveURL(/[?&]resolution=FULL_HD(&|$)/);
     await expect(page).toHaveURL(/[?&]resolutionModifier=GREATER_THAN(&|$)/);
     expect(modifierOf(await applied)).toBe("GREATER_THAN");
@@ -107,8 +102,10 @@ test.describe("List state in the URL", () => {
     const reloaded = sceneRequest();
     await page.reload();
     expect(modifierOf(await reloaded)).toBe("GREATER_THAN");
-    await list.openFilters();
-    await page.getByRole("heading", { name: "Video Properties" }).click();
+    // Reopened, the chip's editor shows both selects as they were
+    await page
+      .getByRole("button", { name: /^Edit filter: Resolution/ })
+      .click();
     await expect(resolution.locator("select").nth(0)).toHaveValue(
       "GREATER_THAN"
     );

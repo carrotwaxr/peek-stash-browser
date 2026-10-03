@@ -152,7 +152,6 @@ function renderBar(
   } = {}
 ) {
   const { filters, removeRow } = staticFilters(kind, state, options);
-  const onFocusLeave = vi.fn();
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -160,14 +159,15 @@ function renderBar(
     <QueryClientProvider client={client}>
       <FilterBar
         filters={filters}
-        onFocusLeave={onFocusLeave}
         {...(permanentFilters ? { permanentFilters } : {})}
         {...(permanentFiltersMetadata ? { permanentFiltersMetadata } : {})}
       />
     </QueryClientProvider>
   );
-  return { removeRow, onFocusLeave };
+  return { removeRow };
 }
+
+const addFilter = () => screen.getByRole("button", { name: "Add filter" });
 
 /** The chip whose text is exactly `text` */
 const edit = (text: string) =>
@@ -464,9 +464,9 @@ describe("chips and rows", () => {
     });
   });
 
-  it("removing a chip moves focus to the next chip's remove button, else the previous one's, else out of the bar", async () => {
+  it("removing a chip moves focus to the next chip's remove button, else the previous one's, else to + Filter", async () => {
     const user = userEvent.setup();
-    const { onFocusLeave } = renderBar({ favorite: true, organized: true });
+    renderBar({ favorite: true, organized: true });
     await edit("Favorite Scenes: Yes");
     const [first, second] = removeButtons();
 
@@ -475,18 +475,18 @@ describe("chips and rows", () => {
 
     await user.click(must(second, "the last chip"));
     expect(first).toHaveFocus();
-    expect(onFocusLeave).not.toHaveBeenCalled();
+    expect(addFilter()).not.toHaveFocus();
   });
 
-  it("the only chip's removal moves focus out of the bar", async () => {
+  it("the only chip's removal moves focus to + Filter", async () => {
     const user = userEvent.setup();
-    const { onFocusLeave } = renderBar({ favorite: true });
+    renderBar({ favorite: true });
 
     await user.click(
       await screen.findByRole("button", { name: /^Remove filter:/ })
     );
 
-    expect(onFocusLeave).toHaveBeenCalledTimes(1);
+    expect(addFilter()).toHaveFocus();
   });
 
   it("two root Tags rows are two chips, each removing its own row", async () => {
@@ -525,7 +525,9 @@ describe("chips and rows", () => {
     const chip = screen.getByText("Performer: Ada");
     expect(chip).toBeInTheDocument();
     expect(chip.closest("button")).toBeNull();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^(Edit|Remove) filter/ })
+    ).not.toBeInTheDocument();
   });
 
   it("a page's locked field draws no chip", async () => {
@@ -538,17 +540,19 @@ describe("chips and rows", () => {
       }
     );
 
-    await waitFor(() => expect(screen.queryByRole("button")).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /^Edit filter/ })).toBeNull()
+    );
   });
 
-  it("no filters and no permanent ones draw nothing", () => {
-    const { container } = render(
+  it("no filters and no permanent ones draw only + Filter", () => {
+    render(
       <QueryClientProvider client={new QueryClient()}>
         <FilterBar filters={staticFilters("scene", {}).filters} />
       </QueryClientProvider>
     );
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getAllByRole("button")).toEqual([addFilter()]);
   });
 });
 
@@ -730,7 +734,7 @@ describe("the chip's editor", () => {
 });
 
 describe("in the list's controls", () => {
-  it("Clear all removes every filter, not the page's permanent ones, and moves focus to the Filters button", async () => {
+  it("Clear all removes every filter, not the page's permanent ones, and moves focus to + Filter", async () => {
     const user = userEvent.setup();
     const PERFORMER = { value: ["1:a"], modifier: "INCLUDES" };
     const list = renderListControls(
@@ -744,16 +748,13 @@ describe("in the list's controls", () => {
     await list.firstQuery();
     expect(removeButtons()).toHaveLength(2);
 
-    const filtersButton = screen.getByRole("button", { name: /^Filters/ });
-    await user.click(filtersButton);
-    await user.click(
-      must((await screen.findByText("Clear All")).closest("button"))
-    );
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
 
     await waitFor(() => expect(removeButtons()).toHaveLength(0));
     expect(screen.getByText("Performer: Ada")).toBeInTheDocument();
     expect(list.lastQuery().scene_filter).toEqual({ performers: PERFORMER });
-    expect(filtersButton).toHaveFocus();
+    expect(list.lastQuery().where).toBeUndefined();
+    expect(addFilter()).toHaveFocus();
   });
 
   it("removing the first of two Tags rows keeps focus on its chip, which then shows the row that took its number", async () => {

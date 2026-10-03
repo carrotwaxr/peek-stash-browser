@@ -373,9 +373,6 @@
     }
   },
   "src/components/ui/FilterControls.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 7
     }
@@ -459,7 +456,7 @@
   },
   "src/components/ui/SearchControls.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
+      "count": 1
     }
   },
   "src/components/ui/SearchInput.tsx": {
