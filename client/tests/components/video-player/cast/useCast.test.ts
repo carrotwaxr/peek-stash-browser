@@ -24,6 +24,7 @@ import {
 import { loadCastSdk } from "@/components/video-player/cast/castSdk";
 import type * as castSdkModule from "@/components/video-player/cast/castSdk";
 import { castSenderId } from "@/components/video-player/cast/castSenderId";
+import type * as castSessionModule from "@/components/video-player/cast/castSession";
 import { canCast } from "@/components/video-player/cast/castSupport";
 import type * as castSupportModule from "@/components/video-player/cast/castSupport";
 import {
@@ -66,6 +67,7 @@ vi.mock("@/api", async (importOriginal) => ({
 }));
 vi.mock("@/utils/toast", () => ({ showError: vi.fn() }));
 
+const CAST_SESSION = "@/components/video-player/cast/castSession";
 const SIGNED = "instanceId=inst-a&uid=7&exp=99&scope=media&sig=abc";
 const NOW = Date.parse("2026-10-03T10:00:00.000Z");
 
@@ -137,6 +139,8 @@ interface RenderOptions {
   scene?: typeof SCENE;
   /** The page's viewing of the scene (none by default) */
   viewing?: Viewing | null;
+  /** The page has no player yet (the ref is empty) */
+  noPlayer?: boolean;
 }
 
 /** Real time passes (the cast code's timers and awaits run) until `check` */
@@ -174,7 +178,7 @@ async function renderCast(options: RenderOptions = {}) {
   // viewing (the cast tracker's own tests are in castActivity.test.ts)
   const viewing = { current: options.viewing ?? null };
   const props: UseCastOptions = {
-    playerRef: { current: player },
+    playerRef: { current: options.noPlayer ? null : player },
     scene,
     sceneKey: `${scene.id}:${scene.instanceId}`,
     dispatch: vi.fn(),
@@ -669,6 +673,119 @@ describe("useCast", () => {
 
     await waitFor(() => expect(castButton(player)).toBeTruthy());
     expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  describe("when the cast code is not ready", () => {
+    /** A promise the test settles when the page has moved on */
+    function deferred<T>() {
+      let resolve: (value: T) => void = () => {};
+      let reject: (error: unknown) => void = () => {};
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    }
+
+    it("a page with no player yet loads no cast code", async () => {
+      const loadSdk = vi.spyOn(castChunk, "loadSdk");
+      const load = vi.spyOn(castChunk, "load");
+      await renderCast({ noPlayer: true, waitForAttach: false });
+      await settle();
+
+      expect(loadSdk).not.toHaveBeenCalled();
+      expect(vi.mocked(loadCastSdk)).not.toHaveBeenCalled();
+      expect(load).not.toHaveBeenCalled();
+    });
+
+    it("a page left while the SDK module loads goes no further", async () => {
+      const sdkModule = deferred<typeof castSdkModule>();
+      vi.spyOn(castChunk, "loadSdk").mockReturnValue(sdkModule.promise);
+      const load = vi.spyOn(castChunk, "load");
+      const { rendered } = await renderCast({ waitForAttach: false });
+
+      rendered.unmount();
+      sdkModule.resolve({ loadCastSdk: vi.mocked(loadCastSdk) });
+      await settle();
+
+      expect(vi.mocked(loadCastSdk)).not.toHaveBeenCalled();
+      expect(load).not.toHaveBeenCalled();
+    });
+
+    it("a page left while Google's script loads never loads the cast session", async () => {
+      const framework = deferred<FakeFramework["framework"] | null>();
+      vi.mocked(loadCastSdk).mockReturnValue(framework.promise);
+      const load = vi.spyOn(castChunk, "load");
+      const { rendered } = await renderCast({ waitForAttach: false });
+      await settle();
+      expect(vi.mocked(loadCastSdk)).toHaveBeenCalledTimes(1);
+
+      rendered.unmount();
+      framework.resolve(fake.framework);
+      await settle();
+
+      expect(load).not.toHaveBeenCalled();
+      expect(fake.controllers).toHaveLength(0);
+    });
+
+    it("a browser whose Cast SDK never becomes available shows no button and no error", async () => {
+      vi.mocked(loadCastSdk).mockResolvedValue(null);
+      const load = vi.spyOn(castChunk, "load");
+      const { player } = await renderCast({ waitForAttach: false });
+      await settle();
+
+      expect(vi.mocked(loadCastSdk)).toHaveBeenCalledTimes(1);
+      expect(load).not.toHaveBeenCalled();
+      expect(castButton(player)).toBeUndefined();
+      expect(vi.mocked(showError)).not.toHaveBeenCalled();
+    });
+
+    it("a page left while the cast session code loads starts no session", async () => {
+      const session = deferred<typeof castSessionModule>();
+      vi.spyOn(castChunk, "load").mockReturnValue(session.promise);
+      const { player, rendered } = await renderCast({ waitForAttach: false });
+      await settle();
+
+      rendered.unmount();
+      session.resolve(
+        await vi.importActual<typeof castSessionModule>(CAST_SESSION)
+      );
+      await settle();
+
+      expect(fake.controllers).toHaveLength(0);
+      expect(castButton(player)).toBeFalsy();
+    });
+
+    it("a player disposed while the cast session code loads starts no session", async () => {
+      const session = deferred<typeof castSessionModule>();
+      vi.spyOn(castChunk, "load").mockReturnValue(session.promise);
+      const { player } = await renderCast({ waitForAttach: false });
+      await settle();
+
+      player.dispose();
+      players = players.filter((open) => open !== player);
+      session.resolve(
+        await vi.importActual<typeof castSessionModule>(CAST_SESSION)
+      );
+      await settle();
+
+      expect(fake.controllers).toHaveLength(0);
+    });
+
+    it("a cast chunk that fails to load is logged, and the page shows no button", async () => {
+      const failure = new Error("chunk failed");
+      vi.spyOn(castChunk, "load").mockRejectedValue(failure);
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { player } = await renderCast({ waitForAttach: false });
+      await settle();
+
+      expect(logged).toHaveBeenCalledWith(
+        "[Cast] could not load the cast code",
+        failure
+      );
+      expect(castButton(player)).toBeUndefined();
+      expect(vi.mocked(showError)).not.toHaveBeenCalled();
+    });
   });
 
   it("unmount removes every listener, the button and the status line", async () => {

@@ -37,4 +37,53 @@ describe("castSenderId", () => {
 
     expect(second).not.toBe(first);
   });
+
+  describe("when sessionStorage is blocked", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    /** Cookies and site data blocked: every access to the storage throws */
+    function blockStorage() {
+      const blocked = () => {
+        throw new DOMException("denied", "SecurityError");
+      };
+      vi.stubGlobal("sessionStorage", {
+        getItem: blocked,
+        setItem: blocked,
+      });
+    }
+
+    it("the tab still has one stable id for the page's life", async () => {
+      blockStorage();
+      const { castSenderId } = await freshModule();
+
+      const id = castSenderId();
+
+      expect(id).toMatch(/\S{16,}/);
+      expect(castSenderId()).toBe(id);
+    });
+
+    it("a reloaded page names itself afresh, and never as another tab", async () => {
+      blockStorage();
+      const first = (await freshModule()).castSenderId();
+      const second = (await freshModule()).castSenderId();
+
+      expect(second).not.toBe(first);
+    });
+
+    it("a tab whose storage can be read but not written keeps one id for the page", async () => {
+      vi.stubGlobal("sessionStorage", {
+        getItem: () => null,
+        setItem: () => {
+          throw new DOMException("full", "QuotaExceededError");
+        },
+      });
+      const { castSenderId } = await freshModule();
+
+      const id = castSenderId();
+
+      expect(castSenderId()).toBe(id);
+    });
+  });
 });
