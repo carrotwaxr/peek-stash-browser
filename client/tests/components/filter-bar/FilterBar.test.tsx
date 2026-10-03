@@ -1240,6 +1240,8 @@ describe("on the sheet surface (a phone or a TV)", () => {
 
     const bar = screen.getByRole("group", { name: "Filters" });
     expect(bar).toHaveClass("flex-nowrap", "overflow-x-auto");
+    // Its scrollbar is the theme's, not the desktop's bright default
+    expect(bar).toHaveClass("scrollbar-themed");
   });
 });
 

@@ -287,6 +287,14 @@ pre,
   display: none;
 }
 
+/* A thin scrollbar in the theme's colours, for a row that scrolls sideways
+   (the filter chips on a phone): the desktop default is a bright track with
+   arrow buttons. Touch, trackpad and focus scrolling are untouched. */
+.scrollbar-themed {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
+
 /* Hide focus indicators when not using keyboard */
 .mouse-user *:focus {
   outline: none !important;

@@ -455,7 +455,7 @@ const FilterBar = ({
       className={
         onOpenSheet === undefined
           ? "flex flex-wrap items-center gap-2"
-          : "flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [&>*]:shrink-0"
+          : "flex flex-nowrap items-center gap-2 overflow-x-auto scrollbar-themed pb-1 [&>*]:shrink-0"
       }
     >
       {permanentLabels.map((label, index) => (

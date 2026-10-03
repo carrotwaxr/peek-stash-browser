@@ -75,6 +75,39 @@ test.describe("Scene Library", () => {
     expect(await tops()).toEqual(before);
   });
 
+  test("the filter chip row scrolls sideways with a themed scrollbar on a phone", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const list = new ListPage(page);
+    await list.goto("/scenes");
+    await expect(list.filterBar).toBeVisible();
+
+    const row = await list.filterBar.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return {
+        overflowX: style.overflowX,
+        scrollbarWidth: style.scrollbarWidth,
+        scrollbarColor: style.scrollbarColor,
+        overflows: el.scrollWidth > el.clientWidth,
+        scrollLeft: el.scrollLeft,
+      };
+    });
+
+    // Thin and coloured from the theme (the browser's default is "auto" and
+    // a bright track), and still scrollable
+    expect(row.overflowX).toBe("auto");
+    expect(row.scrollbarWidth).toBe("thin");
+    expect(row.scrollbarColor).not.toBe("auto");
+    expect(row.overflows).toBe(true);
+
+    // Focus reaching the last chip scrolls it into view
+    await list.filterBar.getByRole("button").last().focus();
+    expect(
+      await list.filterBar.evaluate((el) => el.scrollLeft)
+    ).toBeGreaterThan(row.scrollLeft);
+  });
+
   test("search input accepts text and updates URL", async ({ page }) => {
     await page.goto("/scenes");
     await expect(page.getByPlaceholder("Search...")).toBeVisible({
