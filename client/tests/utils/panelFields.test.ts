@@ -53,6 +53,9 @@ const FREE_TEXT_VALUES: Readonly<Record<string, readonly string[]>> = {
   fake_tits: BREAST_TYPES,
 };
 
+/** Text fields whose select lists suggestions, the field taking any text */
+const OPEN_TEXT: readonly string[] = ["captions"];
+
 describe("panel field table", () => {
   it("every panel field fills a contract field of its list and its editor fits the field's kind", () => {
     const wrong = LIST_KINDS.flatMap((kind) =>
@@ -253,6 +256,8 @@ describe("panel field table", () => {
       panelOf(kind).flatMap((field) => {
         if (field.editor !== "enum") return [];
         const spec = TABLES[kind][field.field];
+        // Captions: any language code Stash stores; the select lists the usual ones
+        if (OPEN_TEXT.includes(field.field)) return [];
         const values: readonly string[] | undefined =
           spec?.kind === "enum" ? spec.values : FREE_TEXT_VALUES[field.field];
         if (!values) return [`${kind}.${field.key}: no value list`];

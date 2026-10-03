@@ -270,6 +270,48 @@ describe("carousel, recommended and similar requests", () => {
       ]);
     });
 
+    it("a carousel rule with a playlist runs for its owner: another user's carousel with the same playlist id lists nothing", async () => {
+      const owner = must(everyInstance, "the playlist's owner");
+      const other = must(onlyA, "another user");
+      const playlist = await prisma.playlist.create({
+        data: {
+          name: "Carousel playlist",
+          userId: owner.id,
+          items: {
+            create: [{ instanceId: FX.A, sceneId: FX_ID.SAME, position: 0 }],
+          },
+        },
+      });
+      try {
+        const rules = {
+          playlists: { value: [playlist.id], modifier: "INCLUDES" },
+        };
+        const run = async (viewer: Viewer) => {
+          const carousel = await prisma.userCarousel.create({
+            data: {
+              userId: viewer.id,
+              title: "Playlist rule",
+              icon: "Film",
+              rules,
+              sort: "title",
+              direction: "ASC",
+            },
+          });
+          const response = await viewer.client.get<ExecuteCarouselByIdResponse>(
+            `/api/carousels/${carousel.id}/execute`
+          );
+          expect(response.status).toBe(200);
+          return shown(response.data.scenes);
+        };
+
+        expect(await run(owner)).toEqual([`${FX.A}/A-${FX_ID.SAME}`]);
+        // The playlist is neither the other user's nor shared with them
+        expect(await run(other)).toEqual([]);
+      } finally {
+        await prisma.playlist.delete({ where: { id: playlist.id } });
+      }
+    });
+
     it("a carousel stored with sort constructor renders in the default order", async () => {
       const { id, client } = must(everyInstance, "the viewer");
       const carousel = await prisma.userCarousel.create({

@@ -43,6 +43,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "performerIdsModifier",
@@ -52,16 +60,37 @@
     },
     {
       "key": "studioId",
-      "label": "Studio",
+      "label": "Studios",
       "type": "searchable-select",
       "entityType": "studios",
-      "multi": false,
-      "defaultValue": "",
-      "placeholder": "Select studio...",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select studios...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "studioIdModifier",
+      "defaultModifier": "INCLUDES",
       "supportsHierarchy": true,
       "hierarchyKey": "studioIdDepth",
       "hierarchyLabel": "Include sub-studios",
-      "countFilterContext": "scenes"
+      "countFilterContext": "scenes",
+      "excludeKey": "studioIdExclude"
     },
     {
       "key": "tagIds",
@@ -83,6 +112,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "tagIdsModifier",
@@ -92,6 +129,35 @@
       "hierarchyLabel": "Include sub-tags",
       "countFilterContext": "scenes",
       "excludeKey": "tagIdsExclude"
+    },
+    {
+      "key": "performerTagIds",
+      "label": "Performer Tags",
+      "type": "searchable-select",
+      "entityType": "tags",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select performer tags...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "performerTagIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "performerTagIdsDepth",
+      "hierarchyLabel": "Include sub-tags",
+      "excludeKey": "performerTagIdsExclude"
     },
     {
       "key": "groupIds",
@@ -109,10 +175,21 @@
         {
           "value": "EXCLUDES",
           "label": "NOT in these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "In none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "In any"
         }
       ],
       "modifierKey": "groupIdsModifier",
       "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "groupIdsDepth",
+      "hierarchyLabel": "Include sub-collections",
       "countFilterContext": "scenes"
     },
     {
@@ -158,30 +235,172 @@
     {
       "key": "favorite",
       "label": "Favorite Scenes",
-      "type": "checkbox",
-      "defaultValue": false,
-      "placeholder": "Favorites Only"
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "key": "performerFavorite",
       "label": "Favorite Performers",
-      "type": "checkbox",
-      "defaultValue": false,
-      "placeholder": "Favorite Performers Only"
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "key": "studioFavorite",
       "label": "Favorite Studios",
-      "type": "checkbox",
-      "defaultValue": false,
-      "placeholder": "Favorite Studios Only"
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "key": "tagFavorite",
       "label": "Favorite Tags",
-      "type": "checkbox",
-      "defaultValue": false,
-      "placeholder": "Favorite Tags Only"
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
+    },
+    {
+      "type": "section-header",
+      "label": "Entity Filters",
+      "key": "section-entities",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "galleryIds",
+      "label": "Galleries",
+      "type": "searchable-select",
+      "entityType": "galleries",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select galleries...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "galleryIdsModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "playlistIds",
+      "label": "Playlists",
+      "type": "searchable-select",
+      "entityType": "playlists",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select playlists...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "playlistIdsModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "inAnyPlaylist",
+      "label": "In any of my playlists",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "In one of your own playlists"
+        },
+        {
+          "value": "false",
+          "label": "In none of your own playlists"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "type": "section-header",
@@ -326,7 +545,8 @@
       "key": "orientation",
       "label": "Orientation",
       "type": "select",
-      "defaultValue": "",
+      "defaultValue": [],
+      "multi": true,
       "options": [
         {
           "value": "LANDSCAPE",
@@ -373,6 +593,244 @@
       "defaultValue": "",
       "placeholder": "Search director...",
       "maxLength": 500
+    },
+    {
+      "key": "path",
+      "label": "Path",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search path...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "STARTS_WITH",
+          "label": "Starts with"
+        }
+      ],
+      "modifierKey": "pathModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "url",
+      "label": "URL",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search URLs...",
+      "maxLength": 500
+    },
+    {
+      "key": "code",
+      "label": "Code",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search code...",
+      "maxLength": 500
+    },
+    {
+      "key": "captions",
+      "label": "Captions",
+      "type": "select",
+      "defaultValue": "",
+      "options": [
+        {
+          "value": "en",
+          "label": "English"
+        },
+        {
+          "value": "de",
+          "label": "German"
+        },
+        {
+          "value": "es",
+          "label": "Spanish"
+        },
+        {
+          "value": "fr",
+          "label": "French"
+        },
+        {
+          "value": "it",
+          "label": "Italian"
+        },
+        {
+          "value": "ja",
+          "label": "Japanese"
+        },
+        {
+          "value": "ko",
+          "label": "Korean"
+        },
+        {
+          "value": "nl",
+          "label": "Dutch"
+        },
+        {
+          "value": "pl",
+          "label": "Polish"
+        },
+        {
+          "value": "pt",
+          "label": "Portuguese"
+        },
+        {
+          "value": "ru",
+          "label": "Russian"
+        },
+        {
+          "value": "sv",
+          "label": "Swedish"
+        },
+        {
+          "value": "tr",
+          "label": "Turkish"
+        },
+        {
+          "value": "zh",
+          "label": "Chinese"
+        },
+        {
+          "value": "00",
+          "label": "Unknown"
+        }
+      ],
+      "placeholder": "Any language",
+      "modifierOptions": [
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "NOT_EQUALS",
+          "label": "Not Equals"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "captionsModifier",
+      "defaultModifier": "EQUALS"
+    },
+    {
+      "key": "organized",
+      "label": "Organized",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
+    },
+    {
+      "key": "hasMarkers",
+      "label": "Has Markers",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
+    },
+    {
+      "key": "duplicated",
+      "label": "Duplicated",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
+    },
+    {
+      "key": "watched",
+      "label": "Watched",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
+    },
+    {
+      "key": "inProgress",
+      "label": "In Progress",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "key": "playDuration",
@@ -432,7 +890,7 @@
       "removedOptions": [
         "text:title"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "details",
@@ -449,7 +907,7 @@
       "removedOptions": [
         "text:details"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "performers",
@@ -467,7 +925,7 @@
       "removedOptions": [
         "searchable-select:performerIds"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "studios",
@@ -480,12 +938,13 @@
       ],
       "removedStateKeys": [
         "studioId",
+        "studioIdModifier",
         "studioIdDepth"
       ],
       "removedOptions": [
         "searchable-select:studioId"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "tags",
@@ -504,7 +963,26 @@
       "removedOptions": [
         "searchable-select:tagIds"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
+    },
+    {
+      "field": "performer_tags",
+      "lockedFieldsTop": [
+        "performer_tags"
+      ],
+      "lockedFieldsInner": [
+        "performer_tags",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "performerTagIds",
+        "performerTagIdsModifier",
+        "performerTagIdsDepth"
+      ],
+      "removedOptions": [
+        "searchable-select:performerTagIds"
+      ],
+      "optionCountAfter": 46
     },
     {
       "field": "groups",
@@ -517,12 +995,13 @@
       ],
       "removedStateKeys": [
         "groupIds",
-        "groupIdsModifier"
+        "groupIdsModifier",
+        "groupIdsDepth"
       ],
       "removedOptions": [
         "searchable-select:groupIds"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "rating100",
@@ -540,7 +1019,7 @@
       "removedOptions": [
         "range:rating"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "o_counter",
@@ -557,7 +1036,7 @@
       "removedOptions": [
         "range:oCount"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "duration",
@@ -574,7 +1053,7 @@
       "removedOptions": [
         "range:duration"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "favorite",
@@ -589,9 +1068,9 @@
         "favorite"
       ],
       "removedOptions": [
-        "checkbox:favorite"
+        "select:favorite"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "performer_favorite",
@@ -606,9 +1085,9 @@
         "performerFavorite"
       ],
       "removedOptions": [
-        "checkbox:performerFavorite"
+        "select:performerFavorite"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "studio_favorite",
@@ -623,9 +1102,9 @@
         "studioFavorite"
       ],
       "removedOptions": [
-        "checkbox:studioFavorite"
+        "select:studioFavorite"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "tag_favorite",
@@ -640,9 +1119,62 @@
         "tagFavorite"
       ],
       "removedOptions": [
-        "checkbox:tagFavorite"
+        "select:tagFavorite"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
+    },
+    {
+      "field": "galleries",
+      "lockedFieldsTop": [
+        "galleries"
+      ],
+      "lockedFieldsInner": [
+        "galleries",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "galleryIds",
+        "galleryIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:galleryIds"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "playlists",
+      "lockedFieldsTop": [
+        "playlists"
+      ],
+      "lockedFieldsInner": [
+        "playlists",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "playlistIds",
+        "playlistIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:playlistIds"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "in_any_playlist",
+      "lockedFieldsTop": [
+        "in_any_playlist"
+      ],
+      "lockedFieldsInner": [
+        "in_any_playlist",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "inAnyPlaylist"
+      ],
+      "removedOptions": [
+        "select:inAnyPlaylist"
+      ],
+      "optionCountAfter": 46
     },
     {
       "field": "date",
@@ -659,7 +1191,7 @@
       "removedOptions": [
         "date-range:date"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "created_at",
@@ -676,7 +1208,7 @@
       "removedOptions": [
         "date-range:createdAt"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "updated_at",
@@ -693,7 +1225,7 @@
       "removedOptions": [
         "date-range:updatedAt"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "last_played_at",
@@ -710,7 +1242,7 @@
       "removedOptions": [
         "date-range:lastPlayedAt"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "resolution",
@@ -728,7 +1260,7 @@
       "removedOptions": [
         "select:resolution"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "bitrate",
@@ -745,7 +1277,7 @@
       "removedOptions": [
         "range:bitrate"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "framerate",
@@ -762,7 +1294,7 @@
       "removedOptions": [
         "range:framerate"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "orientation",
@@ -779,7 +1311,7 @@
       "removedOptions": [
         "select:orientation"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "video_codec",
@@ -796,7 +1328,7 @@
       "removedOptions": [
         "text:videoCodec"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "audio_codec",
@@ -813,7 +1345,7 @@
       "removedOptions": [
         "text:audioCodec"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "director",
@@ -830,7 +1362,162 @@
       "removedOptions": [
         "text:director"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
+    },
+    {
+      "field": "path",
+      "lockedFieldsTop": [
+        "path"
+      ],
+      "lockedFieldsInner": [
+        "path",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "path",
+        "pathModifier"
+      ],
+      "removedOptions": [
+        "text:path"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "url",
+      "lockedFieldsTop": [
+        "url"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "url"
+      ],
+      "removedStateKeys": [
+        "url"
+      ],
+      "removedOptions": [
+        "text:url"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "code",
+      "lockedFieldsTop": [
+        "code"
+      ],
+      "lockedFieldsInner": [
+        "code",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "code"
+      ],
+      "removedOptions": [
+        "text:code"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "captions",
+      "lockedFieldsTop": [
+        "captions"
+      ],
+      "lockedFieldsInner": [
+        "captions",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "captions",
+        "captionsModifier"
+      ],
+      "removedOptions": [
+        "select:captions"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "organized",
+      "lockedFieldsTop": [
+        "organized"
+      ],
+      "lockedFieldsInner": [
+        "organized",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "organized"
+      ],
+      "removedOptions": [
+        "select:organized"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "has_markers",
+      "lockedFieldsTop": [
+        "has_markers"
+      ],
+      "lockedFieldsInner": [
+        "has_markers",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "hasMarkers"
+      ],
+      "removedOptions": [
+        "select:hasMarkers"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "duplicated",
+      "lockedFieldsTop": [
+        "duplicated"
+      ],
+      "lockedFieldsInner": [
+        "duplicated",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "duplicated"
+      ],
+      "removedOptions": [
+        "select:duplicated"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "watched",
+      "lockedFieldsTop": [
+        "watched"
+      ],
+      "lockedFieldsInner": [
+        "scene_filter",
+        "watched"
+      ],
+      "removedStateKeys": [
+        "watched"
+      ],
+      "removedOptions": [
+        "select:watched"
+      ],
+      "optionCountAfter": 46
+    },
+    {
+      "field": "in_progress",
+      "lockedFieldsTop": [
+        "in_progress"
+      ],
+      "lockedFieldsInner": [
+        "in_progress",
+        "scene_filter"
+      ],
+      "removedStateKeys": [
+        "inProgress"
+      ],
+      "removedOptions": [
+        "select:inProgress"
+      ],
+      "optionCountAfter": 46
     },
     {
       "field": "play_duration",
@@ -847,7 +1534,7 @@
       "removedOptions": [
         "range:playDuration"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "play_count",
@@ -864,7 +1551,7 @@
       "removedOptions": [
         "range:playCount"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "performer_count",
@@ -881,7 +1568,7 @@
       "removedOptions": [
         "range:performerCount"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "performer_age",
@@ -898,7 +1585,7 @@
       "removedOptions": [
         "range:performerAge"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     },
     {
       "field": "tag_count",
@@ -915,7 +1602,7 @@
       "removedOptions": [
         "range:tagCount"
       ],
-      "optionCountAfter": 32
+      "optionCountAfter": 46
     }
   ]
 }

@@ -32,17 +32,13 @@ vi.mock("@/api/playlists", () => ({
   getSharedPlaylists: vi.fn(),
 }));
 
-// Images' Studios and Scenes' Performers offer Has none and Has any, and
-// scenes have Path and Playlists rows and clips a Scenes row, as F18 to F21
-// opt them in
+// Images' Studios offers Has none and Has any and clips have a Scenes row, as
+// F19 and F21 opt them in (the scene rows are F18's, real)
 vi.mock("@peek/shared-types", async (importOriginal) => {
   const { withRefPresence } = await import("@tests/helpers/refPresence");
   const { withEditorRows } = await import("@tests/helpers/editorRows");
   return withEditorRows(
-    withRefPresence(await importOriginal(), [
-      ["image", "studioIds"],
-      ["scene", "performerIds"],
-    ])
+    withRefPresence(await importOriginal(), [["image", "studioIds"]])
   );
 });
 
@@ -238,9 +234,29 @@ describe("ActiveFilterChips", () => {
   });
 
   it("a single-pick field names its pick without a condition", async () => {
-    renderChips({ studioId: "10:a" });
+    renderChips({ studioId: "10:a" }, { kind: "tag" });
 
     expect(await edit("Studio: Brazzers")).toBeInTheDocument();
+  });
+
+  it("Scenes' Studios, once a list, names its condition; a lone string stored before reads the same", async () => {
+    renderChips({ studioId: ["10:a", "11:a"], studioIdModifier: "EXCLUDES" });
+
+    expect(
+      await edit("Studios: none of Brazzers, Reality Kings")
+    ).toBeInTheDocument();
+  });
+
+  it("a Studio stored as a lone string reads as one pick", async () => {
+    renderChips({ studioId: "10:a" });
+
+    expect(await edit("Studios: any of Brazzers")).toBeInTheDocument();
+  });
+
+  it("a three-state favourite reads its choice", async () => {
+    renderChips({ favorite: "false" });
+
+    expect(await edit("Favorite Scenes: No")).toBeInTheDocument();
   });
 
   it("Resolution names its condition", async () => {
@@ -262,7 +278,7 @@ describe("ActiveFilterChips", () => {
     expect(await edit("O Count: at least 40")).toBeInTheDocument();
     expect(await edit("Performer Count: at most 40")).toBeInTheDocument();
     expect(await edit("Scene Date: from 2020-01-01")).toBeInTheDocument();
-    expect(await edit("Favorite Scenes")).toBeInTheDocument();
+    expect(await edit("Favorite Scenes: Yes")).toBeInTheDocument();
   });
 
   it("a select reads its choice label", async () => {
@@ -305,11 +321,13 @@ describe("ActiveFilterChips", () => {
     const user = userEvent.setup();
     const { onChipClick, onRemoveFilter } = renderChips({ favorite: true });
 
-    await user.click(await edit("Favorite Scenes"));
+    await user.click(await edit("Favorite Scenes: Yes"));
     expect(onChipClick).toHaveBeenCalledWith("favorite");
 
     await user.click(
-      screen.getByRole("button", { name: "Remove filter: Favorite Scenes" })
+      screen.getByRole("button", {
+        name: "Remove filter: Favorite Scenes: Yes",
+      })
     );
     expect(onRemoveFilter).toHaveBeenCalledWith("favorite");
     expect(onChipClick).toHaveBeenCalledTimes(1);
@@ -319,7 +337,7 @@ describe("ActiveFilterChips", () => {
     const user = userEvent.setup();
     const { onChipClick } = renderChips({ favorite: true });
 
-    (await edit("Favorite Scenes")).focus();
+    (await edit("Favorite Scenes: Yes")).focus();
     await user.keyboard("{Enter}");
 
     expect(onChipClick).toHaveBeenCalledWith("favorite");

@@ -15,6 +15,16 @@ import { CODECS, codecOf, valuesOf } from "@/utils/filterFields";
 import { SPECS } from "@/utils/filterFields/options";
 
 /** A list's panel row by key */
+/** A checkbox row (the favourites became three-state choices): test-local, so no list's table moves it */
+const TOGGLE: PanelField = {
+  key: "favorite",
+  field: "favorite",
+  label: "Favorites",
+  group: "common",
+  editor: "toggle",
+  placeholder: "Favorites Only",
+};
+
 const field = (kind: ListKind, key: string): PanelField => {
   const rows: readonly PanelField[] = PANEL_FIELDS[kind];
   const row = rows.find((each) => each.key === key);
@@ -40,7 +50,7 @@ describe("codecs", () => {
     ).toEqual(["tagIds", "tagIdsModifier", "tagIdsDepth", "tagIdsExclude"]);
     expect(
       codecOf(field("scene", "groupIds")).keys(field("scene", "groupIds"))
-    ).toEqual(["groupIds", "groupIdsModifier"]);
+    ).toEqual(["groupIds", "groupIdsModifier", "groupIdsDepth"]);
     expect(
       codecOf(field("scene", "resolution")).keys(field("scene", "resolution"))
     ).toEqual(["resolution", "resolutionModifier"]);
@@ -102,7 +112,7 @@ describe("codecs", () => {
 
   it("text filters when not blank, a toggle when checked", () => {
     const title = rowOf("scene", "title", "text");
-    const favorite = rowOf("scene", "favorite", "toggle");
+    const favorite = TOGGLE;
 
     expect(CODECS.text.isActive(title, { title: "a" })).toBe(true);
     expect(CODECS.text.isActive(title, { title: "  " })).toBe(false);
@@ -204,11 +214,15 @@ describe("the URL members", () => {
       tagIds: ["5:abc"],
     });
     expect(read(field("scene", "studioId"), "studioId=3&instance=abc")).toEqual(
-      { studioId: "3:abc" }
+      { studioId: ["3:abc"] }
     );
     // A value that names its instance keeps it
     expect(
       read(field("scene", "studioId"), "studioId=3:other&instance=abc")
+    ).toEqual({ studioId: ["3:other"] });
+    // A single-select row's own value does the same
+    expect(
+      read(field("tag", "studioId"), "studioId=3:other&instance=abc")
     ).toEqual({ studioId: "3:other" });
   });
 
@@ -250,13 +264,9 @@ describe("the URL members", () => {
     expect(read(field("scene", "title"), "title=beach")).toEqual({
       title: "beach",
     });
-    expect(write(field("scene", "favorite"), { favorite: true })).toBe(
-      "favorite=true"
-    );
-    expect(write(field("scene", "favorite"), { favorite: false })).toBe("");
-    expect(read(field("scene", "favorite"), "favorite=true")).toEqual({
-      favorite: true,
-    });
+    expect(write(TOGGLE, { favorite: true })).toBe("favorite=true");
+    expect(write(TOGGLE, { favorite: false })).toBe("");
+    expect(read(TOGGLE, "favorite=true")).toEqual({ favorite: true });
     expect(write(field("clip", "isGenerated"), { isGenerated: "false" })).toBe(
       "isGenerated=false"
     );

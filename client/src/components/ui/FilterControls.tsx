@@ -1,5 +1,6 @@
 import { type ReactNode, type RefObject, forwardRef, useEffect } from "react";
 import Button from "./Button";
+import CheckboxGroup from "./CheckboxGroup";
 import {
   ImperialHeightRange,
   ImperialLengthRange,
@@ -100,7 +101,10 @@ export interface FilterControlProps {
    */
   measure?: "height" | "weight" | "length";
   entityType?: string;
+  /** A picker takes several; a select of values draws a box for each */
   multi?: boolean;
+  /** A select that always holds one of its choices: no blank option */
+  noBlank?: boolean;
   countFilterContext?: string | null;
   modifierOptions?: SortOption[];
   modifierValue?: string;
@@ -139,6 +143,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
       measure,
       entityType,
       multi,
+      noBlank = false,
       countFilterContext,
       modifierOptions,
       modifierValue,
@@ -187,11 +192,21 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               </span>
             </label>
           );
-        case "select":
+        case "select": {
+          // "Has none" and "Has any" take no value: the choices are not drawn
+          const presence =
+            modifierValue === "IS_NULL" || modifierValue === "NOT_NULL";
+          const hasCondition =
+            modifierOptions !== undefined && modifierOptions.length > 0;
+          const picked = Array.isArray(value)
+            ? value.map(String)
+            : typeof value === "string" && value !== ""
+              ? [value]
+              : [];
           return (
             <div className="space-y-2">
               {/* Modifier dropdown (if provided) */}
-              {modifierOptions && modifierOptions.length > 0 && (
+              {hasCondition && (
                 <select
                   id={controlId}
                   aria-label={`${label} condition`}
@@ -207,23 +222,40 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                   ))}
                 </select>
               )}
-              {/* Main select */}
-              <select
-                id={modifierOptions?.length ? undefined : controlId}
-                value={value as string}
-                onChange={(e) => onChange(e.target.value)}
-                className={inputClasses}
-                style={baseInputStyle}
-              >
-                <option value="">{placeholder || `All ${label}`}</option>
-                {options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              {/* Main select, or a box per value for a multi one */}
+              {presence ? null : multi ? (
+                <CheckboxGroup
+                  id={hasCondition ? undefined : controlId}
+                  label={label}
+                  options={options}
+                  value={picked}
+                  onChange={(next) => onChange(next)}
+                />
+              ) : (
+                <select
+                  id={hasCondition ? undefined : controlId}
+                  value={
+                    typeof value === "boolean"
+                      ? String(value)
+                      : (value as string)
+                  }
+                  onChange={(e) => onChange(e.target.value)}
+                  className={inputClasses}
+                  style={baseInputStyle}
+                >
+                  {noBlank ? null : (
+                    <option value="">{placeholder || `All ${label}`}</option>
+                  )}
+                  {options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           );
+        }
         case "searchable-select": {
           // "Has none" and "Has any" take no picks: the picker and its
           // sub-items box are not drawn

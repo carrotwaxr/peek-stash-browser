@@ -3,6 +3,7 @@ import {
   CAROUSEL_FILTER_DEFINITIONS,
   type FilterOption,
 } from "../../utils/filterConfig";
+import CheckboxGroup from "../ui/CheckboxGroup";
 import SearchableSelect from "../ui/SearchableSelect";
 import { Button } from "../ui/index";
 
@@ -38,11 +39,12 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
     (f) => f.key === rule.filterKey || !usedFilterKeys.has(f.key)
   );
 
-  // "Not set" and "Set" on a range, "Has none" and "Has any" on a picker
-  // or a text field, take no value
+  // "Not set" and "Set" on a range, "Has none" and "Has any" on a picker,
+  // a select of values or a text field, take no value
   const takesPresence =
     filterDef?.type === "range" ||
     filterDef?.type === "searchable-select" ||
+    filterDef?.type === "select" ||
     filterDef?.type === "text";
   const presence =
     takesPresence &&
@@ -259,6 +261,23 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
       );
 
     case "select":
+      // A multi select (Orientation) is a box for each value; a rule stored
+      // while it was single holds one string, which reads as one box
+      if (filterDef.multi) {
+        const picked = Array.isArray(rule.value)
+          ? (rule.value as unknown[]).map(String)
+          : typeof rule.value === "string" && rule.value !== ""
+            ? [rule.value]
+            : [];
+        return (
+          <CheckboxGroup
+            label={filterDef.label ?? filterDef.key}
+            options={filterDef.options ?? []}
+            value={picked}
+            onChange={(next) => onChange({ value: next })}
+          />
+        );
+      }
       return (
         <select
           value={(rule.value as string) || ""}

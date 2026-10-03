@@ -170,9 +170,19 @@ export interface TextField<F extends string = string> extends FieldBase<F> {
 export interface EnumField<F extends string = string> extends FieldBase<F> {
   readonly editor: "enum";
   readonly choices: readonly Choice[];
-  /** The comparisons the condition select offers (Resolution) */
+  /**
+   * The comparisons the condition select offers (Resolution); IS_NULL and
+   * NOT_NULL ("Has none", "Has any"), where the field takes them, are sent
+   * with no value
+   */
   readonly modifiers?: readonly EnumModifier[];
   readonly defaultModifier?: EnumModifier;
+  /**
+   * Picks several values, on a field whose spec is multi (Orientation): the
+   * state holds a list, and a lone string stored before reads as a
+   * one-element list
+   */
+  readonly multi?: boolean;
 }
 
 export interface ChoiceField<F extends string = string> extends FieldBase<F> {

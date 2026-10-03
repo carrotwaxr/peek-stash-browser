@@ -17,6 +17,103 @@
       "max": 100
     },
     {
+      "key": "captions",
+      "label": "Captions",
+      "type": "select",
+      "defaultValue": "",
+      "options": [
+        {
+          "value": "en",
+          "label": "English"
+        },
+        {
+          "value": "de",
+          "label": "German"
+        },
+        {
+          "value": "es",
+          "label": "Spanish"
+        },
+        {
+          "value": "fr",
+          "label": "French"
+        },
+        {
+          "value": "it",
+          "label": "Italian"
+        },
+        {
+          "value": "ja",
+          "label": "Japanese"
+        },
+        {
+          "value": "ko",
+          "label": "Korean"
+        },
+        {
+          "value": "nl",
+          "label": "Dutch"
+        },
+        {
+          "value": "pl",
+          "label": "Polish"
+        },
+        {
+          "value": "pt",
+          "label": "Portuguese"
+        },
+        {
+          "value": "ru",
+          "label": "Russian"
+        },
+        {
+          "value": "sv",
+          "label": "Swedish"
+        },
+        {
+          "value": "tr",
+          "label": "Turkish"
+        },
+        {
+          "value": "zh",
+          "label": "Chinese"
+        },
+        {
+          "value": "00",
+          "label": "Unknown"
+        }
+      ],
+      "placeholder": "Any language",
+      "modifierOptions": [
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "NOT_EQUALS",
+          "label": "Not Equals"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "captionsModifier",
+      "defaultModifier": "EQUALS"
+    },
+    {
+      "key": "code",
+      "label": "Code",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search code...",
+      "maxLength": 500
+    },
+    {
       "key": "groupIds",
       "label": "Collections",
       "type": "searchable-select",
@@ -32,10 +129,21 @@
         {
           "value": "EXCLUDES",
           "label": "NOT in these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "In none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "In any"
         }
       ],
       "modifierKey": "groupIdsModifier",
       "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "groupIdsDepth",
+      "hierarchyLabel": "Include sub-collections",
       "countFilterContext": "scenes"
     },
     {
@@ -61,6 +169,27 @@
       "maxLength": 500
     },
     {
+      "key": "duplicated",
+      "label": "Duplicated",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
+    },
+    {
       "key": "duration",
       "label": "Duration (minutes)",
       "type": "range",
@@ -71,30 +200,86 @@
     {
       "key": "performerFavorite",
       "label": "Favorite Performers",
-      "type": "checkbox",
-      "defaultValue": false,
-      "placeholder": "Favorite Performers Only"
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "key": "favorite",
       "label": "Favorite Scenes",
-      "type": "checkbox",
-      "defaultValue": false,
-      "placeholder": "Favorites Only"
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "key": "studioFavorite",
       "label": "Favorite Studios",
-      "type": "checkbox",
-      "defaultValue": false,
-      "placeholder": "Favorite Studios Only"
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "key": "tagFavorite",
       "label": "Favorite Tags",
-      "type": "checkbox",
-      "defaultValue": false,
-      "placeholder": "Favorite Tags Only"
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "key": "framerate",
@@ -103,6 +288,102 @@
       "defaultValue": {},
       "min": 0,
       "max": 120
+    },
+    {
+      "key": "galleryIds",
+      "label": "Galleries",
+      "type": "searchable-select",
+      "entityType": "galleries",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select galleries...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "galleryIdsModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "hasMarkers",
+      "label": "Has Markers",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
+    },
+    {
+      "key": "inAnyPlaylist",
+      "label": "In any of my playlists",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "In one of your own playlists"
+        },
+        {
+          "value": "false",
+          "label": "In none of your own playlists"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
+    },
+    {
+      "key": "inProgress",
+      "label": "In Progress",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     },
     {
       "key": "lastPlayedAt",
@@ -119,10 +400,32 @@
       "max": 300
     },
     {
+      "key": "organized",
+      "label": "Organized",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
+    },
+    {
       "key": "orientation",
       "label": "Orientation",
       "type": "select",
-      "defaultValue": "",
+      "defaultValue": [],
+      "multi": true,
       "options": [
         {
           "value": "LANDSCAPE",
@@ -140,6 +443,34 @@
       "placeholder": "Any orientation"
     },
     {
+      "key": "path",
+      "label": "Path",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search path...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "STARTS_WITH",
+          "label": "Starts with"
+        }
+      ],
+      "modifierKey": "pathModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
       "key": "performerAge",
       "label": "Performer Age",
       "type": "range",
@@ -154,6 +485,35 @@
       "defaultValue": {},
       "min": 0,
       "max": 20
+    },
+    {
+      "key": "performerTagIds",
+      "label": "Performer Tags",
+      "type": "searchable-select",
+      "entityType": "tags",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select performer tags...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "performerTagIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "performerTagIdsDepth",
+      "hierarchyLabel": "Include sub-tags",
+      "excludeKey": "performerTagIdsExclude"
     },
     {
       "key": "performerIds",
@@ -175,6 +535,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "performerIdsModifier",
@@ -197,6 +565,31 @@
       "defaultValue": {},
       "min": 1,
       "max": 300
+    },
+    {
+      "key": "playlistIds",
+      "label": "Playlists",
+      "type": "searchable-select",
+      "entityType": "playlists",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select playlists...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "playlistIdsModifier",
+      "defaultModifier": "INCLUDES"
     },
     {
       "key": "rating",
@@ -315,16 +708,37 @@
     },
     {
       "key": "studioId",
-      "label": "Studio",
+      "label": "Studios",
       "type": "searchable-select",
       "entityType": "studios",
-      "multi": false,
-      "defaultValue": "",
-      "placeholder": "Select studio...",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select studios...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "studioIdModifier",
+      "defaultModifier": "INCLUDES",
       "supportsHierarchy": true,
       "hierarchyKey": "studioIdDepth",
       "hierarchyLabel": "Include sub-studios",
-      "countFilterContext": "scenes"
+      "countFilterContext": "scenes",
+      "excludeKey": "studioIdExclude"
     },
     {
       "key": "tagCount",
@@ -354,6 +768,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "tagIdsModifier",
@@ -379,12 +801,41 @@
       "defaultValue": {}
     },
     {
+      "key": "url",
+      "label": "URL",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search URLs...",
+      "maxLength": 500
+    },
+    {
       "key": "videoCodec",
       "label": "Video Codec",
       "type": "text",
       "defaultValue": "",
       "placeholder": "e.g. h264, hevc",
       "maxLength": 500
+    },
+    {
+      "key": "watched",
+      "label": "Watched",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "noBlank": true
     }
   ],
   "samples": [
@@ -476,6 +927,943 @@
       "seeMore": "/scenes?bitrate_min=25&bitrate_max=75&sort=created_at&dir=ASC"
     },
     {
+      "label": "captions: EQUALS en",
+      "state": {
+        "captions": "en",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "en",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "en",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=en&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS de",
+      "state": {
+        "captions": "de",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "de",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "de",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=de&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS es",
+      "state": {
+        "captions": "es",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "es",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "es",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=es&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS fr",
+      "state": {
+        "captions": "fr",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "fr",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "fr",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=fr&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS it",
+      "state": {
+        "captions": "it",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "it",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "it",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=it&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS ja",
+      "state": {
+        "captions": "ja",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "ja",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "ja",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=ja&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS ko",
+      "state": {
+        "captions": "ko",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "ko",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "ko",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=ko&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS nl",
+      "state": {
+        "captions": "nl",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "nl",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "nl",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=nl&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS pl",
+      "state": {
+        "captions": "pl",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "pl",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "pl",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=pl&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS pt",
+      "state": {
+        "captions": "pt",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "pt",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "pt",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=pt&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS ru",
+      "state": {
+        "captions": "ru",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "ru",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "ru",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=ru&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS sv",
+      "state": {
+        "captions": "sv",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "sv",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "sv",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=sv&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS tr",
+      "state": {
+        "captions": "tr",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "tr",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "tr",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=tr&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS zh",
+      "state": {
+        "captions": "zh",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "zh",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "zh",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=zh&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: EQUALS 00",
+      "state": {
+        "captions": "00",
+        "captionsModifier": "EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "00",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "00",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=00&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS en",
+      "state": {
+        "captions": "en",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "en",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "en",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=en&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS de",
+      "state": {
+        "captions": "de",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "de",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "de",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=de&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS es",
+      "state": {
+        "captions": "es",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "es",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "es",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=es&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS fr",
+      "state": {
+        "captions": "fr",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "fr",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "fr",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=fr&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS it",
+      "state": {
+        "captions": "it",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "it",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "it",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=it&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS ja",
+      "state": {
+        "captions": "ja",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "ja",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "ja",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=ja&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS ko",
+      "state": {
+        "captions": "ko",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "ko",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "ko",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=ko&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS nl",
+      "state": {
+        "captions": "nl",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "nl",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "nl",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=nl&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS pl",
+      "state": {
+        "captions": "pl",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "pl",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "pl",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=pl&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS pt",
+      "state": {
+        "captions": "pt",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "pt",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "pt",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=pt&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS ru",
+      "state": {
+        "captions": "ru",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "ru",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "ru",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=ru&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS sv",
+      "state": {
+        "captions": "sv",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "sv",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "sv",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=sv&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS tr",
+      "state": {
+        "captions": "tr",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "tr",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "tr",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=tr&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS zh",
+      "state": {
+        "captions": "zh",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "zh",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "zh",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=zh&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_EQUALS 00",
+      "state": {
+        "captions": "00",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "rules": {
+        "captions": {
+          "value": "00",
+          "modifier": "NOT_EQUALS"
+        }
+      },
+      "back": {
+        "captions": "00",
+        "captionsModifier": "NOT_EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=00&captionsModifier=NOT_EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: IS_NULL no value",
+      "state": {
+        "captionsModifier": "IS_NULL"
+      },
+      "rules": {
+        "captions": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "captionsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captionsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: NOT_NULL no value",
+      "state": {
+        "captionsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "captions": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "captionsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captionsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: en",
+      "state": {
+        "captions": "en"
+      },
+      "rules": {
+        "captions": {
+          "value": "en",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "en",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=en&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: de",
+      "state": {
+        "captions": "de"
+      },
+      "rules": {
+        "captions": {
+          "value": "de",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "de",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=de&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: es",
+      "state": {
+        "captions": "es"
+      },
+      "rules": {
+        "captions": {
+          "value": "es",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "es",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=es&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: fr",
+      "state": {
+        "captions": "fr"
+      },
+      "rules": {
+        "captions": {
+          "value": "fr",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "fr",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=fr&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: it",
+      "state": {
+        "captions": "it"
+      },
+      "rules": {
+        "captions": {
+          "value": "it",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "it",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=it&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: ja",
+      "state": {
+        "captions": "ja"
+      },
+      "rules": {
+        "captions": {
+          "value": "ja",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "ja",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=ja&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: ko",
+      "state": {
+        "captions": "ko"
+      },
+      "rules": {
+        "captions": {
+          "value": "ko",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "ko",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=ko&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: nl",
+      "state": {
+        "captions": "nl"
+      },
+      "rules": {
+        "captions": {
+          "value": "nl",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "nl",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=nl&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: pl",
+      "state": {
+        "captions": "pl"
+      },
+      "rules": {
+        "captions": {
+          "value": "pl",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "pl",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=pl&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: pt",
+      "state": {
+        "captions": "pt"
+      },
+      "rules": {
+        "captions": {
+          "value": "pt",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "pt",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=pt&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: ru",
+      "state": {
+        "captions": "ru"
+      },
+      "rules": {
+        "captions": {
+          "value": "ru",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "ru",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=ru&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: sv",
+      "state": {
+        "captions": "sv"
+      },
+      "rules": {
+        "captions": {
+          "value": "sv",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "sv",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=sv&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: tr",
+      "state": {
+        "captions": "tr"
+      },
+      "rules": {
+        "captions": {
+          "value": "tr",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "tr",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=tr&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: zh",
+      "state": {
+        "captions": "zh"
+      },
+      "rules": {
+        "captions": {
+          "value": "zh",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "zh",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=zh&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "captions: 00",
+      "state": {
+        "captions": "00"
+      },
+      "rules": {
+        "captions": {
+          "value": "00",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "captions": "00",
+        "captionsModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?captions=00&captionsModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "code: text",
+      "state": {
+        "code": "contract"
+      },
+      "rules": {
+        "code": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "code": "contract"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?code=contract&sort=created_at&dir=ASC"
+    },
+    {
       "label": "groupIds: INCLUDES one id",
       "state": {
         "groupIds": [
@@ -529,6 +1917,67 @@
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: INCLUDES one id, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES",
+        "groupIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES&groupIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES",
+        "groupIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES&groupIdsDepth=-1&sort=created_at&dir=ASC"
     },
     {
       "label": "groupIds: EXCLUDES one id",
@@ -586,6 +2035,235 @@
       "seeMore": "/scenes?groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
     },
     {
+      "label": "groupIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "rules": {
+        "groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "EXCLUDES",
+        "groupIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIds=1%3Ainst-a&groupIdsModifier=EXCLUDES&groupIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "rules": {
+        "groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "EXCLUDES",
+        "groupIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=EXCLUDES&groupIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: IS_NULL one id",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "groups": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "groupIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: IS_NULL two ids",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "groups": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "groupIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: IS_NULL one id, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "groups": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "groupIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: IS_NULL two ids, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "groups": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "groupIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: NOT_NULL one id",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "groups": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "groupIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: NOT_NULL two ids",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "groups": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "groupIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: NOT_NULL one id, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "groups": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "groupIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: NOT_NULL two ids, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "groups": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "groupIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
       "label": "groupIds: one id",
       "state": {
         "groupIds": [
@@ -637,6 +2315,65 @@
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: one id, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1
+      },
+      "rules": {
+        "groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES",
+        "groupIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES&groupIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "groupIds: two ids, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1
+      },
+      "rules": {
+        "groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES",
+        "groupIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES&groupIdsDepth=-1&sort=created_at&dir=ASC"
     },
     {
       "label": "createdAt: start only",
@@ -744,6 +2481,36 @@
       "seeMore": "/scenes?director=contract&sort=created_at&dir=ASC"
     },
     {
+      "label": "duplicated: true",
+      "state": {
+        "duplicated": "true"
+      },
+      "rules": {
+        "duplicated": true
+      },
+      "back": {
+        "duplicated": "true"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?duplicated=true&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "duplicated: false",
+      "state": {
+        "duplicated": "false"
+      },
+      "rules": {
+        "duplicated": false
+      },
+      "back": {
+        "duplicated": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?duplicated=false&sort=created_at&dir=ASC"
+    },
+    {
       "label": "duration: min only",
       "state": {
         "duration": {
@@ -813,64 +2580,124 @@
       "seeMore": "/scenes?duration_min=76&duration_max=225&sort=created_at&dir=ASC"
     },
     {
-      "label": "performerFavorite: checked",
+      "label": "performerFavorite: true",
       "state": {
-        "performerFavorite": true
+        "performerFavorite": "true"
       },
       "rules": {
         "performer_favorite": true
       },
       "back": {
-        "performerFavorite": true
+        "performerFavorite": "true"
       },
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?performerFavorite=true&sort=created_at&dir=ASC"
     },
     {
-      "label": "favorite: checked",
+      "label": "performerFavorite: false",
       "state": {
-        "favorite": true
+        "performerFavorite": "false"
+      },
+      "rules": {
+        "performer_favorite": false
+      },
+      "back": {
+        "performerFavorite": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerFavorite=false&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "favorite: true",
+      "state": {
+        "favorite": "true"
       },
       "rules": {
         "favorite": true
       },
       "back": {
-        "favorite": true
+        "favorite": "true"
       },
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?favorite=true&sort=created_at&dir=ASC"
     },
     {
-      "label": "studioFavorite: checked",
+      "label": "favorite: false",
       "state": {
-        "studioFavorite": true
+        "favorite": "false"
+      },
+      "rules": {
+        "favorite": false
+      },
+      "back": {
+        "favorite": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?favorite=false&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioFavorite: true",
+      "state": {
+        "studioFavorite": "true"
       },
       "rules": {
         "studio_favorite": true
       },
       "back": {
-        "studioFavorite": true
+        "studioFavorite": "true"
       },
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?studioFavorite=true&sort=created_at&dir=ASC"
     },
     {
-      "label": "tagFavorite: checked",
+      "label": "studioFavorite: false",
       "state": {
-        "tagFavorite": true
+        "studioFavorite": "false"
+      },
+      "rules": {
+        "studio_favorite": false
+      },
+      "back": {
+        "studioFavorite": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioFavorite=false&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagFavorite: true",
+      "state": {
+        "tagFavorite": "true"
       },
       "rules": {
         "tag_favorite": true
       },
       "back": {
-        "tagFavorite": true
+        "tagFavorite": "true"
       },
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?tagFavorite=true&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagFavorite: false",
+      "state": {
+        "tagFavorite": "false"
+      },
+      "rules": {
+        "tag_favorite": false
+      },
+      "back": {
+        "tagFavorite": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagFavorite=false&sort=created_at&dir=ASC"
     },
     {
       "label": "framerate: min only",
@@ -940,6 +2767,396 @@
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?framerate_min=30&framerate_max=90&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: INCLUDES_ALL one id",
+      "state": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "INCLUDES_ALL"
+      },
+      "rules": {
+        "galleries": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      },
+      "back": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "INCLUDES_ALL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIds=1%3Ainst-a&galleryIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: INCLUDES_ALL two ids",
+      "state": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "INCLUDES_ALL"
+      },
+      "rules": {
+        "galleries": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      },
+      "back": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "INCLUDES_ALL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIds=1%3Ainst-a%2C2%3Ainst-b&galleryIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: INCLUDES one id",
+      "state": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "galleries": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIds=1%3Ainst-a&galleryIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: INCLUDES two ids",
+      "state": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "galleries": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIds=1%3Ainst-a%2C2%3Ainst-b&galleryIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: EXCLUDES one id",
+      "state": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "EXCLUDES"
+      },
+      "rules": {
+        "galleries": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      },
+      "back": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "EXCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIds=1%3Ainst-a&galleryIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: EXCLUDES two ids",
+      "state": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "EXCLUDES"
+      },
+      "rules": {
+        "galleries": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      },
+      "back": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "EXCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIds=1%3Ainst-a%2C2%3Ainst-b&galleryIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: IS_NULL one id",
+      "state": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "galleries": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: IS_NULL two ids",
+      "state": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "galleries": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: NOT_NULL one id",
+      "state": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "galleries": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "galleryIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: NOT_NULL two ids",
+      "state": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "galleries": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "galleryIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: one id",
+      "state": {
+        "galleryIds": [
+          "1:inst-a"
+        ]
+      },
+      "rules": {
+        "galleries": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIds=1%3Ainst-a&galleryIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "galleryIds: two ids",
+      "state": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "rules": {
+        "galleries": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?galleryIds=1%3Ainst-a%2C2%3Ainst-b&galleryIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "hasMarkers: true",
+      "state": {
+        "hasMarkers": "true"
+      },
+      "rules": {
+        "has_markers": true
+      },
+      "back": {
+        "hasMarkers": "true"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?hasMarkers=true&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "hasMarkers: false",
+      "state": {
+        "hasMarkers": "false"
+      },
+      "rules": {
+        "has_markers": false
+      },
+      "back": {
+        "hasMarkers": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?hasMarkers=false&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "inAnyPlaylist: true",
+      "state": {
+        "inAnyPlaylist": "true"
+      },
+      "rules": {
+        "in_any_playlist": true
+      },
+      "back": {
+        "inAnyPlaylist": "true"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?inAnyPlaylist=true&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "inAnyPlaylist: false",
+      "state": {
+        "inAnyPlaylist": "false"
+      },
+      "rules": {
+        "in_any_playlist": false
+      },
+      "back": {
+        "inAnyPlaylist": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?inAnyPlaylist=false&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "inProgress: true",
+      "state": {
+        "inProgress": "true"
+      },
+      "rules": {
+        "in_progress": true
+      },
+      "back": {
+        "inProgress": "true"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?inProgress=true&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "inProgress: false",
+      "state": {
+        "inProgress": "false"
+      },
+      "rules": {
+        "in_progress": false
+      },
+      "back": {
+        "inProgress": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?inProgress=false&sort=created_at&dir=ASC"
     },
     {
       "label": "lastPlayedAt: start only",
@@ -1080,9 +3297,41 @@
       "seeMore": "/scenes?oCount_min=75&oCount_max=225&sort=created_at&dir=ASC"
     },
     {
+      "label": "organized: true",
+      "state": {
+        "organized": "true"
+      },
+      "rules": {
+        "organized": true
+      },
+      "back": {
+        "organized": "true"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?organized=true&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "organized: false",
+      "state": {
+        "organized": "false"
+      },
+      "rules": {
+        "organized": false
+      },
+      "back": {
+        "organized": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?organized=false&sort=created_at&dir=ASC"
+    },
+    {
       "label": "orientation: LANDSCAPE",
       "state": {
-        "orientation": "LANDSCAPE"
+        "orientation": [
+          "LANDSCAPE"
+        ]
       },
       "rules": {
         "orientation": {
@@ -1092,7 +3341,9 @@
         }
       },
       "back": {
-        "orientation": "LANDSCAPE"
+        "orientation": [
+          "LANDSCAPE"
+        ]
       },
       "kept": {},
       "lossless": true,
@@ -1101,7 +3352,9 @@
     {
       "label": "orientation: PORTRAIT",
       "state": {
-        "orientation": "PORTRAIT"
+        "orientation": [
+          "PORTRAIT"
+        ]
       },
       "rules": {
         "orientation": {
@@ -1111,7 +3364,9 @@
         }
       },
       "back": {
-        "orientation": "PORTRAIT"
+        "orientation": [
+          "PORTRAIT"
+        ]
       },
       "kept": {},
       "lossless": true,
@@ -1120,7 +3375,9 @@
     {
       "label": "orientation: SQUARE",
       "state": {
-        "orientation": "SQUARE"
+        "orientation": [
+          "SQUARE"
+        ]
       },
       "rules": {
         "orientation": {
@@ -1130,11 +3387,138 @@
         }
       },
       "back": {
-        "orientation": "SQUARE"
+        "orientation": [
+          "SQUARE"
+        ]
       },
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?orientation=SQUARE&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "orientation: two values",
+      "state": {
+        "orientation": [
+          "LANDSCAPE",
+          "PORTRAIT"
+        ]
+      },
+      "rules": {
+        "orientation": {
+          "value": [
+            "LANDSCAPE",
+            "PORTRAIT"
+          ]
+        }
+      },
+      "back": {
+        "orientation": [
+          "LANDSCAPE",
+          "PORTRAIT"
+        ]
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?orientation=LANDSCAPE%2CPORTRAIT&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "path: INCLUDES text",
+      "state": {
+        "path": "contract",
+        "pathModifier": "INCLUDES"
+      },
+      "rules": {
+        "path": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "path": "contract",
+        "pathModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?path=contract&pathModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "path: EXCLUDES text",
+      "state": {
+        "path": "contract",
+        "pathModifier": "EXCLUDES"
+      },
+      "rules": {
+        "path": {
+          "value": "contract",
+          "modifier": "EXCLUDES"
+        }
+      },
+      "back": {
+        "path": "contract",
+        "pathModifier": "EXCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?path=contract&pathModifier=EXCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "path: EQUALS text",
+      "state": {
+        "path": "contract",
+        "pathModifier": "EQUALS"
+      },
+      "rules": {
+        "path": {
+          "value": "contract",
+          "modifier": "EQUALS"
+        }
+      },
+      "back": {
+        "path": "contract",
+        "pathModifier": "EQUALS"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?path=contract&pathModifier=EQUALS&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "path: STARTS_WITH text",
+      "state": {
+        "path": "contract",
+        "pathModifier": "STARTS_WITH"
+      },
+      "rules": {
+        "path": {
+          "value": "contract",
+          "modifier": "STARTS_WITH"
+        }
+      },
+      "back": {
+        "path": "contract",
+        "pathModifier": "STARTS_WITH"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?path=contract&pathModifier=STARTS_WITH&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "path: text",
+      "state": {
+        "path": "contract"
+      },
+      "rules": {
+        "path": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "path": "contract",
+        "pathModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?path=contract&pathModifier=INCLUDES&sort=created_at&dir=ASC"
     },
     {
       "label": "performerAge: min only",
@@ -1273,6 +3657,466 @@
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?performerCount_min=5&performerCount_max=15&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL one id",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL two ids",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES_ALL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL",
+        "performerTagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES_ALL&performerTagIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL",
+        "performerTagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES_ALL&performerTagIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: INCLUDES one id",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: INCLUDES two ids",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: INCLUDES one id, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES&performerTagIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES&performerTagIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: EXCLUDES one id",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a&performerTagIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: EXCLUDES two ids",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "EXCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a&performerTagIdsModifier=EXCLUDES&performerTagIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "EXCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=EXCLUDES&performerTagIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: one id",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ]
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: two ids",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: one id, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES&performerTagIdsDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerTagIds: two ids, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1
+      },
+      "rules": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES&performerTagIdsDepth=-1&sort=created_at&dir=ASC"
     },
     {
       "label": "performerIds: INCLUDES_ALL one id",
@@ -1438,6 +4282,88 @@
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?performerIds=1%3Ainst-a%2C2%3Ainst-b&performerIdsModifier=EXCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerIds: IS_NULL one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "performers": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "performerIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerIds: IS_NULL two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "performers": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "performerIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerIds: NOT_NULL one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "performers": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "performerIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "performerIds: NOT_NULL two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "performers": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "performerIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?performerIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
     },
     {
       "label": "performerIds: one id",
@@ -1629,6 +4555,120 @@
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?playDuration_min=76&playDuration_max=225&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "playlistIds: INCLUDES_ALL one id",
+      "state": {
+        "playlistIds": [
+          "1:inst-a"
+        ],
+        "playlistIdsModifier": "INCLUDES_ALL"
+      },
+      "rules": {},
+      "back": {},
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?sort=created_at&dir=ASC"
+    },
+    {
+      "label": "playlistIds: INCLUDES_ALL two ids",
+      "state": {
+        "playlistIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "playlistIdsModifier": "INCLUDES_ALL"
+      },
+      "rules": {},
+      "back": {},
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?sort=created_at&dir=ASC"
+    },
+    {
+      "label": "playlistIds: INCLUDES one id",
+      "state": {
+        "playlistIds": [
+          "1:inst-a"
+        ],
+        "playlistIdsModifier": "INCLUDES"
+      },
+      "rules": {},
+      "back": {},
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?sort=created_at&dir=ASC"
+    },
+    {
+      "label": "playlistIds: INCLUDES two ids",
+      "state": {
+        "playlistIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "playlistIdsModifier": "INCLUDES"
+      },
+      "rules": {},
+      "back": {},
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?sort=created_at&dir=ASC"
+    },
+    {
+      "label": "playlistIds: EXCLUDES one id",
+      "state": {
+        "playlistIds": [
+          "1:inst-a"
+        ],
+        "playlistIdsModifier": "EXCLUDES"
+      },
+      "rules": {},
+      "back": {},
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?sort=created_at&dir=ASC"
+    },
+    {
+      "label": "playlistIds: EXCLUDES two ids",
+      "state": {
+        "playlistIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "playlistIdsModifier": "EXCLUDES"
+      },
+      "rules": {},
+      "back": {},
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?sort=created_at&dir=ASC"
+    },
+    {
+      "label": "playlistIds: one id",
+      "state": {
+        "playlistIds": [
+          "1:inst-a"
+        ]
+      },
+      "rules": {},
+      "back": {},
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?sort=created_at&dir=ASC"
+    },
+    {
+      "label": "playlistIds: two ids",
+      "state": {
+        "playlistIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "rules": {},
+      "back": {},
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?sort=created_at&dir=ASC"
     },
     {
       "label": "rating: BETWEEN min only",
@@ -3349,9 +6389,12 @@
       "seeMore": "/scenes?date_start=2020-01-01&date_end=2024-12-31&sort=created_at&dir=ASC"
     },
     {
-      "label": "studioId: one id",
+      "label": "studioId: INCLUDES one id",
       "state": {
-        "studioId": "1:inst-a"
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES"
       },
       "rules": {
         "studios": {
@@ -3362,16 +6405,448 @@
         }
       },
       "back": {
-        "studioId": "1:inst-a"
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES"
       },
       "kept": {},
       "lossless": true,
-      "seeMore": "/scenes?studioId=1%3Ainst-a&sort=created_at&dir=ASC"
+      "seeMore": "/scenes?studioId=1%3Ainst-a&studioIdModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: INCLUDES two ids",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES"
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: INCLUDES one id, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "INCLUDES"
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES",
+        "studioIdDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a&studioIdModifier=INCLUDES&studioIdDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: INCLUDES two ids, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "INCLUDES"
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES",
+        "studioIdDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=INCLUDES&studioIdDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: EXCLUDES one id",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a&studioIdModifier=EXCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: EXCLUDES two ids",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=EXCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: EXCLUDES one id, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "EXCLUDES"
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "EXCLUDES",
+        "studioIdDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a&studioIdModifier=EXCLUDES&studioIdDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: EXCLUDES two ids, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "EXCLUDES"
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "EXCLUDES",
+        "studioIdDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=EXCLUDES&studioIdDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: IS_NULL one id",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "IS_NULL"
+      },
+      "rules": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "studioIdModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioIdModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: IS_NULL two ids",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "IS_NULL"
+      },
+      "rules": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "studioIdModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioIdModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: IS_NULL one id, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "IS_NULL"
+      },
+      "rules": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "studioIdModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioIdModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: IS_NULL two ids, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "IS_NULL"
+      },
+      "rules": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "studioIdModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioIdModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: NOT_NULL one id",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "NOT_NULL"
+      },
+      "rules": {
+        "studios": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "studioIdModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioIdModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: NOT_NULL two ids",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "NOT_NULL"
+      },
+      "rules": {
+        "studios": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "studioIdModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioIdModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: NOT_NULL one id, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "NOT_NULL"
+      },
+      "rules": {
+        "studios": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "studioIdModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioIdModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: NOT_NULL two ids, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "NOT_NULL"
+      },
+      "rules": {
+        "studios": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "studioIdModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioIdModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: one id",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ]
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a&studioIdModifier=INCLUDES&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: two ids",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=INCLUDES&sort=created_at&dir=ASC"
     },
     {
       "label": "studioId: one id, with sub-items",
       "state": {
-        "studioId": "1:inst-a",
+        "studioId": [
+          "1:inst-a"
+        ],
         "studioIdDepth": -1
       },
       "rules": {
@@ -3384,12 +6859,46 @@
         }
       },
       "back": {
-        "studioId": "1:inst-a",
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES",
         "studioIdDepth": -1
       },
       "kept": {},
       "lossless": true,
-      "seeMore": "/scenes?studioId=1%3Ainst-a&studioIdDepth=-1&sort=created_at&dir=ASC"
+      "seeMore": "/scenes?studioId=1%3Ainst-a&studioIdModifier=INCLUDES&studioIdDepth=-1&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "studioId: two ids, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1
+      },
+      "rules": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "back": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES",
+        "studioIdDepth": -1
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=INCLUDES&studioIdDepth=-1&sort=created_at&dir=ASC"
     },
     {
       "label": "tagCount: min only",
@@ -3809,6 +7318,174 @@
       "seeMore": "/scenes?tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1&sort=created_at&dir=ASC"
     },
     {
+      "label": "tagIds: IS_NULL one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: IS_NULL two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: IS_NULL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: IS_NULL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "IS_NULL"
+      },
+      "rules": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      },
+      "back": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIdsModifier=IS_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: NOT_NULL one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: NOT_NULL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "rules": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      },
+      "back": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?tagIdsModifier=NOT_NULL&sort=created_at&dir=ASC"
+    },
+    {
       "label": "tagIds: one id",
       "state": {
         "tagIds": [
@@ -4008,6 +7685,24 @@
       "seeMore": "/scenes?updatedAt_start=2020-01-01&updatedAt_end=2024-12-31&sort=created_at&dir=ASC"
     },
     {
+      "label": "url: text",
+      "state": {
+        "url": "contract"
+      },
+      "rules": {
+        "url": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      },
+      "back": {
+        "url": "contract"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?url=contract&sort=created_at&dir=ASC"
+    },
+    {
       "label": "videoCodec: text",
       "state": {
         "videoCodec": "contract"
@@ -4024,6 +7719,36 @@
       "kept": {},
       "lossless": true,
       "seeMore": "/scenes?videoCodec=contract&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "watched: true",
+      "state": {
+        "watched": "true"
+      },
+      "rules": {
+        "watched": true
+      },
+      "back": {
+        "watched": "true"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?watched=true&sort=created_at&dir=ASC"
+    },
+    {
+      "label": "watched: false",
+      "state": {
+        "watched": "false"
+      },
+      "rules": {
+        "watched": false
+      },
+      "back": {
+        "watched": "false"
+      },
+      "kept": {},
+      "lossless": true,
+      "seeMore": "/scenes?watched=false&sort=created_at&dir=ASC"
     }
   ],
   "prod": {

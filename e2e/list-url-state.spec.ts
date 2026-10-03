@@ -64,8 +64,8 @@ test.describe("List state in the URL", () => {
     await page
       .locator("label", { hasText: /^Favorite Scenes$/ })
       .locator("..")
-      .getByRole("checkbox")
-      .check();
+      .getByRole("combobox")
+      .selectOption("Yes");
     await page.getByRole("button", { name: "Apply Filters" }).click();
     await expect(page).toHaveURL(/[?&]favorite=true(&|$)/);
     await expect(chip).toBeVisible();

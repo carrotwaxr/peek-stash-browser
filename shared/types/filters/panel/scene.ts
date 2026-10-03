@@ -5,8 +5,8 @@ import type { SCENE_FIELDS } from "../fields.js";
 import {
   HAS_MODIFIERS,
   HAS_ONE_MODIFIERS,
-  INCLUDES_ONLY,
   type PanelField,
+  type SendingChoice,
 } from "./types.js";
 
 /** Stash's resolutions as its panel offers them: VR_HD left out */
@@ -26,6 +26,46 @@ const RESOLUTION_CHOICES = [
   { value: "EIGHT_K", label: "8K" },
   { value: "HUGE", label: "Huge" },
 ] as const;
+
+/** Caption languages as Stash's editor sets them (its "unknown" is `00`) */
+const CAPTION_LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "de", label: "German" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "it", label: "Italian" },
+  { value: "ja", label: "Japanese" },
+  { value: "ko", label: "Korean" },
+  { value: "nl", label: "Dutch" },
+  { value: "pl", label: "Polish" },
+  { value: "pt", label: "Portuguese" },
+  { value: "ru", label: "Russian" },
+  { value: "sv", label: "Swedish" },
+  { value: "tr", label: "Turkish" },
+  { value: "zh", label: "Chinese" },
+  { value: "00", label: "Unknown" },
+] as const;
+
+/**
+ * Yes, No and Any: Yes sends `true`, No sends `false`, Any sends nothing.
+ * The state holds the choice's text and the URL its boolean, so a link or a
+ * preset saved with `favorite=true` reads as Yes.
+ */
+const THREE_STATE = [
+  { value: "true", label: "Yes", sends: true },
+  { value: "false", label: "No", sends: false },
+  { value: "any", label: "Any", sends: undefined },
+] as const satisfies readonly SendingChoice[];
+
+/** Has ANY or NONE of these, or has none or any at all (a scene's one studio) */
+const HAS_ONE_OR_PRESENCE = [
+  ...HAS_ONE_MODIFIERS,
+  "IS_NULL",
+  "NOT_NULL",
+] as const;
+
+/** Has ALL, ANY or NONE of these, or has none or any at all */
+const HAS_OR_PRESENCE = [...HAS_MODIFIERS, "IS_NULL", "NOT_NULL"] as const;
 
 export const SCENE_PANEL = [
   // Common
@@ -53,7 +93,7 @@ export const SCENE_PANEL = [
     editor: "ref",
     multi: true,
     placeholder: "Select performers...",
-    modifiers: HAS_MODIFIERS,
+    modifiers: HAS_OR_PRESENCE,
     modifierKey: "performerIdsModifier",
     defaultModifier: "INCLUDES",
     modifierLabels: "has",
@@ -64,15 +104,19 @@ export const SCENE_PANEL = [
   {
     key: "studioId",
     field: "studios",
-    label: "Studio",
+    label: "Studios",
     group: "common",
     editor: "ref",
-    multi: false,
-    placeholder: "Select studio...",
-    modifiers: INCLUDES_ONLY,
+    multi: true,
+    placeholder: "Select studios...",
+    modifiers: HAS_ONE_OR_PRESENCE,
+    modifierKey: "studioIdModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "has",
     hierarchyKey: "studioIdDepth",
     hierarchyLabel: "Include sub-studios",
     countContext: "scenes",
+    excludeKey: "studioIdExclude",
   },
   {
     key: "tagIds",
@@ -82,7 +126,7 @@ export const SCENE_PANEL = [
     editor: "ref",
     multi: true,
     placeholder: "Select tags...",
-    modifiers: HAS_MODIFIERS,
+    modifiers: HAS_OR_PRESENCE,
     modifierKey: "tagIdsModifier",
     defaultModifier: "INCLUDES_ALL",
     modifierLabels: "has",
@@ -93,6 +137,22 @@ export const SCENE_PANEL = [
     excludeKey: "tagIdsExclude",
   },
   {
+    key: "performerTagIds",
+    field: "performer_tags",
+    label: "Performer Tags",
+    group: "common",
+    editor: "ref",
+    multi: true,
+    placeholder: "Select performer tags...",
+    modifiers: HAS_MODIFIERS,
+    modifierKey: "performerTagIdsModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "has",
+    hierarchyKey: "performerTagIdsDepth",
+    hierarchyLabel: "Include sub-tags",
+    excludeKey: "performerTagIdsExclude",
+  },
+  {
     key: "groupIds",
     field: "groups",
     label: "Collections",
@@ -100,10 +160,12 @@ export const SCENE_PANEL = [
     editor: "ref",
     multi: true,
     placeholder: "Select collections...",
-    modifiers: HAS_ONE_MODIFIERS,
+    modifiers: HAS_ONE_OR_PRESENCE,
     modifierKey: "groupIdsModifier",
     defaultModifier: "INCLUDES",
     modifierLabels: "in",
+    hierarchyKey: "groupIdsDepth",
+    hierarchyLabel: "Include sub-collections",
     countContext: "scenes",
   },
   {
@@ -140,32 +202,78 @@ export const SCENE_PANEL = [
     field: "favorite",
     label: "Favorite Scenes",
     group: "common",
-    editor: "toggle",
-    placeholder: "Favorites Only",
+    editor: "choice",
+    choices: THREE_STATE,
+    defaultValue: "any",
   },
   {
     key: "performerFavorite",
     field: "performer_favorite",
     label: "Favorite Performers",
     group: "common",
-    editor: "toggle",
-    placeholder: "Favorite Performers Only",
+    editor: "choice",
+    choices: THREE_STATE,
+    defaultValue: "any",
   },
   {
     key: "studioFavorite",
     field: "studio_favorite",
     label: "Favorite Studios",
     group: "common",
-    editor: "toggle",
-    placeholder: "Favorite Studios Only",
+    editor: "choice",
+    choices: THREE_STATE,
+    defaultValue: "any",
   },
   {
     key: "tagFavorite",
     field: "tag_favorite",
     label: "Favorite Tags",
     group: "common",
-    editor: "toggle",
-    placeholder: "Favorite Tags Only",
+    editor: "choice",
+    choices: THREE_STATE,
+    defaultValue: "any",
+  },
+
+  // Entities
+  {
+    key: "galleryIds",
+    field: "galleries",
+    label: "Galleries",
+    group: "entities",
+    editor: "ref",
+    multi: true,
+    placeholder: "Select galleries...",
+    modifiers: HAS_OR_PRESENCE,
+    modifierKey: "galleryIdsModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "has",
+  },
+  {
+    key: "playlistIds",
+    field: "playlists",
+    label: "Playlists",
+    group: "entities",
+    editor: "ref",
+    source: "playlists",
+    multi: true,
+    placeholder: "Select playlists...",
+    modifiers: HAS_MODIFIERS,
+    modifierKey: "playlistIdsModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "has",
+  },
+  {
+    key: "inAnyPlaylist",
+    field: "in_any_playlist",
+    label: "In any of my playlists",
+    group: "entities",
+    editor: "choice",
+    choices: [
+      { value: "true", label: "In one of your own playlists", sends: true },
+      { value: "false", label: "In none of your own playlists", sends: false },
+      { value: "any", label: "Any", sends: undefined },
+    ],
+    defaultValue: "any",
   },
 
   // Dates
@@ -236,6 +344,7 @@ export const SCENE_PANEL = [
     label: "Orientation",
     group: "video",
     editor: "enum",
+    multi: true,
     placeholder: "Any orientation",
     choices: [
       { value: "LANDSCAPE", label: "Landscape" },
@@ -268,6 +377,89 @@ export const SCENE_PANEL = [
     group: "other",
     editor: "text",
     placeholder: "Search director...",
+  },
+  {
+    key: "path",
+    field: "path",
+    label: "Path",
+    group: "other",
+    editor: "text",
+    placeholder: "Search path...",
+    modifierKey: "pathModifier",
+    modifiers: ["INCLUDES", "EXCLUDES", "EQUALS", "STARTS_WITH"],
+  },
+  {
+    key: "url",
+    field: "url",
+    label: "URL",
+    group: "other",
+    editor: "text",
+    placeholder: "Search URLs...",
+  },
+  {
+    key: "code",
+    field: "code",
+    label: "Code",
+    group: "other",
+    editor: "text",
+    placeholder: "Search code...",
+  },
+  {
+    key: "captions",
+    field: "captions",
+    label: "Captions",
+    group: "other",
+    editor: "enum",
+    placeholder: "Any language",
+    choices: CAPTION_LANGUAGES,
+    modifiers: ["EQUALS", "NOT_EQUALS", "IS_NULL", "NOT_NULL"],
+    modifierKey: "captionsModifier",
+    defaultModifier: "EQUALS",
+  },
+  {
+    key: "organized",
+    field: "organized",
+    label: "Organized",
+    group: "other",
+    editor: "choice",
+    choices: THREE_STATE,
+    defaultValue: "any",
+  },
+  {
+    key: "hasMarkers",
+    field: "has_markers",
+    label: "Has Markers",
+    group: "other",
+    editor: "choice",
+    choices: THREE_STATE,
+    defaultValue: "any",
+  },
+  {
+    key: "duplicated",
+    field: "duplicated",
+    label: "Duplicated",
+    group: "other",
+    editor: "choice",
+    choices: THREE_STATE,
+    defaultValue: "any",
+  },
+  {
+    key: "watched",
+    field: "watched",
+    label: "Watched",
+    group: "other",
+    editor: "choice",
+    choices: THREE_STATE,
+    defaultValue: "any",
+  },
+  {
+    key: "inProgress",
+    field: "in_progress",
+    label: "In Progress",
+    group: "other",
+    editor: "choice",
+    choices: THREE_STATE,
+    defaultValue: "any",
   },
   {
     key: "playDuration",

@@ -40,16 +40,6 @@ import {
   useWallPlayback,
 } from "../../../src/hooks/useWallPlayback";
 
-// The scene Collections row offers In none and In any, and scenes have a
-// Path row with a condition select, as F18 opts them in
-vi.mock("@peek/shared-types", async (importOriginal) => {
-  const { withRefPresence } = await import("@tests/helpers/refPresence");
-  const { withEditorRows } = await import("@tests/helpers/editorRows");
-  return withEditorRows(
-    withRefPresence(await importOriginal(), [["scene", "groupIds"]])
-  );
-});
-
 vi.mock("../../../src/hooks/useTVMode", () => ({
   useTVMode: () => ({ isTVMode: false }),
 }));
@@ -384,16 +374,16 @@ describe("SearchControls", () => {
 
       await user.click(filtersButton());
       const favorite = () =>
-        document.getElementById("filter-favorite") as HTMLInputElement;
-      expect(favorite().checked).toBe(true);
-      await user.click(favorite());
-      expect(favorite().checked).toBe(false);
+        document.getElementById("filter-favorite") as HTMLSelectElement;
+      expect(favorite()).toHaveDisplayValue("Yes");
+      await user.selectOptions(favorite(), "No");
+      expect(favorite()).toHaveDisplayValue("No");
 
       await user.click(screen.getByRole("button", { name: "Cancel" }));
       expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
       await user.click(filtersButton());
 
-      expect(favorite().checked).toBe(true);
+      expect(favorite()).toHaveDisplayValue("Yes");
       expect(list.params().get("favorite")).toBe("true");
     });
 
@@ -628,7 +618,9 @@ describe("SearchControls", () => {
           .parentElement,
         "the Favorite control"
       );
-      await user.click(within(favorite).getByRole("checkbox"));
+      // Three states: Yes, No and Any (Any is what an untouched panel holds)
+      expect(within(favorite).getByRole("combobox")).toHaveDisplayValue("Any");
+      await user.selectOptions(within(favorite).getByRole("combobox"), "Yes");
       expect(list.onQueryChange).toHaveBeenCalledTimes(1);
       await user.click(
         must(screen.getByText("Apply Filters").closest("button"))
@@ -639,6 +631,66 @@ describe("SearchControls", () => {
       );
       expect(list.params().get("favorite")).toBe("true");
       expect(list.actions).toEqual(["PUSH"]);
+    });
+
+    it("favourite No sends false, and Any sends nothing and leaves the URL", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
+      await firstQuery(list.onQueryChange);
+
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      const favorite = screen.getByRole("combobox", {
+        name: "Favorite Scenes",
+      });
+      await user.selectOptions(favorite, "No");
+      await user.click(
+        must(screen.getByText("Apply Filters").closest("button"))
+      );
+      await waitFor(() =>
+        expect(list.lastQuery().scene_filter).toEqual({ favorite: false })
+      );
+      expect(list.params().get("favorite")).toBe("false");
+
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      await user.selectOptions(
+        screen.getByRole("combobox", { name: "Favorite Scenes" }),
+        "Any"
+      );
+      await user.click(
+        must(screen.getByText("Apply Filters").closest("button"))
+      );
+      await waitFor(() => expect(list.lastQuery().scene_filter).toEqual({}));
+      expect(list.params().has("favorite")).toBe(false);
+    });
+
+    it("Orientation is a box for each value, and several send a list", async () => {
+      const user = userEvent.setup();
+      // A link stored while Orientation took one value
+      const list = renderSearchControls(
+        {},
+        { url: "/scenes?orientation=LANDSCAPE" }
+      );
+      await firstQuery(list.onQueryChange);
+
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      await user.click(
+        screen.getByRole("button", { name: "Video Properties" })
+      );
+      const group = screen.getByRole("group", { name: "Orientation" });
+      expect(
+        within(group).getByRole("checkbox", { name: /Landscape$/ })
+      ).toBeChecked();
+      await user.click(within(group).getByRole("checkbox", { name: "Square" }));
+      await user.click(
+        must(screen.getByText("Apply Filters").closest("button"))
+      );
+
+      await waitFor(() =>
+        expect(list.lastQuery().scene_filter).toEqual({
+          orientation: { value: ["LANDSCAPE", "SQUARE"] },
+        })
+      );
+      expect(list.params().get("orientation")).toBe("LANDSCAPE,SQUARE");
     });
 
     it("choosing Not rated hides the bounds and sends IS_NULL", async () => {
@@ -779,7 +831,7 @@ describe("SearchControls", () => {
           document.getElementById("filter-favorite")
         )
       );
-      expect(document.activeElement).toHaveAttribute("type", "checkbox");
+      expect(document.activeElement?.tagName).toBe("SELECT");
 
       await user.click(
         screen.getByRole("button", { name: /^Edit filter: Tags/ })
@@ -1273,7 +1325,7 @@ describe("SearchControls text condition (F22b)", () => {
     expect(condition).toHaveDisplayValue("Contains");
     expect(
       [...condition.querySelectorAll("option")].map((each) => each.text)
-    ).toEqual(["Contains", "Excludes", "Equals", "Not equals", "Starts with"]);
+    ).toEqual(["Contains", "Excludes", "Equals", "Starts with"]);
     await user.selectOptions(condition, "Starts with");
     await user.click(must(screen.getByText("Apply Filters").closest("button")));
 
