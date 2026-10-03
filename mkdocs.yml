@@ -68,6 +68,8 @@ plugins:
         'development/api-reference.md': 'reference/api-reference.md'
         'reference/troubleshooting.md': 'getting-started/troubleshooting.md'
         'reference/faq.md': 'getting-started/faq.md'
+        # The manual regression checklist was retired; the E2E suite covers it
+        'development/regression-testing.md': 'development/local-setup.md#end-to-end-tests'
   - minify:
       minify_html: true
 
@@ -156,7 +158,6 @@ nav:
       - Local Setup: development/local-setup.md
       - Technical Overview: development/technical-overview.md
       - Sync Architecture: development/sync-architecture.md
-      - Regression Testing Guide: development/regression-testing.md
 
 # Social links
 extra:
