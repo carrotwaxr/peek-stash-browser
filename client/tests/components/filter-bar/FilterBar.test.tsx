@@ -1050,6 +1050,22 @@ describe("groups and the Advanced entry", () => {
   const advanced = () => screen.getByRole("button", { name: "Advanced" });
   const view = () => screen.getByRole("dialog", { name: "Advanced filters" });
 
+  it("Apply with nothing changed writes nothing: no history entry, the page stays", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls(
+      {},
+      { url: "/scenes?favorite=true&page=3" }
+    );
+    await list.firstQuery();
+
+    await user.click(advanced());
+    await user.click(within(view()).getByRole("button", { name: "Apply" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(list.params().get("page")).toBe("3");
+    expect(list.actions).toEqual([]);
+  });
+
   it("Advanced opens the row view over the current state; Apply there commits once", async () => {
     const user = userEvent.setup();
     const list = renderListControls({}, { url: "/scenes?favorite=true" });

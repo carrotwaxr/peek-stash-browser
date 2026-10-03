@@ -20,6 +20,7 @@ import {
   type ChipParts,
   type FilterOption,
   type PanelState,
+  filtersEqual,
   rowChip,
 } from "../../utils/filterFields";
 import {
@@ -576,7 +577,10 @@ const FilterBar = ({
         kind={kind}
         value={filters.filters}
         {...(advanced?.over === undefined ? {} : { openedOver: advanced.over })}
-        onApply={(next) => filters.commit(next)}
+        // Nothing changed: no write (no history entry, the page stays)
+        onApply={(next) => {
+          if (!filtersEqual(kind, next, filters.filters)) filters.commit(next);
+        }}
         permanentChips={permanentChips}
         {...(advanced?.focusGroup === undefined
           ? {}

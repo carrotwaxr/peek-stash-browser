@@ -78,10 +78,11 @@ const OpenView = ({
   const isSheet = useMediaQuery(SHEET_QUERY) || isTVMode;
   const reasonId = useId();
 
+  // The user's own edits: the list changing underneath (Back) is not one
   const dirty = !filtersEqual(
     kind,
     stateOf(kind, panelTreeOf(draft).tree),
-    value
+    openedOver
   );
   const listChanged = !filtersEqual(kind, openedOver, value);
   const refused = overLimit(countRows(draft, kind), countGroups(draft));
@@ -182,7 +183,8 @@ const OpenView = ({
  * The Advanced view: the list's filters as rows and groups (the row
  * editor), edited as a draft that sends nothing until Apply. Apply hands
  * the normalized state to `onApply` once and closes; closing with changes
- * asks before discarding them. A dialog on a desktop, the whole screen on a
+ * of the user's own (not the list changing underneath) asks before
+ * discarding them. A dialog on a desktop, the whole screen on a
  * phone or a TV, with Apply and Cancel always in view.
  */
 const AdvancedFilterView = ({ isOpen, ...props }: AdvancedFilterViewProps) =>
