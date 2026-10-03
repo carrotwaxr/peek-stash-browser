@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConflictError, NotFoundError } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
+import { logger } from "../../utils/logger.js";
 import {
   type UserJsonColumn,
   updateUserJson,
@@ -17,7 +18,12 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
+vi.mock("../../utils/logger.js", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
+const mockLogger = vi.mocked(logger, true);
 
 /** The read's rows, as the raw query returns them */
 function stored(row: Record<string, string | null>) {
@@ -138,6 +144,50 @@ describe("updateUserJson", () => {
       anyOf(Number),
       3,
       '{"a":1}'
+    );
+  });
+
+  it("an unreadable column answers 409 naming it, logs a warning and writes nothing", async () => {
+    stored({ filterPresets: "{not json", defaultFilterPresets: null });
+    const mutate = vi.fn((values: Record<UserJsonColumn, unknown>) => values);
+
+    const failure = await updateUserJson(
+      3,
+      ["filterPresets", "defaultFilterPresets"],
+      mutate
+    ).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ConflictError);
+    expect((failure as ConflictError).message).toBe(
+      "Your saved Views can't be read, so nothing was saved"
+    );
+    expect(mutate).not.toHaveBeenCalled();
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      "A stored settings column can't be read",
+      { userId: 3, column: "filterPresets", reset: false }
+    );
+  });
+
+  it("with resetUnreadable an unreadable column reads as NULL and the write replaces it", async () => {
+    stored({ filterPins: "{not json" });
+    mockPrisma.$executeRawUnsafe.mockResolvedValueOnce(1);
+    const mutate = vi.fn((values: Record<UserJsonColumn, unknown>) => values);
+
+    await updateUserJson(3, ["filterPins"], mutate, { resetUnreadable: true });
+
+    expect(mutate).toHaveBeenCalledWith(objectContaining({ filterPins: null }));
+    // Compare-and-set on the text read: a save that fixed it meanwhile wins
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
+      anyOf(String),
+      null,
+      anyOf(Number),
+      3,
+      "{not json"
+    );
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      "A stored settings column can't be read",
+      { userId: 3, column: "filterPins", reset: true }
     );
   });
 
