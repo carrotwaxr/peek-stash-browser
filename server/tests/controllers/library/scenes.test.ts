@@ -921,7 +921,7 @@ describe("findRecommendedScenes", () => {
     expect(mockRecommendationService.getRankedRefs).not.toHaveBeenCalled();
   });
 
-  it("page 1 awaits ensureFresh; a later page and a count-only request do not", async () => {
+  it("page 1 awaits ensureFresh; a later page does not", async () => {
     const order: string[] = [];
     mockRankingService.ensureFresh.mockImplementationOnce(async () => {
       await Promise.resolve();
@@ -939,15 +939,6 @@ describe("findRecommendedScenes", () => {
 
     mockRankingService.ensureFresh.mockClear();
     await run({ filter: { page: 2 } });
-    expect(mockRankingService.ensureFresh).not.toHaveBeenCalled();
-
-    // The count route is the count-only request
-    const req = reqFor(countRecommendedScenes, {
-      body: {},
-      user: testUser(),
-      allowedInstanceIds: ["A", "B"],
-    });
-    await countRecommendedScenes(req, resFor(countRecommendedScenes));
     expect(mockRankingService.ensureFresh).not.toHaveBeenCalled();
   });
 
@@ -1079,7 +1070,7 @@ describe("countRecommendedScenes", () => {
     rankedEntities: 0,
   };
 
-  it("the recommended count answers the builder's count within the ranked refs and never calls ensureFresh", async () => {
+  it("the recommended count answers the builder's count within the ranked refs", async () => {
     mockRecommendationService.getRankedRefs.mockResolvedValue({
       refs,
       criteria,
@@ -1111,8 +1102,53 @@ describe("countRecommendedScenes", () => {
         }),
       })
     );
-    expect(mockRankingService.ensureFresh).not.toHaveBeenCalled();
     expect(mockSceneQueryBuilder.execute).not.toHaveBeenCalled();
+  });
+
+  it("the count awaits the rankings' freshness first, as page 1 does, so its N is page 1's total", async () => {
+    const order: string[] = [];
+    mockRankingService.ensureFresh.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      order.push("ensureFresh");
+    });
+    mockRecommendationService.getRankedRefs.mockImplementationOnce(() => {
+      order.push("getRankedRefs");
+      return Promise.resolve({ refs, criteria });
+    });
+    mockSceneQueryBuilder.count.mockResolvedValue(3);
+    const req = reqFor(countRecommendedScenes, {
+      body: {},
+      user: testUser(),
+    });
+    const res = resFor(countRecommendedScenes);
+
+    await countRecommendedScenes(req, res);
+
+    expect(res._getOkBody()).toEqual({ count: 3 });
+    expect(mockRankingService.ensureFresh).toHaveBeenCalledExactlyOnceWith(1, {
+      wait: true,
+    });
+    expect(order).toEqual(["ensureFresh", "getRankedRefs"]);
+  });
+
+  it("a failed recompute still answers the count from the stored rankings", async () => {
+    mockRankingService.ensureFresh.mockRejectedValueOnce(
+      new Error("recompute failed")
+    );
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs,
+      criteria,
+    });
+    mockSceneQueryBuilder.count.mockResolvedValue(4);
+    const req = reqFor(countRecommendedScenes, {
+      body: {},
+      user: testUser(),
+    });
+    const res = resFor(countRecommendedScenes);
+
+    await countRecommendedScenes(req, res);
+
+    expect(res._getOkBody()).toEqual({ count: 4 });
   });
 
   it("no ranked refs answer 0 without a count query", async () => {
