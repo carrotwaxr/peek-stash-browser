@@ -179,8 +179,10 @@ const SceneContent = () => {
       <main className="w-full px-4 lg:px-6 xl:px-8">
         {/* Two-column layout on desktop, single column on mobile */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(320px,380px)] xl:grid-cols-[1fr_400px] gap-6 mb-6">
-          {/* Left Column: Video + Controls */}
-          <div ref={leftColumnRef} className="flex flex-col gap-2">
+          {/* Left Column: Video + Controls. self-start: a stretched grid item
+              would measure the sidebar's height, and the sidebar takes its
+              height from this measurement */}
+          <div ref={leftColumnRef} className="flex flex-col gap-2 self-start">
             <VideoPlayer />
             <PlaybackControls />
 

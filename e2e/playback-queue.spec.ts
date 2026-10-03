@@ -99,3 +99,50 @@ test("Next scene pressed from the keyboard moves focus into the new scene's play
     )
     .toBe(true);
 });
+
+test("the queue sidebar is as tall as the player and its controls, and scrolls", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const list = new ListPage(page);
+  await list.goto("/scenes");
+  const count = await list.waitForResults("Scene");
+  // Enough items that the full list is taller than the player column
+  requireData(count >= 8 ? count : undefined, "eight scenes");
+
+  await titleLinkOf(list.cards("Scene").first()).click();
+  await expect(page).toHaveURL(/\/scene\//);
+  const sidebar = page.locator("aside div.sticky > div").first();
+  await expect(sidebar.getByText("Browsing", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // The player column's content: the video's top to the controls' bottom
+  const column = page.locator("main > div.grid > div").first();
+  const columnContent = () =>
+    column.evaluate((el) => {
+      const kids = Array.from(el.children) as HTMLElement[];
+      const top = Math.min(...kids.map((k) => k.getBoundingClientRect().top));
+      const bottom = Math.max(
+        ...kids.map((k) => k.getBoundingClientRect().bottom)
+      );
+      return bottom - top;
+    });
+
+  await expect
+    .poll(async () => {
+      const box = await sidebar.boundingBox();
+      return Math.abs((box?.height ?? 0) - (await columnContent()));
+    })
+    .toBeLessThan(2);
+  // The column does not stretch past its content (no gap above Details)
+  const columnBox = await column.boundingBox();
+  expect(
+    Math.abs((columnBox?.height ?? 0) - (await columnContent()))
+  ).toBeLessThan(2);
+  // The list scrolls inside the sidebar instead of growing it
+  const scroller = sidebar.locator(".overflow-y-auto");
+  expect(
+    await scroller.evaluate((el) => el.scrollHeight > el.clientHeight)
+  ).toBe(true);
+});
