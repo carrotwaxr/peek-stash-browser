@@ -17,6 +17,7 @@
  */
 import { ConflictError, NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
+import { logger } from "./logger.js";
 
 /** The `User` columns that hold settings JSON; the names go into SQL */
 export const USER_JSON_COLUMNS = [
@@ -32,11 +33,56 @@ const ATTEMPTS = 3;
 const isUserJsonColumn = (name: string): name is UserJsonColumn =>
   USER_JSON_COLUMNS.some((column) => column === name);
 
+/** What each column holds, as the user knows it */
+const COLUMN_LABELS: Record<UserJsonColumn, string> = {
+  filterPresets: "Views",
+  defaultFilterPresets: "default Views",
+  filterPins: "pinned filters",
+};
+
+export interface UpdateUserJsonOptions {
+  /**
+   * A stored value that is not JSON reads as NULL, so the write replaces it
+   * (a reset). Without it, such a value answers 409 and stays as it is.
+   */
+  readonly resetUnreadable?: boolean;
+}
+
+/**
+ * A column's stored text parsed; NULL as `null`. Text that is not JSON
+ * (written by hand, say) is logged and then, for a reset, `null`; otherwise
+ * a 409 naming what the user cannot save, so no write builds on a value it
+ * could not read.
+ */
+function parseColumn(
+  userId: number,
+  column: UserJsonColumn,
+  text: string | null,
+  resetUnreadable: boolean
+): unknown {
+  if (text === null) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    logger.warn("A stored settings column can't be read", {
+      userId,
+      column,
+      reset: resetUnreadable,
+    });
+    if (resetUnreadable) return null;
+    throw new ConflictError(
+      `Your saved ${COLUMN_LABELS[column]} can't be read, so nothing was saved`
+    );
+  }
+}
+
 /**
  * Changes `columns` of one user's row: `mutate` gets their parsed values (NULL
  * as `null`; only the named columns are set) and returns the values to store
  * (`null` or `undefined` stores NULL), written in one statement. Retried on
- * a lost race up to 3 times with a fresh read; then a 409.
+ * a lost race up to 3 times with a fresh read; then a 409. A stored value
+ * that is not JSON answers 409, unless `resetUnreadable` lets the write
+ * replace it.
  *
  * @returns the values written
  */
@@ -45,7 +91,8 @@ export async function updateUserJson(
   columns: readonly UserJsonColumn[],
   mutate: (
     values: Record<UserJsonColumn, unknown>
-  ) => Record<UserJsonColumn, unknown>
+  ) => Record<UserJsonColumn, unknown>,
+  { resetUnreadable = false }: UpdateUserJsonOptions = {}
 ): Promise<Record<UserJsonColumn, unknown>> {
   // The names are interpolated into the statement: check them at run time
   if (columns.length === 0 || !columns.every(isUserJsonColumn)) {
@@ -76,8 +123,12 @@ export async function updateUserJson(
       filterPins: null,
     } as Record<UserJsonColumn, unknown>;
     for (const column of unique) {
-      const text = row[column];
-      current[column] = text === null ? null : (JSON.parse(text) as unknown);
+      current[column] = parseColumn(
+        userId,
+        column,
+        row[column],
+        resetUnreadable
+      );
     }
 
     const next = mutate(current);

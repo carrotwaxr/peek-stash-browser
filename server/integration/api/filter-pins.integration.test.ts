@@ -168,6 +168,35 @@ describe("filter pins (integration)", () => {
     expect(must(read).filterPins).toMatchObject({ scene: SCENE_PINS });
   });
 
+  it("a stored value that is not JSON: a PUT answers 409 and keeps it, the reset writes NULL over it", async () => {
+    await prisma.$executeRawUnsafe(
+      `UPDATE "User" SET "filterPins" = ? WHERE "id" = ?`,
+      "{not json",
+      user.id
+    );
+
+    const put = await user.client.put<{ error: string }>(
+      "/api/user/filter-pins/scene",
+      SCENE_PINS
+    );
+    expect(put.status).toBe(409);
+    expect(put.data.error).toBe(
+      "Your saved pinned filters can't be read, so nothing was saved"
+    );
+    expect((await storedText(user.id)).pins).toBe("{not json");
+
+    const reset = await user.client.delete("/api/user/filter-pins/scene");
+    expect(reset.status).toBe(200);
+    expect((await storedText(user.id)).pins).toBeNull();
+
+    // Saving works again (and the pins stay for the tests that follow)
+    const again = await user.client.put(
+      "/api/user/filter-pins/scene",
+      SCENE_PINS
+    );
+    expect(again.status).toBe(200);
+  });
+
   it("refuses invalid pins with their paths, and a list that is no list", async () => {
     const bad = await user.client.put<{
       issues?: Array<{ path: string; message: string }>;

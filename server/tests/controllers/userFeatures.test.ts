@@ -837,6 +837,26 @@ describe("User Controller — Features", () => {
       expect(runMutation(null).values.filterPins).toBeNull();
     });
 
+    it("DELETE writes over a stored value it cannot read, so the reset always works; PUT does not", async () => {
+      await resetFilterPins(
+        reqFor(resetFilterPins, { user: USER, params: { list: "scene" } }),
+        resFor(resetFilterPins)
+      );
+      expect(must(mockUpdateUserJson.mock.calls[0])[3]).toEqual({
+        resetUnreadable: true,
+      });
+
+      await putFilterPins(
+        reqFor(putFilterPins, {
+          user: USER,
+          params: { list: "scene" },
+          body: SCENE_PINS,
+        }),
+        resFor(putFilterPins)
+      );
+      expect(must(mockUpdateUserJson.mock.calls[1])[3]).toBeUndefined();
+    });
+
     it("reads and writes only the signed-in user's pins", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({ filterPins: null })

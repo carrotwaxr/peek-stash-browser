@@ -1545,20 +1545,29 @@ export const putFilterPins = async (
   res.json({ pins });
 };
 
-/** DELETE /api/user/filter-pins/:list: back to that list's defaults */
+/**
+ * DELETE /api/user/filter-pins/:list: back to that list's defaults. A stored
+ * value that is not JSON reads as none, so the reset always works and
+ * writes NULL over it (every list's pins, which nothing could read anyway)
+ */
 export const resetFilterPins = async (
   req: TypedAuthRequest<never, FilterPinsParams>,
   res: TypedResponse<FilterPinsListResponse | ApiErrorResponse>
 ) => {
   const kind = listKindOf(req.params.list);
 
-  await updateUserJson(req.user.id, ["filterPins"], (values) => {
-    const { [kind]: _removed, ...rest } = storedPinsOf(values.filterPins);
-    return {
-      ...values,
-      filterPins: Object.keys(rest).length === 0 ? null : rest,
-    };
-  });
+  await updateUserJson(
+    req.user.id,
+    ["filterPins"],
+    (values) => {
+      const { [kind]: _removed, ...rest } = storedPinsOf(values.filterPins);
+      return {
+        ...values,
+        filterPins: Object.keys(rest).length === 0 ? null : rest,
+      };
+    },
+    { resetUnreadable: true }
+  );
 
   res.json({ pins: defaultPinsOf(kind) });
 };
