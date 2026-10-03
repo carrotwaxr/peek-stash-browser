@@ -16,7 +16,6 @@ import {
   carouselRulesToFilterState,
 } from "@/utils/filterConfig";
 import { buildPanelFilter, readPanelFilter } from "@/utils/filterFields";
-import { PATH_ROW, PLAYLISTS_ROW } from "../../helpers/editorRows";
 
 const SCENE_ROWS: readonly PanelField[] = PANEL_FIELDS.scene;
 
@@ -46,7 +45,11 @@ const ROUND_TRIPS: Record<
     rules: {
       studios: { value: ["7:inst-a"], modifier: "INCLUDES", depth: -1 },
     },
-    state: { studioId: "7:inst-a", studioIdDepth: -1 },
+    state: {
+      studioId: ["7:inst-a"],
+      studioIdModifier: "INCLUDES",
+      studioIdDepth: -1,
+    },
   },
   tagIds: {
     rules: {
@@ -74,16 +77,19 @@ const ROUND_TRIPS: Record<
     rules: { duration: { modifier: "BETWEEN", value: 600, value2: 1800 } },
     state: { duration: { min: 10, max: 30 } },
   },
-  favorite: { rules: { favorite: true }, state: { favorite: true } },
+  favorite: { rules: { favorite: true }, state: { favorite: "true" } },
   performerFavorite: {
-    rules: { performer_favorite: true },
-    state: { performerFavorite: true },
+    rules: { performer_favorite: false },
+    state: { performerFavorite: "false" },
   },
   studioFavorite: {
     rules: { studio_favorite: true },
-    state: { studioFavorite: true },
+    state: { studioFavorite: "true" },
   },
-  tagFavorite: { rules: { tag_favorite: true }, state: { tagFavorite: true } },
+  tagFavorite: {
+    rules: { tag_favorite: true },
+    state: { tagFavorite: "true" },
+  },
   date: {
     rules: {
       date: { modifier: "BETWEEN", value: "2020-01-01", value2: "2020-12-31" },
@@ -124,7 +130,7 @@ const ROUND_TRIPS: Record<
   },
   orientation: {
     rules: { orientation: { value: ["PORTRAIT"] } },
-    state: { orientation: "PORTRAIT" },
+    state: { orientation: ["PORTRAIT"] },
   },
   videoCodec: {
     rules: { video_codec: { value: "hevc", modifier: "INCLUDES" } },
@@ -157,6 +163,53 @@ const ROUND_TRIPS: Record<
   tagCount: {
     rules: { tag_count: { modifier: "BETWEEN", value: 5 } },
     state: { tagCount: { min: 5 } },
+  },
+  // F18's rows
+  performerTagIds: {
+    rules: {
+      performer_tags: { value: ["5:inst-a"], modifier: "INCLUDES", depth: -1 },
+    },
+    state: {
+      performerTagIds: ["5:inst-a"],
+      performerTagIdsModifier: "INCLUDES",
+      performerTagIdsDepth: -1,
+    },
+  },
+  galleryIds: {
+    rules: { galleries: { value: ["3:inst-a"], modifier: "INCLUDES_ALL" } },
+    state: { galleryIds: ["3:inst-a"], galleryIdsModifier: "INCLUDES_ALL" },
+  },
+  playlistIds: {
+    rules: { playlists: { value: [12, 7], modifier: "INCLUDES_ALL" } },
+    state: { playlistIds: ["12", "7"], playlistIdsModifier: "INCLUDES_ALL" },
+  },
+  inAnyPlaylist: {
+    rules: { in_any_playlist: true },
+    state: { inAnyPlaylist: "true" },
+  },
+  organized: { rules: { organized: false }, state: { organized: "false" } },
+  path: {
+    rules: { path: { value: "/media/new", modifier: "STARTS_WITH" } },
+    state: { path: "/media/new", pathModifier: "STARTS_WITH" },
+  },
+  url: {
+    rules: { url: { value: "example.com", modifier: "INCLUDES" } },
+    state: { url: "example.com" },
+  },
+  code: {
+    rules: { code: { value: "ABC-123", modifier: "INCLUDES" } },
+    state: { code: "ABC-123" },
+  },
+  captions: {
+    rules: { captions: { value: "en", modifier: "NOT_EQUALS" } },
+    state: { captions: "en", captionsModifier: "NOT_EQUALS" },
+  },
+  hasMarkers: { rules: { has_markers: true }, state: { hasMarkers: "true" } },
+  duplicated: { rules: { duplicated: false }, state: { duplicated: "false" } },
+  watched: { rules: { watched: true }, state: { watched: "true" } },
+  inProgress: {
+    rules: { in_progress: false },
+    state: { inProgress: "false" },
   },
 };
 
@@ -243,12 +296,11 @@ describe("carousel rules", () => {
 
   it("keeps every rule no row can edit, as stored", () => {
     const stored = {
-      organized: true,
-      favorite: false,
+      // No row edits Tagged, a duration NOT_BETWEEN or a studio's Has ALL
+      tagged: true,
       tags: { value: ["5"], modifier: "INCLUDES", depth: -1 },
-      // No row edits a duration NOT_BETWEEN or a studio EXCLUDES yet
       duration: { modifier: "NOT_BETWEEN", value: 60, value2: 120 },
-      studios: { value: ["3"], modifier: "EXCLUDES" },
+      studios: { value: ["3"], modifier: "INCLUDES_ALL" },
       // Stash's VR resolution is no choice of the panel's
       resolution: { value: "VR_HD", modifier: "EQUALS" },
     };
@@ -261,10 +313,9 @@ describe("carousel rules", () => {
       tagIdsDepth: -1,
     });
     expect(kept).toEqual({
-      organized: true,
-      favorite: false,
+      tagged: true,
       duration: { modifier: "NOT_BETWEEN", value: 60, value2: 120 },
-      studios: { value: ["3"], modifier: "EXCLUDES" },
+      studios: { value: ["3"], modifier: "INCLUDES_ALL" },
       resolution: { value: "VR_HD", modifier: "EQUALS" },
     });
   });
@@ -354,11 +405,8 @@ describe("carousel rules", () => {
   });
 });
 
-describe("carousel rules of the F22b editors (test-local rows; F18 adds the real ones)", () => {
-  const table = {
-    rows: [...SCENE_ROWS, PATH_ROW, PLAYLISTS_ROW],
-    specs: SCENE_FIELDS,
-  };
+describe("carousel rules of the F22b editors (the real Path and Playlists rows)", () => {
+  const table = { rows: SCENE_ROWS, specs: SCENE_FIELDS };
 
   it("a Path condition and a playlist rule read back and build the same", () => {
     const stored = {

@@ -55,7 +55,7 @@ describe("CarouselBuilder", () => {
 
   it("editing a carousel keeps a rule it cannot edit", async () => {
     const tags = { value: ["284"], modifier: "INCLUDES_ALL" };
-    const stored = { ...CAROUSEL, rules: { organized: true, tags } };
+    const stored = { ...CAROUSEL, rules: { tagged: true, tags } };
     const fetchMock = stubApi({
       "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
       "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
@@ -80,18 +80,18 @@ describe("CarouselBuilder", () => {
       url.includes("/carousels/preview")
     );
     expect(JSON.parse(preview?.[1]?.body as string)).toMatchObject({
-      rules: { organized: true, tags },
+      rules: { tagged: true, tags },
     });
     expect(bodyOf("PUT")).toMatchObject({
       title: "Renamed",
-      rules: { organized: true, tags },
+      rules: { tagged: true, tags },
     });
   });
 
   it("a rule it cannot edit shows on a line, and Remove drops it from the save", async () => {
     const stored = {
       ...CAROUSEL,
-      rules: { ...CAROUSEL.rules, organized: true, o_counter: { value: 1 } },
+      rules: { ...CAROUSEL.rules, tagged: true, o_counter: { value: 1 } },
     };
     const fetchMock = stubApi({
       "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
@@ -254,5 +254,121 @@ describe("CarouselBuilder", () => {
     ).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
     expect(await update(second)).toEqual(saved);
+  });
+
+  /** Opens the editor on a carousel with these rules; routes are the extra endpoints the rules' pickers ask */
+  async function openWith(
+    rules: unknown,
+    routes: Record<string, () => Response> = {}
+  ) {
+    const stored = { ...CAROUSEL, rules };
+    const fetchMock = stubApi({
+      "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
+      "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+      ...routes,
+    });
+    renderEditor(createQueryClient());
+    await screen.findByDisplayValue("Highly rated");
+    return fetchMock;
+  }
+
+  /** Previews, saves and returns the rules the preview and the save sent */
+  async function previewAndUpdate(fetchMock: ReturnType<typeof stubApi>) {
+    fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+    const button = await screen.findByRole("button", { name: /Update/ });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await screen.findByText("Settings");
+    const rulesOf = (
+      find: (url: string, method: string | undefined) => boolean
+    ) =>
+      (
+        JSON.parse(
+          fetchMock.mock.calls.find(([url, init]) =>
+            find(url, init?.method)
+          )?.[1]?.body as string
+        ) as { rules: unknown }
+      ).rules;
+    return {
+      previewed: rulesOf((url) => url.includes("/carousels/preview")),
+      saved: rulesOf((_url, method) => method === "PUT"),
+    };
+  }
+
+  it('a Studio Has none rule saves `studios: { modifier: "IS_NULL" }` and survives an edit', async () => {
+    const fetchMock = await openWith({ studios: { modifier: "IS_NULL" } });
+
+    // The stored rule reads as the Has none choice, with no picker to fill
+    expect(
+      screen.getByRole("combobox", { name: "Condition" })
+    ).toHaveDisplayValue("Has none");
+    expect(screen.queryByText("Value")).toBeNull();
+    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+
+    const { previewed, saved } = await previewAndUpdate(fetchMock);
+    expect(previewed).toEqual({ studios: { modifier: "IS_NULL" } });
+    expect(saved).toEqual({ studios: { modifier: "IS_NULL" } });
+  });
+
+  it("a Playlists rule lists own and shared playlists and saves the playlist id", async () => {
+    const fetchMock = await openWith(
+      { playlists: { value: [12], modifier: "INCLUDES" } },
+      {
+        "/playlists": () =>
+          jsonResponse(200, { playlists: [{ id: 12, name: "Road trip" }] }),
+        "/playlists/shared": () =>
+          jsonResponse(200, {
+            playlists: [
+              { id: 40, name: "Weekend", owner: { username: "alice" } },
+            ],
+          }),
+      }
+    );
+    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+
+    // Own playlists first, then those shared with the user, named by owner
+    fireEvent.click(await screen.findByRole("button", { name: /^Playlists/ }));
+    expect(
+      await screen.findByRole("button", { name: "Weekend by alice" })
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Weekend by alice" }));
+
+    const { saved } = await previewAndUpdate(fetchMock);
+    expect(saved).toEqual({
+      playlists: { value: [12, 40], modifier: "INCLUDES" },
+    });
+  });
+
+  it("a Path Starts with rule saves STARTS_WITH and survives an edit", async () => {
+    const stored = { path: { value: "/media/new", modifier: "STARTS_WITH" } };
+    const fetchMock = await openWith(stored);
+
+    expect(
+      screen.getByRole("combobox", { name: "Condition" })
+    ).toHaveDisplayValue("Starts with");
+    expect(screen.getByDisplayValue("/media/new")).toBeInTheDocument();
+    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+
+    const { previewed, saved } = await previewAndUpdate(fetchMock);
+    expect(previewed).toEqual(stored);
+    expect(saved).toEqual(stored);
+  });
+
+  it("a three-state favourite and a multi Orientation rule survive an edit", async () => {
+    const stored = {
+      favorite: false,
+      orientation: { value: ["LANDSCAPE", "SQUARE"] },
+    };
+    const fetchMock = await openWith(stored);
+
+    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "Landscape" })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Portrait" })
+    ).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Square" })).toBeChecked();
+
+    const { saved } = await previewAndUpdate(fetchMock);
+    expect(saved).toEqual(stored);
   });
 });

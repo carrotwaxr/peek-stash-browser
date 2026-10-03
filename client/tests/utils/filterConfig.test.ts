@@ -196,15 +196,13 @@ describe("buildSceneFilter", () => {
       });
     });
 
-    it("sends no galleries for a panel key the scene panel does not have", () => {
-      // Scenes filter by gallery only on a gallery page (the permanent
-      // `galleries` below); the panel has no gallery picker
+    it("sends galleries for the scene panel's Galleries picker", () => {
       const uiFilters = {
         galleryIds: ["1"],
         galleryIdsModifier: "INCLUDES",
       };
       const result = buildSceneFilter(uiFilters);
-      expect(result.galleries).toBeUndefined();
+      expect(result.galleries).toEqual({ value: ["1"], modifier: "INCLUDES" });
     });
 
     it("should build galleries filter from permanent filters", () => {
@@ -1125,21 +1123,24 @@ describe("filter requests follow the contract", () => {
   it.each(MULTI_SELECTS.map(({ kind, option }) => ({ kind, option })))(
     "every multi-select sends its modifier, which is the defaultModifier when untouched: $kind $option.key",
     ({ kind, option }) => {
-      const ids = ["10:server-a", "11:server-a"];
+      // Playlist ids are Peek's own: sent as numbers
+      const playlists = option.entityType === "playlists";
+      const ids = playlists ? ["10", "11"] : ["10:server-a", "11:server-a"];
+      const sentIds = playlists ? [10, 11] : ids;
 
       expect(sentRef(kind, option, { [option.key]: ids })).toEqual({
-        value: ids,
+        value: sentIds,
         modifier: option.defaultModifier ?? "INCLUDES",
       });
       for (const { value: modifier } of option.modifierOptions ?? []) {
-        // Has none and Has any are sent alone, with no ids
+        // Has none and Has any are sent with no ids
         const presence = modifier === "IS_NULL" || modifier === "NOT_NULL";
         expect(
           sentRef(kind, option, {
             [option.key]: ids,
             [must(option.modifierKey, `${option.key} modifierKey`)]: modifier,
           })
-        ).toEqual({ value: presence ? undefined : ids, modifier });
+        ).toEqual({ value: presence ? undefined : sentIds, modifier });
       }
     }
   );

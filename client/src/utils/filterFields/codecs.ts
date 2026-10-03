@@ -10,8 +10,15 @@
  * screen only.
  *
  * A multi `ref` or `enum` row reads a lone string as a one-element list
- * everywhere (`valuesOf`): a preset, default preset or carousel rule stored
- * while the field was single keeps its value once the field takes several.
+ * everywhere (`valuesOf`, and `normalize` for a default preset): a preset,
+ * default preset or carousel rule stored while the field was single keeps
+ * its value once the field takes several. A multi row writes its list to the
+ * URL joined with commas (`studioId=1:a,2:b`).
+ *
+ * A `choice` row holds its choice's text ("true", "false", "any") and
+ * writes it to the URL, but for a default choice that sends nothing (Any).
+ * A boolean stored by the checkbox it replaced reads as the same choice:
+ * `true` as Yes, an unchecked `false` as Any.
  *
  * A ref row with an `excludeKey` holds the ids it includes under its key and
  * those it excludes under the companion (`tagIds`, `tagIdsExclude`), and
@@ -30,6 +37,7 @@
  * Imports only relative modules and `@peek/shared-types` (see `options.ts`).
  */
 import type {
+  ChoiceField,
   EditorKind,
   EnumField,
   FieldSpec,
@@ -40,6 +48,7 @@ import type {
   RefFieldModifier,
   RefModifier,
   RefSpec,
+  SendingChoice,
   TextField,
 } from "@peek/shared-types";
 import { makeCompositeKey, parseCompositeKey } from "../compositeKey";
@@ -469,6 +478,22 @@ const textPresenceOf = (
     : undefined;
 };
 
+/**
+ * The presence choice an enum row's condition select holds, when it offers
+ * it ("Has none", "Has any"); while one is set the value is ignored
+ */
+const enumPresenceOf = (
+  field: EnumField,
+  state: PanelState
+): Presence | undefined => {
+  if (field.modifierKey === undefined) return undefined;
+  const presence = asPresence(state[field.modifierKey]);
+  return presence !== undefined &&
+    field.modifiers?.some((modifier) => modifier === presence)
+    ? presence
+    : undefined;
+};
+
 /** What a text row with no condition chosen matches: a substring */
 const TEXT_DEFAULT = "INCLUDES";
 
@@ -513,6 +538,31 @@ function textCriterion(
   const text = textOf(field, state);
   return text === "" ? undefined : { value: text, modifier };
 }
+
+/**
+ * The choice a state value names: its text, or a boolean stored by a
+ * checkbox (`true` is "true"). An unchecked box stored as `false` filtered
+ * nothing, so on a row whose default sends nothing it is that default.
+ * Nothing for an unknown value.
+ */
+function choiceOf(
+  field: ChoiceField,
+  value: unknown
+): SendingChoice | undefined {
+  const named = (text: unknown) =>
+    field.choices.find((choice) => choice.value === text);
+  if (value === false) {
+    const fallback = named(field.defaultValue);
+    if (fallback?.sends === undefined) return fallback;
+  }
+  return named(typeof value === "boolean" ? String(value) : value);
+}
+
+/** A multi row's lone string as a one-element list; a list as it is; a blank as nothing */
+const asList = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value;
+  return typeof value === "string" && value !== "" ? [value] : undefined;
+};
 
 // ── Chips ─────────────────────────────────────────────────────────────────
 
@@ -720,6 +770,13 @@ function enumChip(
   spec: FieldSpec,
   state: PanelState
 ): ChipParts | null {
+  const presence = enumPresenceOf(field, state);
+  if (presence !== undefined) {
+    return {
+      label: chipLabel(field),
+      values: [TEXT_CONDITIONS[presence] ?? presence.toLowerCase()],
+    };
+  }
   const stored = valuesOf(state[field.key]);
   if (stored.length === 0) return null;
   const values = stored.map(
@@ -970,8 +1027,26 @@ function enumFromCriterion(
 ): PanelState {
   const parts = partsOf(criterion, ["value", "modifier"]);
   if (parts === undefined) return {};
+  const presence = asPresence(parts.modifier);
+  if (presence !== undefined) {
+    return field.modifierKey !== undefined &&
+      field.modifiers?.some((modifier) => modifier === presence) &&
+      parts.value === undefined
+      ? { [field.modifierKey]: presence }
+      : {};
+  }
   const values = valuesOf(parts.value);
   const [value] = values;
+  if (spec.kind === "enum" && spec.multi && field.multi) {
+    // A list matching any of the values the row offers sends no modifier
+    return parts.modifier === undefined &&
+      values.length > 0 &&
+      values.every((each) =>
+        field.choices.some((choice) => choice.value === each)
+      )
+      ? { [field.key]: values }
+      : {};
+  }
   if (
     values.length !== 1 ||
     value === undefined ||
@@ -1169,7 +1244,10 @@ type CodecOf<K extends EditorKind> = FieldCodec<
 export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
   ref: {
     keys: keysOf,
-    normalize: identity,
+    // A multi row holds a list: a lone id stored while the field was single
+    // (a Studio preset) is a one-element list
+    normalize: (field, value) =>
+      field.multi && !Array.isArray(value) ? asList(value) : value,
     // Its picks, its exclusions, or a presence choice it offers
     isActive: (field, state) =>
       refPresenceOf(field, state) !== undefined ||
@@ -1211,7 +1289,8 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
     // name their own instance, the excluded ones too. Playlist ids are
     // Peek's, never joined with an instance
     readUrl: urlReader((field, params) => {
-      const one = params.get(entityParamFor(field.key));
+      const singular = entityParamFor(field.key);
+      const one = params.get(singular);
       const value = params.get(field.key);
       const excluded =
         field.excludeKey === undefined ? null : params.get(field.excludeKey);
@@ -1220,11 +1299,19 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
           ? {}
           : { [field.excludeKey]: excluded.split(",").filter(Boolean) };
       if (one) {
-        const ref =
+        const instance = params.get("instance");
+        // A multi row whose singular param is its own key (`studioId`) takes
+        // a list too: each ref joins the page's instance unless it names one
+        const refs =
           field.source === "playlists"
-            ? one
-            : entityRefFromParam(one, params.get("instance"));
-        return { [field.key]: field.multi ? [ref] : ref, ...excludes };
+            ? [one]
+            : field.multi && singular === field.key
+              ? one
+                  .split(",")
+                  .filter(Boolean)
+                  .map((each) => entityRefFromParam(each, instance))
+              : [entityRefFromParam(one, instance)];
+        return { [field.key]: field.multi ? refs : refs[0], ...excludes };
       }
       if (value === null) return excludes;
       return {
@@ -1398,18 +1485,54 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
   },
   enum: {
     keys: keysOf,
-    normalize: identity,
-    writeUrl: urlWriter((field, value, params) => {
-      if (value) setParam(params, field.key, value);
+    // A multi row holds a list: a lone value stored while the field was
+    // single (an Orientation preset) is a one-element list
+    normalize: (field, value) =>
+      field.multi === true && !Array.isArray(value) ? asList(value) : value,
+    // A presence choice the row offers writes its modifier alone; a multi
+    // row writes its values joined with commas
+    writeUrl: (field, state, params) => {
+      const presence = enumPresenceOf(field, state);
+      if (presence !== undefined && field.modifierKey !== undefined) {
+        params.set(field.modifierKey, presence);
+        return;
+      }
+      const value = state[field.key];
+      if (field.multi === true) {
+        const values = valuesOf(value);
+        if (values.length === 0) return;
+        params.set(field.key, values.join(","));
+        writeCompanions(field, state, params);
+        return;
+      }
+      if (isUnset(value) || !value) return;
+      setParam(params, field.key, value);
+      writeCompanions(field, state, params);
+    },
+    readUrl: urlReader((field, params) => {
+      const value = params.get(field.key);
+      if (value === null) return {};
+      return {
+        [field.key]:
+          field.multi === true ? value.split(",").filter(Boolean) : value,
+      };
     }),
-    readUrl: urlReader((field, params) =>
-      params.has(field.key) ? { [field.key]: params.get(field.key) } : {}
-    ),
-    isActive: (field, state) => valuesOf(state[field.key]).length > 0,
+    isActive: (field, state) =>
+      enumPresenceOf(field, state) !== undefined ||
+      valuesOf(state[field.key]).length > 0,
     // A field of values sends those it takes (several: a list matching any
-    // of them); a free-text field (hair colour) its value, compared whole
+    // of them); a free-text field (hair colour) its value, compared whole; a
+    // presence choice alone
     toCriterion: (field, spec, state) => {
       const chosen = field.modifierKey && state[field.modifierKey];
+      const presence = enumPresenceOf(field, state);
+      if (
+        presence !== undefined &&
+        (spec.kind === "enum" || spec.kind === "text") &&
+        (spec.modifiers as readonly string[]).includes(presence)
+      ) {
+        return { modifier: presence };
+      }
       if (spec.kind === "text") {
         const [value] = valuesOf(state[field.key]);
         return value === undefined
@@ -1445,29 +1568,40 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
   },
   choice: {
     keys: keysOf,
-    normalize: identity,
+    // A checkbox's boolean is its choice's text; an unchecked one is nothing
+    normalize: (field, value) => {
+      if (typeof value !== "boolean") return value;
+      const choice = choiceOf(field, value);
+      return choice === undefined || choice.sends === undefined
+        ? undefined
+        : choice.value;
+    },
+    // The choice's text; nothing for a default that sends nothing (Any), so
+    // the URL keys stay the booleans they were
     writeUrl: urlWriter((field, value, params) => {
-      if (value) setParam(params, field.key, value);
+      const choice = choiceOf(field, value);
+      if (choice === undefined) {
+        if (value) setParam(params, field.key, value);
+        return;
+      }
+      if (choice.value === field.defaultValue && choice.sends === undefined) {
+        return;
+      }
+      params.set(field.key, choice.value);
     }),
     readUrl: urlReader((field, params) =>
       params.has(field.key) ? { [field.key]: params.get(field.key) } : {}
     ),
-    // A choice that sends nothing ("All clips") does not filter
+    // A choice that sends nothing ("All clips", "Any") does not filter
     isActive: (field, state) =>
-      field.choices.some(
-        (choice) =>
-          choice.value === state[field.key] && choice.sends !== undefined
-      ),
+      choiceOf(field, state[field.key])?.sends !== undefined,
     // What the chosen choice sends; an unknown or missing value is the
     // row's default choice
-    toCriterion: (field, _spec, state) => {
-      const value = state[field.key];
-      const text = typeof value === "boolean" ? String(value) : value;
-      const choice =
-        field.choices.find((each) => each.value === text) ??
-        field.choices.find((each) => each.value === field.defaultValue);
-      return choice?.sends;
-    },
+    toCriterion: (field, _spec, state) =>
+      (
+        choiceOf(field, state[field.key]) ??
+        field.choices.find((each) => each.value === field.defaultValue)
+      )?.sends,
     // The choice that sends the stored value
     fromCriterion: (field, _spec, criterion) => {
       const choice = field.choices.find(
@@ -1476,12 +1610,8 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       return choice === undefined ? {} : { [field.key]: choice.value };
     },
     chip: (field, _spec, state) => {
-      const value = state[field.key];
-      const text = typeof value === "boolean" ? String(value) : value;
-      const choice = field.choices.find(
-        (each) => each.value === text && each.sends !== undefined
-      );
-      return choice === undefined
+      const choice = choiceOf(field, state[field.key]);
+      return choice === undefined || choice.sends === undefined
         ? null
         : { label: chipLabel(field), values: [choice.label] };
     },

@@ -122,8 +122,18 @@ describe("getFilteredListPath", () => {
     );
   });
 
+  it("the Scenes page filters by one gallery, through its Galleries picker", () => {
+    expect(
+      getFilteredListPath(
+        "/scenes",
+        "galleries",
+        { id: "7", instanceId: "inst-a" },
+        true
+      )
+    ).toBe("/scenes?galleryId=7&instance=inst-a");
+  });
+
   it.each([
-    ["/scenes", "galleries"],
     ["/performers", "galleries"],
     ["/tags", "galleries"],
     ["/performers", "scenes"],

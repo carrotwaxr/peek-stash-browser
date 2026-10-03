@@ -781,15 +781,8 @@ describeWithDb(
         ),
         "the scene Tags option"
       );
-      const withPresence: ClientOption = {
-        ...tags,
-        modifierOptions: [
-          ...(tags.modifierOptions ?? []),
-          { value: "IS_NULL", label: "Has none" },
-          { value: "NOT_NULL", label: "Has any" },
-        ],
-      };
-      const presence = optionSamples(withPresence, walk.refs).filter(
+      // The scene Tags row offers them since F18
+      const presence = optionSamples(tags, walk.refs).filter(
         (sample) =>
           sample.modifier === "IS_NULL" || sample.modifier === "NOT_NULL"
       );

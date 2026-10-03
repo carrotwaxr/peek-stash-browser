@@ -44,6 +44,11 @@ export interface FilterOption {
    * each picked value then has an include or exclude toggle
    */
   excludeKey?: string;
+  /**
+   * A select that always holds one of its choices (Yes, No, Any): it draws
+   * no blank option of its own
+   */
+  noBlank?: boolean;
   countFilterContext?: string;
   min?: number;
   max?: number;
@@ -113,12 +118,14 @@ const REF_MODIFIER_LABELS = {
   },
 } as const satisfies Record<string, Record<RefFieldModifier, string>>;
 
-/** The condition select's words for a select of values (Resolution) */
+/** The condition select's words for a select of values (Resolution, Captions) */
 const ENUM_MODIFIER_LABELS: Readonly<Record<string, string>> = {
   EQUALS: "Equals",
   NOT_EQUALS: "Not Equals",
   GREATER_THAN: "Greater Than",
   LESS_THAN: "Less Than",
+  IS_NULL: "Has none",
+  NOT_NULL: "Has any",
 };
 
 /**
@@ -331,7 +338,9 @@ function optionOf(
     case "enum":
       return {
         ...head(row),
-        defaultValue: "",
+        // A multi row (Orientation) is drawn as a group of checkboxes
+        defaultValue: row.multi === true ? [] : "",
+        ...(row.multi === true ? { multi: true } : {}),
         options: row.choices.map(({ value, label }) => ({ value, label })),
         ...placeholderOf(row),
         ...(row.modifiers === undefined || row.modifiers.length < 2
@@ -353,6 +362,13 @@ function optionOf(
         defaultValue: row.defaultValue,
         options: row.choices.map(({ value, label }) => ({ value, label })),
         ...placeholderOf(row),
+        // The default is a choice that sends nothing (Any): no blank option
+        ...(row.choices.some(
+          (choice) =>
+            choice.value === row.defaultValue && choice.sends === undefined
+        )
+          ? { noBlank: true }
+          : {}),
       };
     case "toggle":
       return { ...head(row), defaultValue: false, ...placeholderOf(row) };

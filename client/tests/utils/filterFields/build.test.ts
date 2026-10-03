@@ -21,8 +21,6 @@ import { buildPanelFilter } from "@/utils/filterFields";
 import {
   CLIP_SCENES_ROW,
   DETAILS_WITH_PRESENCE_ROW,
-  PATH_ROW,
-  PLAYLISTS_ROW,
 } from "../../helpers/editorRows";
 
 interface GoldenEntry {
@@ -251,35 +249,23 @@ describe("buildPanelFilter", () => {
   });
 
   it('Has any sends `{ modifier: "NOT_NULL" }` with no value', () => {
-    const rows = (PANEL_FIELDS.scene as readonly PanelField[]).map(
-      (row): PanelField =>
-        row.key === "performerIds" && row.editor === "ref"
-          ? { ...row, modifiers: [...row.modifiers, "IS_NULL", "NOT_NULL"] }
-          : row
-    );
-    const table = { rows, specs: SCENE_FIELDS };
-
-    expect(
-      buildPanelFilter(
-        "scene",
-        {
-          performerIds: ["1:a"],
-          performerIdsExclude: ["2:a"],
-          performerIdsModifier: "NOT_NULL",
-        },
-        table
-      )
-    ).toEqual({ performers: { modifier: "NOT_NULL" } });
-    expect(
-      buildPanelFilter("scene", { performerIdsModifier: "IS_NULL" }, table)
-    ).toEqual({ performers: { modifier: "IS_NULL" } });
-    // A row that does not offer presence ignores a stale choice
     expect(
       buildPanelFilter("scene", {
         performerIds: ["1:a"],
+        performerIdsExclude: ["2:a"],
         performerIdsModifier: "NOT_NULL",
       })
-    ).toEqual({ performers: { value: ["1:a"], modifier: "INCLUDES" } });
+    ).toEqual({ performers: { modifier: "NOT_NULL" } });
+    expect(
+      buildPanelFilter("scene", { performerIdsModifier: "IS_NULL" })
+    ).toEqual({ performers: { modifier: "IS_NULL" } });
+    // A row that does not offer presence (Performer tags) ignores a stale choice
+    expect(
+      buildPanelFilter("scene", {
+        performerTagIds: ["1:a"],
+        performerTagIdsModifier: "NOT_NULL",
+      })
+    ).toEqual({ performer_tags: { value: ["1:a"], modifier: "INCLUDES" } });
   });
 
   it("the To Review preset sends what it sent in beta.7", () => {
@@ -340,7 +326,7 @@ describe("buildPanelFilter", () => {
 });
 
 describe("buildPanelFilter: the text condition and the playlist and scene pickers (F22b)", () => {
-  // Test-local rows: F18 adds the real Path and Playlists, F21 clip Scenes
+  // Path and Playlists are the scene table's real rows (F18); the test-local rows are the rest
   const sceneTable = (...rows: PanelField[]) => ({
     rows: [
       ...(PANEL_FIELDS.scene as readonly PanelField[]).filter(
@@ -352,7 +338,7 @@ describe("buildPanelFilter: the text condition and the playlist and scene picker
   });
 
   it("a text condition Starts with sends `STARTS_WITH`", () => {
-    const table = sceneTable(PATH_ROW);
+    const table = sceneTable();
 
     expect(
       buildPanelFilter(
@@ -362,12 +348,8 @@ describe("buildPanelFilter: the text condition and the playlist and scene picker
       )
     ).toEqual({ path: { value: "/media/new", modifier: "STARTS_WITH" } });
     expect(
-      buildPanelFilter(
-        "scene",
-        { path: "old", pathModifier: "NOT_EQUALS" },
-        table
-      )
-    ).toEqual({ path: { value: "old", modifier: "NOT_EQUALS" } });
+      buildPanelFilter("scene", { path: "old", pathModifier: "EQUALS" }, table)
+    ).toEqual({ path: { value: "old", modifier: "EQUALS" } });
     // No condition chosen, or one the row does not offer: Contains
     expect(buildPanelFilter("scene", { path: "x" }, table)).toEqual({
       path: { value: "x", modifier: "INCLUDES" },
@@ -400,7 +382,7 @@ describe("buildPanelFilter: the text condition and the playlist and scene picker
   });
 
   it("playlist ids are sent as numbers", () => {
-    const table = sceneTable(PLAYLISTS_ROW);
+    const table = sceneTable();
 
     expect(
       buildPanelFilter(

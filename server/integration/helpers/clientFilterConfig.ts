@@ -236,11 +236,12 @@ const SUB_ITEMS = ", with sub-items";
 /**
  * The option's samples, per its type: range min only, max only, both; date
  * start only, end only, both; text; each select value but the one the
- * control shows when unset (its `defaultValue`, the unfiltered state);
- * checkbox checked; searchable select one id and (multi) two ids, with and
+ * control shows when unset (its `defaultValue`, the unfiltered state; a
+ * multi select: each value alone, then two); checkbox checked; searchable select one id and (multi) two ids, with and
  * without sub-items (a playlist picker's ids are Peek playlist ids). Each
  * under every modifier the option offers: a text option's every condition
- * (Contains to Starts with), and its Has none and Has any with no text. A picker
+ * (Contains to Starts with), and its Has none and Has any with no text (a
+ * select's with no value). A picker
  * with an exclude companion adds one include plus one exclude under Has ANY
  * and Has ALL, and excludes alone under its default modifier; a picker's
  * Has none and Has any (IS_NULL, NOT_NULL) are one sample each, with no
@@ -257,8 +258,8 @@ export function optionSamples(
   const picker = option.type === "searchable-select";
   const valuesUnder = (modifier: string | undefined) => {
     if (picker) return pickerValues(option, refs, modifier, values);
-    // A text option's presence choice takes no text
-    return option.type === "text" &&
+    // A text or select option's presence choice takes no text or value
+    return (option.type === "text" || option.type === "select") &&
       modifier !== undefined &&
       PRESENCE_MODIFIERS.includes(modifier)
       ? [
@@ -385,6 +386,14 @@ function sampleValues(option: ClientOption, refs: RefPool): SampleValue[] {
         plain("start and end", { start: DATE_START, end: DATE_END }),
       ];
     case "select":
+      if (option.multi === true) {
+        // A group of boxes holds a list: each value alone, then two
+        const values = (option.options ?? []).map((choice) => choice.value);
+        return [
+          ...values.map((value) => plain(value, [value])),
+          plain("two values", values.slice(0, 2)),
+        ];
+      }
       return (option.options ?? [])
         .filter((choice) => choice.value !== option.defaultValue)
         .map((choice) =>

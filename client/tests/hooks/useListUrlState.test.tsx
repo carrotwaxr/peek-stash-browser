@@ -171,7 +171,7 @@ describe("useListUrlState", () => {
 
     it("reads filters, sort and page from the URL", () => {
       const list = renderList("/scenes?favorite=true&sort=rating&page=2");
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
       expect(list.state.sort.field).toBe("rating");
       expect(list.state.page).toBe(2);
     });
@@ -188,7 +188,7 @@ describe("useListUrlState", () => {
 
     it("a sidebar link to the same list clears its filters", async () => {
       const list = renderList("/scenes?favorite=true");
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
 
       await act(() => list.router.navigate("/scenes"));
       expect(list.state.filters).toEqual({});
@@ -261,7 +261,7 @@ describe("useListUrlState", () => {
 
     it("applies whole when the URL names no filter", () => {
       const list = renderList("/scenes", SCENE_OPTIONS, favoritePreset);
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
       expect(list.state.sort).toEqual({
         field: "rating",
         direction: "ASC",
@@ -271,13 +271,44 @@ describe("useListUrlState", () => {
       expect(list.state.activePreset?.id).toBe("p1");
     });
 
+    it("a default preset stored before 9a keeps its Studio and Orientation, now lists", () => {
+      // Single values stored while the fields took one; no URL reader ran
+      const list = renderList("/scenes", SCENE_OPTIONS, {
+        context: "scene",
+        preset: preset({
+          filters: { studioId: "5:a", orientation: "LANDSCAPE" },
+        }),
+      });
+
+      expect(list.state.filters).toEqual({
+        studioId: ["5:a"],
+        orientation: ["LANDSCAPE"],
+      });
+    });
+
+    it("loadPreset with a lone Studio and Orientation writes them as lists to the URL", async () => {
+      const list = renderList("/scenes");
+      await actAsync(() =>
+        list.state.loadPreset(
+          preset({ filters: { studioId: "5:a", orientation: "LANDSCAPE" } })
+        )
+      );
+
+      expect(list.params().get("studioId")).toBe("5:a");
+      expect(list.params().get("orientation")).toBe("LANDSCAPE");
+      expect(list.state.filters).toEqual({
+        studioId: ["5:a"],
+        orientation: ["LANDSCAPE"],
+      });
+    });
+
     it("instance and tab in the URL keep the default preset's filters", () => {
       const list = renderList(
         "/scenes?instance=abc&tab=scenes&sort=title&view=wall&page=2",
         SCENE_OPTIONS,
         favoritePreset
       );
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
       expect(list.state.sort.field).toBe("title");
       expect(list.state.viewMode).toBe("wall");
       expect(list.state.page).toBe(2);
@@ -307,7 +338,7 @@ describe("useListUrlState", () => {
 
     it("clearFilters with a filtering default preset shows the unfiltered list and Back restores the filters", async () => {
       const list = renderList("/scenes", SCENE_OPTIONS, favoritePreset);
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
 
       await actAsync(() => list.state.clearFilters());
       expect(list.state.filters).toEqual({});
@@ -315,7 +346,7 @@ describe("useListUrlState", () => {
       expect(list.state.listKey).not.toContain("none");
 
       await act(() => list.router.navigate(-1));
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
     });
 
     it("removing the last chip leaves the list unfiltered", async () => {
@@ -347,7 +378,7 @@ describe("useListUrlState", () => {
 
       await actAsync(() => list.state.removeFilter("tagIds"));
 
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
       expect(list.params().has("tagIdsModifier")).toBe(false);
       expect(list.params().has("tagIdsDepth")).toBe(false);
     });
@@ -368,7 +399,7 @@ describe("useListUrlState", () => {
 
       await actAsync(() => list.state.removeFilter("tagIds"));
 
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
     });
 
     it("loading a preset with no filters leaves the list unfiltered", async () => {
@@ -387,7 +418,7 @@ describe("useListUrlState", () => {
       expect(list.state.filters).toEqual({});
 
       await act(() => list.router.navigate("/scenes"));
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
     });
 
     it("sort and per page fall back to the preset one field at a time", () => {
@@ -476,7 +507,7 @@ describe("useListUrlState", () => {
       await waitFor(() => expect(list.state.ready).toBe(true));
       expect(list.params().get("sort")).toMatch(/^random_\d{8}$/);
       expect(list.actions).toEqual(["REPLACE"]);
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
     });
   });
 
@@ -505,7 +536,7 @@ describe("useListUrlState", () => {
         "/performer/1?performerIds=9:abc&performerIdsModifier=EXCLUDES&favorite=true",
         { ...SCENE_OPTIONS, lockedFields: ["performers"] }
       );
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
     });
 
     it("locks nothing that is not named", () => {
@@ -641,7 +672,7 @@ describe("useListUrlState", () => {
     it("applyFilters and removeFilter reset the page", async () => {
       const list = renderList("/scenes?page=3");
       await actAsync(() => list.state.applyFilters({ favorite: true }));
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
       expect(list.state.page).toBe(1);
 
       await actAsync(() => list.state.setPage(3));
@@ -708,7 +739,7 @@ describe("useListUrlState", () => {
           preset({ filters: { favorite: true }, perPage: 48, viewMode: "wall" })
         )
       );
-      expect(list.state.filters).toEqual({ favorite: true });
+      expect(list.state.filters).toEqual({ favorite: "true" });
       expect(list.state.sort).toEqual({
         field: "rating",
         direction: "ASC",

@@ -161,7 +161,8 @@ const PANEL_COMPANIONS: Companions = {
 /**
  * The option's states, as `server/integration/helpers/clientFilterConfig.ts`
  * `optionSamples` walks them: range min only, max only, both; date start,
- * end, both; text; each select value but the unfiltered one; checkbox;
+ * end, both; text; each select value but the unfiltered one (a multi select:
+ * each value alone, then two); checkbox;
  * picker one id and (multi) two ids, with and without sub-items; each under
  * every modifier the option offers, and once with none chosen.
  */
@@ -211,11 +212,23 @@ function samplesOf(
       ];
       break;
     case "select":
-      values = (option.options ?? [])
-        .filter((choice) => choice.value !== option.defaultValue)
-        .map((choice) =>
-          plain(choice.value || `"" (${choice.label})`, choice.value)
-        );
+      values =
+        option.multi === true
+          ? // A group of boxes holds a list: each value alone, then two
+            [
+              ...(option.options ?? []).map((choice) =>
+                plain(choice.value, [choice.value])
+              ),
+              plain(
+                "two values",
+                (option.options ?? []).slice(0, 2).map((choice) => choice.value)
+              ),
+            ]
+          : (option.options ?? [])
+              .filter((choice) => choice.value !== option.defaultValue)
+              .map((choice) =>
+                plain(choice.value || `"" (${choice.label})`, choice.value)
+              );
       break;
     case "searchable-select": {
       const hierarchyKey = companions.hierarchyKey(option);
@@ -255,8 +268,14 @@ function samplesOf(
     ...(option.modifierOptions ? [undefined] : []),
   ];
   if (modifiers.length === 0) modifiers.push(undefined);
+  // A select's Has none and Has any (Captions) take no value
+  const noValue = [{ variant: "no value", state: {} as State }];
   return modifiers.flatMap((modifier) =>
-    values.map((value) => ({
+    (option.type === "select" &&
+    (modifier === "IS_NULL" || modifier === "NOT_NULL")
+      ? noValue
+      : values
+    ).map((value) => ({
       label: `${key}: ${modifier === undefined ? "" : `${modifier} `}${value.variant}`,
       state: {
         ...value.state,

@@ -8,7 +8,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import GalleryCard from "../../../src/components/cards/GalleryCard";
 import type { BaseCardProps } from "../../../src/components/ui/BaseCard";
 import type * as indicatorBehaviors from "../../../src/config/indicatorBehaviors";
-import { IMAGE_FILTER_OPTIONS } from "../../../src/utils/filterConfig";
+import {
+  IMAGE_FILTER_OPTIONS,
+  SCENE_FILTER_OPTIONS,
+  buildSceneFilter,
+} from "../../../src/utils/filterConfig";
 import { parseSearchParams } from "../../../src/utils/urlParams";
 
 const { navigate, baseCardProps } = vi.hoisted(() => ({
@@ -170,7 +174,23 @@ describe("GalleryCard indicator links", () => {
     expect(filters.galleryIds).toEqual(["12:inst-a"]);
   });
 
-  it.each(["SCENES", "PERFORMERS", "TAGS"])(
+  it("the scenes count opens the Scenes page filtered to the gallery on its instance and lists that gallery's scenes", () => {
+    must(renderCard()("SCENES").onClick, "the scenes link")();
+
+    const to = must(navigate.mock.lastCall, "a navigation")[0];
+    expect(to).toBe("/scenes?galleryId=12&instance=inst-a");
+    const url = new URL(to, "http://peek.test");
+    const { filters } = parseSearchParams(url.searchParams, [
+      ...SCENE_FILTER_OPTIONS,
+    ]);
+    expect(filters.galleryIds).toEqual(["12:inst-a"]);
+    expect(buildSceneFilter(filters).galleries).toEqual({
+      value: ["12:inst-a"],
+      modifier: "INCLUDES",
+    });
+  });
+
+  it.each(["PERFORMERS", "TAGS"])(
     "the %s count opens nothing: that list page has no gallery filter",
     (type) => {
       expect(renderCard()(type).onClick).toBeUndefined();
@@ -206,7 +226,7 @@ describe("GalleryCard scenes count", () => {
       "the scenes indicator"
     );
     expect(scenes.count).toBe(3);
-    // No link: the Scenes page has no gallery filter
-    expect(scenes.onClick).toBeUndefined();
+    // A count of scenes links to the Scenes page's gallery filter
+    expect(scenes.onClick).toBeDefined();
   });
 });

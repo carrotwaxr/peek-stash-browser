@@ -52,11 +52,7 @@ import {
   readListParams,
   writeListParams,
 } from "@/utils/urlParams";
-import {
-  DETAILS_WITH_PRESENCE_ROW,
-  PATH_ROW,
-  PLAYLISTS_ROW,
-} from "../helpers/editorRows";
+import { DETAILS_WITH_PRESENCE_ROW } from "../helpers/editorRows";
 import { untrusted } from "../helpers/untrusted";
 
 // Wrapper with defaults for optional params to avoid repeating them in every test
@@ -438,13 +434,25 @@ describe("parseSearchParams - additional filter types", () => {
 
 describe("parseSearchParams - a list page reads only the entity params it declares (FILTERS-11)", () => {
   it("a galleryId param on a page without a galleryIds option is ignored", () => {
-    // The Scenes page has no gallery filter
+    // Options with no gallery filter (the Scenes page has one since F18)
+    const { filters } = parseSearchParams(
+      new URLSearchParams("galleryId=12&instance=abc"),
+      mockFilterOptions.filter((option) => option.key !== "galleryIds")
+    );
+    expect(filters).not.toHaveProperty("galleryIds");
+    expect(buildSceneFilter(filters)).not.toHaveProperty("galleries");
+  });
+
+  it("galleryId on the Scenes page sets its Galleries filter with the instance", () => {
     const { filters } = parseSearchParams(
       new URLSearchParams("galleryId=12&instance=abc"),
       [...SCENE_FILTER_OPTIONS]
     );
-    expect(filters).not.toHaveProperty("galleryIds");
-    expect(buildSceneFilter(filters)).not.toHaveProperty("galleries");
+    expect(filters.galleryIds).toEqual(["12:abc"]);
+    expect(buildSceneFilter(filters).galleries).toEqual({
+      value: ["12:abc"],
+      modifier: "INCLUDES",
+    });
   });
 
   it("studioId on the Images page sets its Studios filter, studioIds, with the instance", () => {
@@ -480,8 +488,15 @@ describe("parseSearchParams - a list page reads only the entity params it declar
       new URLSearchParams("instance=abc&studioId=3:def&studioIdDepth=-1"),
       [...SCENE_FILTER_OPTIONS]
     );
-    expect(filters.studioId).toBe("3:def");
+    // Scenes' Studios takes a list, so one value is a one-element list
+    expect(filters.studioId).toEqual(["3:def"]);
     expect(filters.studioIdDepth).toBe(-1);
+    // A single-select Studio keeps one value
+    expect(
+      parseSearchParams(new URLSearchParams("instance=abc&studioId=3:def"), [
+        { key: "studioId", type: "searchable-select", multi: false },
+      ]).filters.studioId
+    ).toBe("3:def");
   });
 
   it("an empty singular param is ignored", () => {
@@ -1360,6 +1375,14 @@ describe("include or exclude per value (F22a)", () => {
 });
 
 describe("the text condition and playlist ids in the URL (F22b)", () => {
+  /** The scene table's real row (F18) */
+  const rowOf = (key: string): PanelField => {
+    const row = (PANEL_FIELDS.scene as readonly PanelField[]).find(
+      (each) => each.key === key
+    );
+    if (row === undefined) throw new Error(`no scene row ${key}`);
+    return row;
+  };
   /** A row's state through the URL: written by its codec, then read back */
   const throughUrl = (row: PanelField, state: Record<string, unknown>) => {
     const params = new URLSearchParams();
@@ -1373,7 +1396,7 @@ describe("the text condition and playlist ids in the URL (F22b)", () => {
   it("a text condition round-trips as `<key>Modifier`", () => {
     const state = { path: "/media/new", pathModifier: "STARTS_WITH" };
 
-    const { query, read } = throughUrl(PATH_ROW, state);
+    const { query, read } = throughUrl(rowOf("path"), state);
 
     expect(query).toBe("path=/media/new&pathModifier=STARTS_WITH");
     expect(read).toEqual(state);
@@ -1395,20 +1418,20 @@ describe("the text condition and playlist ids in the URL (F22b)", () => {
       playlistIdsModifier: "INCLUDES_ALL",
     };
 
-    const { query, read } = throughUrl(PLAYLISTS_ROW, state);
+    const { query, read } = throughUrl(rowOf("playlistIds"), state);
 
     expect(query).toBe("playlistIds=12,7&playlistIdsModifier=INCLUDES_ALL");
     expect(read).toEqual(state);
     // The page's instance names a Stash server: never joined to a Peek id
     expect(
-      codecOf(PLAYLISTS_ROW).readUrl(
-        PLAYLISTS_ROW,
+      codecOf(rowOf("playlistIds")).readUrl(
+        rowOf("playlistIds"),
         new URLSearchParams("playlistIds=12&instance=x")
       )
     ).toEqual({ playlistIds: ["12"] });
     expect(
-      codecOf(PLAYLISTS_ROW).readUrl(
-        PLAYLISTS_ROW,
+      codecOf(rowOf("playlistIds")).readUrl(
+        rowOf("playlistIds"),
         new URLSearchParams("playlistId=12&instance=x")
       )
     ).toEqual({ playlistIds: ["12"] });
