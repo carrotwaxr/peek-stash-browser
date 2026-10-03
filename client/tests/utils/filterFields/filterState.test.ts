@@ -104,6 +104,24 @@ describe("filterState", () => {
     ).toEqual({ favorite: "true" });
   });
 
+  it("removeGroup counts groups as the bar draws them, so a hand-edited gap removes the right one", () => {
+    // No g1 rows: the bar draws g2 as its first group and g4 as its second
+    const state: PanelState = {
+      g2: "any",
+      "g2.tagIds": ["3:a"],
+      g4: "all",
+      "g4.performerIds": ["5:a"],
+    };
+    expect(removeGroup("scene", state, 1)).toEqual({
+      g3: "all",
+      "g3.performerIds": ["5:a"],
+    });
+    expect(removeGroup("scene", state, 2)).toEqual({
+      g2: "any",
+      "g2.tagIds": ["3:a"],
+    });
+  });
+
   it("removeGroup drops `g2.*` and `g2`, and `g3` becomes `g2`", () => {
     const state: PanelState = {
       tagIds: ["1:a"],

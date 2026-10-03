@@ -20,7 +20,7 @@ import {
 } from "@peek/shared-types";
 import { normalizePanelState } from "./build";
 import { type PanelState, codecOf, valuesOf } from "./codecs";
-import { stateOf, treeOf } from "./tree";
+import { groupNumbersOf, stateOf, treeOf } from "./tree";
 
 const GROUP_DECLARATION = /^g([1-5])$/;
 
@@ -83,12 +83,16 @@ export function removeRow(
   return stateOf(kind, treeOf(kind, setRow(kind, state, at, {})));
 }
 
-/** The state without group `group` (its `gN` and every `gN.` key); later groups move up one */
+/**
+ * The state without the bar's group `position` (1 is the first group the
+ * bar draws): its `gN` and every `gN.` key go, and later groups move up one
+ */
 export function removeGroup(
-  _kind: ListKind,
+  kind: ListKind,
   state: PanelState,
-  group: number
+  position: number
 ): PanelState {
+  const group = groupNumbersOf(kind, state)[position - 1] ?? position;
   const shifted = (number: number) => (number > group ? number - 1 : number);
   const entries: (readonly [string, unknown])[] = [];
   for (const [key, value] of Object.entries(state)) {

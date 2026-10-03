@@ -280,6 +280,16 @@ const treeOfParsed = (parsed: ParsedState): PanelTree => ({
 export const treeOf = (kind: ListKind, state: PanelState): PanelTree =>
   treeOfParsed(parseState(PANEL_FIELDS[kind], SPECS[kind], state));
 
+/**
+ * The state's group numbers in the order `treeOf` draws its groups (those
+ * holding a row), so the bar's nth group chip is `gN` with N the nth entry
+ * even when a hand-edited URL skips a number
+ */
+export const groupNumbersOf = (kind: ListKind, state: PanelState): number[] =>
+  [...parseState(PANEL_FIELDS[kind], SPECS[kind], state).containers]
+    .filter(([number, group]) => number > 0 && group.rows.length > 0)
+    .map(([number]) => number);
+
 /** How many rows and groups the tree holds, as the server counts them */
 export const treeCounts = (
   tree: PanelTree
