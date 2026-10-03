@@ -25,7 +25,6 @@ import {
   type FilterClause,
   type JunctionTarget,
   type ViaSceneSpec,
-  ageYearsSql,
   allOf,
   buildDayFilter,
   buildFavoriteFilter,
@@ -33,6 +32,7 @@ import {
   buildNumericFilter,
   buildTextFilter,
   careerYearsSql,
+  dayNumberSql,
   exclusionJoin,
   fullDateSql,
   noClause,
@@ -47,6 +47,7 @@ import {
   parseStashIds,
   searchTerms,
 } from "../utils/sqlHelpers.js";
+import { zonedToday } from "../utils/zonedTime.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
@@ -257,9 +258,17 @@ function genderClause(
 /**
  * A performer's age, Stash's way: today's, or the age reached at death. A
  * birthdate or death date of only a year, or a year and month, counts from
- * its first day.
+ * its first day. Today is the viewer's (`ctx.timeZone`), bound as its
+ * `YYYY.MMDD` day number (`dayNumberSql`'s form), so near midnight the age
+ * turns on the viewer's birthday, not UTC's.
  */
-const AGE = ageYearsSql("COALESCE(p.deathDate, date('now'))", "p.birthdate");
+function ageClause(timeZone: string): FilterClause {
+  const today = zonedToday(timeZone);
+  return {
+    sql: `CAST((CASE WHEN p.deathDate IS NULL THEN ? ELSE ${dayNumberSql("p.deathDate")} END) - ${dayNumberSql("p.birthdate")} AS INTEGER)`,
+    params: [`${today.slice(0, 4)}.${today.slice(5, 7)}${today.slice(8, 10)}`],
+  };
+}
 
 /** The years of the performer's career, from Stash's free-text career field */
 const CAREER_YEARS = careerYearsSql("p.careerLength");
@@ -272,16 +281,18 @@ const CAREER_YEARS = careerYearsSql("p.careerLength");
 function datedNumberClause(
   criterion: NumberCriterion,
   column: string,
-  expr: string
+  expr: string | FilterClause
 ): FilterClause {
   if (criterion.modifier === "IS_NULL" || criterion.modifier === "NOT_NULL") {
     return noClause();
   }
-  const clause = buildNumericFilter(criterion, expr);
+  const value = typeof expr === "string" ? { sql: expr, params: [] } : expr;
+  // buildNumericFilter writes the expression once, ahead of its own values
+  const clause = buildNumericFilter(criterion, value.sql);
   if (!clause.sql) return clause;
   return {
     sql: `(${column} IS NOT NULL AND ${clause.sql})`,
-    params: clause.params,
+    params: [...value.params, ...clause.params],
   };
 }
 
@@ -449,7 +460,8 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
         "p.deathDate",
         `CAST(SUBSTR(${fullDateSql("p.deathDate")}, 1, 4) AS INTEGER)`
       ),
-    age: (c) => datedNumberClause(c, "p.birthdate", AGE),
+    age: (c, ctx) =>
+      datedNumberClause(c, "p.birthdate", ageClause(ctx.timeZone)),
 
     // Dates
     birthdate: (c) => buildDayFilter(c, "p.birthdate"),

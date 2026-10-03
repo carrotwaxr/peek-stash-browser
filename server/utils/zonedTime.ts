@@ -137,6 +137,18 @@ function zonedInstant(wall: number, timeZone: string): number {
   return after;
 }
 
+/**
+ * The zone's calendar day at an instant (now by default), as `YYYY-MM-DD`:
+ * "today" where the viewer is.
+ */
+export function zonedToday(timeZone: string, at = Date.now()): string {
+  const wall = new Date(wallAt(at, timeZone));
+  const y = String(wall.getUTCFullYear()).padStart(4, "0");
+  const m = String(wall.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(wall.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 /** Year, month and day of a valid `YYYY-MM-DD`, else undefined */
 function dayFields(day: string): [number, number, number] | undefined {
   const match = DATE_ONLY.exec(day);
