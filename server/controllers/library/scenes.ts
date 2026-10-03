@@ -336,9 +336,12 @@ export const findRecommendedScenes = async (
 /**
  * `POST /api/library/scenes/recommended/count`: how many scenes the
  * request matches within the ranked list, the number `findRecommendedScenes`
- * answers as `count`. It reads the stored rankings (no recompute, so a count
- * made while the filter sheet is open never waits on one); no ranked scenes
- * answer 0.
+ * answers as `count` on page 1. It first makes the rankings fresh as page 1
+ * does, so the sheet's "Show N" and the page it opens score with the same
+ * rankings: fresh rankings cost a lookup in memory (0.3 µs), and stale ones
+ * (over an hour old, or after a rating or play) are recomputed once, the
+ * recompute page 1 would otherwise wait on, shared with it. No ranked
+ * scenes answer 0.
  */
 export const countRecommendedScenes = async (
   req: TypedLibraryRequest<FindRecommendedScenesRequest>,
@@ -348,6 +351,7 @@ export const countRecommendedScenes = async (
   const request = parseRecommendedListRequest(req.body, { userId });
   const { allowedInstanceIds, timeZone } = req;
 
+  await freshRankings(userId);
   const { within } = await rankedWithin(userId, allowedInstanceIds);
   if ("empty" in within) {
     res.json({ count: 0 });
