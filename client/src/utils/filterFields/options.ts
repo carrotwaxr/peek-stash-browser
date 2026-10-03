@@ -118,8 +118,13 @@ const REF_MODIFIER_LABELS = {
   },
 } as const satisfies Record<string, Record<RefFieldModifier, string>>;
 
-/** The condition select's words for a select of values (Resolution, Captions) */
+/**
+ * The condition select's words for a select of values (Resolution, Captions)
+ * or a group of boxes (Gender)
+ */
 const ENUM_MODIFIER_LABELS: Readonly<Record<string, string>> = {
+  INCLUDES: "Is ANY of these",
+  EXCLUDES: "Is NONE of these",
   EQUALS: "Equals",
   NOT_EQUALS: "Not Equals",
   GREATER_THAN: "Greater Than",

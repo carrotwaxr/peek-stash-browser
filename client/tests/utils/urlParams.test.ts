@@ -1158,7 +1158,11 @@ describe("every companion of a field is written and read, whatever its editor", 
         const choice = row.choices[0];
         return choice === undefined
           ? undefined
-          : { [row.key]: choice.value, ...companions };
+          : {
+              // A multi row (Gender) reads back as a list
+              [row.key]: row.multi === true ? [choice.value] : choice.value,
+              ...companions,
+            };
       }
       case "text":
         return { [row.key]: "text", ...companions };

@@ -96,7 +96,7 @@ const TABS = [
     find: "findPerformers",
     filterKey: "performer_filter",
     panel: "?gender=FEMALE",
-    fromPanel: { gender: { value: "FEMALE", modifier: "EQUALS" } },
+    fromPanel: { gender: { value: ["FEMALE"], modifier: "INCLUDES" } },
     locked: { tags: LOCK },
   },
   {

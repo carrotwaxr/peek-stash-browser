@@ -382,7 +382,8 @@
       "key": "orientation",
       "label": "Orientation",
       "type": "select",
-      "defaultValue": "",
+      "defaultValue": [],
+      "multi": true,
       "options": [
         {
           "value": "LANDSCAPE",

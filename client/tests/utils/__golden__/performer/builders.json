@@ -451,74 +451,380 @@
       }
     },
     {
-      "label": "gender: MALE",
+      "label": "gender: INCLUDES MALE",
       "state": {
-        "gender": "MALE"
+        "gender": [
+          "MALE"
+        ],
+        "genderModifier": "INCLUDES"
       },
       "request": {
         "gender": {
-          "value": "MALE",
-          "modifier": "EQUALS"
+          "value": [
+            "MALE"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: INCLUDES FEMALE",
+      "state": {
+        "gender": [
+          "FEMALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "FEMALE"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: INCLUDES TRANSGENDER_MALE",
+      "state": {
+        "gender": [
+          "TRANSGENDER_MALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "TRANSGENDER_MALE"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: INCLUDES TRANSGENDER_FEMALE",
+      "state": {
+        "gender": [
+          "TRANSGENDER_FEMALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "TRANSGENDER_FEMALE"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: INCLUDES INTERSEX",
+      "state": {
+        "gender": [
+          "INTERSEX"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "INTERSEX"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: INCLUDES NON_BINARY",
+      "state": {
+        "gender": [
+          "NON_BINARY"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "NON_BINARY"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: INCLUDES two values",
+      "state": {
+        "gender": [
+          "MALE",
+          "FEMALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "MALE",
+            "FEMALE"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: EXCLUDES MALE",
+      "state": {
+        "gender": [
+          "MALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "MALE"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: EXCLUDES FEMALE",
+      "state": {
+        "gender": [
+          "FEMALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "FEMALE"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: EXCLUDES TRANSGENDER_MALE",
+      "state": {
+        "gender": [
+          "TRANSGENDER_MALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "TRANSGENDER_MALE"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: EXCLUDES TRANSGENDER_FEMALE",
+      "state": {
+        "gender": [
+          "TRANSGENDER_FEMALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "TRANSGENDER_FEMALE"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: EXCLUDES INTERSEX",
+      "state": {
+        "gender": [
+          "INTERSEX"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "INTERSEX"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: EXCLUDES NON_BINARY",
+      "state": {
+        "gender": [
+          "NON_BINARY"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "NON_BINARY"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: EXCLUDES two values",
+      "state": {
+        "gender": [
+          "MALE",
+          "FEMALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "MALE",
+            "FEMALE"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: IS_NULL no value",
+      "state": {
+        "genderModifier": "IS_NULL"
+      },
+      "request": {
+        "gender": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "gender: NOT_NULL no value",
+      "state": {
+        "genderModifier": "NOT_NULL"
+      },
+      "request": {
+        "gender": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "gender: MALE",
+      "state": {
+        "gender": [
+          "MALE"
+        ]
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "MALE"
+          ],
+          "modifier": "INCLUDES"
         }
       }
     },
     {
       "label": "gender: FEMALE",
       "state": {
-        "gender": "FEMALE"
+        "gender": [
+          "FEMALE"
+        ]
       },
       "request": {
         "gender": {
-          "value": "FEMALE",
-          "modifier": "EQUALS"
+          "value": [
+            "FEMALE"
+          ],
+          "modifier": "INCLUDES"
         }
       }
     },
     {
       "label": "gender: TRANSGENDER_MALE",
       "state": {
-        "gender": "TRANSGENDER_MALE"
+        "gender": [
+          "TRANSGENDER_MALE"
+        ]
       },
       "request": {
         "gender": {
-          "value": "TRANSGENDER_MALE",
-          "modifier": "EQUALS"
+          "value": [
+            "TRANSGENDER_MALE"
+          ],
+          "modifier": "INCLUDES"
         }
       }
     },
     {
       "label": "gender: TRANSGENDER_FEMALE",
       "state": {
-        "gender": "TRANSGENDER_FEMALE"
+        "gender": [
+          "TRANSGENDER_FEMALE"
+        ]
       },
       "request": {
         "gender": {
-          "value": "TRANSGENDER_FEMALE",
-          "modifier": "EQUALS"
+          "value": [
+            "TRANSGENDER_FEMALE"
+          ],
+          "modifier": "INCLUDES"
         }
       }
     },
     {
       "label": "gender: INTERSEX",
       "state": {
-        "gender": "INTERSEX"
+        "gender": [
+          "INTERSEX"
+        ]
       },
       "request": {
         "gender": {
-          "value": "INTERSEX",
-          "modifier": "EQUALS"
+          "value": [
+            "INTERSEX"
+          ],
+          "modifier": "INCLUDES"
         }
       }
     },
     {
       "label": "gender: NON_BINARY",
       "state": {
-        "gender": "NON_BINARY"
+        "gender": [
+          "NON_BINARY"
+        ]
       },
       "request": {
         "gender": {
-          "value": "NON_BINARY",
-          "modifier": "EQUALS"
+          "value": [
+            "NON_BINARY"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "gender: two values",
+      "state": {
+        "gender": [
+          "MALE",
+          "FEMALE"
+        ]
+      },
+      "request": {
+        "gender": {
+          "value": [
+            "MALE",
+            "FEMALE"
+          ],
+          "modifier": "INCLUDES"
         }
       }
     },
@@ -4272,7 +4578,9 @@
       },
       "asDefault": {
         "panelFilters": {
-          "gender": "FEMALE"
+          "gender": [
+            "FEMALE"
+          ]
         },
         "url": "",
         "request": {
@@ -4285,15 +4593,19 @@
           },
           "performer_filter": {
             "gender": {
-              "value": "FEMALE",
-              "modifier": "EQUALS"
+              "value": [
+                "FEMALE"
+              ],
+              "modifier": "INCLUDES"
             }
           }
         }
       },
       "afterLoad": {
         "panelFilters": {
-          "gender": "FEMALE"
+          "gender": [
+            "FEMALE"
+          ]
         },
         "url": "?gender=FEMALE&sort=rating&dir=DESC",
         "request": {
@@ -4306,8 +4618,10 @@
           },
           "performer_filter": {
             "gender": {
-              "value": "FEMALE",
-              "modifier": "EQUALS"
+              "value": [
+                "FEMALE"
+              ],
+              "modifier": "INCLUDES"
             }
           }
         }
@@ -4322,8 +4636,10 @@
         },
         "performer_filter": {
           "gender": {
-            "value": "FEMALE",
-            "modifier": "EQUALS"
+            "value": [
+              "FEMALE"
+            ],
+            "modifier": "INCLUDES"
           }
         }
       }

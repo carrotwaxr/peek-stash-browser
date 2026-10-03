@@ -978,6 +978,8 @@ describeWithDb("Performer birth year and age, partial dates (seeded)", () => {
  *   7899103 (nothing set; tag 3), 7899104 (hidden by the viewer, matching
  *   every text 7899101 matches). pf-b performers 7899101 (tag 1 of pf-b,
  *   the same StashDB id) and 7899102.
+ * - Genders: pf-a 7899101 and 7899104 FEMALE, 7899102 MALE, 7899103 none;
+ *   pf-b 7899101 MALE, 7899102 empty.
  * - pf-a scenes: 7899301 (studio 7899202; performers 1 and 2; a live clip,
  *   one the viewer hid, a deleted one), 7899302 (studio 7899201; performers
  *   1 and 3; a clip; hidden by the viewer), 7899303 (performers 2, 3 and 4).
@@ -1094,6 +1096,7 @@ describeWithDb("Performer parity filters (seeded)", () => {
           disambiguation: "the first",
           country: "US",
           circumcised: "CUT",
+          gender: "FEMALE",
           aliasList: JSON.stringify(["Alpha One", "A1"]),
           urls: JSON.stringify([
             "https://example.com/pf-one",
@@ -1109,6 +1112,7 @@ describeWithDb("Performer parity filters (seeded)", () => {
           name: "PF two",
           country: "DE",
           circumcised: "UNCUT",
+          gender: "MALE",
           stashIds: "[]",
         },
         { id: P3, stashInstanceId: A, name: "PF three" },
@@ -1119,6 +1123,7 @@ describeWithDb("Performer parity filters (seeded)", () => {
           disambiguation: "the first",
           country: "US",
           circumcised: "CUT",
+          gender: "FEMALE",
           aliasList: JSON.stringify(["Alpha Four"]),
           urls: JSON.stringify(["https://example.com/pf-four"]),
           stashIds: stashIds("aaaa-1111"),
@@ -1129,10 +1134,11 @@ describeWithDb("Performer parity filters (seeded)", () => {
           id: P1,
           stashInstanceId: B,
           name: "PF one b",
+          gender: "MALE",
           stashIds: stashIds("aaaa-1111"),
           imageCount: 5,
         },
-        { id: P2, stashInstanceId: B, name: "PF two b" },
+        { id: P2, stashInstanceId: B, name: "PF two b", gender: "" },
       ],
     });
     const performerTag = (performerId: string, tagId: string, inst = A) => ({
@@ -1296,6 +1302,37 @@ describeWithDb("Performer parity filters (seeded)", () => {
     );
     expect(await listed({ circumcised: { modifier: "NOT_NULL" } })).toEqual(
       [key(P1, A), key(P2, A)].sort()
+    );
+  });
+
+  it("gender takes any of its values or none of them, and IS_NULL and NOT_NULL; beta.7's EQUALS and NOT_EQUALS of one value read the same", async () => {
+    // pf-a 7899101 FEMALE, 7899102 MALE, 7899103 none, 7899104 FEMALE but
+    // hidden; pf-b 7899101 MALE, 7899102 an empty gender
+    const females = [key(P1, A)];
+    expect(await listed({ gender: { value: ["FEMALE"] } })).toEqual(females);
+    expect(
+      await listed({ gender: { value: "FEMALE", modifier: "EQUALS" } })
+    ).toEqual(females);
+    expect(
+      await listed({
+        gender: { value: ["FEMALE", "MALE"], modifier: "INCLUDES" },
+      })
+    ).toEqual([key(P1, A), key(P2, A), key(P1, B)].sort());
+    // None of them keeps the performers without a gender, never the hidden one
+    expect(
+      await listed({ gender: { value: ["FEMALE"], modifier: "EXCLUDES" } })
+    ).toEqual(without(key(P1, A)));
+    expect(
+      await listed({ gender: { value: "FEMALE", modifier: "NOT_EQUALS" } })
+    ).toEqual(without(key(P1, A)));
+    expect(
+      await listed({ gender: { value: ["MALE"], modifier: "EXCLUDES" } })
+    ).toEqual([key(P1, A), key(P3, A), key(P2, B)].sort());
+    expect(await listed({ gender: { modifier: "IS_NULL" } })).toEqual(
+      [key(P3, A), key(P2, B)].sort()
+    );
+    expect(await listed({ gender: { modifier: "NOT_NULL" } })).toEqual(
+      [key(P1, A), key(P2, A), key(P1, B)].sort()
     );
   });
 

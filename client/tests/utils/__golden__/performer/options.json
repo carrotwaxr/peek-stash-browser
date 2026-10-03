@@ -78,7 +78,8 @@
       "key": "gender",
       "label": "Gender",
       "type": "select",
-      "defaultValue": "",
+      "defaultValue": [],
+      "multi": true,
       "options": [
         {
           "value": "MALE",
@@ -105,7 +106,27 @@
           "label": "Non-Binary"
         }
       ],
-      "placeholder": "Any gender"
+      "placeholder": "Any gender",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Is ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Is NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "genderModifier",
+      "defaultModifier": "INCLUDES"
     },
     {
       "key": "rating",
@@ -807,7 +828,8 @@
       "key": "gender",
       "label": "Gender",
       "type": "select",
-      "defaultValue": "",
+      "defaultValue": [],
+      "multi": true,
       "options": [
         {
           "value": "MALE",
@@ -834,7 +856,27 @@
           "label": "Non-Binary"
         }
       ],
-      "placeholder": "Any gender"
+      "placeholder": "Any gender",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Is ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Is NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "genderModifier",
+      "defaultModifier": "INCLUDES"
     },
     {
       "key": "rating",
@@ -1524,7 +1566,8 @@
         "performer_filter"
       ],
       "removedStateKeys": [
-        "gender"
+        "gender",
+        "genderModifier"
       ],
       "removedOptions": [
         "select:gender"

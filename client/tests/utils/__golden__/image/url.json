@@ -1968,7 +1968,9 @@
       "label": "orientation: LANDSCAPE",
       "params": "orientation=LANDSCAPE",
       "parsed": {
-        "orientation": "LANDSCAPE"
+        "orientation": [
+          "LANDSCAPE"
+        ]
       },
       "lossless": true
     },
@@ -1976,7 +1978,9 @@
       "label": "orientation: PORTRAIT",
       "params": "orientation=PORTRAIT",
       "parsed": {
-        "orientation": "PORTRAIT"
+        "orientation": [
+          "PORTRAIT"
+        ]
       },
       "lossless": true
     },
@@ -1984,7 +1988,20 @@
       "label": "orientation: SQUARE",
       "params": "orientation=SQUARE",
       "parsed": {
-        "orientation": "SQUARE"
+        "orientation": [
+          "SQUARE"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "orientation: two values",
+      "params": "orientation=LANDSCAPE%2CPORTRAIT",
+      "parsed": {
+        "orientation": [
+          "LANDSCAPE",
+          "PORTRAIT"
+        ]
       },
       "lossless": true
     },
@@ -3991,7 +4008,9 @@
       "label": "orientation: LANDSCAPE",
       "written": "instance=inst-a&tab=x&orientation=LANDSCAPE",
       "filters": {
-        "orientation": "LANDSCAPE"
+        "orientation": [
+          "LANDSCAPE"
+        ]
       },
       "hasFilters": true
     },
@@ -3999,7 +4018,9 @@
       "label": "orientation: PORTRAIT",
       "written": "instance=inst-a&tab=x&orientation=PORTRAIT",
       "filters": {
-        "orientation": "PORTRAIT"
+        "orientation": [
+          "PORTRAIT"
+        ]
       },
       "hasFilters": true
     },
@@ -4007,7 +4028,20 @@
       "label": "orientation: SQUARE",
       "written": "instance=inst-a&tab=x&orientation=SQUARE",
       "filters": {
-        "orientation": "SQUARE"
+        "orientation": [
+          "SQUARE"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "orientation: two values",
+      "written": "instance=inst-a&tab=x&orientation=LANDSCAPE%2CPORTRAIT",
+      "filters": {
+        "orientation": [
+          "LANDSCAPE",
+          "PORTRAIT"
+        ]
       },
       "hasFilters": true
     },

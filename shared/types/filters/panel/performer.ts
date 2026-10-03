@@ -14,6 +14,14 @@ const TEXT_OR_PRESENCE = [
   "NOT_NULL",
 ] as const;
 
+/** A box group's condition select (Gender): any or none of the boxes, or has none or any */
+const ANY_NONE_OR_PRESENCE = [
+  "INCLUDES",
+  "EXCLUDES",
+  "IS_NULL",
+  "NOT_NULL",
+] as const;
+
 /** Yes, No or Any: Any sends nothing */
 const YES_NO_ANY = [
   { value: "any", label: "Any", sends: undefined },
@@ -64,6 +72,12 @@ export const PERFORMER_PANEL = [
     label: "Gender",
     group: "common",
     editor: "enum",
+    // A box for each gender; a preset saved while it took one value (the
+    // owner's default `gender: "FEMALE"`) reads as a one-element list
+    multi: true,
+    modifiers: ANY_NONE_OR_PRESENCE,
+    modifierKey: "genderModifier",
+    defaultModifier: "INCLUDES",
     placeholder: "Any gender",
     choices: [
       { value: "MALE", label: "Male" },

@@ -125,12 +125,14 @@ export type TextModifier = BaseTextModifier | (typeof PATH_MODIFIERS)[number];
 /**
  * An enum's value compared (GREATER_THAN and LESS_THAN only where the values
  * are ordered, as resolutions are); a multi-valued enum criterion matches any
- * of its values (INCLUDES), and where its field offers them IS_NULL ("not
- * set") and NOT_NULL ("is set"), which take no value
+ * of its values (INCLUDES), and where its field offers them none of its
+ * values (EXCLUDES), IS_NULL ("not set") and NOT_NULL ("is set"), which take
+ * no value
  */
 export const ENUM_MODIFIERS = [
   ...COMPARISON_MODIFIERS,
   "INCLUDES",
+  "EXCLUDES",
   ...PRESENCE_MODIFIERS,
 ] as const;
 export type EnumModifier = (typeof ENUM_MODIFIERS)[number];
@@ -517,7 +519,9 @@ type EnumModifiersOf<O> = Extract<
 /**
  * An enum field. One value compared with EQUALS or NOT_EQUALS by default
  * (EQUALS when the modifier is missing); a multi-valued one takes a list and
- * matches any of it (INCLUDES).
+ * matches any of it (INCLUDES), or where it offers EXCLUDES none of it. A
+ * multi-valued field also reads a request from before it took a list (one
+ * value, EQUALS as INCLUDES, NOT_EQUALS as EXCLUDES where it offers that).
  */
 export function enumOf<
   const V extends string,

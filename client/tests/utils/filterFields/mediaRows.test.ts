@@ -22,6 +22,7 @@ import {
 import {
   chipsOf,
   filterOptionsOf,
+  normalizePanelState,
   readPanelFilter,
 } from "@/utils/filterFields";
 import { buildSearchParams, parseSearchParams } from "@/utils/urlParams";
@@ -280,7 +281,7 @@ describe.each(["image", "gallery"] as const)("the %s panel's rows", (list) => {
 });
 
 describe("the image panel", () => {
-  it("resolution compares the shorter side, as the scene's does, and orientation sends a list", () => {
+  it("resolution compares the shorter side, as the scene's does, and orientation takes several values", () => {
     expect(
       buildImageFilter({
         resolution: "FULL_HD",
@@ -293,12 +294,25 @@ describe("the image panel", () => {
     expect(buildImageFilter({ orientation: "PORTRAIT" })).toEqual({
       orientation: { value: ["PORTRAIT"] },
     });
+    expect(buildImageFilter({ orientation: ["PORTRAIT", "SQUARE"] })).toEqual({
+      orientation: { value: ["PORTRAIT", "SQUARE"] },
+    });
     const state = {
       resolution: "FOUR_K",
       resolutionModifier: "LESS_THAN",
-      orientation: "SQUARE",
+      orientation: ["LANDSCAPE", "SQUARE"],
     };
     expect(throughUrl("image", state)).toEqual(state);
+    // One orientation stored while the row took one value reads as a list
+    expect(throughUrl("image", { orientation: "SQUARE" })).toEqual({
+      orientation: ["SQUARE"],
+    });
+    expect(normalizePanelState("image", { orientation: "SQUARE" })).toEqual({
+      orientation: ["SQUARE"],
+    });
+    expect(
+      filterOptionsOf("image").find((option) => option.key === "orientation")
+    ).toMatchObject({ multi: true, defaultValue: [] });
     expect(
       chipsOf("image", {
         resolution: "FOUR_K",

@@ -3,8 +3,8 @@
  * filters the server added (hierarchy with depth, links, StashDB ids,
  * counts, three-state favourites): each row's state builds the request its
  * field takes and goes through the URL and back, and the old stored values
- * of the fields that stay single (a preset's `gender: "FEMALE"`) read as
- * before.
+ * of the fields that stay single, and beta.7's one Gender (a preset's
+ * `gender: "FEMALE"`), read as before.
  */
 import {
   type ListKind,
@@ -18,6 +18,7 @@ import {
   buildPanelFilter,
   chipsOf,
   filterOptionsOf,
+  normalizePanelState,
 } from "@/utils/filterFields";
 import { readListParams, writeListParams } from "@/utils/urlParams";
 
@@ -68,6 +69,32 @@ const CASES: readonly Case[] = [
     label: "performer Appears with all of two performers",
     state: { performerIds: [A, B], performerIdsModifier: "INCLUDES_ALL" },
     request: { performers: { value: [A, B], modifier: "INCLUDES_ALL" } },
+  },
+  {
+    list: "performer",
+    label: "performer Gender any of two",
+    state: { gender: ["FEMALE", "TRANSGENDER_FEMALE"] },
+    request: {
+      gender: { value: ["FEMALE", "TRANSGENDER_FEMALE"], modifier: "INCLUDES" },
+    },
+  },
+  {
+    list: "performer",
+    label: "performer Gender none of one",
+    state: { gender: ["MALE"], genderModifier: "EXCLUDES" },
+    request: { gender: { value: ["MALE"], modifier: "EXCLUDES" } },
+  },
+  {
+    list: "performer",
+    label: "performer Gender Has none",
+    state: { genderModifier: "IS_NULL" },
+    request: { gender: { modifier: "IS_NULL" } },
+  },
+  {
+    list: "performer",
+    label: "performer Gender Has any",
+    state: { genderModifier: "NOT_NULL" },
+    request: { gender: { modifier: "NOT_NULL" } },
   },
   {
     list: "performer",
@@ -445,7 +472,8 @@ describe("the metadata rows of the performer, studio, tag and collection panels"
   });
 
   it("the Gender preset a beta.7 user saved reads as one value, as a string and as a one-element list", () => {
-    const request = { gender: { value: "FEMALE", modifier: "EQUALS" } };
+    // The server's INCLUDES of one value is beta.7's EQUALS
+    const request = { gender: { value: ["FEMALE"], modifier: "INCLUDES" } };
 
     expect(buildPanelFilter("performer", { gender: "FEMALE" })).toEqual(
       request
@@ -453,8 +481,12 @@ describe("the metadata rows of the performer, studio, tag and collection panels"
     expect(buildPanelFilter("performer", { gender: ["FEMALE"] })).toEqual(
       request
     );
+    // A default preset becomes list state without the URL reader
+    expect(normalizePanelState("performer", { gender: "FEMALE" })).toEqual({
+      gender: ["FEMALE"],
+    });
     expect(throughUrl("performer", { gender: "FEMALE" })).toEqual({
-      gender: "FEMALE",
+      gender: ["FEMALE"],
     });
     const chips = chipsOf("performer", { gender: "FEMALE" });
     expect(chips).toHaveLength(1);
@@ -462,6 +494,22 @@ describe("the metadata rows of the performer, studio, tag and collection panels"
       label: "Gender",
       values: ["Female"],
     });
+  });
+
+  it("several genders read as their labels under the condition, and Has none alone", () => {
+    expect(
+      chipsOf("performer", {
+        gender: ["MALE", "NON_BINARY"],
+        genderModifier: "EXCLUDES",
+      }).map((chip) => chip.parts)
+    ).toEqual([
+      { label: "Gender", condition: "none of", values: ["Male", "Non-Binary"] },
+    ]);
+    expect(
+      chipsOf("performer", { genderModifier: "IS_NULL" }).map(
+        (chip) => chip.parts
+      )
+    ).toEqual([{ label: "Gender", values: ["has none"] }]);
   });
 
   it("single-value fields stored before 9a read as one value", () => {

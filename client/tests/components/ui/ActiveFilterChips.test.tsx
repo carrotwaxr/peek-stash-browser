@@ -278,9 +278,18 @@ describe("ActiveFilterChips", () => {
   });
 
   it("a select reads its choice label", async () => {
+    renderChips(
+      { resolution: "FULL_HD", resolutionModifier: "GREATER_THAN" },
+      { kind: "image" }
+    );
+
+    expect(await edit("Resolution: higher than 1080p")).toBeInTheDocument();
+  });
+
+  it("a group of boxes with a condition reads it, as a picker's chip does", async () => {
     renderChips({ gender: "FEMALE" }, { kind: "performer" });
 
-    expect(await edit("Gender: Female")).toBeInTheDocument();
+    expect(await edit("Gender: any of Female")).toBeInTheDocument();
   });
 
   it("a number with a unit names it", async () => {

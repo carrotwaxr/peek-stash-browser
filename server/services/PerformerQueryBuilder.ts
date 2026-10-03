@@ -12,6 +12,7 @@ import type { NormalizedPerformer, TagRef } from "../types/index.js";
 import type { PerformerQueryRow } from "../types/internal/queryRows.js";
 import type {
   MultiEnumFieldCriterion,
+  MultiEnumModifier,
   NumberCriterion,
   ParsedFilter,
   RefCriterion,
@@ -227,6 +228,33 @@ function circumcisedClause(
 }
 
 /**
+ * Gender: any of the values or none of them, ignoring case (none of them
+ * keeps performers without a gender, as beta.7's NOT_EQUALS did), or not set
+ * ('' or NULL, as Stash reads it) and set
+ */
+function genderClause(
+  criterion: MultiEnumFieldCriterion<string, MultiEnumModifier>
+): FilterClause {
+  switch (criterion.modifier) {
+    case "IS_NULL":
+      return { sql: "(p.gender IS NULL OR p.gender = '')", params: [] };
+    case "NOT_NULL":
+      return { sql: "(p.gender IS NOT NULL AND p.gender != '')", params: [] };
+    case "INCLUDES":
+    case "EXCLUDES": {
+      const marks = criterion.values.map(() => "?").join(", ");
+      return {
+        sql:
+          criterion.modifier === "INCLUDES"
+            ? `UPPER(p.gender) IN (${marks})`
+            : `(p.gender IS NULL OR UPPER(p.gender) NOT IN (${marks}))`,
+        params: [...criterion.values],
+      };
+    }
+  }
+}
+
+/**
  * A performer's age, Stash's way: today's, or the age reached at death. A
  * birthdate or death date of only a year, or a year and month, counts from
  * its first day.
@@ -258,9 +286,9 @@ function datedNumberClause(
 }
 
 /**
- * A text attribute compared whole, ignoring case (gender, and the free text
- * Stash keeps for ethnicity, hair and eye colour, breast type): NOT_EQUALS
- * keeps performers without one.
+ * A text attribute compared whole, ignoring case (the free text Stash keeps
+ * for ethnicity, hair and eye colour, breast type): NOT_EQUALS keeps
+ * performers without one.
  */
 function wholeTextClause(
   criterion: { readonly modifier: string; readonly value?: string },
@@ -402,7 +430,7 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
     career_length: (c) => buildNumericFilter(c, CAREER_YEARS),
 
     // Compared whole, ignoring case
-    gender: (c) => wholeTextClause(c, "p.gender"),
+    gender: (c) => genderClause(c),
     ethnicity: (c) => wholeTextClause(c, "p.ethnicity"),
     hair_color: (c) => wholeTextClause(c, "p.hairColor"),
     eye_color: (c) => wholeTextClause(c, "p.eyeColor"),

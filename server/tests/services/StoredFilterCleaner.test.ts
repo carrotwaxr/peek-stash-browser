@@ -404,6 +404,24 @@ describe("cleanFilterPresets", () => {
     ]);
   });
 
+  it("keeps beta.7's one gender and the several genders and condition a later panel saves", () => {
+    const stored = {
+      performer: [
+        preset({ id: "old", filters: { gender: "FEMALE" } }),
+        preset({
+          id: "new",
+          filters: { gender: ["MALE", "FEMALE"], genderModifier: "EXCLUDES" },
+        }),
+        preset({ id: "none", filters: { genderModifier: "IS_NULL" } }),
+      ],
+    };
+
+    const { value, changed } = cleanFilterPresets(stored);
+
+    expect(changed).toBe(false);
+    expect(value).toBe(stored);
+  });
+
   it("leaves presets with nothing to clean as the same object", () => {
     const stored = { scene: [preset({})] };
 

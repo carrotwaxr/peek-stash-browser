@@ -600,6 +600,8 @@ const TEXT_CONDITIONS: Readonly<Record<string, string>> = {
 };
 
 const ENUM_CONDITIONS: Readonly<Record<string, string>> = {
+  INCLUDES: "any of",
+  EXCLUDES: "none of",
   EQUALS: "is",
   NOT_EQUALS: "is not",
   GREATER_THAN: "higher than",
@@ -1016,6 +1018,34 @@ function playlistFromCriterion(
 }
 
 /**
+ * The values modifier a multi enum row with a condition select sends: the
+ * select's (or the stored criterion's) when the row offers it, a stored
+ * beta.7 EQUALS as INCLUDES and NOT_EQUALS as EXCLUDES, else the row's
+ * default; undefined for one the row cannot send. Presence is not one.
+ */
+function multiEnumModifierOf(
+  field: EnumField,
+  spec: FieldSpec,
+  chosen: unknown
+): string | undefined {
+  const legacy: Readonly<Record<string, string>> = {
+    EQUALS: "INCLUDES",
+    NOT_EQUALS: "EXCLUDES",
+  };
+  const wanted =
+    chosen === undefined || chosen === null || chosen === ""
+      ? (field.defaultModifier ??
+        (spec.kind === "enum" ? spec.defaultModifier : undefined))
+      : typeof chosen === "string"
+        ? (legacy[chosen] ?? chosen)
+        : undefined;
+  return (field.modifiers ?? []).find(
+    (modifier) =>
+      modifier === wanted && modifier !== "IS_NULL" && modifier !== "NOT_NULL"
+  );
+}
+
+/**
  * A stored select criterion as the row edits it: one value the row offers,
  * with its modifier when the row has a condition select (else the modifier
  * the row sends). Nothing for a value or modifier the row cannot show.
@@ -1038,14 +1068,23 @@ function enumFromCriterion(
   const values = valuesOf(parts.value);
   const [value] = values;
   if (spec.kind === "enum" && spec.multi && field.multi) {
-    // A list matching any of the values the row offers sends no modifier
-    return parts.modifier === undefined &&
-      values.length > 0 &&
-      values.every((each) =>
+    if (
+      values.length === 0 ||
+      !values.every((each) =>
         field.choices.some((choice) => choice.value === each)
       )
-      ? { [field.key]: values }
-      : {};
+    ) {
+      return {};
+    }
+    // Without a condition select a list matching any of them sends no
+    // modifier; with one (Gender) any or none of them, as the select offers
+    if (field.modifierKey === undefined) {
+      return parts.modifier === undefined ? { [field.key]: values } : {};
+    }
+    const modifier = multiEnumModifierOf(field, spec, parts.modifier);
+    return modifier === undefined
+      ? {}
+      : { [field.key]: values, [field.modifierKey]: modifier };
   }
   if (
     values.length !== 1 ||
@@ -1550,7 +1589,16 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       const values = valuesOf(state[field.key]).filter((value) =>
         spec.values.includes(value)
       );
-      if (spec.multi) return values.length > 0 ? { value: values } : undefined;
+      if (spec.multi) {
+        if (values.length === 0) return undefined;
+        // A row with a condition select (Gender) names any or none of them
+        if (field.modifierKey === undefined) return { value: values };
+        // A condition the row cannot send reads as the row's default
+        const modifier =
+          multiEnumModifierOf(field, spec, chosen) ??
+          multiEnumModifierOf(field, spec, undefined);
+        return modifier === undefined ? undefined : { value: values, modifier };
+      }
       const [value] = values;
       return value === undefined
         ? undefined
