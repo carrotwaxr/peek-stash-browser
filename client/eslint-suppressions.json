@@ -661,19 +661,19 @@
   },
   "src/components/video-player/plugins/source-selector.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 19
+      "count": 14
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 11
+      "count": 7
     },
     "@typescript-eslint/no-unsafe-call": {
       "count": 24
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 22
+      "count": 19
     },
     "@typescript-eslint/no-unsafe-return": {
       "count": 3

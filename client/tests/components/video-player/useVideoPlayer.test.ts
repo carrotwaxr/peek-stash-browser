@@ -5,15 +5,20 @@
  * scenes: moving from one to the other is a scene change, and every write
  * and stream URL carries the instance of the scene playing.
  */
-import { useState } from "react";
-import type { NormalizedScene } from "@peek/shared-types";
+import { type ReactNode, createElement, useState } from "react";
+import type {
+  NormalizedScene,
+  SceneMediaLinkResponse,
+} from "@peek/shared-types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { SignedIn } from "@tests/helpers/SignedIn";
+import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import videojs from "video.js";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, apiGet, apiPost, redirectToLogin } from "@/api";
+import { queryKeys } from "@/api/queryKeys";
 import { useCast } from "@/components/video-player/cast/useCast";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
 import { setupAirPlay } from "@/components/video-player/plugins/airplay";
@@ -97,6 +102,7 @@ function fakePlayer() {
     minimumPlayPercent: 0,
   };
   const setSources = vi.fn();
+  const refreshSources = vi.fn();
   const vttSrc = vi.fn();
   const vttDetach = vi.fn();
   const el = document.createElement("div");
@@ -107,8 +113,9 @@ function fakePlayer() {
     vttThumbnails: () => ({ src: vttSrc, detach: vttDetach }),
     el: () => el,
     trackActivity: () => trackActivity,
-    sourceSelector: () => ({ setSources }),
+    sourceSelector: () => ({ setSources, refreshSources }),
     setSources,
+    refreshSources,
     skipButtons: () => ({
       setForwardHandler: vi.fn(),
       setBackwardHandler: vi.fn(),
@@ -182,6 +189,11 @@ function renderPlayer(
     /** The route: a new one starts a scene change before its scene lands */
     pathname?: string;
   };
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { gcTime: Infinity } },
+  });
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children);
   const rendered = renderHook<ReturnType<typeof useVideoPlayer>, Props>(
     ({ current, restartCount = 0, pathname = "/scene/123" }) =>
       useVideoPlayer({
@@ -210,9 +222,9 @@ function renderPlayer(
             : { resumeTime: controls.resumeTime },
         loadingWatchHistory: false,
       }),
-    { initialProps: { current: scene } }
+    { initialProps: { current: scene }, wrapper }
   );
-  return Object.assign(rendered, { dispatch });
+  return Object.assign(rendered, { dispatch, queryClient });
 }
 
 /** A queue as a grid, a carousel or a playlist row builds it: no autoplayNext */
@@ -448,8 +460,8 @@ describe("useVideoPlayer", () => {
     rerender({ current: onB });
 
     expect(vi.mocked(buildPlayerSources).mock.calls).toEqual([
-      [onA, canDecode],
-      [onB, canDecode],
+      [onA, canDecode, undefined],
+      [onB, canDecode, undefined],
     ]);
     expect(player.load).toHaveBeenCalledTimes(2);
   });
@@ -608,6 +620,245 @@ describe("useVideoPlayer", () => {
     await expect(beforeFallback()).resolves.toBe(true);
     expect(redirectToLogin).toHaveBeenCalledWith("expired");
     unmount();
+  });
+
+  describe("the signed media link", () => {
+    const HOUR = 60 * 60 * 1000;
+
+    function mediaLink(
+      signature: string,
+      expiresInMs = 12 * HOUR
+    ): SceneMediaLinkResponse {
+      return {
+        expiresAt: new Date(Date.now() + expiresInMs).toISOString(),
+        streams: [
+          {
+            url: `/api/scene/123/proxy-stream/stream?instanceId=inst-a&sig=${signature}`,
+            mime_type: "video/mp4",
+            label: "Direct stream",
+          },
+        ],
+        cast: null,
+        captions: [],
+        poster: null,
+      };
+    }
+
+    /** Answers each media-link request with the next of `answers` (an Error rejects) */
+    function answerLinks(...answers: (SceneMediaLinkResponse | Error)[]) {
+      const queue = [...answers];
+      vi.mocked(apiPost).mockImplementation(((endpoint: string) => {
+        if (!endpoint.endsWith("/media-link")) {
+          return Promise.resolve({ success: true });
+        }
+        const answer = queue.shift() ?? queue[0];
+        return answer instanceof Error
+          ? Promise.reject(answer)
+          : Promise.resolve(answer);
+      }) as typeof apiPost);
+    }
+
+    const linkRequests = () =>
+      vi
+        .mocked(apiPost)
+        .mock.calls.filter(([endpoint]) => endpoint.endsWith("/media-link"));
+
+    /** What the hook's source selector was asked to load */
+    const built = [{ src: "built", offset: false }];
+
+    beforeEach(() => {
+      Object.assign(videojs.browser, { IS_SAFARI: true });
+      vi.mocked(buildPlayerSources).mockReturnValue(built);
+    });
+    afterEach(() => {
+      Object.assign(videojs.browser, { IS_SAFARI: false });
+      vi.mocked(buildPlayerSources).mockReturnValue([]);
+    });
+
+    /** Renders the player with a real option set, for the fallback's check */
+    function renderWithFallback() {
+      const player = { ...fakePlayer(), dispose: vi.fn() };
+      vi.mocked(videojs).mockReturnValueOnce(player as never);
+      const rendered = renderPlayer(player, onA, document.createElement("div"));
+      const options = must(
+        vi.mocked(videojs).mock.calls[0]?.[1],
+        "videojs options"
+      ) as {
+        plugins: { sourceSelector: { beforeFallback: () => Promise<boolean> } };
+      };
+      return {
+        player,
+        ...rendered,
+        beforeFallback: options.plugins.sourceSelector.beforeFallback,
+      };
+    }
+
+    it("in Safari the sources are built with the link's streams", async () => {
+      const link = mediaLink("a");
+      answerLinks(link);
+      const player = fakePlayer();
+      renderPlayer(player, onA);
+
+      await waitFor(() => expect(player.setSources).toHaveBeenCalledTimes(1));
+
+      expect(vi.mocked(buildPlayerSources)).toHaveBeenCalledWith(
+        onA,
+        canDecode,
+        link.streams
+      );
+      expect(player.setSources).toHaveBeenCalledWith(built);
+      expect(linkRequests()).toEqual([
+        ["/scene/123/media-link", { instanceId: "inst-a" }],
+      ]);
+    });
+
+    it("in Safari without a link (error) the session sources are used", async () => {
+      answerLinks(new Error("offline"));
+      const player = fakePlayer();
+      renderPlayer(player, onA);
+
+      await waitFor(() => expect(player.setSources).toHaveBeenCalledTimes(1));
+
+      expect(vi.mocked(buildPlayerSources)).toHaveBeenCalledWith(
+        onA,
+        canDecode,
+        undefined
+      );
+    });
+
+    it("in Chrome the sources never carry sig: no link is asked for", () => {
+      Object.assign(videojs.browser, { IS_SAFARI: false });
+      answerLinks(mediaLink("a"));
+      const player = fakePlayer();
+      renderPlayer(player, onA);
+
+      expect(player.setSources).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(buildPlayerSources)).toHaveBeenCalledWith(
+        onA,
+        canDecode,
+        undefined
+      );
+      expect(linkRequests()).toEqual([]);
+    });
+
+    it("the scene is not marked loaded until the link settles", async () => {
+      let settle: (link: SceneMediaLinkResponse) => void = () => {};
+      vi.mocked(apiPost).mockImplementation(
+        (() =>
+          new Promise((resolve) => {
+            settle = resolve as typeof settle;
+          })) as typeof apiPost
+      );
+      const player = fakePlayer();
+      const { rerender, dispatch } = renderPlayer(player, onA);
+
+      expect(player.setSources).not.toHaveBeenCalled();
+      expect(player.load).not.toHaveBeenCalled();
+      // The last scene's ready flag must not autoplay the old source
+      expect(dispatch).toHaveBeenCalledWith({
+        type: "SET_READY",
+        payload: false,
+      });
+      rerender({ current: onA });
+      expect(player.setSources).not.toHaveBeenCalled();
+
+      await act(async () => {
+        settle(mediaLink("a"));
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(player.setSources).toHaveBeenCalledTimes(1));
+      expect(player.load).toHaveBeenCalledTimes(1);
+    });
+
+    it("a renewed link does not reload the source", async () => {
+      answerLinks(mediaLink("a"));
+      const player = fakePlayer();
+      const { rerender, queryClient } = renderPlayer(player, onA);
+      await waitFor(() => expect(player.setSources).toHaveBeenCalledTimes(1));
+
+      act(() => {
+        queryClient.setQueryData(
+          queryKeys.scenes.mediaLink("inst-a", "123"),
+          mediaLink("b")
+        );
+      });
+      rerender({ current: onA });
+
+      expect(player.setSources).toHaveBeenCalledTimes(1);
+      expect(player.load).toHaveBeenCalledTimes(1);
+    });
+
+    it("a network error on a signed source after expiresAt refetches the link and reloads the same source, before the session check", async () => {
+      const fresh = mediaLink("fresh");
+      answerLinks(mediaLink("old", -1000), fresh);
+      const { player, beforeFallback } = renderWithFallback();
+      await waitFor(() => expect(player.setSources).toHaveBeenCalledTimes(1));
+      player.error.mockReturnValue({ code: 2 });
+      player.currentSrc.mockReturnValue(
+        "http://localhost/api/scene/123/proxy-stream/stream?instanceId=inst-a&sig=old"
+      );
+      vi.mocked(buildPlayerSources).mockClear();
+
+      await expect(beforeFallback()).resolves.toBe(false);
+
+      expect(linkRequests()).toHaveLength(2);
+      expect(vi.mocked(buildPlayerSources)).toHaveBeenCalledWith(
+        onA,
+        canDecode,
+        fresh.streams
+      );
+      // Swapped in place: nothing reloads here, the fallback's retry loads
+      // the same source (now signed afresh) at the same time
+      expect(player.refreshSources).toHaveBeenCalledWith(built);
+      expect(player.setSources).toHaveBeenCalledTimes(1);
+      expect(player.load).toHaveBeenCalledTimes(1);
+      expect(isSessionExpired).not.toHaveBeenCalled();
+    });
+
+    it("a refetch that fails hands over to the session check", async () => {
+      answerLinks(mediaLink("old", -1000), new Error("401"));
+      const { player, beforeFallback } = renderWithFallback();
+      await waitFor(() => expect(player.setSources).toHaveBeenCalledTimes(1));
+      player.error.mockReturnValue({ code: 2 });
+      player.currentSrc.mockReturnValue("http://localhost/x?sig=old");
+      vi.mocked(isSessionExpired).mockResolvedValueOnce(true);
+
+      await expect(beforeFallback()).resolves.toBe(true);
+
+      expect(player.refreshSources).not.toHaveBeenCalled();
+      expect(isSessionExpired).toHaveBeenCalledTimes(1);
+      expect(redirectToLogin).toHaveBeenCalledWith("expired");
+    });
+
+    it("before expiresAt no link is refetched", async () => {
+      answerLinks(mediaLink("a"));
+      const { player, beforeFallback } = renderWithFallback();
+      await waitFor(() => expect(player.setSources).toHaveBeenCalledTimes(1));
+      player.error.mockReturnValue({ code: 2 });
+      player.currentSrc.mockReturnValue("http://localhost/x?sig=a");
+
+      await expect(beforeFallback()).resolves.toBe(false);
+
+      expect(linkRequests()).toHaveLength(1);
+      expect(isSessionExpired).toHaveBeenCalledTimes(1);
+    });
+
+    it("an error that is not a network error, or an unsigned source, refetches nothing", async () => {
+      answerLinks(mediaLink("old", -1000));
+      const { player, beforeFallback } = renderWithFallback();
+      await waitFor(() => expect(player.setSources).toHaveBeenCalledTimes(1));
+      player.currentSrc.mockReturnValue("http://localhost/x?sig=old");
+
+      player.error.mockReturnValue({ code: 4 });
+      await expect(beforeFallback()).resolves.toBe(false);
+      player.error.mockReturnValue({ code: 2 });
+      player.currentSrc.mockReturnValue("http://localhost/x?instanceId=inst-a");
+      await expect(beforeFallback()).resolves.toBe(false);
+
+      expect(linkRequests()).toHaveLength(1);
+      expect(player.refreshSources).not.toHaveBeenCalled();
+    });
   });
 
   it("sets the AirPlay button up on the new player and tears it down with it", () => {
@@ -893,7 +1144,7 @@ describe("useVideoPlayer", () => {
             loadingWatchHistory: history.loading,
           });
         },
-        { initialProps: { current: first }, wrapper: SignedIn }
+        { initialProps: { current: first }, wrapper: SignedInWithQuery }
       );
       return { player, initialResumeTimeRef, ...rendered };
     }

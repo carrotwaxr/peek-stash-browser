@@ -273,3 +273,88 @@ describe("buildPlayerSources", () => {
     ).toBe(false);
   });
 });
+
+describe("buildPlayerSources with the signed media link's streams", () => {
+  const sceneStreams = [
+    {
+      url: "/api/scene/5/proxy-stream/stream?instanceId=i",
+      mime_type: "video/mp4",
+      label: "Direct stream",
+    },
+    {
+      url: "/api/scene/5/proxy-stream/stream.mp4?resolution=LOW&instanceId=i",
+      mime_type: "video/mp4",
+      label: "MP4 Low (240p)",
+    },
+    {
+      url: "/api/scene/5/proxy-stream/stream.mpd?instanceId=i",
+      mime_type: "application/dash+xml",
+      label: "DASH",
+    },
+    {
+      url: "/api/scene/5/proxy-stream/stream.m3u8?resolution=LOW&instanceId=i",
+      mime_type: "application/vnd.apple.mpegurl",
+      label: "HLS Low (240p)",
+    },
+  ];
+  const scene = { id: "5", instanceId: "i", sceneStreams };
+  const signed = [
+    {
+      url: "/api/scene/5/proxy-stream/stream?instanceId=i&uid=1&exp=9&scope=media&sig=a",
+      mime_type: "video/mp4",
+      label: "Direct stream",
+    },
+    {
+      url: "/api/scene/5/proxy-stream/stream.m3u8?resolution=LOW&instanceId=i&uid=1&exp=9&scope=media&sig=b",
+      mime_type: "application/vnd.apple.mpegurl",
+      label: "HLS Low (240p)",
+    },
+  ];
+
+  it("has the session list's labels and order; Direct and HLS carry sig, DASH and the transcodes do not", () => {
+    const plain = buildPlayerSources(scene, decodesAll);
+    const sources = buildPlayerSources(scene, decodesAll, signed);
+
+    expect(sources.map((s) => s.label)).toEqual(plain.map((s) => s.label));
+    const origin = window.location.origin;
+    expect(
+      sources.map((s) => [
+        s.label,
+        new URL(s.src, origin).searchParams.has("sig"),
+      ])
+    ).toEqual([
+      ["Direct stream", true],
+      ["MP4 Low (240p)", false],
+      ["DASH", false],
+      ["HLS Low (240p)", true],
+    ]);
+    // Absolute, so a device that takes the stream over (AirPlay) can fetch it
+    expect(must(sources[0]).src).toBe(origin + must(signed[0]).url);
+    expect(must(sources[1]).src).toBe(must(plain[1]).src);
+    expect(must(sources[2]).src).toBe(must(plain[2]).src);
+    expect(sources.map((s) => s.offset)).toEqual(plain.map((s) => s.offset));
+  });
+
+  it("keeps the reordering for a file this browser cannot decode", () => {
+    const sources = buildPlayerSources(
+      { ...scene, files: [{ video_codec: "hevc" }] },
+      () => false,
+      signed
+    );
+
+    expect(sources.map((s) => s.label)).toEqual([
+      "MP4 Low (240p)",
+      "DASH",
+      "HLS Low (240p)",
+      "Direct stream",
+    ]);
+    expect(isDirectSource(must(sources[3]).src)).toBe(true);
+    expect(must(sources[3]).src).toContain("sig=a");
+  });
+
+  it("without signed streams no source carries sig", () => {
+    const sources = buildPlayerSources(scene, decodesAll);
+
+    for (const source of sources) expect(source.src).not.toContain("sig=");
+  });
+});

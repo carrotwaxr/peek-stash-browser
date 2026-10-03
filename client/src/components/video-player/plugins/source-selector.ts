@@ -3,10 +3,10 @@ import { type PlayerSource, isDirectSource } from "../playerSources";
 import { togglePlaybackRateControl } from "../videoPlayerUtils";
 
 class SourceMenuItem extends videojs.getComponent("MenuItem") {
-  source: any;
+  source: PlayerSource;
   isSelected: boolean;
 
-  constructor(parent: any, source: any) {
+  constructor(parent: any, source: PlayerSource) {
     const options: any = {};
     options.selectable = true;
     options.multiSelectable = false;
@@ -34,7 +34,7 @@ class SourceMenuItem extends videojs.getComponent("MenuItem") {
 
 class SourceMenuButton extends videojs.getComponent("MenuButton") {
   items: SourceMenuItem[];
-  selectedSource: any;
+  selectedSource: PlayerSource | null;
 
   constructor(player: any) {
     super(player);
@@ -47,10 +47,10 @@ class SourceMenuButton extends videojs.getComponent("MenuButton") {
     });
   }
 
-  setSources(sources: any[]) {
+  setSources(sources: PlayerSource[]) {
     this.selectedSource = null;
 
-    this.items = sources.map((source: any, i: number) => {
+    this.items = sources.map((source, i) => {
       if (i === 0) {
         this.selectedSource = source;
       }
@@ -58,13 +58,22 @@ class SourceMenuButton extends videojs.getComponent("MenuButton") {
       const item = new SourceMenuItem(this, source);
 
       item.on("selected", () => {
-        this.selectedSource = source;
+        this.selectedSource = item.source;
 
-        this.trigger("sourceselected", source);
+        this.trigger("sourceselected", item.source);
       });
 
       return item;
     });
+  }
+
+  /** The same sources at new addresses: the selection stays where it is */
+  refreshSources(sources: PlayerSource[]) {
+    const index = this.items.findIndex((i) => i.source === this.selectedSource);
+    this.items.forEach((item, i) => {
+      item.source = sources[i] ?? item.source;
+    });
+    this.selectedSource = this.items[index]?.source ?? this.selectedSource;
   }
 
   createEl() {
@@ -94,7 +103,9 @@ class SourceMenuButton extends videojs.getComponent("MenuButton") {
   }
 
   markSourceErrored(source: any) {
-    const item = this.items.find((i: SourceMenuItem) => i.source.src === source.src);
+    const item = this.items.find(
+      (i: SourceMenuItem) => i.source.src === source.src
+    );
     if (item === undefined) return;
 
     item.addClass("vjs-source-menu-item-error");
@@ -205,6 +216,14 @@ export class SourceFallback {
     this.loadCount += 1;
     const first = sources[0];
     if (first) this.player.src(first);
+  }
+
+  /**
+   * The same sources at new addresses (a renewed link): the selected one and
+   * a pending retry stay, and the next load reads the new address
+   */
+  refreshSources(sources: PlayerSource[]): void {
+    this.sources = sources;
   }
 
   /** The user picked `source` in the menu: it loads at the current time */
@@ -334,6 +353,11 @@ class SourceSelectorPlugin extends videojs.getPlugin("plugin") {
 
     this.menu.setSources(sources);
     this.fallback.setSources(sources);
+  }
+
+  refreshSources(sources: PlayerSource[]) {
+    (this.menu as SourceMenuButton).refreshSources(sources);
+    this.fallback.refreshSources(sources);
   }
 
   get textTracks() {

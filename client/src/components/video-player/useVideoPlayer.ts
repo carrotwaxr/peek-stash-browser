@@ -1,8 +1,13 @@
 import { useEffect, useRef } from "react";
 import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
+import { useQueryClient } from "@tanstack/react-query";
 import videojs from "video.js";
 import { redirectToLogin } from "../../api";
+import {
+  sceneMediaLinkQuery,
+  useSceneMediaLink,
+} from "../../api/hooks/useScenes";
 import { usePlayerHotkeys } from "../../hooks/useMediaKeys";
 import { canDecode } from "../../utils/browserPlayback";
 import { makeCompositeKey } from "../../utils/compositeKey";
@@ -18,6 +23,7 @@ import {
   SESSION_EXPIRED_PLAYBACK_MESSAGE,
   isSessionExpired,
 } from "./sessionCheck";
+import type { LinkPlayer, LoadedLink } from "./signedLink";
 import { setupSubtitles } from "./videoPlayerUtils";
 import { type VrModeScene, useVrMode } from "./vr/useVrMode";
 import "./vtt-thumbnails.js";
@@ -115,6 +121,19 @@ export function useVideoPlayer({
   // The scene's one viewing, shared by the local and the cast tracker
   const viewingRef = useRef<Viewing | null>(null);
 
+  // Safari plays the signed media link's Direct and HLS (so AirPlay can take
+  // the stream over); the sources wait for the link, or its error. The flag,
+  // not the data, drives the sources effect: the hourly renewal reloads
+  // nothing.
+  const queryClient = useQueryClient();
+  const safari = videojs.browser.IS_SAFARI;
+  const link = useSceneMediaLink(sceneId ?? "", sceneInstanceId ?? "", {
+    enabled: safari,
+  });
+  const linkSettled = !safari || link.isSuccess || link.isError;
+  // What the loaded sources were built from, for the expired-link refetch
+  const loadedLinkRef = useRef<LoadedLink | null>(null);
+
   // Keys video.js's controls stop go to the shortcut dispatcher (stable)
   const hotkeys = usePlayerHotkeys();
 
@@ -152,6 +171,32 @@ export function useVideoPlayer({
 
     // Append to container before initialization
     container.appendChild(videoElement);
+
+    const renewExpiredLink = async () => {
+      const loaded = loadedLinkRef.current;
+      if (!loaded || Date.now() < Date.parse(loaded.expiresAt)) return false;
+      const { id, instanceId } = loaded.scene as {
+        id: string;
+        instanceId: string;
+      };
+      const { renewSignedLink } = await import("./signedLink");
+      return renewSignedLink(
+        playerRef.current as LinkPlayer | null,
+        loaded,
+        () =>
+          queryClient.fetchQuery({
+            ...sceneMediaLinkQuery(id, instanceId),
+            staleTime: 0,
+          }),
+        (streams) =>
+          buildPlayerSources(
+            loaded.scene as Parameters<typeof buildPlayerSources>[0],
+            canDecode,
+            streams
+          ),
+        () => loadedLinkRef.current === loaded
+      );
+    };
 
     // Initialize Video.js (matching Stash configuration)
     const player = videojs(videoElement, {
@@ -197,6 +242,10 @@ export function useVideoPlayer({
         // server is asked first: a lost session goes to login instead.
         sourceSelector: {
           beforeFallback: async () => {
+            // A signed source that fails to load after its link ran out
+            // (a <video> cannot see the 401): sign it again, and the
+            // selector retries the same source at the same time
+            if (await renewExpiredLink()) return false;
             if (!(await isSessionExpired())) return false;
             redirectToLogin(SESSION_EXPIRED_PLAYBACK_MESSAGE);
             return true;
@@ -437,6 +486,13 @@ export function useVideoPlayer({
       return;
     }
 
+    // Safari waits for the link (or its error) before the sources are set;
+    // until then the last scene's ready flag must not autoplay
+    if (!linkSettled) {
+      dispatch({ type: "SET_READY", payload: false });
+      return;
+    }
+
     // Mark this scene as loaded
     prevSceneKeyRef.current = sceneKey ?? null;
 
@@ -455,7 +511,10 @@ export function useVideoPlayer({
     // Sources are the server's stream paths (Stash's list for this file, as
     // keyless Peek proxy paths), with Direct and MKV after the transcodes
     // when this browser cannot decode the file
-    const sources = buildPlayerSources(scene, canDecode);
+    const streams = link.data?.streams;
+    const sources = buildPlayerSources(scene, canDecode, streams);
+    loadedLinkRef.current =
+      safari && link.data ? { scene, expiresAt: link.data.expiresAt } : null;
 
     // The plugin loads the first, falls back through the rest and shows the
     // rate menu only on Direct and MKV
@@ -483,7 +542,7 @@ export function useVideoPlayer({
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneKey]); // Stateless: only the scene matters
+  }, [sceneKey, linkSettled]); // Only the scene, and a Safari link settling
 
   // ============================================================================
   // RESTART (a queue step to an entry of the same scene)

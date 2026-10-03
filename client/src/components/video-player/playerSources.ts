@@ -52,6 +52,11 @@ export function isDirectSource(src: string): boolean {
  * a file this browser cannot decode (`canDecode` false) Direct and MKV go
  * after the transcodes. Nothing is dropped, so the source menu still offers
  * them.
+ *
+ * `signedStreams` (the media link's Direct and HLS, in Safari) replace the
+ * entry of the same label with its signed address, on this origin so a
+ * device that takes the stream over can fetch it; the rest stay session
+ * paths, so the transcode fallbacks remain.
  */
 export function buildPlayerSources(
   scene: {
@@ -64,7 +69,8 @@ export function buildPlayerSources(
     }>;
     files?: Array<DecodableFile & { duration?: number | null }>;
   },
-  canDecode: DecodeCheck
+  canDecode: DecodeCheck,
+  signedStreams?: Array<{ url: string; label: string }>
 ): PlayerSource[] {
   if (scene.sceneStreams && scene.sceneStreams.length > 0) {
     // Video duration from the first file (HLS transcodes need it to show the
@@ -78,6 +84,10 @@ export function buildPlayerSources(
       offset: needsOffset(stream.url),
       duration,
     }));
+    for (const signed of signedStreams ?? []) {
+      const source = sources.find((s) => s.label === signed.label);
+      if (source) source.src = window.location.origin + signed.url;
+    }
     if (!firstFile || canDecode(firstFile) !== false) return sources;
     return [
       ...sources.filter((source) => !isDirectSource(source.src)),
