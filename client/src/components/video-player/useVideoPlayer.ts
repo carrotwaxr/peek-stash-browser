@@ -514,24 +514,28 @@ export function useVideoPlayer({
     const shouldResume = location.state?.shouldResume;
     const resumeTime = initialResumeTimeRef.current;
 
-    // Handle resume playback before starting
-    if (
-      shouldResume &&
-      !hasResumedRef.current &&
-      resumeTime != null &&
-      resumeTime > 0
-    ) {
-      hasResumedRef.current = true;
-      player.currentTime(resumeTime);
-    }
-
-    // A browser that blocks autoplay with sound may still play it muted
-    player.play()?.catch((err: unknown) => {
-      if (err instanceof DOMException && err.name === "NotAllowedError") {
-        player.muted(true);
-        void player.play()?.catch(() => {});
+    // While casting, the load on the receiver plays the scene there (and a
+    // session playing another scene is not taken over by an autoplay)
+    if (!(player as CastAwarePlayer).peekCastRemote) {
+      // Handle resume playback before starting
+      if (
+        shouldResume &&
+        !hasResumedRef.current &&
+        resumeTime != null &&
+        resumeTime > 0
+      ) {
+        hasResumedRef.current = true;
+        player.currentTime(resumeTime);
       }
-    });
+
+      // A browser that blocks autoplay with sound may still play it muted
+      player.play()?.catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "NotAllowedError") {
+          player.muted(true);
+          void player.play()?.catch(() => {});
+        }
+      });
+    }
 
     // Clear autoplay flag
     dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: false });

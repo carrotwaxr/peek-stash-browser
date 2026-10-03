@@ -53,6 +53,7 @@ export const REMOTE_EVENT = {
   DURATION_CHANGED: "durationChanged",
   IS_PAUSED_CHANGED: "isPausedChanged",
   PLAYER_STATE_CHANGED: "playerStateChanged",
+  MEDIA_INFO_CHANGED: "mediaInfoChanged",
 };
 
 export class FakeRemotePlayer {
@@ -73,15 +74,22 @@ export class FakeRemotePlayerController extends Emitter {
 }
 
 export interface FakeMediaSession {
-  media?: { customData?: unknown } | null;
+  media?: { customData?: unknown; tracks?: unknown[] } | null;
   idleReason?: string | null;
+  editTracksInfo?: (request: { activeTrackIds?: number[] }) => void;
 }
 
 export class FakeSession {
   mediaSession: FakeMediaSession | null = null;
+  /** The receiver takes the media: the session's media is now the request's */
   readonly loadMedia = vi.fn(
-    (_request: unknown): Promise<string | undefined> =>
-      Promise.resolve(undefined)
+    (request: unknown): Promise<string | undefined> => {
+      this.mediaSession = {
+        media: untrusted<{ media: FakeMediaSession["media"] }>(request).media,
+        editTracksInfo: vi.fn(),
+      };
+      return Promise.resolve(undefined);
+    }
   );
 
   constructor(readonly friendlyName = "Living Room TV") {}
@@ -187,6 +195,9 @@ export const fakeMedia = {
       readonly contentId: string,
       readonly contentType: string
     ) {}
+  },
+  EditTracksInfoRequest: class {
+    constructor(readonly activeTrackIds?: number[]) {}
   },
   LoadRequest: class {
     autoplay?: boolean;

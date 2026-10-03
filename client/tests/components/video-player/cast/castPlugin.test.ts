@@ -103,6 +103,22 @@ describe("Cast button", () => {
     expect(castButton(player)?.hasClass("vjs-cast-connected")).toBe(false);
   });
 
+  it("on a page whose scene the session does not play, it reads 'Cast this scene (<device>)' and still shows connected", () => {
+    const player = makePlayer();
+    const button = addCastButton(
+      asCastPlayer(player),
+      vi.fn(),
+      addOrderedControl
+    );
+
+    button.setCastState("CONNECTED", "Living Room TV", false);
+
+    expect(castButton(player)?.controlText()).toBe(
+      "Cast this scene (Living Room TV)"
+    );
+    expect(castButton(player)?.hasClass("vjs-cast-connected")).toBe(true);
+  });
+
   it("is added through addOrderedControl as peekCastButton, before the fullscreen toggle", () => {
     const player = makePlayer();
     addCastButton(asCastPlayer(player), vi.fn(), addOrderedControl);
@@ -166,6 +182,10 @@ describe("Cast status line", () => {
     status.show("Living Room TV");
     expect(line()?.textContent).toBe("Casting to Living Room TV");
     expect(line()?.classList.contains("vjs-cast-status-active")).toBe(true);
+
+    // Another tab loaded the media: this one mirrors it
+    status.show("Living Room TV", false);
+    expect(line()?.textContent).toBe("Casting on Living Room TV");
 
     status.show(null);
     expect(line()?.textContent).toBe("");

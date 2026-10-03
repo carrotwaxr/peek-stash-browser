@@ -119,6 +119,8 @@ declare namespace cast.framework {
     DURATION_CHANGED: string;
     IS_PAUSED_CHANGED: string;
     PLAYER_STATE_CHANGED: string;
+    /** The receiver's media changed (a load from this or another sender) */
+    MEDIA_INFO_CHANGED: string;
   };
   /** The receiver's state, kept current by its controller */
   class RemotePlayer {
@@ -189,10 +191,20 @@ declare namespace chrome.cast.media {
     currentTime?: number;
     activeTrackIds?: number[];
   }
+  /** Which of the media's tracks the receiver shows */
+  class EditTracksInfoRequest {
+    constructor(activeTrackIds?: number[]);
+    activeTrackIds?: number[];
+  }
   /** The receiver's media session */
   interface Media {
     media?: MediaInfo | null;
     idleReason?: string | null;
+    editTracksInfo(
+      request: EditTracksInfoRequest,
+      onSuccess: () => void,
+      onError: (error: unknown) => void
+    ): void;
   }
 }
 

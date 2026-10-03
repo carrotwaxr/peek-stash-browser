@@ -8,6 +8,13 @@
  * loads the scene on the receiver, the page's controls then drive the
  * receiver (through `castMiddleware`), and a session end hands the scene back
  * to the local player where the TV left it.
+ *
+ * The cast follows the page (C10): while attached, every scene change on the
+ * page (a queue step, a restart) loads that scene on the TV; a page on
+ * another scene than the session's does not attach, and its Cast button or
+ * play loads its scene into the session. Each load names this tab
+ * (`castSenderId`), and only the tab named by the playing media records it.
+ * The page's captions menu drives the receiver's text tracks.
  */
 import type { SceneMediaLinkResponse } from "@peek/shared-types";
 import { makeCompositeKey } from "../../../utils/compositeKey";
@@ -24,6 +31,7 @@ import {
   addCastStatus,
 } from "./castPlugin";
 import type { CastFramework } from "./castSdk";
+import { castSenderId } from "./castSenderId";
 
 export type CastMedia = typeof chrome.cast.media;
 
@@ -38,6 +46,54 @@ export interface CastScene {
 
 /** Captions on the TV come through Peek's caption route, which serves WebVTT */
 const CAPTION_TYPE = "text/vtt";
+
+/** A text track of the local player, as video.js describes it */
+export interface LocalTextTrack {
+  kind: string;
+  language: string;
+  mode: string;
+  src?: string;
+}
+
+/** The caption format a caption URL names (`type=srt`, `type=vtt`) */
+const captionFormat = (url: string | undefined) =>
+  /[?&]type=([^&#]*)/.exec(url ?? "")?.[1];
+
+/**
+ * The receiver's track ids for the local caption `caption` (none when the
+ * page shows none): the track in its language and format, else the first in
+ * its language.
+ */
+export function activeTrackIds(
+  tracks: readonly chrome.cast.media.Track[],
+  caption: LocalTextTrack | null
+): number[] {
+  if (!caption) return [];
+  const inLanguage = tracks.filter(
+    (track) => track.language === caption.language
+  );
+  const format = captionFormat(caption.src);
+  const track =
+    inLanguage.find(
+      (candidate) => captionFormat(candidate.trackContentId) === format
+    ) ?? inLanguage[0];
+  return track ? [track.trackId] : [];
+}
+
+/** The caption or subtitle track the local player shows, if any */
+function showingCaption(player: CastPlayer): LocalTextTrack | null {
+  const tracks = player.textTracks();
+  for (let index = 0; index < tracks.length; index += 1) {
+    const track = tracks[index];
+    if (
+      track?.mode === "showing" &&
+      (track.kind === "captions" || track.kind === "subtitles")
+    ) {
+      return track;
+    }
+  }
+  return null;
+}
 
 /**
  * Where a cast starts: the local player's position once it has played, else
@@ -60,7 +116,8 @@ export function castStartTime({
  * The receiver's load request for `scene`, or null when the link offers no
  * source a Cast device plays. `customData.scene` is the scene as
  * `id:instanceId`, so a page joining the session later can tell whose media
- * is playing.
+ * is playing, and `customData.sender` the tab that loads it, the one that
+ * records it. The captions the page shows (`caption`) show on the TV.
  */
 export function buildLoadRequest(
   media: CastMedia,
@@ -69,11 +126,15 @@ export function buildLoadRequest(
     origin,
     scene,
     startTime,
+    sender,
+    caption = null,
   }: {
     link: SceneMediaLinkResponse;
     origin: string;
     scene: CastScene;
     startTime: number;
+    sender: string;
+    caption?: LocalTextTrack | null;
   }
 ): chrome.cast.media.LoadRequest | null {
   const source = link.cast;
@@ -108,11 +169,15 @@ export function buildLoadRequest(
     track.language = caption.lang;
     return track;
   });
-  info.customData = { scene: makeCompositeKey(scene.id, scene.instanceId) };
+  info.customData = {
+    scene: makeCompositeKey(scene.id, scene.instanceId),
+    sender,
+  };
 
   const request = new media.LoadRequest(info);
   request.currentTime = startTime;
   request.autoplay = true;
+  request.activeTrackIds = activeTrackIds(info.tracks, caption);
   return request;
 }
 
@@ -158,19 +223,29 @@ export interface CastPlayer extends CastControlsPlayer, CastAwarePlayer {
   isDisposed(): boolean;
   /** The local tracker (absent where the plugin is not registered) */
   trackActivity?(): { setEnabled(enabled: boolean): void };
+  /** The local text tracks: the captions menu sets their modes */
+  textTracks(): {
+    readonly length: number;
+    readonly [index: number]: LocalTextTrack | undefined;
+    addEventListener(type: "change", handler: () => void): void;
+    removeEventListener(type: "change", handler: () => void): void;
+  };
 }
 
 export interface CastSessionOptions {
   framework: CastFramework;
-  media: CastMedia;
+  /** `chrome.cast.media` (the SDK's, unless a test hands one in) */
+  media?: CastMedia;
   player: CastPlayer;
   /**
    * The page now (it changes while the controller lives): its scene, the
-   * user's resume point for that scene, and the scene's viewing (the local
-   * tracker's senders, which the cast tracker shares)
+   * queue's restart count, the user's resume point for that scene, and the
+   * scene's viewing (the local tracker's senders, which the cast tracker
+   * shares)
    */
   page(): {
     scene: CastScene | null;
+    restartCount?: number;
     resumeTime: number | null | undefined;
     viewing: { readonly current: Viewing | null };
     minimumPlayPercent: number;
@@ -191,38 +266,71 @@ export const CAST_LINK_EXPIRED_MESSAGE =
 const deviceName = (session: cast.framework.CastSession | null) =>
   session?.getCastDevice().friendlyName ?? null;
 
-/** The scene a session's media names in `customData.scene`, if any */
-function sceneOfMedia(media: chrome.cast.media.Media | null): string | null {
-  const customData = media?.media?.customData;
-  if (typeof customData !== "object" || customData === null) return null;
-  const scene = (customData as { scene?: unknown }).scene;
-  return typeof scene === "string" ? scene : null;
+const asString = (value: unknown) => (typeof value === "string" ? value : null);
+
+/**
+ * What the session plays: the scene its `customData.scene` names (null for
+ * media Peek did not load) and the tab that loaded it; null while nothing is
+ * loaded
+ */
+function mediaOf(
+  media: chrome.cast.media.Media | null
+): { scene: string | null; sender: string | null } | null {
+  const info = media?.media;
+  if (!info) return null;
+  const customData = (info.customData ?? {}) as {
+    scene?: unknown;
+    sender?: unknown;
+  };
+  return {
+    scene: asString(customData.scene),
+    sender: asString(customData.sender),
+  };
 }
 
 /**
  * Ties one player to the Cast framework. `attach` adds the button, the
- * status line and every listener; `detach` removes them all.
+ * status line and every listener; `detach` removes them all; `update` hears
+ * each render of the page, whose scene may have changed.
  */
 export class CastSessionController {
+  private readonly media: CastMedia;
   private readonly context: cast.framework.CastContext;
   private readonly remote: cast.framework.RemotePlayer;
   private readonly controller: cast.framework.RemotePlayerController;
   private readonly view: CastRemote;
+  /**
+   * What the player's play reaches while the session plays another scene
+   * (`castMiddleware` calls it): this page's scene loads into the session
+   */
+  private readonly loader: CastRemote;
   private readonly remoteListeners: [string, () => void][];
+  /** This tab, as the media it loads names it */
+  private readonly sender = castSenderId();
   private button: CastButtonControl | null = null;
   private status: CastStatusControl | null = null;
-  /** Records the TV's progress while attached */
+  /** Records the TV's progress while media this tab loaded plays */
   private tracker: CastActivity | null = null;
   private castState = "";
   /** The session this page follows; null while the local player plays */
   private attachedTo: cast.framework.CastSession | null = null;
+  /** This tab loaded the media playing, so it records it */
+  private loadedHere = false;
+  /** A load from this page is under way: the session still plays the last */
+  private loading = false;
+  /** The page's scene and restart count when last seen */
+  private seen = "";
+  /** The receiver's text tracks as last set, so a repeat is not sent */
+  private sentTracks = "";
   private lastRemoteTime = 0;
   private expiresAt = Number.POSITIVE_INFINITY;
-  /** Bumped by each start and end, so a late answer to an old load is dropped */
+  /** Bumped by each load and end, so a late answer to an old load is dropped */
   private loads = 0;
 
   constructor(private readonly options: CastSessionOptions) {
-    const { framework, media } = options;
+    const { framework } = options;
+    const media = options.media ?? chrome.cast.media;
+    this.media = media;
     this.context = framework.CastContext.getInstance();
     this.remote = new framework.RemotePlayer();
     this.controller = new framework.RemotePlayerController(this.remote);
@@ -232,12 +340,19 @@ export class CastSessionController {
       () => this.attachedTo?.getMediaSession() ?? null,
       media
     );
+    this.loader = {
+      ...this.view,
+      play: () => {
+        this.castHere();
+      },
+    };
     const events = framework.RemotePlayerEventType;
     this.remoteListeners = [
       [events.CURRENT_TIME_CHANGED, this.onRemoteTime],
       [events.IS_PAUSED_CHANGED, this.onRemotePaused],
       [events.DURATION_CHANGED, this.onRemoteDuration],
       [events.PLAYER_STATE_CHANGED, this.onRemotePlayerState],
+      [events.MEDIA_INFO_CHANGED, this.onMediaInfo],
     ];
   }
 
@@ -252,18 +367,19 @@ export class CastSessionController {
     for (const [type, handler] of this.remoteListeners) {
       this.controller.addEventListener(type, handler);
     }
+    player.textTracks().addEventListener("change", this.onTextTracks);
     this.button = addCastButton(
       player,
-      this.requestSession,
+      this.onPress,
       this.options.addOrderedControl
     );
     this.status = addCastStatus(player);
-    this.setCastState(this.context.getCastState());
+    this.seen = this.pageMark();
+    this.castState = this.context.getCastState();
 
     // A session already live (joined after a reload, or this page opened
     // while casting) is followed when it plays this scene
-    const session = this.context.getCurrentSession();
-    if (session) this.resume(session);
+    this.sync();
   }
 
   detach() {
@@ -281,12 +397,18 @@ export class CastSessionController {
       this.controller.removeEventListener(type, handler);
     }
     this.loads += 1;
+    this.loading = false;
     const attached = this.attachedTo !== null;
     this.attachedTo = null;
+    // The page goes and the TV plays on: what it played since the last save
+    // goes in a request that outlives the page, and nothing records until a
+    // page of this tab shows the cast scene again
+    this.stopTracking({ keepalive: true });
     player.peekCastConnected = false;
     player.peekCastRemote = null;
-    if (attached) this.track(false);
     if (!player.isDisposed()) {
+      player.textTracks().removeEventListener("change", this.onTextTracks);
+      if (attached) player.trackActivity?.().setEnabled(true);
       this.button?.remove();
       this.status?.remove();
     }
@@ -294,14 +416,72 @@ export class CastSessionController {
     this.status = null;
   }
 
-  /** Opens Chrome's Cast dialog (pick a device, or stop casting) */
-  private readonly requestSession = () => {
+  /**
+   * The page rendered. While attached, a new scene or a restart (a queue
+   * step, the playlist, the media keys, the VR HUD) loads that scene on the
+   * TV at its start; a page that moves to the scene the TV plays follows it.
+   */
+  update() {
+    if (!this.button || !this.options.page().scene) return;
+    const mark = this.pageMark();
+    if (mark === this.seen) return;
+    this.seen = mark;
+    // After the render's effects, which give the new scene its viewing
+    queueMicrotask(() => {
+      if (!this.button) return;
+      const session = this.attachedTo;
+      if (!session) {
+        this.sync();
+        return;
+      }
+      // The TV goes on as it was: playing (or just finished), or paused
+      const playing = !this.view.paused() || this.view.ended();
+      void this.load(session, 0, playing);
+    });
+  }
+
+  /** The page's scene as `id:instanceId`, or null while it loads */
+  private pageKey() {
+    const { scene } = this.options.page();
+    return scene ? makeCompositeKey(scene.id, scene.instanceId) : null;
+  }
+
+  private pageMark() {
+    return `${this.pageKey()}#${this.options.page().restartCount ?? 0}`;
+  }
+
+  /** The live session, when it plays another scene than this page's */
+  private elsewhere() {
+    const session = this.context.getCurrentSession();
+    if (!session || this.attachedTo) return null;
+    const playing = mediaOf(session.getMediaSession());
+    return playing && playing.scene !== this.pageKey() ? session : null;
+  }
+
+  /**
+   * Cast or play on a page whose scene the session does not play: this scene
+   * loads into it. False when there is no such session.
+   */
+  private castHere() {
+    const session = this.elsewhere();
+    if (!session) return false;
+    void this.start(session);
+    return true;
+  }
+
+  /**
+   * The Cast button: this scene into a session playing another, else
+   * Chrome's Cast dialog (pick a device, or stop casting)
+   */
+  private readonly onPress = () => {
+    if (this.castHere()) return;
     // The dialog rejects when the user closes it: nothing to do
     this.context.requestSession().catch(() => {});
   };
 
   private readonly onCastState = (event: cast.framework.CastStateEventData) => {
-    this.setCastState(event.castState);
+    this.castState = event.castState;
+    this.refresh();
   };
 
   private readonly onSessionState = (
@@ -313,7 +493,7 @@ export class CastSessionController {
         void this.start(event.session);
         break;
       case states.SESSION_RESUMED:
-        this.resume(event.session);
+        this.sync();
         break;
       case states.SESSION_ENDED:
         this.end();
@@ -339,7 +519,7 @@ export class CastSessionController {
   private readonly onRemotePlayerState = () => {
     const session = this.attachedTo;
     if (!session) return;
-    const { media } = this.options;
+    const { media } = this;
     if (
       this.remote.playerState === media.PlayerState.IDLE &&
       session.getMediaSession()?.idleReason === media.IdleReason.ERROR
@@ -348,16 +528,61 @@ export class CastSessionController {
     }
   };
 
-  private setCastState(castState: string) {
-    this.castState = castState;
-    this.button?.setCastState(
-      castState,
-      deviceName(this.context.getCurrentSession())
+  /** Other media on the receiver (perhaps loaded from another tab) */
+  private readonly onMediaInfo = () => {
+    this.sync();
+  };
+
+  /** The captions menu changed: the TV shows the same captions, or none */
+  private readonly onTextTracks = () => {
+    const session = this.attachedTo;
+    if (!session || this.loading) return;
+    const media = session.getMediaSession();
+    if (!media?.media) return;
+    const ids = activeTrackIds(
+      media.media.tracks ?? [],
+      showingCaption(this.options.player)
     );
-    this.publish();
+    if (ids.join() === this.sentTracks) return;
+    this.sentTracks = ids.join();
+    media.editTracksInfo(
+      new this.media.EditTracksInfoRequest(ids),
+      () => {},
+      (error) => console.warn("[CAST] Captions not changed:", error)
+    );
+  };
+
+  /**
+   * Follows what the session plays: a page on that scene attaches, and
+   * records it when this tab loaded it; a page on another scene lets go
+   */
+  private sync() {
+    if (!this.button || this.loading) return;
+    const session = this.context.getCurrentSession();
+    const playing = mediaOf(session?.getMediaSession() ?? null);
+    const page = this.pageKey();
+    if (!session || !playing || !page) {
+      this.refresh();
+      return;
+    }
+    if (playing.scene !== page) {
+      // Another tab loaded another scene: the TV is not this page's now
+      if (this.attachedTo) this.release();
+      else this.refresh();
+      return;
+    }
+    this.loadedHere = playing.sender === this.sender;
+    if (this.attachedTo) {
+      this.refresh();
+    } else {
+      this.lastRemoteTime = this.remote.currentTime;
+      this.follow(session);
+    }
+    if (!this.loadedHere) this.stopTracking();
+    else if (!this.tracker) this.startTracking();
   }
 
-  /** A new session: the scene moves from the local player to the TV */
+  /** The scene moves from the local player to the TV */
   private async start(session: cast.framework.CastSession) {
     const { player } = this.options;
     const { scene, resumeTime } = this.options.page();
@@ -370,7 +595,28 @@ export class CastSessionController {
     });
     player.pause();
     this.expiresAt = Number.POSITIVE_INFINITY;
+    this.loadedHere = true;
     this.follow(session);
+    await this.load(session, startTime, true);
+  }
+
+  /**
+   * Loads the page's scene on the receiver, as this tab's: the tracker of
+   * the media it replaces saves what was played and stops, and once the TV
+   * has the scene its own tracker starts
+   */
+  private async load(
+    session: cast.framework.CastSession,
+    startTime: number,
+    autoplay: boolean
+  ) {
+    const { player } = this.options;
+    const { scene } = this.options.page();
+    if (!scene) return;
+    this.stopTracking();
+    this.loadedHere = true;
+    this.loading = true;
+    this.refresh();
 
     this.loads += 1;
     const load = this.loads;
@@ -378,40 +624,40 @@ export class CastSessionController {
       const link = await this.options.fetchLink(scene);
       if (load !== this.loads) return;
       this.expiresAt = Date.parse(link.expiresAt);
-      const request = buildLoadRequest(this.options.media, {
+      const request = buildLoadRequest(this.media, {
         link,
         origin: window.location.origin,
         scene,
         startTime,
+        sender: this.sender,
+        caption: player.isDisposed() ? null : showingCaption(player),
       });
       if (!request) {
         this.fail(NO_CAST_SOURCE_MESSAGE);
         return;
       }
+      request.autoplay = autoplay;
+      this.sentTracks = String(request.activeTrackIds);
       const error = await session.loadMedia(request);
       if (load !== this.loads) return;
-      if (error) this.fail(this.failureMessage(session));
+      if (error) {
+        this.fail(this.failureMessage(session));
+        return;
+      }
+      this.loading = false;
+      this.sync();
     } catch {
       if (load !== this.loads) return;
       this.fail(this.failureMessage(session));
     }
   }
 
-  /** A session joined later: followed only when it plays this scene */
-  private resume(session: cast.framework.CastSession) {
-    const { scene } = this.options.page();
-    if (!scene) return;
-    const playing = sceneOfMedia(session.getMediaSession());
-    if (playing !== makeCompositeKey(scene.id, scene.instanceId)) return;
-    this.lastRemoteTime = this.remote.currentTime;
-    this.follow(session);
-  }
-
   /** The session ended: the local player takes the scene back, paused */
   private end() {
     this.loads += 1;
-    if (!this.attachedTo) return;
-    this.release(this.lastRemoteTime);
+    this.loading = false;
+    if (this.attachedTo) this.release(this.lastRemoteTime);
+    else this.refresh();
   }
 
   private fail(message: string) {
@@ -434,31 +680,26 @@ export class CastSessionController {
   private follow(session: cast.framework.CastSession) {
     const { player } = this.options;
     // Before the flags: the local tracker's last save reads the local player
-    this.track(true);
+    if (!player.isDisposed()) player.trackActivity?.().setEnabled(false);
     this.attachedTo = session;
-    player.peekCastConnected = true;
-    player.peekCastRemote = this.view;
-    this.status?.show(deviceName(session));
-    this.publish();
+    // Whatever tracks the receiver shows, the next captions change is sent
+    this.sentTracks = "-";
+    this.refresh();
     this.durationChanged();
   }
 
   /** Back to the local player, at `seekTo` when given, paused */
   private release(seekTo?: number) {
     const { player } = this.options;
+    this.loading = false;
+    this.stopTracking();
     this.attachedTo = null;
-    player.peekCastConnected = false;
-    player.peekCastRemote = null;
-    this.status?.show(null);
-    this.publish();
-    if (player.isDisposed()) {
-      this.track(false);
-      return;
-    }
+    this.refresh();
+    if (player.isDisposed()) return;
     player.pause();
     if (seekTo !== undefined) player.currentTime(seekTo);
     // Once the local player is paused where the TV left it
-    this.track(false);
+    player.trackActivity?.().setEnabled(true);
     // The control bar showed the receiver: it follows the local player again
     player.trigger("pause");
     player.trigger("timeupdate");
@@ -466,25 +707,45 @@ export class CastSessionController {
   }
 
   /**
-   * While attached the cast tracker records the TV's progress through the
-   * page's viewing and the local tracker is off (the player answers for the
-   * TV then); otherwise the local tracker is on again.
+   * Records the TV through the page's viewing (the local tracker's senders),
+   * which is the scene the media names: `sync` starts it only then
    */
-  private track(attached: boolean) {
-    const { player, media } = this.options;
-    this.tracker?.stop();
-    this.tracker = null;
+  private startTracking() {
     const { viewing, minimumPlayPercent } = this.options.page();
-    if (attached && viewing.current) {
-      this.tracker = new CastActivity({
-        remote: this.remote,
-        media,
-        viewing: viewing.current,
-        minimumPlayPercent,
-      });
-      this.tracker.start();
-    }
-    if (!player.isDisposed()) player.trackActivity?.().setEnabled(!attached);
+    if (!viewing.current) return;
+    this.tracker = new CastActivity({
+      remote: this.remote,
+      media: this.media,
+      viewing: viewing.current,
+      minimumPlayPercent,
+    });
+    this.tracker.start();
+  }
+
+  private stopTracking(options?: { keepalive: true }) {
+    this.tracker?.stop(options);
+    this.tracker = null;
+  }
+
+  /**
+   * The player's flags, the button and the status line as they are now:
+   * attached, the player answers for the receiver; on a page the session
+   * does not play, play loads this scene into it
+   */
+  private refresh() {
+    const { player } = this.options;
+    const session = this.attachedTo;
+    const elsewhere = this.elsewhere();
+    player.peekCastConnected = session !== null;
+    player.peekCastRemote = session
+      ? this.view
+      : elsewhere
+        ? this.loader
+        : null;
+    const device = deviceName(session ?? this.context.getCurrentSession());
+    this.button?.setCastState(this.castState, device, !elsewhere);
+    this.status?.show(session ? device : null, this.loadedHere);
+    this.publish();
   }
 
   /** `player.peekCastState` and `peek:caststate` for the player's readers */

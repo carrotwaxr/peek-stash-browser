@@ -5,9 +5,11 @@
  * Chromium tab), never in TV mode, then the cast chunk, and hands the player
  * to a `CastSessionController`, which adds the Cast button and follows the
  * session, which records the TV's progress while attached
- * (`castActivity.ts`). `useVideoPlayer` passes everything the cast features
- * read (the queue and controls are for the queue steps that build on this),
- * so they need no other change to the player hook.
+ * (`castActivity.ts`). Each render tells the controller, so a scene change on
+ * the page (a queue step, a restart) moves the TV with it. `useVideoPlayer`
+ * passes everything the cast features read (the queue and controls are for
+ * the queue steps that build on this), so they need no other change to the
+ * player hook.
  */
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,7 +19,11 @@ import { showError } from "../../../utils/toast";
 import type { Viewing } from "../activitySenders";
 import { addOrderedControl } from "../controlBarOrder";
 import { loadCastSdk } from "./castSdk";
-import type { CastPlayer, CastScene } from "./castSession";
+import type {
+  CastPlayer,
+  CastScene,
+  CastSessionController,
+} from "./castSession";
 
 /**
  * The cast UI and session code are their own chunk, loaded only once the SDK
@@ -59,10 +65,13 @@ export function useCast(options: UseCastOptions): void {
   const { isTVMode } = useTVMode();
   const queryClient = useQueryClient();
 
-  // The controller outlives renders and reads the page's scene as it is now
+  // The controller outlives renders and reads the page's scene as it is now;
+  // it hears each render, so a new scene or a restart reaches the TV
   const latest = useRef(options);
+  const live = useRef<CastSessionController | null>(null);
   useEffect(() => {
     latest.current = options;
+    live.current?.update();
   });
 
   useEffect(() => {
@@ -74,7 +83,7 @@ export function useCast(options: UseCastOptions): void {
     let cancelled = false;
     // Read through a call: after each await, the cleanup may have run
     const isCancelled = () => cancelled;
-    let controller: { detach(): void } | null = null;
+    let controller: CastSessionController | null = null;
 
     const start = async () => {
       const framework = await loadCastSdk();
@@ -83,7 +92,6 @@ export function useCast(options: UseCastOptions): void {
       if (isCancelled() || player.isDisposed()) return;
       const session = new CastSessionController({
         framework,
-        media: chrome.cast.media,
         player,
         page: () => latest.current,
         fetchLink: (scene) =>
@@ -94,7 +102,7 @@ export function useCast(options: UseCastOptions): void {
         addOrderedControl,
       });
       session.attach();
-      controller = session;
+      controller = live.current = session;
     };
 
     void start();

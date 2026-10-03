@@ -31,6 +31,11 @@ export interface CastRemote {
 /** What the middleware reads on the player (`useCast` sets both) */
 export interface CastAwarePlayer {
   peekCastConnected?: boolean;
+  /**
+   * The receiver while connected. While a session plays another scene than
+   * the page's, a stand-in whose `play` loads the page's scene into it (only
+   * `play` reads it then); null otherwise.
+   */
   peekCastRemote?: CastRemote | null;
 }
 
@@ -92,7 +97,8 @@ export function castMiddleware(player: CastAwarePlayer) {
     },
 
     callPlay(value: unknown) {
-      const receiver = remote();
+      // Connected, or a session playing another scene: never the local play
+      const receiver = player.peekCastRemote;
       if (!receiver) return value;
       receiver.play();
       return TERMINATOR;

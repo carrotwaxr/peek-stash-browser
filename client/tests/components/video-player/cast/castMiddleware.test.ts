@@ -6,6 +6,7 @@
  * controller and stop at the middleware. A seek never moves the paused local
  * element, so a piped transcode starts no local ffmpeg.
  */
+import { untrusted } from "@tests/helpers/untrusted";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { remoteView } from "@/components/video-player/cast/castSession";
 // The production registration: the cast middleware before durationMiddleware
@@ -49,7 +50,13 @@ async function attached(source?: Parameters<typeof startPlayer>[0]) {
   const session: { idleReason: string | null } = { idleReason: null };
   Object.assign(player, {
     peekCastConnected: true,
-    peekCastRemote: remoteView(remote, controller, () => session, castMedia()),
+    peekCastRemote: remoteView(
+      remote,
+      controller,
+      // The media session as the middleware reads it (only its idle reason)
+      () => untrusted<chrome.cast.media.Media>(session),
+      castMedia()
+    ),
   });
   return { player, remote, controller: fake.controller(), session };
 }
@@ -126,7 +133,7 @@ describe("castMiddleware", () => {
 
   it("not connected, every call passes through", async () => {
     const { player, controller } = await attached();
-    Object.assign(player, { peekCastConnected: false });
+    Object.assign(player, { peekCastConnected: false, peekCastRemote: null });
 
     expect(player.currentTime()).toBe(0);
     expect(player.paused()).toBe(true);
@@ -142,5 +149,22 @@ describe("castMiddleware", () => {
 
     expect(controller.seek).not.toHaveBeenCalled();
     expect(controller.playOrPause).not.toHaveBeenCalled();
+  });
+
+  it("while a session plays another scene, play reaches its stand-in and the local element does not play", async () => {
+    const { player } = await attached();
+    const castHere = vi.fn();
+    Object.assign(player, {
+      peekCastConnected: false,
+      peekCastRemote: { play: castHere },
+    });
+
+    void player.play();
+
+    expect(castHere).toHaveBeenCalledTimes(1);
+    expect(media.play).not.toHaveBeenCalled();
+    // Everything else is the local player's
+    player.currentTime(30);
+    expect(media.seek).toHaveBeenCalledWith(30);
   });
 });

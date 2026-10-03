@@ -13,11 +13,16 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { apiPost } from "@/api";
+import { apiFetch, apiPost } from "@/api";
 import type * as apiModule from "@/api";
 import { queryKeys } from "@/api/queryKeys";
+import {
+  type Viewing,
+  createViewing,
+} from "@/components/video-player/activitySenders";
 import { loadCastSdk } from "@/components/video-player/cast/castSdk";
 import type * as castSdkModule from "@/components/video-player/cast/castSdk";
+import { castSenderId } from "@/components/video-player/cast/castSenderId";
 import {
   type UseCastOptions,
   castChunk,
@@ -44,8 +49,12 @@ import {
 vi.mock("@/components/video-player/cast/castSdk", () => ({
   loadCastSdk: vi.fn(),
 }));
+vi.mock("@/components/video-player/cast/castSenderId", () => ({
+  castSenderId: vi.fn(),
+}));
 vi.mock("@/api", async (importOriginal) => ({
   ...(await importOriginal<typeof apiModule>()),
+  apiFetch: vi.fn(),
   apiPost: vi.fn(),
 }));
 vi.mock("@/utils/toast", () => ({ showError: vi.fn() }));
@@ -76,6 +85,9 @@ const SCENE = {
   performers: [{ name: "Ada" }],
 };
 
+/** The next entry in the queue */
+const NEXT = { id: "13", instanceId: "inst-a", title: "Low Tide" };
+
 let fake: FakeFramework;
 let media: ReturnType<typeof stubMediaElement>;
 let players: TestPlayer[] = [];
@@ -87,9 +99,12 @@ beforeEach(() => {
   vi.stubGlobal("chrome", { cast: { media: fakeMedia } });
   vi.mocked(loadCastSdk).mockResolvedValue(fake.framework);
   vi.mocked(apiPost).mockResolvedValue(mediaLink());
+  vi.mocked(apiFetch).mockResolvedValue({ success: true });
   vi.mocked(showError).mockClear();
   vi.mocked(loadCastSdk).mockClear();
   vi.mocked(apiPost).mockClear();
+  vi.mocked(apiFetch).mockClear();
+  vi.mocked(castSenderId).mockReturnValue("tab-a");
   vi.spyOn(Date, "now").mockReturnValue(NOW);
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -97,6 +112,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   players.forEach((player) => player.dispose());
   players = [];
   vi.restoreAllMocks();
@@ -111,11 +127,27 @@ interface RenderOptions {
   strict?: boolean;
   resumeTime?: number | null;
   scene?: typeof SCENE;
+  /** The page's viewing of the scene (none by default) */
+  viewing?: Viewing | null;
 }
+
+/** Real time passes (the cast code's timers and awaits run) until `check` */
+async function eventually(check: () => boolean, what: string) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (check()) return;
+    await act(() => new Promise((resolve) => setTimeout(resolve, 10)));
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
+/** Lets a link fetch and a load settle (real time; the clock may be fake) */
+const settle = () =>
+  act(() => new Promise((resolve) => setTimeout(resolve, 30)));
 
 async function renderCast(options: RenderOptions = {}) {
   const player = await startPlayer();
   players.push(player);
+  const before = fake.controllers.length;
   const { tvMode = false, strict = false, waitForAttach = !tvMode } = options;
   const wrapper = ({ children }: { children: ReactNode }) => {
     const inner = createElement(
@@ -130,6 +162,9 @@ async function renderCast(options: RenderOptions = {}) {
     return strict ? createElement(StrictMode, null, inner) : inner;
   };
   const scene = options.scene ?? SCENE;
+  // One ref for the page's life, as useVideoPlayer keeps it; by default no
+  // viewing (the cast tracker's own tests are in castActivity.test.ts)
+  const viewing = { current: options.viewing ?? null };
   const props: UseCastOptions = {
     playerRef: { current: player },
     scene,
@@ -141,18 +176,45 @@ async function renderCast(options: RenderOptions = {}) {
     playlist: null,
     resumeTime: options.resumeTime ?? null,
     minimumPlayPercent: 20,
-    // No viewing: the cast tracker's own tests are in castActivity.test.ts
-    viewing: { current: null },
+    viewing,
   };
-  const rendered = renderHook(() => useCast(props), { wrapper });
+  const rendered = renderHook((current: UseCastOptions) => useCast(current), {
+    wrapper,
+    initialProps: props,
+  });
   // The SDK and the cast chunk resolve after the effect runs
   await act(() => Promise.resolve());
   if (waitForAttach) {
-    await waitFor(() =>
-      expect(fake.context.count("sessionstatechanged")).toBeGreaterThan(0)
+    await eventually(
+      () =>
+        fake.controllers.length > before &&
+        must(fake.controllers.at(-1)).count(REMOTE_EVENT.CURRENT_TIME_CHANGED) >
+          0,
+      "the cast controller"
     );
   }
-  return { player, rendered };
+
+  let current = props;
+  /**
+   * The page changes scene (a queue step) or restarts it; `next.viewing` is
+   * the new scene's viewing, set as useVideoPlayer's tracker effect sets it
+   */
+  const step = (next: {
+    scene?: typeof NEXT;
+    restartCount?: number;
+    viewing?: Viewing;
+  }) => {
+    const nextScene = next.scene ?? current.scene ?? SCENE;
+    if (next.viewing) viewing.current = next.viewing;
+    current = {
+      ...current,
+      scene: nextScene,
+      sceneKey: `${nextScene.id}:${nextScene.instanceId}`,
+      restartCount: next.restartCount ?? current.restartCount,
+    };
+    rendered.rerender(current);
+  };
+  return { player, rendered, step, viewing };
 }
 
 const castButton = (player: TestPlayer) =>
@@ -172,10 +234,116 @@ async function startCasting(player: TestPlayer) {
   return { session, remote, controller: fake.controller(), player };
 }
 
-const loadRequestOf = (session: FakeSession) =>
-  untrusted<{ currentTime: number; media: { contentId: string } }>(
-    must(session.loadMedia.mock.calls[0], "loadMedia call")[0]
+interface SentLoadRequest {
+  currentTime: number;
+  autoplay: boolean;
+  activeTrackIds: number[];
+  media: { contentId: string; customData: unknown };
+}
+
+const loadRequestOf = (session: FakeSession, index = 0) =>
+  untrusted<SentLoadRequest>(
+    must(session.loadMedia.mock.calls[index], `loadMedia call ${index}`)[0]
   );
+
+/** From here the cast tracker's interval and clock are fake */
+function fakeClock() {
+  vi.mocked(Date.now).mockRestore();
+  vi.useFakeTimers({
+    toFake: ["setInterval", "clearInterval", "Date"],
+    now: NOW,
+  });
+}
+
+/** The receiver plays its media from `currentTime` (every tab's view of it) */
+function tvPlays(currentTime: number) {
+  for (const remote of fake.remotes) {
+    Object.assign(remote, {
+      isMediaLoaded: true,
+      isPaused: false,
+      duration: 600,
+      currentTime,
+      playerState: "PLAYING",
+    });
+  }
+}
+
+/** The TV plays on for `seconds`, its position moving with the clock */
+async function playTv(seconds: number) {
+  for (let second = 0; second < seconds; second += 1) {
+    for (const remote of fake.remotes) remote.currentTime += 1;
+    await vi.advanceTimersByTimeAsync(1000);
+  }
+}
+
+interface SaveBody {
+  sceneId: string;
+  instanceId: string;
+  resumeTime: number;
+  playDuration: number;
+}
+
+const saves = () =>
+  vi
+    .mocked(apiPost)
+    .mock.calls.filter(([endpoint]) => endpoint.endsWith("save-activity"))
+    .map(([, body]) => body as SaveBody);
+
+/** A live session whose receiver plays `scene`, loaded by the tab `sender` */
+function liveSession(scene: string, sender: string) {
+  const session = new FakeSession();
+  session.mediaSession = { media: { customData: { scene, sender } } };
+  fake.context.session = session;
+  fake.context.castState = CAST_STATE.CONNECTED;
+  return session;
+}
+
+const statusLine = (player: TestPlayer) =>
+  player.el().querySelector(".vjs-cast-status")?.textContent;
+
+/**
+ * A caption track on the local player, as setupSubtitles adds it but with no
+ * source: video.js would fetch it once shown (castSession.test.ts matches a
+ * track's format by its source)
+ */
+function addCaption(player: TestPlayer, lang: string, type: string) {
+  const added = untrusted<{
+    addRemoteTextTrack(
+      options: object,
+      manualCleanup: boolean
+    ): { track: { mode: string } };
+  }>(player).addRemoteTextTrack(
+    {
+      kind: "captions",
+      srclang: lang,
+      label: `${lang} (${type})`,
+    },
+    false
+  );
+  return added.track;
+}
+
+/** The media link with English WebVTT captions */
+function linkWithCaptions(): SceneMediaLinkResponse {
+  return {
+    ...mediaLink(),
+    captions: [
+      {
+        url: `/api/scene/12/caption?lang=en&type=vtt&${SIGNED}`,
+        lang: "en",
+        type: "vtt",
+      },
+    ],
+  };
+}
+
+/** The last track change the page sent to the receiver */
+function lastTrackEdit(session: FakeSession) {
+  const edit = vi.mocked(
+    must(session.mediaSession?.editTracksInfo, "editTracksInfo")
+  );
+  return must(edit.mock.lastCall, "an editTracksInfo call")[0];
+}
 
 describe("useCast", () => {
   it("session start pauses the local player and loads the media at its start time", async () => {
@@ -359,8 +527,6 @@ describe("useCast", () => {
 
     expect(player.peekCastConnected).not.toBe(true);
     expect(session.loadMedia).not.toHaveBeenCalled();
-    void player.play();
-    expect(media.play).toHaveBeenCalledTimes(1);
   });
 
   it("a resumed session playing this scene attaches without loading it again", async () => {
@@ -487,6 +653,259 @@ describe("useCast", () => {
     expect(player.el().querySelector(".vjs-cast-status")).toBeNull();
   });
 
+  describe("the cast follows the page", () => {
+    it("Next on the page while connected loads the next scene on the receiver", async () => {
+      const { player, step } = await renderCast();
+      const { session } = await startCasting(player);
+
+      step({ scene: NEXT });
+
+      await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+      expect(vi.mocked(apiPost)).toHaveBeenCalledWith("/scene/13/media-link", {
+        instanceId: "inst-a",
+      });
+      const request = loadRequestOf(session, 1);
+      expect(request.media.customData).toEqual({
+        scene: "13:inst-a",
+        sender: "tab-a",
+      });
+      expect(request.currentTime).toBe(0);
+      // The TV was playing: it plays the next scene
+      expect(request.autoplay).toBe(true);
+      expect(player.peekCastConnected).toBe(true);
+      expect(media.play).not.toHaveBeenCalled();
+    });
+
+    it("a restartCount bump while connected reloads the same scene at 0", async () => {
+      const { player, step } = await renderCast({ resumeTime: 300 });
+      const { session, remote } = await startCasting(player);
+      remote.isPaused = true;
+
+      step({ restartCount: 1 });
+
+      await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+      const request = loadRequestOf(session, 1);
+      expect(request.media.customData).toEqual({
+        scene: "12:inst-a",
+        sender: "tab-a",
+      });
+      expect(request.currentTime).toBe(0);
+      // A paused TV stays paused
+      expect(request.autoplay).toBe(false);
+    });
+
+    it("after a step, save-activity names the receiver's scene, never the page's previous one", async () => {
+      const { step } = await renderCast({
+        viewing: createViewing("12", "inst-a"),
+      });
+      fakeClock();
+      tvPlays(0);
+      const session = new FakeSession();
+      fake.context.startSession(session);
+      await settle();
+      await playTv(12);
+      expect(saves().map((save) => save.sceneId)).toEqual(["12"]);
+
+      // Next: the page shows scene 13 with its own viewing; the TV loads it
+      step({ scene: NEXT, viewing: createViewing("13", "inst-a") });
+      await settle();
+      expect(session.loadMedia).toHaveBeenCalledTimes(2);
+      // What the TV played of scene 12 since the last save
+      expect(saves().at(-1)).toEqual({
+        sceneId: "12",
+        instanceId: "inst-a",
+        resumeTime: 12,
+        playDuration: 2,
+      });
+
+      vi.mocked(apiPost).mockClear();
+      for (const remote of fake.remotes) remote.currentTime = 0;
+      await playTv(11);
+      expect(saves()).toEqual([
+        {
+          sceneId: "13",
+          instanceId: "inst-a",
+          resumeTime: 11,
+          playDuration: 10,
+        },
+      ]);
+    });
+
+    it("on another scene's page, Cast loads this scene into the live session", async () => {
+      const session = liveSession("99:inst-a", "tab-z");
+      const { player } = await renderCast();
+      expect(player.peekCastConnected).not.toBe(true);
+      const button = must(castButton(player), "the Cast button");
+      expect(button.hasClass("vjs-cast-connected")).toBe(true);
+
+      untrusted<{ trigger(event: string): void }>(button).trigger("click");
+
+      await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(1));
+      expect(fake.context.requestSession).not.toHaveBeenCalled();
+      expect(loadRequestOf(session).media.customData).toEqual({
+        scene: "12:inst-a",
+        sender: "tab-a",
+      });
+      expect(player.peekCastConnected).toBe(true);
+    });
+
+    it("on another scene's page, play loads this scene into the live session and the local player stays paused", async () => {
+      const session = liveSession("99:inst-a", "tab-z");
+      const { player } = await renderCast({ resumeTime: 300 });
+
+      void player.play();
+
+      await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(1));
+      const request = loadRequestOf(session);
+      expect(request.media.customData).toEqual({
+        scene: "12:inst-a",
+        sender: "tab-a",
+      });
+      expect(request.currentTime).toBe(300);
+      expect(media.play).not.toHaveBeenCalled();
+      expect(player.peekCastConnected).toBe(true);
+    });
+
+    it("unmount while connected flushes one keepalive save and leaves the session", async () => {
+      const { rendered } = await renderCast({
+        viewing: createViewing("12", "inst-a"),
+      });
+      const controller = fake.controller();
+      fakeClock();
+      tvPlays(0);
+      const session = new FakeSession();
+      fake.context.startSession(session);
+      await settle();
+      await playTv(5);
+      expect(saves()).toEqual([]);
+
+      rendered.unmount();
+
+      expect(vi.mocked(apiFetch).mock.calls).toEqual([
+        [
+          "/watch-history/save-activity",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              sceneId: "12",
+              instanceId: "inst-a",
+              resumeTime: 5,
+              playDuration: 5,
+            }),
+            keepalive: true,
+          },
+        ],
+      ]);
+      // The page let go; the TV plays on
+      expect(fake.context.count("sessionstatechanged")).toBe(0);
+      expect(controller.playOrPause).not.toHaveBeenCalled();
+      expect(fake.context.getCurrentSession()).toBe(session);
+
+      await playTv(30);
+      expect(vi.mocked(apiFetch)).toHaveBeenCalledTimes(1);
+      expect(saves()).toEqual([]);
+    });
+
+    it("a second tab attached to the same media sends no save-activity and shows 'Casting on <device>'", async () => {
+      vi.mocked(castSenderId).mockReturnValue("tab-b");
+      const session = liveSession("12:inst-a", "tab-a");
+      const { player } = await renderCast({
+        viewing: createViewing("12", "inst-a"),
+      });
+
+      expect(player.peekCastConnected).toBe(true);
+      expect(statusLine(player)).toBe("Casting on Living Room TV");
+      fakeClock();
+      tvPlays(100);
+      await playTv(30);
+
+      expect(saves()).toEqual([]);
+      expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+      expect(session.loadMedia).not.toHaveBeenCalled();
+    });
+
+    it("a load from the second tab moves tracking to it and the first tab's tracker flushes and stops", async () => {
+      const first = createViewing("12", "inst-a");
+      const second = createViewing("12", "inst-a");
+      const firstSaves = vi.spyOn(first, "save");
+      const secondSaves = vi.spyOn(second, "save");
+
+      // The first tab casts and records
+      const tabA = await renderCast({ viewing: first });
+      fakeClock();
+      tvPlays(0);
+      const session = new FakeSession();
+      fake.context.startSession(session);
+      await settle();
+      await playTv(12);
+      expect(firstSaves).toHaveBeenCalledTimes(1);
+      expect(statusLine(tabA.player)).toBe("Casting to Living Room TV");
+
+      // The second tab joins the same media: it mirrors, it does not record
+      vi.mocked(castSenderId).mockReturnValue("tab-b");
+      const tabB = await renderCast({ viewing: second });
+      // Its RemotePlayer has the receiver's state too
+      tvPlays(12);
+      expect(tabB.player.peekCastConnected).toBe(true);
+      expect(statusLine(tabB.player)).toBe("Casting on Living Room TV");
+
+      // The second tab restarts the scene: its load names it
+      tabB.step({ restartCount: 1 });
+      await settle();
+      expect(session.loadMedia).toHaveBeenCalledTimes(2);
+      expect(loadRequestOf(session, 1).media.customData).toEqual({
+        scene: "12:inst-a",
+        sender: "tab-b",
+      });
+      // Every tab's RemotePlayer sees the new media
+      for (const controller of fake.controllers) {
+        controller.emit(REMOTE_EVENT.MEDIA_INFO_CHANGED);
+      }
+
+      // The first tab saved what it had and stopped
+      expect(firstSaves).toHaveBeenCalledTimes(2);
+      expect(firstSaves.mock.lastCall).toEqual([12, 2, undefined]);
+      expect(statusLine(tabA.player)).toBe("Casting on Living Room TV");
+      expect(statusLine(tabB.player)).toBe("Casting to Living Room TV");
+
+      for (const remote of fake.remotes) remote.currentTime = 0;
+      await playTv(11);
+      expect(firstSaves).toHaveBeenCalledTimes(2);
+      expect(secondSaves).toHaveBeenCalledTimes(1);
+      expect(secondSaves.mock.lastCall).toEqual([11, 10, undefined]);
+    });
+
+    it("turning captions off on the page sends activeTrackIds: []", async () => {
+      vi.mocked(apiPost).mockResolvedValue(linkWithCaptions());
+      const { player } = await renderCast();
+      const track = addCaption(player, "en", "vtt");
+      track.mode = "showing";
+
+      const { session } = await startCasting(player);
+      expect(loadRequestOf(session).activeTrackIds).toEqual([1]);
+
+      track.mode = "disabled";
+      // video.js reports a track list change on a timer
+      await settle();
+
+      expect(lastTrackEdit(session).activeTrackIds).toEqual([]);
+    });
+
+    it("turning a caption on sends its id", async () => {
+      vi.mocked(apiPost).mockResolvedValue(linkWithCaptions());
+      const { player } = await renderCast();
+      const track = addCaption(player, "en", "vtt");
+
+      const { session } = await startCasting(player);
+      expect(loadRequestOf(session).activeTrackIds).toEqual([]);
+
+      track.mode = "showing";
+      await settle();
+
+      expect(lastTrackEdit(session).activeTrackIds).toEqual([1]);
+    });
+  });
+
   describe("under StrictMode", () => {
     it("one Cast button after a remount", async () => {
       const { player } = await renderCast({ strict: true });
@@ -515,6 +934,21 @@ describe("useCast", () => {
 
       expect(session.loadMedia).toHaveBeenCalledTimes(1);
       expect(vi.mocked(apiPost)).toHaveBeenCalledTimes(1);
+    });
+
+    it("one load request per scene change", async () => {
+      const { player, step } = await renderCast({ strict: true });
+      const { session } = await startCasting(player);
+
+      step({ scene: NEXT });
+      await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+      await settle();
+
+      expect(session.loadMedia).toHaveBeenCalledTimes(2);
+      const nextLinks = vi
+        .mocked(apiPost)
+        .mock.calls.filter(([endpoint]) => endpoint === "/scene/13/media-link");
+      expect(nextLinks).toHaveLength(1);
     });
   });
 });

@@ -677,6 +677,32 @@ describe("useVideoPlayer", () => {
     expect(vi.mocked(plugin.setEnabled).mock.lastCall).toEqual([true]);
   });
 
+  it("while connected, a NEXT_SCENE leaves the local player paused and its tracker disabled", async () => {
+    // Connected as the cast controller leaves the player: the flag, and the
+    // receiver the cast middleware answers from
+    const player = Object.assign(fakePlayer(), {
+      peekCastConnected: true,
+      peekCastRemote: {},
+    });
+    // The queue's step: the next scene, with autoplay
+    const { rerender, dispatch } = renderPlayer(player, onA, null, {
+      autoplay: true,
+    });
+    const plugin = player.trackActivity();
+
+    rerender({ current: onA2 });
+    await act(() => Promise.resolve());
+
+    // The load on the receiver plays it there, not on the phone
+    expect(player.play).not.toHaveBeenCalled();
+    expect(plugin.setEnabled).not.toHaveBeenCalledWith(true);
+    // The autoplay request is still used up, so it never plays locally later
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "SET_SHOULD_AUTOPLAY",
+      payload: false,
+    });
+  });
+
   it("a blocked autoplay retries muted", async () => {
     const player = fakePlayer();
     player.play.mockRejectedValueOnce(

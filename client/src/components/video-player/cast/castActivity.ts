@@ -43,15 +43,18 @@ export class CastActivity {
     window.addEventListener("pagehide", this.onPageHide);
   }
 
-  /** Saves what was played since the last save and stops tracking */
-  stop() {
+  /**
+   * Saves what was played since the last save and stops tracking; with
+   * `keepalive` (the page is going) in a request that outlives the page
+   */
+  stop(options?: { keepalive: true }) {
     if (this.timer === undefined) return;
     window.clearInterval(this.timer);
     this.timer = undefined;
     document.removeEventListener("visibilitychange", this.onVisibility);
     window.removeEventListener("pagehide", this.onPageHide);
     this.accrue();
-    this.send();
+    this.send(options);
   }
 
   private readonly tick = () => {

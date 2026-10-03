@@ -98,8 +98,16 @@ videojs.registerComponent("PeekCastButton", CastButton);
 videojs.registerComponent(STATUS_NAME, CastStatus);
 
 export interface CastButtonControl {
-  /** Hidden while no Cast device is in range; named for what a press does */
-  setCastState(castState: string, deviceName: string | null): void;
+  /**
+   * Hidden while no Cast device is in range; named for what a press does.
+   * `attached` false: the session plays another scene, and a press casts
+   * this one into it.
+   */
+  setCastState(
+    castState: string,
+    deviceName: string | null,
+    attached?: boolean
+  ): void;
   remove(): void;
 }
 
@@ -122,15 +130,14 @@ export function addCastButton(
   button.hide();
 
   return {
-    setCastState(castState, deviceName) {
+    setCastState(castState, deviceName, attached = true) {
       if (castState === NO_DEVICES_AVAILABLE) button.hide();
       else button.show();
 
       if (castState === CONNECTED) {
         button.addClass("vjs-cast-connected");
-        button.controlText(
-          deviceName ? `Stop casting (${deviceName})` : "Stop casting"
-        );
+        const action = attached ? "Stop casting" : "Cast this scene";
+        button.controlText(deviceName ? `${action} (${deviceName})` : action);
       } else {
         button.removeClass("vjs-cast-connected");
         button.controlText("Cast");
@@ -146,8 +153,11 @@ export function addCastButton(
 }
 
 export interface CastStatusControl {
-  /** "Casting to <device>" while attached; null empties the line */
-  show(deviceName: string | null): void;
+  /**
+   * "Casting to <device>" while attached, "Casting on <device>" when another
+   * tab loaded the media (this one only mirrors it); null empties the line
+   */
+  show(deviceName: string | null, loadedHere?: boolean): void;
   remove(): void;
 }
 
@@ -156,8 +166,11 @@ export function addCastStatus(player: CastControlsPlayer): CastStatusControl {
   const status = player.getChild(STATUS_NAME) ?? player.addChild(STATUS_NAME);
 
   return {
-    show(deviceName) {
-      status.el().textContent = deviceName ? `Casting to ${deviceName}` : "";
+    show(deviceName, loadedHere = true) {
+      const preposition = loadedHere ? "to" : "on";
+      status.el().textContent = deviceName
+        ? `Casting ${preposition} ${deviceName}`
+        : "";
       if (deviceName) status.addClass("vjs-cast-status-active");
       else status.removeClass("vjs-cast-status-active");
     },

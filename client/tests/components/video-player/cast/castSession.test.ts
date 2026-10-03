@@ -59,6 +59,7 @@ describe("buildLoadRequest", () => {
         origin: ORIGIN,
         scene,
         startTime: 42,
+        sender: "tab-a",
       }),
       "request"
     );
@@ -107,7 +108,10 @@ describe("buildLoadRequest", () => {
       },
     ]);
 
-    expect(request.media.customData).toEqual({ scene: "12:inst-a" });
+    expect(request.media.customData).toEqual({
+      scene: "12:inst-a",
+      sender: "tab-a",
+    });
     // A direct file says nothing about HLS segments
     expect(request.media.hlsSegmentFormat).toBeUndefined();
     expect(request.media.hlsVideoSegmentFormat).toBeUndefined();
@@ -124,6 +128,7 @@ describe("buildLoadRequest", () => {
         origin: ORIGIN,
         scene,
         startTime: 0,
+        sender: "tab-a",
       }),
       "request"
     );
@@ -145,6 +150,7 @@ describe("buildLoadRequest", () => {
           files: [{ basename: "harbour.mp4" }],
         },
         startTime: 0,
+        sender: "tab-a",
       }),
       "request"
     );
@@ -162,8 +168,48 @@ describe("buildLoadRequest", () => {
         origin: ORIGIN,
         scene,
         startTime: 0,
+        sender: "tab-a",
       })
     ).toBeNull();
+  });
+
+  it("the load request carries customData.sender and the showing track in activeTrackIds", () => {
+    // The page shows the German WebVTT captions
+    const request = must(
+      buildLoadRequest(castMedia(), {
+        link: link(),
+        origin: ORIGIN,
+        scene,
+        startTime: 0,
+        sender: "tab-a",
+        caption: {
+          kind: "captions",
+          mode: "showing",
+          language: "de",
+          src: "/api/scene/12/caption?lang=de&type=vtt&instanceId=inst-a",
+        },
+      }),
+      "request"
+    );
+    expect(request.media.customData).toEqual({
+      scene: "12:inst-a",
+      sender: "tab-a",
+    });
+    expect(request.activeTrackIds).toEqual([2]);
+
+    // Captions off on the page: none on the TV
+    const off = must(
+      buildLoadRequest(castMedia(), {
+        link: link(),
+        origin: ORIGIN,
+        scene,
+        startTime: 0,
+        sender: "tab-a",
+        caption: null,
+      }),
+      "request"
+    );
+    expect(off.activeTrackIds).toEqual([]);
   });
 });
 
