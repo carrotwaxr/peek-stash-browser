@@ -116,6 +116,14 @@ const SELECT_COLUMNS = `c.id, c.stashInstanceId, c.sceneId, c.sceneInstanceId,
   s.title AS sceneTitle, s.pathScreenshot AS scenePathScreenshot,
   s.studioId AS sceneStudioId`;
 
+/**
+ * The name a clip shows (`clipTitle` in the client): its title, else its
+ * primary tag's name while the tag is live. A hidden tag hides the clip, so
+ * no visibility arm. A scalar subquery, read only for untitled rows, so
+ * titled clips keep the browse index's title column.
+ */
+export const CLIP_NAME_SQL = `COALESCE(NULLIF(c.title, ''), (SELECT pt.name FROM StashTag pt WHERE pt.id = c.primaryTagId AND pt.stashInstanceId = c.primaryTagInstanceId AND pt.deletedAt IS NULL))`;
+
 /** The clip's scene, on its (id, instance): a clip without one does not list */
 const SCENE_JOIN =
   "INNER JOIN StashScene s ON c.sceneId = s.id AND c.sceneInstanceId = s.stashInstanceId";
@@ -352,15 +360,13 @@ class ClipQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The clip's own title, as every clip surface shows it (an untitled clip
-   * reads "Untitled"), case-insensitive; untitled clips (no title or an
-   * empty one) last in both directions. Naming an untitled clip by its
-   * primary tag is a 9b idea; the search and the Title filter read the same
-   * column.
+   * The name the card shows (`CLIP_NAME_SQL`: the title, else the live
+   * primary tag's name), case-insensitive; a clip with neither last in both
+   * directions.
    */
   private titleSort(direction: SortDirection): SortExpr {
     return {
-      sql: `NULLIF(c.title, '') IS NULL, NULLIF(c.title, '') COLLATE NOCASE ${direction}`,
+      sql: `${CLIP_NAME_SQL} IS NULL, ${CLIP_NAME_SQL} COLLATE NOCASE ${direction}`,
       params: [],
     };
   }
@@ -430,7 +436,14 @@ class ClipQueryBuilder extends EntityQueryBuilder<
       buildInstantFilter(c, "c.stashCreatedAt", ctx.timeZone),
     updated_at: (c, ctx) =>
       buildInstantFilter(c, "c.stashUpdatedAt", ctx.timeZone),
-    title: (c) => buildTextFilter(c, "c.title"),
+    // Comparisons read the shown name; set / not set read the clip's own title
+    title: (c) =>
+      buildTextFilter(
+        c,
+        c.modifier === "IS_NULL" || c.modifier === "NOT_NULL"
+          ? "c.title"
+          : CLIP_NAME_SQL
+      ),
   };
 
   /**
@@ -452,10 +465,10 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /** The search across the title: every word must match (`searchAll`) */
+  /** The search across the shown name: every word must match (`searchAll`) */
   protected override searchClause(q: string): FilterClause {
     return searchAll(searchTerms(q), (pattern) => ({
-      sql: "c.title LIKE ? ESCAPE '\\'",
+      sql: `${CLIP_NAME_SQL} LIKE ? ESCAPE '\\'`,
       params: [pattern],
     }));
   }

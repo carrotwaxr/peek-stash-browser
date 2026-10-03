@@ -39,7 +39,7 @@ Click the filter icon in the toolbar to open the filter panel. Available filters
 | **Duration (seconds)** | How long the clip lasts: a minimum, a maximum, or both. A clip with no end time never matches |
 | **Created Date**, **Updated Date** | A start date, an end date, or both; both ends are included, in your device's time zone |
 
-Filters are cumulative (AND logic). Use the search box to filter by clip title. Include and exclude, sub-tags and sub-studios work as on every list: see [Browse and Display](browse-and-display.md#include-or-exclude-each-value). A saved clip filter from an earlier version, and an address with a clip filter in it, keep working.
+Filters are cumulative (AND logic). Use the search box to find a clip by the name its card shows. Include and exclude, sub-tags and sub-studios work as on every list: see [Browse and Display](browse-and-display.md#include-or-exclude-each-value). A saved clip filter from an earlier version, and an address with a clip filter in it, keep working.
 
 ## Sorting
 
