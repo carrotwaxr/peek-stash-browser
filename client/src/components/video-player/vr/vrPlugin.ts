@@ -30,7 +30,15 @@ export interface VrPlayer {
   src(source: object): void;
   on(type: string, listener: () => void): void;
   off(type: string, listener: () => void): void;
+  /** Where the fork adds its headset (Cardboard) button */
+  controlBar: {
+    getChild(name: string): { dispose(): void } | undefined;
+    removeChild(child: { dispose(): void }): void;
+  };
 }
+
+/** The fork's headset button: it enters VR in a headset or a Cardboard */
+const HEADSET_BUTTON = "CardboardButton";
 
 /** What the headset HUD's buttons do. */
 export interface VrHud {
@@ -47,7 +55,10 @@ export interface PeekVr {
   enable(projection: VrProjection): void;
   /** Changes the projection, on the page and in a headset. No-op while off. */
   setProjection(projection: VrProjection): void;
-  /** Disposes the fork: the canvas goes and the flat video shows again. */
+  /**
+   * Disposes the fork: the canvas and its headset button go, and the flat
+   * video shows again.
+   */
   disable(): void;
   /** What the HUD's next, previous and favourite do; the last given wins. */
   setHud(hud: VrHud): void;
@@ -213,6 +224,14 @@ export function createVrController(player: VrPlayer): PeekVr {
         // After a failed start `reset()` can reach a canvas that is no longer
         // in the page; the fork is disposed by then, and the video shows
         console.error("[VR] could not tidy up after a failed start", error);
+      }
+      // The fork adds its headset button to the control bar (on a phone, or
+      // where immersive-vr is supported) but its reset() looks for it on the
+      // player and leaves it: pressed, it would make a fork Peek never sees
+      const headset = player.controlBar.getChild(HEADSET_BUTTON);
+      if (headset) {
+        player.controlBar.removeChild(headset);
+        headset.dispose();
       }
     },
     setHud(next) {

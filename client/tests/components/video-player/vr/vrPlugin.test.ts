@@ -75,8 +75,31 @@ class FakeFork extends Emitter implements VrPlugin {
   setFavoriteState = vi.fn();
 }
 
+/** A control the fork adds to the bar (its headset button) */
+class FakeControl {
+  dispose = vi.fn();
+}
+
+/** The player's control bar, with the children the fork adds */
+class FakeBar {
+  readonly children = new Map<string, FakeControl>();
+  getChild = (name: string) => this.children.get(name);
+  /** As the fork's `addCardboardButton_` */
+  addChild(name: string) {
+    const control = new FakeControl();
+    this.children.set(name, control);
+    return control;
+  }
+  removeChild = vi.fn((child: FakeControl) => {
+    for (const [name, control] of this.children) {
+      if (control === child) this.children.delete(name);
+    }
+  });
+}
+
 class FakePlayer extends Emitter implements VrPlayer {
   state = 0;
+  controlBar = new FakeBar();
   /** The player's `preload` option: Peek's players start with none */
   preloading = "none";
   forks: FakeFork[] = [];
@@ -344,6 +367,49 @@ describe("peekVr", () => {
     expect(vr.enabled).toBe(false);
     vr.setProjection("360");
     expect(fork.setProjection).not.toHaveBeenCalled();
+  });
+
+  it("disable removes and disposes the fork's headset button from the control bar", () => {
+    const player = new FakePlayer();
+    player.state = 1;
+    const vr = createVrController(player);
+    vr.enable("180_LR");
+    // The fork adds it on a phone or where immersive-vr is supported; its
+    // reset() looks for it on the player, never the bar, and leaves it
+    const headset = player.controlBar.addChild("CardboardButton");
+
+    vr.disable();
+
+    expect(player.controlBar.removeChild).toHaveBeenCalledWith(headset);
+    expect(headset.dispose).toHaveBeenCalledTimes(1);
+    expect(player.controlBar.getChild("CardboardButton")).toBeUndefined();
+  });
+
+  it("disable with no headset button leaves the control bar alone", () => {
+    const player = new FakePlayer();
+    const vr = createVrController(player);
+    vr.enable("180_LR");
+
+    vr.disable();
+
+    expect(player.controlBar.removeChild).not.toHaveBeenCalled();
+  });
+
+  it("a fork that cannot be disposed still loses its headset button", () => {
+    const player = new FakePlayer();
+    player.state = 1;
+    const vr = createVrController(player);
+    vr.enable("180_LR");
+    const headset = player.controlBar.addChild("CardboardButton");
+    player.fork.dispose.mockImplementation(() => {
+      throw new Error("canvas already removed");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    vr.disable();
+
+    expect(headset.dispose).toHaveBeenCalledTimes(1);
+    expect(player.controlBar.getChild("CardboardButton")).toBeUndefined();
   });
 
   it("enable after disable starts a new fork from the flat view", () => {
