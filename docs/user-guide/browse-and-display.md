@@ -198,7 +198,7 @@ When nothing matches the search and filters, a list says so ("No performers foun
 
 ### The search box
 
-Every word you type must match, in any order and anywhere the search looks: a scene's title, details, path, performers, studio and tags, so "anna blonde" finds a scene with a performer named Anna and a tag named Blonde. Put words in "quotes" to keep them together as one phrase. A quote with no partner is an ordinary character, a repeated word counts once, and only the first 10 words are used. A performer's or tag's aliases are searched one at a time, `%` and `_` match themselves, and a capital letter with an accent matches when you type it exactly. A gallery without a title is found by the name its card shows (its zip file's name without the extension, or its folder's name); the gallery **Title** filter matches the same name. The filters' text fields (Title contains and the like) are not split: they match the text as one phrase.
+Every word you type must match, in any order and anywhere the search looks: a scene's title, details, path, performers, studio and tags, so "anna blonde" finds a scene with a performer named Anna and a tag named Blonde. Put words in "quotes" to keep them together as one phrase. A quote with no partner is an ordinary character, a repeated word counts once, and only the first 10 words are used. A performer's or tag's aliases are searched one at a time, `%` and `_` match themselves, and a capital letter with an accent matches when you type it exactly. A gallery without a title is found by the name its card shows (its zip file's name without the extension, or its folder's name); the gallery **Title** filter matches the same name. An image is found by the name its card shows (its title, or its file name without the extension when it has none), and so is an untitled gallery; the image **Title** filter matches the same name. The Images search no longer matches words from a file's folder: use the image **Path** filter for that. The filters' text fields (Title contains and the like) are not split: they match the text as one phrase.
 
 ---
 
@@ -221,13 +221,37 @@ A filter that picks performers, tags, studios, collections or galleries has a dr
 - The dropdown always shows the choice the search uses. Until you change it, that is the filter's default: **Has ALL** for tags, **Has ANY** for the others.
 - A gallery or an image has one studio, so its Studios filter offers only **Has ANY** and **Has NONE**.
 
-### Favorite Performers, Studios and Tags
+### Include or Exclude Each Value
 
-On the Scenes list, **Favorite Tags** lists the scenes that have one of your favorite tags: tagged with it, tagged with one of its sub-tags, or carrying it by inheritance from a performer, studio or collection, as the Tags filter does. **Favorite Studios** includes the scenes of a favorite studio's sub-studios. Only your own favorites count.
+Every Tags, Performers and Studios picker (and Performer Tags, and a clip's tags and studio) lets you decide per value. Each value you pick has an include or exclude toggle beside its remove button; press it to turn a pick from "include" into "exclude" and back. A filter can then say "Tags: Anal and Outdoor, but not Redhead" in one go. The chip reads "Tags: any of Anal, Outdoor; not Redhead", and excluded values alone read "Tags: not Redhead". Include and exclude are kept in the address (for example `tagIds=1:a&tagIdsExclude=2:a`), in saved presets and in custom carousels.
+
+- The toggle is offered under **Has ANY** and **Has ALL**. Under **Has NONE** every pick already excludes, so there is no toggle.
+- With **Include sub-tags** (or sub-studios) on, an excluded tag also leaves out items that have one of its sub-tags.
+- A filter saved before this existed, with only its picks and **Has NONE**, still means what it did.
+- The Content Restrictions editor has no toggle: it has its own Show only and Always hide lists.
+
+### Has None and Has Any
+
+Where a thing can be missing, the condition select above a picker also offers **Has none** and **Has any**: a scene with no performers, a gallery with no studio, an image with no tags. A collection picker says **In none** and **In any**. They list items by whether the relation is empty, not by who is in it, so the picker hides while one is chosen. Only what you can see counts: a performer you hid is not "a performer" for **Has any**, and a scene whose only performer you hid is listed under **Has none**.
+
+Scenes offer them on Performers, Tags, Studios, Collections and Galleries; images on Performers, Tags, Studios and Galleries; galleries on Performers, Tags and Studios; performers and studios on Tags; studios on Parent Studio; and collections on Studio and Tags. The text filters that can be empty (a performer's Aliases, URL and StashDB ID, a scene's Captions) offer **Has none** and **Has any** in the same way.
+
+### Favorites and Yes / No / Any Filters
+
+Many filters are three-state selects: **Yes**, **No** and **Any** (the default, which filters nothing). They are Favorite Scenes, Favorite Performers, Favorite Studios and Favorite Tags on Scenes; Favorite Performers, Favorite Studios and Favorite Tags on Images and Galleries; Has a Favorite Tag on Performers; Has a Favorite Performer on Collections; and, on Scenes, Organized, Has Markers, Duplicated, Watched, In Progress and In any of my playlists. A favorites checkbox such as Favorite Galleries lists favorites only. **No** lists what **Yes** leaves out: **Favorite Performers: No** lists scenes with no favorite performer, scenes with no performers at all included. A filter saved before these had a **No** keeps meaning what it did.
+
+On the Scenes list, **Favorite Tags** lists the scenes that have one of your favorite tags: tagged with it, tagged with one of its sub-tags, or carrying it by inheritance from a performer, studio or collection, as the Tags filter does. **Favorite Studios** includes the scenes of a favorite studio's sub-studios. Images and galleries follow the same rules (an image's tags include its gallery's). Only your own favorites count, and a favorite you hid no longer matches.
+
+- **Watched** and **In Progress** use the History page's rules (see [Watch History](watch-history.md)): the same scenes as its tabs and as Continue Watching.
+- **Duplicated** lists scenes that share their file fingerprint with another scene you can see on the same server.
+- **Has Markers** lists scenes with at least one clip you can see.
+- **Organized** is Stash's flag, kept as Peek stores it.
 
 ### Number Ranges
 
 A number range (rating, height, weight, duration and the like) never matches an item with no value: "rating at most 40" lists only items you rated 40 or less, not the ones you have not rated, and "weight at most 60 kg" only performers with a weight.
+
+Ranges take decimals (a penis length of 14.5 cm, a frame rate of 29.97) and a minimum or a maximum on its own includes that value: "at least 10" lists 10 and up. Heights, weights and penis lengths are stored and linked in metric, so an address or preset means the same to everyone; with imperial units on, the boxes and chips show feet, inches and pounds and the address still holds centimetres and kilograms.
 
 #### Unknown values
 
@@ -238,6 +262,49 @@ A range never matches an item with no value. To list those items, open the condi
 Set a start date, an end date, or both. Both ends are included: a start alone matches that day and later, an end alone that day and earlier, and both the days in between, so the same day as start and end lists that one day. An item with no date never matches a range.
 
 Created, updated and last-played dates follow your device's time zone: a scene you played at 8 pm is under that day, wherever the server is. A release date or birthdate is a plain calendar day; one Stash holds as a year or a month alone counts as its first day.
+
+### Text Filters
+
+A text filter (Title Search, Path, URL, Code, Aliases and the like) matches the text you type as one phrase, in any capitals. `%` and `_` match themselves, and a quote or bracket is an ordinary character. A filter on a performer's or studio's aliases matches each alias on its own, and URL matches any of an item's links.
+
+Where a text filter offers a condition select, the choices are **Contains**, **Excludes**, **Equals**, **Starts with** (Path) and, on filters that can be empty, **Has none** and **Has any**. **Path** is the path of the scene's or image's primary file, as Peek stores it (a scene with several files is matched by its primary file only), or a gallery's folder, or its zip file's path; it takes no regular expressions.
+
+### Playlists
+
+On the Scenes list, **Playlists** lists the scenes in the playlists you pick: yours, then those shared with you, marked "by (owner name)". **Has ANY**, **Has ALL** and **Has NONE** work as for other pickers. **In any of my playlists** is a separate Yes / No / Any select over your own playlists only (a shared playlist does not count). **Playlist order** appears in the sort list only while exactly one playlist is chosen, and sorts the scenes by their place in it.
+
+Your own exclusions still apply: a scene you hid, or a restriction removes, is not listed or counted whoever shared the playlist, and a playlist you cannot see (never shared with you, or its owner lost Can Share) is treated as one that does not exist: filtering by it lists nothing, and **Has NONE** of it lists everything. A saved filter that names a playlist you can no longer see keeps working and shows "Unavailable playlist".
+
+### Performer Age, Resolution and Multi-Value Selects
+
+- **Performer Age** matches a scene when any of its performers was that age on the scene's date, as Stash does. A scene with no date never matches. A performer's birthdate given as a year or a year and month counts from its first day, and a performer who has died keeps the age they reached. On one library "under 26" found 2,260 scenes before this change and finds 11,985 now.
+- **Resolution** uses Stash's ranges on the shorter side of the file, so a portrait 1080p video counts as 1080p. Image Resolution works the same way.
+- **Gender** (Performers) and **Orientation** (Scenes and Images) take several values at once, **Has ANY** of them, and Gender can also be "not set". A preset saved with a single gender or orientation still means that one.
+
+### Hidden Scenes and Related Filters
+
+Filtering performers, collections, galleries or tags by a studio, a scene or another performer never counts scenes you hid or your restrictions remove: a performer whose only scene in that studio you hid is not listed under it.
+
+### Filters by Page
+
+Every list's panel offers these filters, grouped in sections; the ones that take a picker also take **Has none / Has any** and include or exclude where described above.
+
+- **Scenes:** Title and Details Search; Performers, Studios, Tags, Performer Tags, Collections (with sub-collections), Galleries and Playlists; Rating, O Count, Duration; the favorites above; **In any of my playlists**; Scene, Created, Updated and Last Played dates; Resolution, Bitrate, Framerate, Orientation, Video and Audio Codec; Director, Path, URL, Code, Captions; Organized, Has Markers, Duplicated, Watched and In Progress; Play Duration, Play Count, Performer Count, Performer Age and Tag Count.
+- **Images:** Title, Details, Code, Photographer, Path and URL; Performers, Studios, Tags, Performer Tags and Galleries; Rating, O Count, Tag Count, Performer Count and Performer Age; the favorites; Organized; Resolution and Orientation; Image, Created and Updated dates.
+- **Galleries:** Title, Details, Code, Photographer, Path and URL; Performers, Studios, Tags and Performer Tags; Rating, Image Count, Tag Count, Performer Count and Performer Age; the favorites and Has Favorite Image; Organized; **Zip or Folder**; Gallery, Created and Updated dates.
+- **Performers:** Name, Disambiguation, Aliases, URL, StashDB ID and Details; Tags (with sub-tags), Studios (with sub-studios), Collections and **Appears With** (performers who share a scene with the ones you pick); Gender, hair and eye color, ethnicity, breast type, country, circumcised, measurements, tattoos, piercings; Age, Birth and Death Year, Career Length, Height, Weight, Penis Length; Birth, Death, Created and Updated dates; Scene, Image, Gallery, Marker, Tag and Play counts; Rating, O Count and the favorites.
+- **Studios:** Name, Details, Aliases, URL and StashDB ID; Tags, **Parent Studio** (with sub-studios); counts of scenes, children, tags, images, galleries, performers and collections; Rating, O Count, Play Count, dates and Favorite Studios.
+- **Tags:** Name, Description and Aliases; StashDB ID; Performers, Studio and Collections; **Parent Tags** and **Child Tags** (with sub-tags); counts of scenes, parents, children, images, galleries, performers, studios, collections and markers; Rating, O Count, Play Count, dates and Favorite Tags.
+- **Collections:** Name, Synopsis, Director, Aliases and URL; Performers, Studio (with sub-studios and Has none / Has any), Tags (with sub-tags); **Parent collection** and **Sub-collections** (with depth); Scene, Sub-collection, Parent Collection and Tag counts; Duration, Rating, O Count, Play Count and Has a Favorite Performer; Release, Created and Updated dates.
+- **Clips:** see [Clips](clips.md).
+
+A collection's O Count and Play Count are yours, summed over its scenes you can see.
+
+### Sorting
+
+Each list's sort menu offers the keys of its page, with the Random order keeping its seed. Beyond the long-standing ones: Scenes sort by Resolution, Studio, Code, Performer Age (youngest first ascending, oldest first descending, at the scene's date) and Organized, and by Resume Time; Images by Resolution, Tag Count and Performer Count; Galleries by Tag Count and Performer Count; Performers by Tag Count, Marker Count, Image Count, Gallery Count and Collection Count; Studios by Child Studio Count, Tag Count and the counts of images, galleries, performers and collections; Tags by Child Tag Count, Parent Tag Count and the counts of images, galleries, performers, studios and collections; Collections by Tag Count, Performer Count and O Count.
+
+Two sorts appear only beside the filter they depend on: **Playlist Order** with exactly one playlist chosen, and **Collection Order** (position within a collection) with exactly one parent collection chosen. Counts are of what you can see.
 
 ### Studio and Tag Pages
 

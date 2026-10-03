@@ -30,20 +30,23 @@ Click the filter icon in the toolbar to open the filter panel. Available filters
 
 | Filter | Description |
 |--------|-------------|
-| **Clip Tags** | Tags applied directly to the clip. Supports ANY / ALL / NONE modifiers |
-| **Scene Tags** | Tags on the parent scene |
-| **Performers** | Performers in the parent scene. Supports ANY / ALL / NONE modifiers |
-| **Studio** | Studio of the parent scene |
+| **Clip Tags** | Tags applied directly to the clip. Supports ANY / ALL / NONE, include or exclude per tag, and **Include sub-tags** |
+| **Scene Tags** | Tags on the parent scene, with the same choices |
+| **Performers** | Performers in the parent scene. Supports ANY / ALL / NONE and include or exclude per performer |
+| **Studio** | Studio of the parent scene: pick several, include or exclude each, and **Include sub-studios**. A scene with no studio is kept by an exclusion |
+| **Scenes** | Clips of the scenes you pick, found by their title |
 | **Has Preview** | Filter by generation status: "With preview only", "Without preview only", or "All clips" |
+| **Duration (seconds)** | How long the clip lasts: a minimum, a maximum, or both. A clip with no end time never matches |
+| **Created Date**, **Updated Date** | A start date, an end date, or both; both ends are included, in your device's time zone |
 
-Filters are cumulative (AND logic). Use the search box to filter by clip title.
+Filters are cumulative (AND logic). Use the search box to filter by clip title. Include and exclude, sub-tags and sub-studios work as on every list: see [Browse and Display](browse-and-display.md#include-or-exclude-each-value). A saved clip filter from an earlier version, and an address with a clip filter in it, keep working.
 
 ## Sorting
 
 | Sort Option | Description |
 |-------------|-------------|
 | **Created At** (default) | When the clip was created in Stash |
-| **Title** | Alphabetical by clip title |
+| **Title** | Alphabetical by clip title, or by its tag's name when it has no title, as the card shows it |
 | **Position in Scene** | By start time within the scene |
 | **Duration** | By clip length |
 | **Random** | Randomized order (consistent across pages) |

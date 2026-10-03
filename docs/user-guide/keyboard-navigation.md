@@ -179,7 +179,11 @@ The filter sections' headings, and the Search & Filter header above them, are bu
 
 A picker's list opens with the cursor in its search box. `Tab` or an arrow that leaves the picker closes the list. The same pickers work in the carousel builder and the Content Restrictions editor.
 
-In TV mode the D-pad reaches every picker: arrows move between the fields, `Enter` opens a picker, `Down` goes from the search box to the options, `Enter` picks one, and `Escape` closes the list.
+In TV mode the D-pad reaches every picker: arrows move between the fields, `Enter` opens a picker, `Down` goes from the search box to the options, `Enter` picks one, and `Escape` closes the list. Every other filter control is reachable too:
+
+- `Left` and `Right` leave a text field once the cursor is at that end of the text, and leave a number or date field at once, so no field traps the D-pad.
+- `Enter` (the remote's OK) ticks a checkbox or radio button, in the filter panel and in dialogs; `Space` still does as well.
+- A picked value's include or exclude toggle and its remove button are buttons the arrows reach, like the rest of the panel.
 
 ## Playlists
 

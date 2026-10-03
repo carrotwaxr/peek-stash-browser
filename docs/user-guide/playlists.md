@@ -61,6 +61,12 @@ On the Playlists page, each playlist shows thumbnails of the first four scenes y
 3. Change the name or description
 4. Click **Save**
 
+### Finding Scenes by Playlist
+
+The Scenes page can list the scenes in one or more playlists: open **Filters**, pick them under **Playlists** (your own playlists first, then those shared with you, marked "by (owner name)"), and apply. **Has ANY**, **Has ALL** and **Has NONE** combine several playlists. **In any of my playlists** lists the scenes that are in one of your own playlists, or in none of them; playlists shared with you do not count for it. While exactly one playlist is chosen, **Playlist Order** appears in the sort menu and orders the scenes by their place in that playlist.
+
+The filter shows what you may see, as the playlist page does: a scene you hid, or that your restrictions remove, is neither listed nor counted, even when the playlist holds it. A playlist shared with you counts only while its owner can still share (see [Sharing Playlists](#sharing-playlists)); one you can no longer see is treated like a playlist that does not exist, and a saved filter that names it shows "Unavailable playlist" and matches nothing. The same rules apply to a Playlists rule in a [custom carousel](custom-carousels.md), which runs as you.
+
 ### Sorting a Playlist
 
 Anyone who can see a playlist can sort it with the sort menu above the list (see [Viewing Playlist Contents](#viewing-playlist-contents)). Sorting changes only what you see, not the playlist. Play, and Next and Previous while watching, follow the order shown.
@@ -215,7 +221,7 @@ To stop sharing, uncheck all groups and save.
 2. Click the **Shared with Me** tab
 3. Shared playlists show the owner's name and which groups they're shared through
 
-A shared playlist shows you only the scenes your own hidden items and restrictions allow, so its count can be smaller for you than for its owner.
+A shared playlist shows you only the scenes your own hidden items and restrictions allow, so its count can be smaller for you than for its owner. You can also filter the Scenes page by a shared playlist: see [Finding Scenes by Playlist](#finding-scenes-by-playlist).
 
 ### What Shared Users Can Do
 

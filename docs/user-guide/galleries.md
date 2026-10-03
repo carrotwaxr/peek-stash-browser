@@ -20,19 +20,28 @@ Galleries support five view modes:
 
 | Filter | Description |
 |--------|-------------|
-| **Title** | Text search on gallery title |
-| **Performers** | Filter by performers. Supports ANY / ALL / NONE modifiers |
-| **Studio** | Filter by studio, including sub-studios |
-| **Tags** | Filter by tags, with "Include sub-tags". With sub-tags on, "has all of" matches a gallery tagged with any sub-tag of each chosen tag |
+| **Title Search** | Text search on the name the gallery card shows: its title, or for an untitled gallery its zip file's name or its folder's name |
+| **Details Search**, **Code**, **Photographer** | Text search |
+| **Path** | The gallery's folder path, or its zip file's path; **Contains**, **Excludes**, **Equals** or **Starts with**. No regular expressions |
+| **URL** | Text search on any of the gallery's links |
+| **Performers** | Filter by performers. Supports ANY / ALL / NONE, include or exclude per performer, and Has none / Has any |
+| **Studio** | Filter by studio (ANY or NONE, include or exclude, Has none / Has any), including sub-studios |
+| **Tags** | Filter by tags, with "Include sub-tags". With sub-tags on, "has all of" matches a gallery tagged with any sub-tag of each chosen tag. Include or exclude per tag, Has none / Has any |
+| **Performer Tags** | Galleries with a performer who has the tag (ANY, ALL or NONE, with sub-tags) |
 | **Rating** | 0-100 range slider |
 | **Image Count** | Range filter for number of images |
-| **Tag Count** | Range filter for number of tags; 0 to 0 lists the untagged galleries |
+| **Tag Count**, **Performer Count** | Range filters; 0 to 0 on Tag Count lists the untagged galleries |
+| **Performer Age** | A performer's age on the gallery's date, as on Scenes |
 | **Favorites** | Show only favorited galleries |
 | **Has Favorite Image** | Show galleries containing at least one favorited image |
+| **Favorite Performers**, **Favorite Studios**, **Favorite Tags** | Yes / No / Any, by your favorites (and their sub-tags and sub-studios) |
+| **Organized** | Yes / No / Any, by Stash's organized flag |
+| **Zip or Folder** | A gallery from a zip file, or from a folder |
+| **Gallery Date**, **Created Date**, **Updated Date** | A start date, an end date, or both; both ends are included |
 
 ### Sorting
 
-Sort by Created At, Date, Image Count, Path, Random, Rating, Title, or Updated At.
+Sort by Created At, Date, Image Count, Path, Performer Count, Random, Rating, Tag Count, Title, or Updated At.
 
 ## Gallery Detail Page
 

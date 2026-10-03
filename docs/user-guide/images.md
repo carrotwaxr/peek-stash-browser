@@ -9,7 +9,7 @@ Browse, filter, and view images from your Stash library with a full-featured lig
 Access the Images page from the main navigation menu. Here you can:
 
 - **Browse** all images in your library with thumbnail cards
-- **Search** by title, code, or other text fields
+- **Search** by the name the card shows (the title, or the file name without its extension), details and the like. Words from a file's folder are not searched: use the **Path** filter
 - **Filter** by performer, studio, tag, or gallery
 - **Sort** by date, rating, random, and more
 - **Paginate** through large collections
@@ -138,6 +138,25 @@ With **Include sub-tags** on, a chosen tag also matches its sub-tags, and "has a
 ### By Tag Count
 
 **Tag Count** filters by how many tags an image has, the ones its galleries give it included: 0 to 0 lists the untagged images, as the folder view's **Untagged** folder does.
+
+### More Filters
+
+| Filter | Description |
+|--------|-------------|
+| **Title Search** | The name the card shows: the title, or the file name without its extension for an untitled image |
+| **Details Search**, **Code**, **Photographer** | Text search |
+| **Path** | The image file's path: **Contains**, **Excludes**, **Equals** or **Starts with**. No regular expressions |
+| **URL** | Text search on any of the image's links |
+| **Performers**, **Studios**, **Tags**, **Galleries** | ANY / ALL / NONE (a studio: ANY or NONE), include or exclude each value, and **Has none / Has any** (see [Browse and Display](browse-and-display.md#include-or-exclude-each-value)) |
+| **Performer Tags** | Images with a performer who has the tag, with sub-tags |
+| **Performer Count**, **Performer Age** | Range filters: how many performers you can see on the image, and a performer's age on the image's date |
+| **Favorite Performers**, **Favorite Studios**, **Favorite Tags** | Yes / No / Any, by your favorites (their sub-tags and sub-studios, and the tags an image gets from its galleries, included) |
+| **Organized** | Yes / No / Any, by Stash's organized flag |
+| **Resolution** | Stash's ranges on the shorter side of the file (a portrait 1080p image is 1080p), with Equals, Not Equals, Greater Than and Less Than |
+| **Orientation** | Landscape, portrait or square: pick one or several |
+| **Image Date**, **Created Date**, **Updated Date** | A start date, an end date, or both; both ends are included |
+
+You can also sort by Resolution, Tag Count and Performer Count.
 
 ### Combined Filters
 

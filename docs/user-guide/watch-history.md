@@ -88,9 +88,12 @@ Open **Watch History** from the navigation (or the **See more** link on Continue
 
 - **All** - every scene you have played, watched for any length of time, or left with a resume point
 - **In Progress** - scenes you stopped before the last 10% of the scene, however little you had watched (the same list as Continue Watching, and the same as the **In progress** filter on the Scenes page)
-- **Completed** - scenes you played at least once and whose last session finished, or stopped within the final 10% of the scene
+- **Completed** - scenes you played at least once and whose last session finished, or stopped within the final 10% of the scene (the same as the **Watched** filter on the Scenes page)
 
 **Sort:** Recently Watched, Most Watched (play count) or Longest Duration (time you watched).
+
+!!! info "One rule everywhere"
+    The Watch History tabs, Continue Watching and the Scenes page's **Watched** and **In Progress** filters (Yes, No or Any) use the same two rules, so they list the same scenes. A scene is in progress when you have a resume point before its last 10%, or when its length is unknown; it is watched when you have played it and your last session ended in the final 10%. A scene you never opened is neither, so **Watched: No** lists it. Before 3.4.0-beta.8 the History page's In Progress tab also asked for 2% watched, so it left out scenes you had barely started (on one library, 897 scenes against 1,723 now); it now follows the same rule as Continue Watching. Your own history only counts: another user's progress never marks a scene for you.
 
 The header shows the number of scenes in the view and **Total watch time** for the whole view, not just the page you are on. The filter, sort and page are in the address, so the Back button steps through your choices and a page can be bookmarked.
 
