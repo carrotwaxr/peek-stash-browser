@@ -113,6 +113,12 @@ export interface ListView {
 export interface ListUrlState {
   /** The panel's filters; permanent filters not included */
   filters: Record<string, unknown>;
+  /**
+   * The panel's filters with only the page's locks applied: a view's own
+   * field (the timeline period's `date`) keeps the user's value here, so the
+   * timeline's bars count the user's Date filter while a period is chosen
+   */
+  filtersBeforeView: Record<string, unknown>;
   sort: { field: string; direction: Direction; seed: number | null };
   page: number;
   perPage: number;
@@ -260,12 +266,17 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   );
 
   const derived = useMemo(() => {
-    const filters = withoutLockedFilters(
+    const filtersBeforeView = withoutLockedFilters(
       entityType,
       url.hasFilters
         ? url.filters
         : // A default preset becomes state without the URL's reader
           normalizePanelState(entityType, activePreset?.filters ?? NO_FILTERS),
+      pageLockedFields
+    );
+    const filters = withoutLockedFilters(
+      entityType,
+      filtersBeforeView,
       lockedFields
     );
 
@@ -287,6 +298,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
 
     return {
       filters,
+      filtersBeforeView,
       sort: {
         field: sort.field,
         direction: direction ?? defaults.direction,
@@ -306,6 +318,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     permanentFilters,
     defaults,
     entityType,
+    pageLockedFields,
     lockedFields,
     view,
     shown,
