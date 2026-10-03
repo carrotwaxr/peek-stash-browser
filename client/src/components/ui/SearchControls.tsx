@@ -77,6 +77,14 @@ interface SearchControlsProps {
    * route). Left out, the list's request built from the list state.
    */
   countRequestOf?: CountRequestOf;
+  /**
+   * The sorts the page offers for these filters (the page's permanent ones
+   * merged in): Recommended's rank first. Left out, the entity's
+   * (`sortOptionsFor`).
+   */
+  sortOptions?: (
+    filters: Record<string, unknown>
+  ) => readonly { value: string; label: string }[];
 }
 
 const NO_FILTERS: Record<string, unknown> = {};
@@ -118,6 +126,7 @@ const SearchControls = ({
   isRefreshing = false,
   filterable = true,
   countRequestOf,
+  sortOptions: pageSortOptions,
 }: SearchControlsProps) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
@@ -226,12 +235,14 @@ const SearchControls = ({
 
   // The sorts this list offers: Scene Number only beside a collection filter
   // that includes, the page's permanent one or the panel's
-  const sortOptions = useMemo(
-    () => [
-      ...sortOptionsFor(artifactType, { ...filters, ...permanentFilters }),
-    ],
-    [artifactType, filters, permanentFilters]
-  );
+  const sortOptions = useMemo(() => {
+    const offeredFilters = { ...filters, ...permanentFilters };
+    return [
+      ...(pageSortOptions
+        ? pageSortOptions(offeredFilters)
+        : sortOptionsFor(artifactType, offeredFilters)),
+    ];
+  }, [pageSortOptions, artifactType, filters, permanentFilters]);
 
   // The sheet's count: the page's request over the draft, else the list's
   // own request built from the list state

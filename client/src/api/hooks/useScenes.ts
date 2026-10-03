@@ -1,10 +1,15 @@
 import type {
   ExternalPlayerLinkResponse,
+  FindRecommendedScenesRequest,
   NormalizedScene,
 } from "@peek/shared-types";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "..";
-import { fetchListPage, libraryListTotal } from "../../utils/listQuery";
+import {
+  fetchListPage,
+  libraryListTotal,
+  recommendedListTotal,
+} from "../../utils/listQuery";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 import { useLibraryReady } from "./useLibraryReady";
@@ -27,6 +32,32 @@ export function useSceneList(
               params,
               libraryListTotal("findScenes"),
               (request) => libraryApi.findScenes(request, context.signal)
+            ),
+    // Keep the current results on screen while the next page loads; a page
+    // change reuses the list's count (`fetchListPage`)
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * One page of Recommended: the scene list's request within the user's
+ * ranked scenes, its total in a top-level `count` (`recommendedListTotal`),
+ * keyed apart from the Scenes list so the two never share a total. A null
+ * request sends nothing.
+ */
+export function useRecommendedList(
+  params: FindRecommendedScenesRequest | null
+) {
+  return useQuery({
+    queryKey: queryKeys.scenes.recommended(
+      (params ?? {}) as Record<string, unknown>
+    ),
+    queryFn:
+      params === null
+        ? skipToken
+        : (context) =>
+            fetchListPage(context, params, recommendedListTotal, (request) =>
+              libraryApi.findRecommendedScenes(request, context.signal)
             ),
     // Keep the current results on screen while the next page loads; a page
     // change reuses the list's count (`fetchListPage`)

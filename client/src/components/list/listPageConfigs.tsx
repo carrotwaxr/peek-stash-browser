@@ -73,6 +73,8 @@ export interface ListPageData {
   items: ListRow[];
   /** The list's total */
   count: number;
+  /** The list's response as the server sent it (Recommended's empty-state message) */
+  response: unknown;
   /** The page's request (null while none is sent); its cache key's params */
   request: ListRequest;
   /** The list request's error, if it failed */
@@ -106,6 +108,10 @@ export interface ListPageExtras {
    * shows the list, not the error page, and the part reports the failure
    */
   holdsPage?: boolean;
+  /** Shown between the header and the toolbar (Recommended's "Filtering within ...") */
+  notice?: ReactNode;
+  /** What an empty list says, over the config's (the server's own message) */
+  empty?: { message: string; description?: ReactNode };
 }
 
 export interface ViewContext {
@@ -122,6 +128,8 @@ export interface GridContext {
   ctx: CardContext;
   /** "No scenes found" */
   emptyMessage: string;
+  /** What else an empty list says; the grid's own when not set */
+  emptyDescription?: ReactNode;
   /** The list's query, page included: what a selection belongs to */
   selectionScope: string;
 }
@@ -146,10 +154,22 @@ export interface ListPageConfig {
   /** The page's heading and document title */
   title: string;
   subtitle: string;
+  /** Beside the heading (Recommended's "How recommendations work") */
+  headerAside?: ReactNode;
+  /** The preset context ("scene_recommended"); the entity type by default */
+  context?: string;
   /** The entity's default sort */
   defaultSort: string;
   /** The views the page renders (`LIST_VIEW_MODES`) */
   viewModes: { id: ViewModeId; label: string }[];
+  /**
+   * The sorts the page offers for these filters (the page's permanent ones
+   * merged in), in the toolbar and the URL state; the entity's
+   * (`sortOptionsFor`) when not set
+   */
+  sortOptions?: (
+    filters: Record<string, unknown>
+  ) => readonly { value: string; label: string }[];
   /** Its list hook, query key and response shape */
   source: ListSource;
   /** One row's card; key it by nothing, the page keys it by id and instance */

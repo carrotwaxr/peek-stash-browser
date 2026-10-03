@@ -21,6 +21,7 @@ import type {
   FindPerformersMinimalResponse,
   FindPerformersRequest,
   FindPerformersResponse,
+  FindRecommendedScenesRequest,
   FindScenesMinimalRequest,
   FindScenesMinimalResponse,
   FindScenesRequest,
@@ -36,6 +37,7 @@ import type {
   FindTagsRequest,
   FindTagsResponse,
   GetCarouselResponse,
+  GetRecommendedScenesResponse,
   GetUserCarouselsResponse,
   ListRequestInput,
   NormalizedGallery,
@@ -177,6 +179,20 @@ export const libraryApi = {
   // Search endpoints
   findScenes: (params: FindScenesRequest = {}, signal?: AbortSignal) =>
     apiFetch("/library/scenes", {
+      method: "POST",
+      body: JSON.stringify(params),
+      signal,
+    }),
+
+  /**
+   * One page of the user's top 500 (`RECOMMENDED_LIMIT`) as the scene list
+   * asks it: its filters, search and sort, `recommended` (the rank) among them
+   */
+  findRecommendedScenes: (
+    params: FindRecommendedScenesRequest = {},
+    signal?: AbortSignal
+  ) =>
+    apiFetch<GetRecommendedScenesResponse>("/library/scenes/recommended", {
       method: "POST",
       body: JSON.stringify(params),
       signal,

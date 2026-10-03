@@ -15,6 +15,7 @@ import {
   listKeyOf,
   listKeyWithoutPageOf,
   lockedFieldsOf,
+  recommendedListTotal,
   sortOptionsFor,
   withoutLockedFilters,
   withoutLockedOptions,
@@ -723,5 +724,40 @@ describe("a page change reuses its list's count (fetchListPage)", () => {
     expect(filterOf(must(clipSent[0])).count).toBeUndefined();
     expect(filterOf(must(clipSent[1])).count).toBe(false);
     expect(page2).toMatchObject({ total: 50, totalPages: 3, page: 2 });
+  });
+
+  it("recommendedListTotal reads and writes `count`", async () => {
+    const recommendedSent: Record<string, unknown>[] = [];
+    const filterOf = (body: Record<string, unknown>) =>
+      body.filter as Record<string, unknown>;
+    const recommendedServer = (body: Record<string, unknown>) => {
+      recommendedSent.push(body);
+      return Promise.resolve({
+        scenes: [],
+        count: filterOf(body).count === false ? null : 30,
+        page: filterOf(body).page,
+        perPage: 24,
+      });
+    };
+    const loadRecommended = (page: number) => {
+      const body = { filter: { page, per_page: 24, sort: "recommended" } };
+      return client.fetchQuery({
+        queryKey: queryKeys.scenes.recommended(body),
+        queryFn: (context) =>
+          fetchListPage(context, body, recommendedListTotal, recommendedServer),
+      });
+    };
+
+    await loadRecommended(1);
+    const page2 = await loadRecommended(2);
+
+    expect(filterOf(must(recommendedSent[0])).count).toBeUndefined();
+    expect(filterOf(must(recommendedSent[1])).count).toBe(false);
+    expect(page2).toMatchObject({ count: 30, page: 2 });
+    expect(recommendedListTotal.total({ count: 7 })).toBe(7);
+    expect(recommendedListTotal.total({ count: null })).toBeNull();
+    expect(
+      recommendedListTotal.withTotal({ scenes: [], count: null }, 9)
+    ).toEqual({ scenes: [], count: 9 });
   });
 });

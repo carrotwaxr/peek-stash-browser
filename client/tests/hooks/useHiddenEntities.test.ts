@@ -41,7 +41,7 @@ const DEPENDENTS = [
   queryKeys.homeCarousels.byKey("recentlyAdded"),
   queryKeys.carousels.execute("3"),
   queryKeys.clips.list({}),
-  queryKeys.scenes.recommended(1, 24),
+  queryKeys.scenes.recommended({ filter: { page: 1, per_page: 24 } }),
   queryKeys.user.stats(),
   queryKeys.user.hiddenItems("all", 1),
 ];

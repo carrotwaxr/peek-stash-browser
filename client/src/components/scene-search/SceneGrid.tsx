@@ -1,4 +1,11 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { NormalizedScene } from "@peek/shared-types";
 import {
   LucideCheckSquare,
@@ -39,7 +46,7 @@ interface Props {
   ) => void;
   fromPageTitle?: string;
   emptyMessage?: string;
-  emptyDescription?: string;
+  emptyDescription?: ReactNode;
   enableKeyboard?: boolean;
   /**
    * What the selection belongs to: the list's query, page included. The
