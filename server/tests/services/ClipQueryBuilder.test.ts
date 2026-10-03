@@ -12,7 +12,10 @@
 import { CLIP_FIELDS } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
+import {
+  CLIP_NAME_SQL,
+  clipQueryBuilder,
+} from "../../services/ClipQueryBuilder.js";
 import type { ClipRow } from "../../types/internal/queryRows.js";
 import type {
   ClipListRequest,
@@ -119,10 +122,7 @@ describe("ClipQueryBuilder", () => {
     it.each([
       ["stashCreatedAt", "c.stashCreatedAt"],
       ["stashUpdatedAt", "c.stashUpdatedAt"],
-      [
-        "title",
-        "NULLIF(c.title, '') IS NULL, NULLIF(c.title, '') COLLATE NOCASE",
-      ],
+      ["title", `${CLIP_NAME_SQL} IS NULL, ${CLIP_NAME_SQL} COLLATE NOCASE`],
       ["seconds", "c.seconds"],
       ["sceneTitle", "s.title"],
       ["duration", "(c.endSeconds - c.seconds)"],
@@ -142,15 +142,16 @@ describe("ClipQueryBuilder", () => {
       }
     );
 
-    it("the title sort reads the clip's own title, case-insensitive, untitled clips last in both directions, and binds nothing", async () => {
+    it("the Title sort orders by the title, else the live primary tag's name, case-insensitive; clips with neither last in both directions", async () => {
       await run({
         sort: { field: "title", direction: "ASC", seed: undefined },
       });
       const page = statement(0);
       expect(page.sql).toContain(
-        "ORDER BY NULLIF(c.title, '') IS NULL, NULLIF(c.title, '') COLLATE NOCASE ASC, c.id ASC"
+        `ORDER BY ${CLIP_NAME_SQL} IS NULL, ${CLIP_NAME_SQL} COLLATE NOCASE ASC, c.id ASC`
       );
-      expect(page.sql).not.toContain("ptg");
+      expect(CLIP_NAME_SQL).toContain("NULLIF(c.title, '')");
+      expect(CLIP_NAME_SQL).toContain("pt.deletedAt IS NULL");
       // The clip's own exclusion join and its scene's bind the viewer
       expect(page.params.filter((p) => p === 7)).toHaveLength(2);
 
@@ -159,7 +160,7 @@ describe("ClipQueryBuilder", () => {
         sort: { field: "title", direction: "DESC", seed: undefined },
       });
       expect(statement(0).sql).toContain(
-        "ORDER BY NULLIF(c.title, '') IS NULL, NULLIF(c.title, '') COLLATE NOCASE DESC, c.id DESC"
+        `ORDER BY ${CLIP_NAME_SQL} IS NULL, ${CLIP_NAME_SQL} COLLATE NOCASE DESC, c.id DESC`
       );
     });
 
@@ -289,15 +290,15 @@ describe("ClipQueryBuilder", () => {
       await run({ q: "50%_off\\" });
 
       const { sql, params } = statement(0);
-      expect(sql).toContain("c.title LIKE ? ESCAPE '\\'");
+      expect(sql).toContain(`${CLIP_NAME_SQL} LIKE ? ESCAPE '\\'`);
       expect(params).toContain("%50\\%\\_off\\\\%");
     });
 
-    it("two words are two AND-ed title matches", async () => {
+    it("two words are two AND-ed matches on the shown name", async () => {
       await run({ q: "sea side" });
 
       const { sql, params } = statement(0);
-      expect(sql.match(/c\.title LIKE \? ESCAPE/g)).toHaveLength(2);
+      expect(sql.split(`${CLIP_NAME_SQL} LIKE ? ESCAPE`)).toHaveLength(3);
       expect(params).toContain("%sea%");
       expect(params).toContain("%side%");
     });
@@ -306,7 +307,7 @@ describe("ClipQueryBuilder", () => {
       await run({ q: "sea", filter: { is_generated: true } });
 
       const { sql, params } = statement(0);
-      positions(sql, ["c.isGenerated = ?", "c.title LIKE ? ESCAPE"]);
+      positions(sql, ["c.isGenerated = ?", `${CLIP_NAME_SQL} LIKE ? ESCAPE`]);
       expect(params.indexOf(1)).toBeLessThan(params.indexOf("%sea%"));
     });
 
@@ -544,11 +545,26 @@ describe("ClipQueryBuilder", () => {
       );
     });
 
-    it("the title filter reads the clip's own title", async () => {
+    it("the search and the Title filter's comparisons read the same expression", async () => {
       await run({ filter: { title: { modifier: "EQUALS", value: "Intro" } } });
 
-      expect(statement(0).sql).toContain("c.title");
+      expect(statement(0).sql).toContain(`LOWER(${CLIP_NAME_SQL}) = LOWER(?)`);
       expect(statement(0).params).toContain("Intro");
+
+      vi.clearAllMocks();
+      await run({ filter: { title: { modifier: "INCLUDES", value: "ana" } } });
+      expect(statement(0).sql).toContain(`${CLIP_NAME_SQL} LIKE ? ESCAPE`);
+    });
+
+    it("Title is set / not set still reads the clip's own title", async () => {
+      await run({ filter: { title: { modifier: "IS_NULL" } } });
+      expect(statement(0).sql).toContain("(c.title IS NULL OR c.title = '')");
+
+      vi.clearAllMocks();
+      await run({ filter: { title: { modifier: "NOT_NULL" } } });
+      expect(statement(0).sql).toContain(
+        "(c.title IS NOT NULL AND c.title != '')"
+      );
     });
 
     it("the studio's EXCLUDES keeps a clip whose scene has no studio", async () => {

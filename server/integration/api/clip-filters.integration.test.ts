@@ -672,3 +672,116 @@ describeWithDb("Clip filters: the filter body (integration)", () => {
     expect(getKeys).toEqual([...at(X, K1), ...at(Y, K1)].sort());
   });
 });
+
+/**
+ * The name a clip shows (R7): the Title sort, the search and the Title
+ * filter's comparisons read the clip's title, else its live primary tag's
+ * name; Title is set / not set still reads the clip's own title. One made-up
+ * instance holds:
+ * - tags 7893001 "Anal" (live) and 7893002 "Gone" (deleted)
+ * - clip 7893101 titled "Zebra" (primary tag "Anal")
+ * - clip 7893102 untitled, primary tag "Anal"
+ * - clip 7893103 untitled (an empty title), primary tag "Gone"
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Clip filters: the shown name (integration)", () => {
+  const N = "cfn-a";
+  const [TAG_LIVE, TAG_GONE] = ["7893001", "7893002"];
+  const [ZEBRA, BY_TAG, BY_GONE] = ["7893101", "7893102", "7893103"];
+  const SCENE = "7893001";
+
+  async function removeRows(): Promise<void> {
+    const where = { stashInstanceId: N };
+    await prisma.stashClip.deleteMany({ where });
+    await prisma.stashScene.deleteMany({ where });
+    await prisma.stashTag.deleteMany({ where });
+  }
+
+  /** The clip ids a request lists, in the page's order */
+  async function ids(
+    overrides: Partial<ClipListRequest> = {}
+  ): Promise<string[]> {
+    const { items, total } = await clipQueryBuilder.execute({
+      userId: 0,
+      applyExclusions: false,
+      allowedInstanceIds: [N],
+      request: parsedClipRequest({ perPage: 100, ...overrides }),
+    });
+    expect(total).toBe(items.length);
+    return items.map((clip) => clip.id);
+  }
+
+  const bySort = (direction: "ASC" | "DESC"): Partial<ClipListRequest> => ({
+    sort: { field: "title", direction, seed: undefined },
+  });
+
+  beforeAll(async () => {
+    await removeRows();
+    await prisma.stashTag.createMany({
+      data: [
+        { id: TAG_LIVE, stashInstanceId: N, name: "Anal" },
+        {
+          id: TAG_GONE,
+          stashInstanceId: N,
+          name: "Gone",
+          deletedAt: new Date(),
+        },
+      ],
+    });
+    await prisma.stashScene.create({
+      data: { id: SCENE, stashInstanceId: N, title: "Scene" },
+    });
+    const clip = (id: string, title: string | null, tagId?: string) => ({
+      id,
+      stashInstanceId: N,
+      sceneId: SCENE,
+      sceneInstanceId: N,
+      title,
+      seconds: Number(id) - 7893100,
+      ...(tagId === undefined
+        ? {}
+        : { primaryTagId: tagId, primaryTagInstanceId: N }),
+    });
+    await prisma.stashClip.createMany({
+      data: [
+        clip(ZEBRA, "Zebra", TAG_LIVE),
+        clip(BY_TAG, null, TAG_LIVE),
+        clip(BY_GONE, "", TAG_GONE),
+      ],
+    });
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  it("an untitled clip sorts by its tag's name", async () => {
+    // Anal, Zebra, then the clips with neither (a deleted tag names nothing)
+    expect(await ids(bySort("ASC"))).toEqual([BY_TAG, ZEBRA, BY_GONE]);
+    // The clips with neither stay last in descending order too
+    expect(await ids(bySort("DESC"))).toEqual([ZEBRA, BY_TAG, BY_GONE]);
+  });
+
+  it("the search finds an untitled clip by its tag's name", async () => {
+    expect(await ids({ q: "anal" })).toEqual([BY_TAG]);
+    expect(await ids({ q: "gone" })).toEqual([]);
+  });
+
+  it("Title contains 'ana' finds the untitled clip", async () => {
+    expect(
+      await ids({
+        filter: { title: { modifier: "INCLUDES", value: "ana" } },
+        ...bySort("ASC"),
+      })
+    ).toEqual([BY_TAG]);
+  });
+
+  it("Title is not set finds both untitled clips, and Title is set the titled one", async () => {
+    expect(
+      (await ids({ filter: { title: { modifier: "IS_NULL" } } })).sort()
+    ).toEqual([BY_TAG, BY_GONE].sort());
+    expect(await ids({ filter: { title: { modifier: "NOT_NULL" } } })).toEqual([
+      ZEBRA,
+    ]);
+  });
+});

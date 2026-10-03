@@ -1723,9 +1723,9 @@ describe("Sorts for resolution, studio, code, performer age, organized, counts a
   });
 
   describe("clips", () => {
-    it("title orders by the clip's own title, as every clip surface shows it; untitled clips last in both directions", async () => {
-      expect(await clips("ASC")).toEqual(["k1", "k2", "k4", "k7"]);
-      expect(await clips("DESC")).toEqual(["k1", "k7", "k4", "k2"]);
+    it("title orders by the name the card shows (the title, else the primary tag's name), case-insensitive: Apple, banana, cherry, Zulu", async () => {
+      expect(await clips("ASC")).toEqual(["k2", "k1", "k4", "k7"]);
+      expect(await clips("DESC")).toEqual(["k7", "k4", "k1", "k2"]);
     });
   });
 });
