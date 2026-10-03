@@ -28,7 +28,7 @@ A new server stays hidden from everyone until its first sync has finished, so yo
 
 Ratings, favorites, O counts, watch history, resume points and hidden items are kept per account and per server. A scene on two servers is two scenes to Peek, each with its own rating and history. Playlist entries remember which server their scene came from, so a playlist can hold items from several servers.
 
-If the same content exists on more than one server, the server with the lowest priority number is the primary source. An admin sets that number on each server.
+Peek does not merge the same content across servers: each server's copy is listed separately. An admin sets a priority number on each server; it orders the server lists and decides which server's names show without a suffix (below).
 
 ## Same name, two servers
 
