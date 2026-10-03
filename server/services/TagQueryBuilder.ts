@@ -54,6 +54,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  refOptionsOf,
 } from "./query/EntityQueryBuilder.js";
 import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
 import {
@@ -381,10 +382,12 @@ class TagQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: LeafContext
   ): FilterClause {
-    return refClause(target, criterion.refs, criterion.modifier, {
-      name: ctx.name,
-      allowedInstanceIds: ctx.allowedInstanceIds,
-    });
+    return refClause(
+      target,
+      criterion.refs,
+      criterion.modifier,
+      refOptionsOf(ctx)
+    );
   }
 
   /**

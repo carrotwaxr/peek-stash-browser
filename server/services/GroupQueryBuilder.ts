@@ -64,6 +64,7 @@ import {
   type SortExpr,
   favoriteRefs,
   hierarchicalRefClause,
+  refOptionsOf,
 } from "./query/EntityQueryBuilder.js";
 import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
 import { STUDIO_REF, loadRefsByKey } from "./query/nestedRefs.js";
@@ -484,7 +485,7 @@ class GroupQueryBuilder extends EntityQueryBuilder<
     const match = refSetMatch(
       ["gfsp.performerId", "gfsp.performerInstanceId"],
       refs,
-      { name: ctx.name, allowedInstanceIds: ctx.allowedInstanceIds }
+      refOptionsOf(ctx)
     );
     const exists: FilterClause = {
       sql: `EXISTS (SELECT 1 FROM SceneGroup gfg JOIN StashScene gfs ON gfs.id = gfg.sceneId AND gfs.stashInstanceId = gfg.sceneInstanceId${scene.join} JOIN ScenePerformer gfsp ON gfsp.sceneId = gfs.id AND gfsp.sceneInstanceId = gfs.stashInstanceId JOIN StashPerformer gfp ON gfp.id = gfsp.performerId AND gfp.stashInstanceId = gfsp.performerInstanceId${performer.join} WHERE gfg.groupId = g.id AND gfg.groupInstanceId = g.stashInstanceId AND ${scene.where} AND ${performer.where} AND ${match.sql})`,

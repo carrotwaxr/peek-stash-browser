@@ -62,6 +62,7 @@ import {
   favoriteRefs,
   hierarchicalRefClause,
   refFieldClause,
+  refOptionsOf,
   refPresence,
 } from "./query/EntityQueryBuilder.js";
 import {
@@ -244,8 +245,7 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     // an index walks it
     performer_tags: (c, ctx) =>
       performerTagsFieldClause(IMAGE_PERFORMERS, c, {
-        name: ctx.name,
-        allowedInstanceIds: ctx.allowedInstanceIds,
+        ...refOptionsOf(ctx),
         viewerId: ctx.applyExclusions ? ctx.userId : null,
         sortedByIndex: INDEXED_SORTS.has(ctx.sortField) && !ctx.underAny,
       }),
@@ -349,10 +349,12 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     };
     if (kind === "tag") return this.tagClause(criterion, ctx);
     if (kind === "studio") return this.studioClause(criterion, ctx);
-    return refClause(IMAGE_PERFORMERS, refs, criterion.modifier, {
-      name: ctx.name,
-      allowedInstanceIds: ctx.allowedInstanceIds,
-    });
+    return refClause(
+      IMAGE_PERFORMERS,
+      refs,
+      criterion.modifier,
+      refOptionsOf(ctx)
+    );
   }
 
   /**
@@ -379,8 +381,7 @@ class ImageQueryBuilder extends EntityQueryBuilder<
       });
     }
     return refClause(IMAGE_GALLERIES, criterion.refs, criterion.modifier, {
-      name: ctx.name,
-      allowedInstanceIds: ctx.allowedInstanceIds,
+      ...refOptionsOf(ctx),
       sortedByIndex: false,
     });
   }

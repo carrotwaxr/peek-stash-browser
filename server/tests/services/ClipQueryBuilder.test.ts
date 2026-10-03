@@ -829,3 +829,63 @@ describe("the clip field table", () => {
     );
   });
 });
+
+describe("the where tree on clips", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+  });
+
+  const studio = {
+    field: "studios",
+    criterion: criterion([ref("8")]),
+  } as const;
+  const generated = { field: "is_generated", criterion: true } as const;
+  /** The clip tags filter as a probe per clip (a studio drives) */
+  const PROBE =
+    "EXISTS (SELECT 1 FROM ClipTag ct WHERE ct.clipId = c.id AND ct.clipInstanceId = c.stashInstanceId";
+  /** The clip tags filter as one list from the junction's tag index */
+  const LIST =
+    "(c.id, c.stashInstanceId) IN (SELECT ct.clipId, ct.clipInstanceId FROM ClipTag ct WHERE";
+
+  it("lists reads the top level: a studio row at the root of an all where drives, one inside an any group does not", async () => {
+    await run({
+      filter: { tags: criterion([ref("5")]) },
+      where: { match: "all", rules: [studio] },
+    });
+    expect(statement(0).sql).toContain(PROBE);
+    expect(statement(0).sql).not.toContain(LIST);
+
+    vi.clearAllMocks();
+    await run({
+      filter: { tags: criterion([ref("5")]) },
+      where: {
+        match: "all",
+        rules: [{ match: "any", rules: [studio, generated] }],
+      },
+    });
+    expect(statement(0).sql).toContain(LIST);
+    expect(statement(0).sql).not.toContain(PROBE);
+  });
+
+  it("two scene_tags rows and the filter's scene_tags name three CTE sets", async () => {
+    const many = (from: number) =>
+      Array.from({ length: 70 }, (_, i) => ref(String(from + i)));
+    await run({
+      filter: { scene_tags: criterion(many(1)) },
+      where: {
+        match: "all",
+        rules: [
+          { field: "scene_tags", criterion: criterion(many(101)) },
+          { field: "scene_tags", criterion: criterion(many(201)) },
+        ],
+      },
+    });
+
+    const { sql } = statement(0);
+    for (const name of ["scene_tags", "w0_scene_tags", "w1_scene_tags"]) {
+      expect(sql).toContain(`${name}_refs(id, inst) AS MATERIALIZED`);
+      expect(sql).toContain(`${name}_matched(id, inst) AS MATERIALIZED`);
+    }
+  });
+});

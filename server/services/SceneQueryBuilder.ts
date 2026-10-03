@@ -83,6 +83,7 @@ import {
   favoriteRefs,
   hierarchicalRefClause,
   refFieldClause,
+  refOptionsOf,
 } from "./query/EntityQueryBuilder.js";
 import {
   GALLERY_REF,
@@ -692,10 +693,12 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: LeafContext
   ): FilterClause {
-    return refClause(target, criterion.refs, criterion.modifier, {
-      name: ctx.name,
-      allowedInstanceIds: ctx.allowedInstanceIds,
-    });
+    return refClause(
+      target,
+      criterion.refs,
+      criterion.modifier,
+      refOptionsOf(ctx)
+    );
   }
 
   /**
@@ -742,8 +745,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     ctx: LeafContext
   ): Promise<FilterClause> {
     return performerTagsFieldClause(SCENE_PERFORMERS, criterion, {
-      name: ctx.name,
-      allowedInstanceIds: ctx.allowedInstanceIds,
+      ...refOptionsOf(ctx),
       viewerId: ctx.applyExclusions ? ctx.userId : null,
       sortedByIndex: INDEXED_SORTS.has(ctx.sortField) && !ctx.underAny,
     });
