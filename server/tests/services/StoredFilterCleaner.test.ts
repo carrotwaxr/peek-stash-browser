@@ -11,6 +11,7 @@ import {
   type BareRefLookup,
   bareRefLookupFor,
   cleanCarouselRules,
+  cleanCarouselTree,
   cleanFilterPresets,
   cleanPresetState,
 } from "../../services/StoredFilterCleaner.js";
@@ -716,6 +717,174 @@ describe("cleanCarouselRules", () => {
     expect(
       cleanCarouselRules(first.value.rules, "random", "DESC", lookup).changed
     ).toBe(false);
+  });
+});
+
+describe("cleanCarouselRules stays flat (migration 009)", () => {
+  it("cleanCarouselRules still returns flat rules", () => {
+    const rules = { tags: { value: ["284"], modifier: "INCLUDES_ALL" } };
+    const cleaned = cleanCarouselRules(
+      rules,
+      "random",
+      "DESC",
+      lookupOf({ tag: { "284": "default" } })
+    );
+
+    expect(cleaned.value.rules).toEqual({
+      tags: { value: ["284:default"], modifier: "INCLUDES_ALL" },
+    });
+    expect(cleaned.report.shapeConverted).toBe(false);
+  });
+});
+
+describe("cleanCarouselTree", () => {
+  const tags = (value: string[], modifier = "INCLUDES") => ({
+    field: "tags",
+    criterion: { value, modifier },
+  });
+
+  it("cleans a tree's leaves one by one and ties bare ids", () => {
+    const lookup = lookupOf({ tag: { "284": "default" } });
+    const tree = {
+      match: "all",
+      rules: [
+        tags(["284"]),
+        { field: "not_a_field", criterion: { value: 1 } },
+        {
+          match: "any",
+          rules: [
+            {
+              field: "performers",
+              criterion: { value: ["3:a"], modifier: "SOMETIMES" },
+            },
+            { field: "favorite", criterion: true },
+            tags(["999"]),
+          ],
+        },
+      ],
+    };
+
+    const first = cleanCarouselTree(tree, "random", "DESC", lookup);
+
+    expect(first.changed).toBe(true);
+    expect(first.value).toEqual({
+      rules: {
+        match: "all",
+        rules: [
+          tags(["284:default"]),
+          {
+            match: "any",
+            rules: [{ field: "favorite", criterion: true }, tags(["999"])],
+          },
+        ],
+      },
+      sort: "random",
+      direction: "DESC",
+    });
+    expect(first.report.droppedKeys).toEqual(["not_a_field", "performers"]);
+    expect(first.report.refsRewritten).toBe(1);
+    expect(first.report.refsLeftBare).toBe(1);
+    expect(first.report.shapeConverted).toBe(false);
+
+    // A clean of a clean changes nothing
+    const second = cleanCarouselTree(
+      first.value.rules,
+      first.value.sort,
+      first.value.direction,
+      lookup
+    );
+    expect(second.changed).toBe(false);
+    expect(second.value.rules).toBe(first.value.rules);
+  });
+
+  it("a flat rule set with nothing to clean is changed (converted), with `shapeConverted`", () => {
+    const rules = {
+      tags: { value: ["284:default"], modifier: "INCLUDES_ALL" },
+      favorite: true,
+    };
+
+    const cleaned = cleanCarouselTree(rules, "random", "DESC");
+
+    expect(cleaned.changed).toBe(true);
+    expect(cleaned.report.shapeConverted).toBe(true);
+    expect(cleaned.report.droppedKeys).toEqual([]);
+    expect(cleaned.value.rules).toEqual({
+      match: "all",
+      rules: [
+        tags(["284:default"], "INCLUDES_ALL"),
+        { field: "favorite", criterion: true },
+      ],
+    });
+  });
+
+  it("a flat rule set is cleaned as the flat cleaner cleans it, then converted", () => {
+    const lookup = lookupOf({ tag: { "284": "default" } });
+    const cleaned = cleanCarouselTree(
+      {
+        tags: { value: ["284"], modifier: "INCLUDES_ALL" },
+        not_a_field: { value: 1 },
+      },
+      "bogus",
+      "asc",
+      lookup
+    );
+
+    expect(cleaned.value).toEqual({
+      rules: {
+        match: "all",
+        rules: [tags(["284:default"], "INCLUDES_ALL")],
+      },
+      sort: "random",
+      direction: "DESC",
+    });
+    expect(cleaned.report.droppedKeys).toEqual(["not_a_field"]);
+    expect(cleaned.report.sortReset).toBe(true);
+  });
+
+  it("Scene Number stays with a collection row at the root of an all tree, and becomes random under any", () => {
+    const groups = {
+      field: "groups",
+      criterion: { value: ["5:a"], modifier: "INCLUDES" },
+    };
+    expect(
+      cleanCarouselTree({ match: "all", rules: [groups] }, "scene_index", "ASC")
+        .changed
+    ).toBe(false);
+    expect(
+      cleanCarouselTree(
+        { match: "any", rules: [groups, tags(["1:a"])] },
+        "scene_index",
+        "ASC"
+      ).value
+    ).toMatchObject({ sort: "random", direction: "DESC" });
+  });
+
+  it("rules of neither shape become the empty tree; a group the parser drops goes whole", () => {
+    for (const rules of [null, ["x"], "x"]) {
+      const cleaned = cleanCarouselTree(untrusted(rules), "random", "DESC");
+      expect(cleaned.value.rules, JSON.stringify(rules)).toEqual({
+        match: "all",
+        rules: [],
+      });
+      expect(cleaned.report.shapeConverted).toBe(true);
+    }
+
+    const cleaned = cleanCarouselTree(
+      {
+        match: "all",
+        rules: [
+          { match: "sometimes", rules: [tags(["1:a"])] },
+          { match: "any", rules: [{ match: "all", rules: [tags(["2:a"])] }] },
+          tags(["3:a"]),
+        ],
+      },
+      "random",
+      "DESC"
+    );
+    expect(cleaned.value.rules).toEqual({
+      match: "all",
+      rules: [tags(["3:a"])],
+    });
   });
 });
 

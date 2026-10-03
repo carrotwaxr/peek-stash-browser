@@ -393,7 +393,11 @@ describe("parseListRequest: where", () => {
     expect(
       issuesOf(() => parseListRequest("scene", { where: bad }, opts()))
     ).toEqual([{ path: "where.rules[0].field", message: "Not a row field" }]);
-    // parseStoredSceneQuery takes a tree from W5 on
+    const stored = parseStoredSceneQuery(bad, "random", "DESC", opts());
+    expect(stored).not.toHaveProperty("where");
+    expect(stored.ignored).toEqual([
+      { path: "rules.rules[0].field", reason: "Not a row field" },
+    ]);
   });
 
   it("a request without where, or with an empty one, carries no where", () => {
@@ -2059,12 +2063,19 @@ describe("parseStoredSceneQuery", () => {
       "asc",
       { userId: USER_ID, perPage: 12 }
     );
-    expect(parsed.filter).toEqual({
-      tags: {
-        refs: [{ id: "284", instanceId: undefined }],
-        modifier: "INCLUDES_ALL",
-        depth: 0,
-      },
+    expect(parsed.filter).toEqual({});
+    expect(parsed.where).toEqual({
+      match: "all",
+      rules: [
+        {
+          field: "tags",
+          criterion: {
+            refs: [{ id: "284", instanceId: undefined }],
+            modifier: "INCLUDES_ALL",
+            depth: 0,
+          },
+        },
+      ],
     });
     expect(parsed.sort).toEqual({
       field: "rating",
@@ -2139,12 +2150,19 @@ describe("parseCarouselRequest", () => {
       perPage: 12,
       q: undefined,
       sort: { field: "random", direction: "ASC", seed: 99 },
-      filter: {
-        tags: {
-          refs: [{ id: "284", instanceId: "a" }],
-          modifier: "INCLUDES_ALL",
-          depth: 0,
-        },
+      filter: {},
+      where: {
+        match: "all",
+        rules: [
+          {
+            field: "tags",
+            criterion: {
+              refs: [{ id: "284", instanceId: "a" }],
+              modifier: "INCLUDES_ALL",
+              depth: 0,
+            },
+          },
+        ],
       },
       specificInstanceId: "a",
     });
@@ -2196,6 +2214,167 @@ describe("parseCarouselRequest", () => {
         issuesOf(() => parseCarouselRequest({ rules }, carouselOpts()))
       ).toEqual([{ path: "rules", message: "Expected an object" }]);
     }
+  });
+});
+
+describe("carousel rules as a tree", () => {
+  /** The prod "Goddesses" carousel's rules, as stored */
+  const GODDESSES = { tags: { value: ["284"], modifier: "INCLUDES_ALL" } };
+  const tagsLeaf = (value: string) => ({
+    field: "tags",
+    criterion: { value: [value], modifier: "INCLUDES" },
+  });
+  const parsedTags = (id: string, instanceId: string | undefined) => ({
+    field: "tags",
+    criterion: {
+      refs: [{ id, instanceId }],
+      modifier: "INCLUDES",
+      depth: 0,
+    },
+  });
+
+  it("a stored flat rule set reads as a root all tree", () => {
+    const parsed = parseStoredSceneQuery(GODDESSES, "random", "DESC", opts());
+
+    expect(parsed.filter).toEqual({});
+    expect(parsed.where).toEqual({
+      match: "all",
+      rules: [
+        {
+          field: "tags",
+          criterion: {
+            refs: [{ id: "284", instanceId: undefined }],
+            modifier: "INCLUDES_ALL",
+            depth: 0,
+          },
+        },
+      ],
+    });
+    expect(parsed.ignored).toEqual([]);
+  });
+
+  it("a stored tree reads as itself", () => {
+    const tree = {
+      match: "all",
+      rules: [
+        tagsLeaf("1:a"),
+        {
+          match: "any",
+          rules: [tagsLeaf("2:a"), { field: "favorite", criterion: true }],
+        },
+      ],
+    };
+
+    const parsed = parseStoredSceneQuery(tree, "random", "DESC", opts());
+
+    expect(parsed.filter).toEqual({});
+    expect(parsed.where).toEqual({
+      match: "all",
+      rules: [
+        parsedTags("1", "a"),
+        {
+          match: "any",
+          rules: [parsedTags("2", "a"), { field: "favorite", criterion: true }],
+        },
+      ],
+    });
+    expect(parsed.ignored).toEqual([]);
+  });
+
+  it("a stored tree's bad leaf is ignored with its path", () => {
+    const tree = {
+      match: "any",
+      rules: [
+        tagsLeaf("1:a"),
+        { field: "not_a_field", criterion: { value: 1 } },
+        tagsLeaf("3:a"),
+      ],
+    };
+
+    const parsed = parseStoredSceneQuery(tree, "random", "DESC", opts());
+
+    expect(parsed.where).toEqual({
+      match: "any",
+      rules: [parsedTags("1", "a"), parsedTags("3", "a")],
+    });
+    expect(parsed.ignored).toEqual([
+      { path: "rules.rules[1].field", reason: "Unknown filter field" },
+    ]);
+  });
+
+  it("Scene Number on a carousel needs a collection leaf at the root of an all tree", () => {
+    const groups = {
+      field: "groups",
+      criterion: { value: ["5:a"], modifier: "INCLUDES" },
+    };
+    const sorted = (rules: unknown) =>
+      parseCarouselRequest(
+        { rules, sort: "scene_index", direction: "ASC" },
+        opts()
+      );
+
+    expect(sorted({ match: "all", rules: [groups] }).sort.field).toBe(
+      "scene_index"
+    );
+    expect(
+      sorted({ groups: { value: ["5:a"], modifier: "INCLUDES" } }).sort.field
+    ).toBe("scene_index");
+    for (const rules of [
+      { match: "any", rules: [groups, tagsLeaf("1:a")] },
+      { match: "all", rules: [{ match: "all", rules: [groups] }] },
+    ]) {
+      expect(issuesOf(() => sorted(rules))).toEqual([
+        { path: "sort", message: "Scene Number needs a collection filter" },
+      ]);
+    }
+    // Stored, the sort falls back to the default
+    expect(
+      parseStoredSceneQuery(
+        { match: "any", rules: [groups, tagsLeaf("1:a")] },
+        "scene_index",
+        "ASC",
+        opts()
+      ).sort.field
+    ).toBe("created_at");
+  });
+
+  it("a stored flat `ids` or `instance_id` stays in the filter, never a where leaf", () => {
+    const parsed = parseStoredSceneQuery(
+      {
+        ...GODDESSES,
+        ids: { value: ["7:a", "8:b"], modifier: "INCLUDES" },
+        instance_id: "a",
+      },
+      "random",
+      "DESC",
+      opts()
+    );
+
+    expect(parsed.filter).toEqual({
+      ids: {
+        refs: [
+          { id: "7", instanceId: "a" },
+          { id: "8", instanceId: "b" },
+        ],
+        modifier: "INCLUDES",
+        depth: 0,
+      },
+    });
+    expect(parsed.specificInstanceId).toBe("a");
+    expect(
+      parsed.where?.rules.map((node) => "field" in node && node.field)
+    ).toEqual(["tags"]);
+    expect(parsed.ignored).toEqual([]);
+  });
+
+  it("a request's tree over the limits is a 400 at rules", () => {
+    const rules = {
+      match: "all",
+      rules: Array.from({ length: 21 }, (_, i) => tagsLeaf(`${i + 1}:a`)),
+    };
+    expect(issuesOf(() => parseCarouselRequest({ rules }, opts()))).toEqual([
+      { path: "rules", message: "At most 20 rows" },
+    ]);
   });
 });
 

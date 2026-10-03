@@ -7777,6 +7777,30 @@
       }
     }
   },
+  "prodAsTree": {
+    "rules": {
+      "match": "all",
+      "rules": [
+        {
+          "field": "tags",
+          "criterion": {
+            "value": [
+              "284"
+            ],
+            "modifier": "INCLUDES_ALL"
+          }
+        }
+      ]
+    },
+    "back": {
+      "tagIds": [
+        "284"
+      ],
+      "tagIdsModifier": "INCLUDES_ALL"
+    },
+    "kept": {},
+    "seeMore": "/scenes?tagIds=284&tagIdsModifier=INCLUDES_ALL&sort=random&dir=DESC"
+  },
   "seeMoreCases": [
     {
       "label": "no rules",

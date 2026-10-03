@@ -9,7 +9,9 @@
  * Unknown or invalid input answers 400 with one issue per problem, naming
  * its path. Stored carousel rules parse leniently (`parseStoredSceneQuery`):
  * the user cannot fix them by resending, so what the parser ignores is
- * returned as `ignored` for the caller to log.
+ * returned as `ignored` for the caller to log. A carousel's rules are a
+ * `where` tree, or a flat scene filter read as the tree's root rows (stored
+ * before 9b, or sent by an older tab), both for good.
  */
 import {
   DEFAULT_PLAYLIST_ITEM_SORT,
@@ -79,7 +81,13 @@ import { shouldLogOnce } from "./logThrottle.js";
 import { logger } from "./logger.js";
 import { generateDailySeed } from "./seededRandom.js";
 import { INSTANCE_ID_PATTERN } from "./stashMediaPath.js";
-import { parseWhere, topLevelCriteria } from "./whereTree.js";
+import {
+  type FlatWhere,
+  isWhereShape,
+  parseWhere,
+  topLevelCriteria,
+  whereOfFlatFilter,
+} from "./whereTree.js";
 
 const PER_PAGE_DEFAULT = 40;
 const CLIP_PER_PAGE_DEFAULT = 24;
@@ -103,7 +111,11 @@ export interface IgnoredInput {
   readonly reason: string;
 }
 
-/** A stored carousel query: the scene query, and what the lenient parse ignored */
+/**
+ * A stored carousel query: the scene query (its rules in `where`, a flat
+ * rule set's `ids` and `instance_id` in `filter`), and what the lenient
+ * parse ignored
+ */
 export type ParsedStoredQuery = ParsedListRequest<"scene"> & {
   readonly ignored: readonly IgnoredInput[];
 };
@@ -126,7 +138,7 @@ export type CarouselRequestOptions = StoredQueryOptions;
 
 /** A carousel's rules, sort and direction as a create, update or preview request sends them */
 export interface CarouselRequestInput {
-  /** The scene filter; absent when an update leaves it as it is */
+  /** The where tree or a flat scene filter; absent when an update leaves it as it is */
   readonly rules?: unknown;
   readonly sort?: unknown;
   readonly direction?: unknown;
@@ -1111,9 +1123,65 @@ export function singleIdRef(
 
 /** A carousel's rules, sort and direction, each read at its own path */
 interface CarouselParts {
+  /** A flat rule set's `ids` and `instance_id`: the page's own, never rows */
   readonly fields: ParsedFieldsResult;
+  readonly where: ParsedWhereGroup<"scene"> | undefined;
   readonly sortField: SortField<"scene"> | undefined;
   readonly direction: SortDirection | undefined;
+}
+
+/** The fields a flat rule set keeps in the filter: a tree cannot hold them */
+const CAROUSEL_PAGE_FIELDS: ReadonlySet<string> = new Set([
+  "ids",
+  "instance_id",
+]);
+
+const NO_FIELDS: ParsedFieldsResult = {
+  criteria: {},
+  specificInstanceId: undefined,
+};
+
+/**
+ * A path of a flat rule set's tree as the flat object had it:
+ * `rules.rules[1].criterion.modifier` is `rules.<second key>.modifier`
+ */
+function flatRulePath(path: string, flat: FlatWhere): string {
+  const found = /^rules\.rules\[(\d+)\](?:\.(?:field|criterion))?(.*)$/.exec(
+    path
+  );
+  const field =
+    found?.[1] === undefined ? undefined : flat.rules[Number(found[1])]?.field;
+  return field === undefined ? path : `rules.${field}${found?.[2] ?? ""}`;
+}
+
+/**
+ * A carousel's rules: a tree as the where of a list request, or a flat
+ * scene filter as an "all" root of one row per key, with its `ids` and
+ * `instance_id` kept in the filter (as rows they would be refused, and
+ * dropping them would widen the carousel). A flat rule set's problems keep
+ * the flat object's paths (`rules.<key>`).
+ */
+function parseCarouselRules(
+  rules: Record<string, unknown>,
+  problems: Problems
+): Pick<CarouselParts, "fields" | "where"> {
+  if (isWhereShape(rules)) {
+    return {
+      fields: NO_FIELDS,
+      where: parseWhere("scene", rules, "rules", problems),
+    };
+  }
+  const page = Object.fromEntries(
+    Object.entries(rules).filter(([key]) => CAROUSEL_PAGE_FIELDS.has(key))
+  );
+  const fields = parseFields(SCENE_FIELDS, page, "rules", problems);
+  const flat = whereOfFlatFilter(rules);
+  const rowProblems = new Problems();
+  const where = parseWhere("scene", flat, "rules", rowProblems);
+  for (const { path, reason } of rowProblems.ignored()) {
+    problems.add(flatRulePath(path, flat), reason);
+  }
+  return { fields, where };
 }
 
 /** Rules that are undefined were not sent: no criteria */
@@ -1123,14 +1191,20 @@ function parseCarouselParts(
   direction: unknown,
   problems: Problems
 ): CarouselParts {
-  const fields = rules
-    ? parseFields(SCENE_FIELDS, rules, "rules", problems)
-    : { criteria: {}, specificInstanceId: undefined };
+  const { fields, where } = rules
+    ? parseCarouselRules(rules, problems)
+    : { fields: NO_FIELDS, where: undefined };
+  // A sort reads the filter object, then the root rows of an "all" tree
+  const top: Record<string, unknown> = topLevelCriteria(
+    fields.criteria as ParsedFilter<"scene">,
+    where
+  );
   return {
     fields,
+    where,
     sortField: requireSortContext(
       parseSortField("scene", sort, "sort", problems),
-      fields.criteria,
+      top,
       "sort",
       problems
     ),
@@ -1156,6 +1230,7 @@ function carouselQuery(
     ),
     // The boundary cast: each criterion was validated by its field's schema
     filter: parts.fields.criteria as ParsedFilter<"scene">,
+    ...(parts.where === undefined ? {} : { where: parts.where }),
     specificInstanceId: parts.fields.specificInstanceId,
   };
 }
@@ -1200,6 +1275,31 @@ export function parseCarouselRequest(
   );
   problems.finish();
   return carouselQuery(parts, options);
+}
+
+/**
+ * The rules a carousel stores (create and update, after
+ * `parseCarouselRequest` accepted them): a tree as sent, a flat rule set as
+ * its root "all" tree, so `rules` holds only trees from then on. A flat rule
+ * set naming `ids` or `instance_id` is a 400 at that key: no row can hold
+ * them, and storing the tree without them would widen the carousel.
+ */
+export function carouselRulesToStore(
+  rules: Record<string, unknown>
+): Record<string, unknown> {
+  if (isWhereShape(rules)) return rules;
+  const named = Object.keys(rules).filter((key) =>
+    CAROUSEL_PAGE_FIELDS.has(key)
+  );
+  if (named.length > 0) {
+    throw new ValidationError("Invalid request", {
+      issues: named.map((key) => ({
+        path: `rules.${key}`,
+        message: "Not a carousel rule",
+      })),
+    });
+  }
+  return { ...whereOfFlatFilter(rules) };
 }
 
 // =============================================================================

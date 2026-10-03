@@ -755,6 +755,25 @@ describe("scene", () => {
       ),
       rebuilt: buildCarouselRules(prodRead.state, prodRead.kept),
     };
+    // The prod rules as the server serves them from 9b on: a root "all" tree
+    const prodTree = {
+      match: "all",
+      rules: Object.entries(prodRules).map(([field, criterion]) => ({
+        field,
+        criterion,
+      })),
+    };
+    const prodTreeRead = carouselRulesToFilterState(prodTree);
+    const prodAsTree = {
+      rules: prodTree,
+      back: prodTreeRead.state,
+      kept: prodTreeRead.kept,
+      seeMore: buildCustomCarouselUrl(
+        prodTree,
+        PROD_CAROUSEL.sort,
+        PROD_CAROUSEL.direction
+      ),
+    };
     const seeMoreCases = [
       { label: "no rules", rules: null, sort: undefined, direction: undefined },
       {
@@ -778,6 +797,7 @@ describe("scene", () => {
         definitions: CAROUSEL_FILTER_DEFINITIONS,
         samples,
         prod,
+        prodAsTree,
         seeMoreCases,
       })
     ).toMatchFileSnapshot(goldenPath("scene", "carousel"));

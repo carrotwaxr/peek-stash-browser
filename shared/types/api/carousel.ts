@@ -5,7 +5,7 @@
  * Request and response types for /api/carousels/* endpoints.
  */
 import type { NormalizedScene } from "../entities.js";
-import type { SceneFilterInput } from "../filters/index.js";
+import type { WhereGroup } from "../filters/index.js";
 import type { WithStashUrl } from "./library.js";
 
 // =============================================================================
@@ -16,14 +16,15 @@ import type { WithStashUrl } from "./library.js";
 
 /**
  * Carousel data structure
- * Note: rules is the scene filter stored as JSON, as the client saved it
+ * Note: rules is the scene where tree; a flat rule set stored before 9b is
+ * served as its root "all" tree
  */
 export interface CarouselData {
   id: string;
   userId: number;
   title: string;
   icon: string;
-  rules: SceneFilterInput;
+  rules: WhereGroup<"scene">;
   sort: string;
   direction: string;
   createdAt: string;
@@ -63,9 +64,10 @@ export interface GetCarouselResponse {
 // =============================================================================
 
 /**
- * The rules a request sends: the scene filter the client builds
- * (`SceneFilterInput`). The server reads them as an unvalidated object and
- * checks them against the scene contract, so it takes any object.
+ * The rules a request sends: a scene where tree (`WhereGroup<"scene">`), or
+ * the flat scene filter older clients build (`SceneFilterInput`), which the
+ * server converts to the tree. The server reads them as an unvalidated
+ * object and checks them against the scene contract, so it takes any object.
  */
 export type CarouselRulesInput = object;
 

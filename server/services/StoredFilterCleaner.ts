@@ -15,7 +15,10 @@
  *   becomes a one-element list. `perPage` is held to PER_PAGE_MAX.
  * - A carousel's rules are parsed leniently with the scene contract, one key
  *   at a time: a key the parser drops (unknown, or a criterion it refuses,
- *   which the query ignores whole) goes; the rest stays as stored.
+ *   which the query ignores whole) goes; the rest stays as stored. Migration
+ *   009 keeps them flat (`cleanCarouselRules`); `cleanCarouselTree` cleans a
+ *   tree's rows the same way, one at a time, and turns a flat rule set into
+ *   its root "all" tree.
  * - A sort outside the list becomes the default sort and direction (a
  *   carousel's is random, DESC); a direction outside ASC and DESC the
  *   default direction, and a lower-case one is upper-cased. A scene preset
@@ -59,6 +62,7 @@ import {
   parseFilterRef,
   parseStoredSceneQuery,
 } from "../utils/listRequest.js";
+import { isWhereShape, whereOfFlatFilter } from "../utils/whereTree.js";
 
 /** What a new carousel sorts by when the request names nothing */
 export const DEFAULT_CAROUSEL_SORT = "random";
@@ -92,6 +96,8 @@ export interface CleanReport {
   readonly refsLeftBare: number;
   /** A multi row's lone values made one-element lists */
   readonly valuesListed: number;
+  /** A carousel's rules were not a tree: `cleanCarouselTree` stored them as one */
+  readonly shapeConverted: boolean;
 }
 
 export interface Cleaned<T> {
@@ -132,6 +138,7 @@ class Tally {
   refsRewritten = 0;
   refsLeftBare = 0;
   valuesListed = 0;
+  shapeConverted = false;
 
   get changed(): boolean {
     return (
@@ -140,7 +147,8 @@ class Tally {
       this.directionFixed ||
       this.perPageCapped ||
       this.refsRewritten > 0 ||
-      this.valuesListed > 0
+      this.valuesListed > 0 ||
+      this.shapeConverted
     );
   }
 
@@ -153,6 +161,7 @@ class Tally {
       refsRewritten: this.refsRewritten,
       refsLeftBare: this.refsLeftBare,
       valuesListed: this.valuesListed,
+      shapeConverted: this.shapeConverted,
     };
   }
 }
@@ -656,6 +665,30 @@ const SCENE_FIELD_SPECS: ReadonlyMap<string, FieldSpec> = new Map(
   Object.entries(SCENE_FIELDS)
 );
 
+/**
+ * The sort as the carousel runs it (Scene Number needs a collection rule at
+ * the top level), fixed as `cleanSort` fixes it
+ */
+function cleanCarouselSort(
+  rules: unknown,
+  sort: string,
+  direction: string,
+  tally: Tally
+): SortParts {
+  const ignored = parseStoredSceneQuery(
+    isPlainObject(rules) ? rules : {},
+    sort,
+    direction,
+    { userId: 0 }
+  ).ignored;
+  return cleanSort(
+    { sort, direction },
+    { field: DEFAULT_CAROUSEL_SORT, direction: DEFAULT_CAROUSEL_DIRECTION },
+    !ignored.some((problem) => problem.path === "sort"),
+    tally
+  );
+}
+
 /** Whether the lenient scene parser drops this one rule */
 function dropsRule(key: string, value: unknown): boolean {
   const parsed = parseStoredSceneQuery(
@@ -701,19 +734,7 @@ export function cleanCarouselRules(
     if (changed) cleanedRules = Object.fromEntries(entries);
   }
 
-  // The sort as the carousel runs it: Scene Number needs a collection rule
-  const ignored = parseStoredSceneQuery(
-    isPlainObject(cleanedRules) ? cleanedRules : {},
-    sort,
-    direction,
-    { userId: 0 }
-  ).ignored;
-  const fixed = cleanSort(
-    { sort, direction },
-    { field: DEFAULT_CAROUSEL_SORT, direction: DEFAULT_CAROUSEL_DIRECTION },
-    !ignored.some((problem) => problem.path === "sort"),
-    tally
-  );
+  const fixed = cleanCarouselSort(cleanedRules, sort, direction, tally);
 
   if (!tally.changed) {
     return {
@@ -725,6 +746,197 @@ export function cleanCarouselRules(
   return {
     value: {
       rules: cleanedRules,
+      sort: String(fixed.sort),
+      direction: String(fixed.direction),
+    },
+    changed: true,
+    report: tally.report(),
+  };
+}
+
+const EMPTY_TREE: Readonly<Record<string, unknown>> = {
+  match: "all",
+  rules: [],
+};
+
+/** An own key, never one the prototype holds */
+function hasOwn(object: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+/** A stored node that is a group, as the parser tells one from a row */
+function isGroupNode(node: Record<string, unknown>): boolean {
+  return hasOwn(node, "rules") || hasOwn(node, "match");
+}
+
+/** What a dropped node is reported as: its field, else its path */
+function droppedName(node: unknown, path: string): string {
+  return isPlainObject(node) && typeof node.field === "string"
+    ? node.field
+    : path;
+}
+
+/** The keys a row may have */
+const ROW_KEYS: ReadonlySet<string> = new Set(["field", "criterion"]);
+
+/**
+ * Whether the lenient parser keeps this one row: it drops a row with a
+ * problem (an unknown field, a criterion it refuses, which the query
+ * ignores whole) and keeps an empty one, as it keeps an empty flat key
+ */
+function keepsRow(row: Record<string, unknown>): boolean {
+  const parsed = parseStoredSceneQuery(
+    { match: "all", rules: [row] },
+    DEFAULT_SORT.scene.field,
+    DEFAULT_SORT.scene.direction,
+    { userId: 0 }
+  );
+  return parsed.ignored.length === 0;
+}
+
+/**
+ * One row as the parser keeps it: a key other than `field` and
+ * `criterion` goes (the parser ignores it), the row goes when the parser
+ * drops it, and a ref row's bare ids are tied. Undefined when it goes; the
+ * input itself when nothing changed.
+ */
+function cleanTreeRow(
+  node: unknown,
+  path: string,
+  lookup: BareRefLookup,
+  tally: Tally
+): unknown {
+  if (!isPlainObject(node)) {
+    tally.droppedKeys.push(path);
+    return undefined;
+  }
+  const extra = Object.keys(node).filter((key) => !ROW_KEYS.has(key));
+  for (const key of extra) tally.droppedKeys.push(`${path}.${key}`);
+  const row =
+    extra.length === 0
+      ? node
+      : Object.fromEntries(
+          Object.entries(node).filter(([key]) => ROW_KEYS.has(key))
+        );
+  if (!keepsRow(row)) {
+    tally.droppedKeys.push(droppedName(row, path));
+    return undefined;
+  }
+  const spec =
+    typeof row.field === "string"
+      ? SCENE_FIELD_SPECS.get(row.field)
+      : undefined;
+  if (spec?.kind !== "ref") return row;
+  const criterion = cleanRefCriterion(
+    row.criterion,
+    spec.target,
+    lookup,
+    tally
+  );
+  return criterion === row.criterion ? row : { ...row, criterion };
+}
+
+/**
+ * A group (the root when `isRoot`) as the parser keeps it: its match "all"
+ * or "any" (else the parser drops it whole, rows and all), only `match` and
+ * `rules`, each row cleaned, a group only at the root, and a group left
+ * with no row gone. Undefined when it goes; the input itself when nothing
+ * changed.
+ */
+function cleanTreeGroup(
+  group: Readonly<Record<string, unknown>>,
+  path: string,
+  isRoot: boolean,
+  lookup: BareRefLookup,
+  tally: Tally
+): Readonly<Record<string, unknown>> | undefined {
+  const { match, rules } = group;
+  if ((match !== "all" && match !== "any") || !Array.isArray(rules)) {
+    tally.droppedKeys.push(path);
+    return undefined;
+  }
+  const extra = Object.keys(group).filter(
+    (key) => key !== "match" && key !== "rules"
+  );
+  for (const key of extra) tally.droppedKeys.push(`${path}.${key}`);
+
+  const items: readonly unknown[] = rules;
+  const cleaned: unknown[] = [];
+  items.forEach((node, index) => {
+    const nodePath = `${path}.rules[${index}]`;
+    if (!isPlainObject(node) || !isGroupNode(node)) {
+      const row = cleanTreeRow(node, nodePath, lookup, tally);
+      if (row !== undefined) cleaned.push(row);
+      return;
+    }
+    if (!isRoot) {
+      // Groups nest one level: the parser drops a group in a group
+      tally.droppedKeys.push(nodePath);
+      return;
+    }
+    const inner = cleanTreeGroup(node, nodePath, false, lookup, tally);
+    if (inner === undefined) return;
+    const innerRules = inner.rules;
+    if (Array.isArray(innerRules) && innerRules.length > 0) {
+      cleaned.push(inner);
+    } else {
+      tally.droppedKeys.push(nodePath);
+    }
+  });
+
+  const same =
+    extra.length === 0 &&
+    cleaned.length === items.length &&
+    cleaned.every((node, i) => node === items[i]);
+  return same ? group : { match, rules: cleaned };
+}
+
+/**
+ * A carousel's stored rules, sort and direction, as the tree it stores
+ * (data migration 012): rules of either shape go in, a tree always comes
+ * out. A flat rule set becomes its root "all" tree (`shapeConverted`, so
+ * it is rewritten even with nothing else to clean); its `ids` and
+ * `instance_id` cannot be rows and are dropped. Each row is cleaned as
+ * `cleanCarouselRules` cleans a key: a row the lenient parser drops goes,
+ * and a ref row's bare ids are tied to their one instance. A group the
+ * parser drops goes whole, and so does a group left with no row. Rules of
+ * neither shape (which filter nothing) become the empty tree. A clean of a
+ * clean changes nothing.
+ */
+export function cleanCarouselTree(
+  rules: unknown,
+  sort: string,
+  direction: string,
+  lookup: BareRefLookup = NO_LOOKUP
+): Cleaned<CarouselQuery> {
+  const tally = new Tally();
+
+  let tree: Readonly<Record<string, unknown>>;
+  if (isWhereShape(rules)) {
+    tree = rules;
+  } else {
+    tally.shapeConverted = true;
+    tree = isPlainObject(rules) ? { ...whereOfFlatFilter(rules) } : EMPTY_TREE;
+    if (isPlainObject(rules)) {
+      for (const key of ["ids", "instance_id"]) {
+        if (hasOwn(rules, key)) tally.droppedKeys.push(key);
+      }
+    }
+  }
+  const cleaned =
+    cleanTreeGroup(tree, "rules", true, lookup, tally) ?? EMPTY_TREE;
+  const fixed = cleanCarouselSort(cleaned, sort, direction, tally);
+
+  if (!tally.changed) {
+    return {
+      value: { rules, sort, direction },
+      changed: false,
+      report: tally.report(),
+    };
+  }
+  return {
+    value: {
+      rules: cleaned,
       sort: String(fixed.sort),
       direction: String(fixed.direction),
     },
