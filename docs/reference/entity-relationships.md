@@ -181,8 +181,31 @@ When you filter scenes by tag, Peek searches both direct tags AND inherited tags
 - Filtering by a performer's tag shows scenes with that performer
 - Filtering by a studio's tag shows scenes from that studio
 - Content restrictions on tags apply to inherited tags too
+- "Has none" and "has any" on tags count inherited tags too: a scene whose only tags are inherited is tagged, and is in that tag's folder in the folder view
+- A clip's scene tags filter reads the scene's own and inherited tags
+- An image's tags include the tags it copied from its galleries (see [Image Gallery Inheritance](#image-gallery-inheritance)), so tag filters, counts and the Untagged folder treat them as its own
 
 **Example:** If performer "Jane" has tag "Comedy", all scenes with Jane will match a "Comedy" tag filter, even if the scene itself isn't tagged "Comedy".
+
+**Sub-tags:**
+
+With **Include sub-tags** (a depth, or every level), each tag you pick stands for itself and its descendants, which Peek walks through every parent, since tags form a DAG. The match is the same on direct and inherited tags:
+
+- **Has any of** a set of tags matches a scene that has any of them or any of their descendants
+- **Has all of** is one test per picked tag, each with that tag's own descendants: a scene matches when, for every picked tag, it has the tag or one of its descendants. It does not need a descendant of every picked tag at once
+- **Has none of**, and the excluded tags of an include/exclude pick, leave out the descendants too, to the same depth
+
+**Favorite tags:**
+
+The Favorite Tags filter (**Yes** or **No**) uses your favorite tags only, always with all their descendants, and counts a tag the scene has directly or inherits. A favorite you hid, or one a content restriction removes for you, does not count (an admin is not restricted). If you have no favorite tags, **Yes** matches nothing and **No** is no filter. Favorite Studios works the same way with sub-studios. Favorite Performers matches the scene's own performers. Galleries and images follow the same rules (an image's tags include its galleries'), and the performer filter **Has a Favorite Tag** matches a performer with a favorite tag or a sub-tag of one.
+
+**Performer tags:**
+
+The Performer Tags filter on scenes, galleries and images matches an item with a performer who holds one of the tags (and their descendants, with a depth). Only performers and tags you can see count.
+
+**The same filter twice:**
+
+In a match-all group a filter can appear in several rows, and each row is its own test, all AND-ed: two Tags rows, "has all of A, B" and "has any of C, D", need both. In a match-any group, rows on the same filter that each say "has any of" (or "has all of" one tag) and use the same depth merge into one test over all their values; rows that cannot merge, such as "has all of" two or more tags, stay separate tests.
 
 ### Image Gallery Inheritance
 
