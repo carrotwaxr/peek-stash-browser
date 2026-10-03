@@ -128,6 +128,17 @@ export function isTVModeOn(): boolean {
   return document.documentElement.classList.contains("tv-mode");
 }
 
+/** A native checkbox or radio */
+export function isCheckable(
+  target: EventTarget | null
+): target is HTMLInputElement {
+  const el = asElement(target);
+  return (
+    el instanceof HTMLInputElement &&
+    (el.type.toLowerCase() === "checkbox" || el.type.toLowerCase() === "radio")
+  );
+}
+
 /** A native range input or an ARIA slider */
 export function isSlider(el: HTMLElement): boolean {
   return (
@@ -145,6 +156,8 @@ export function isSlider(el: HTMLElement): boolean {
  * gives up its arrows and Enter (TV focus moves on, and Enter opens its
  * picker), and a slider gives up Up and Down but keeps Left and Right to
  * change its value. An open menu or listbox keeps its arrows in any mode.
+ * Enter on a checkbox or radio is ticked by the dispatcher in TV mode
+ * (browsers ignore it; a remote's OK sends it).
  */
 export function targetOwnsKey(
   target: EventTarget | null,

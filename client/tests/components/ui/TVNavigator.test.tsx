@@ -307,6 +307,39 @@ describe("TVNavigator on selects and sliders", () => {
     expect(document.activeElement).toBe(select);
   });
 
+  it("Enter (a remote's OK) ticks a checkbox or radio like Space; outside TV mode it is left alone", () => {
+    const onBox = vi.fn();
+    const onRadio = vi.fn();
+    renderWithNavigator(
+      <main>
+        <input id="box" type="checkbox" onChange={onBox} />
+        <input id="radio" type="radio" name="pick" onChange={onRadio} />
+      </main>
+    );
+    const box = byId("box") as HTMLInputElement;
+    const radio = byId("radio") as HTMLInputElement;
+
+    act(() => box.focus());
+    expect(fireEvent.keyDown(box, { key: "Enter" })).toBe(false);
+    expect(box.checked).toBe(true);
+    expect(onBox).toHaveBeenCalledTimes(1);
+    expect(fireEvent.keyDown(box, { key: "Enter" })).toBe(false);
+    expect(box.checked).toBe(false);
+    expect(document.activeElement).toBe(box);
+
+    act(() => radio.focus());
+    expect(fireEvent.keyDown(radio, { key: "Enter" })).toBe(false);
+    expect(radio.checked).toBe(true);
+    expect(onRadio).toHaveBeenCalledTimes(1);
+
+    // Desktop mode: the browser's own Enter, nothing ticks
+    document.documentElement.classList.remove("tv-mode");
+    act(() => box.focus());
+    expect(fireEvent.keyDown(box, { key: "Enter" })).toBe(true);
+    expect(box.checked).toBe(false);
+    expect(onBox).toHaveBeenCalledTimes(2);
+  });
+
   it("on a range input Left and Right are the input's; Up and Down move focus", () => {
     renderControls();
     const range = byId("range");
