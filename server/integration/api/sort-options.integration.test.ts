@@ -1723,9 +1723,9 @@ describe("Sorts for resolution, studio, code, performer age, organized, counts a
   });
 
   describe("clips", () => {
-    it("title falls back to the primary tag's name, a hidden tag lends none", async () => {
-      expect(await clips("ASC")).toEqual(["k7", "k2", "k1", "k4"]);
-      expect(await clips("DESC")).toEqual(["k4", "k1", "k2", "k7"]);
+    it("title orders by the clip's own title, as every clip surface shows it; untitled clips last in both directions", async () => {
+      expect(await clips("ASC")).toEqual(["k1", "k2", "k4", "k7"]);
+      expect(await clips("DESC")).toEqual(["k1", "k7", "k4", "k2"]);
     });
   });
 });
