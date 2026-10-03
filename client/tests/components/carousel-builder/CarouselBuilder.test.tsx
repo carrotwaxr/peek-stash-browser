@@ -50,8 +50,59 @@ function renderEditor(client: QueryClient) {
   );
 }
 
+/** The builder on a new carousel */
+function renderNew() {
+  render(
+    <QueryClientProvider client={createQueryClient()}>
+      <MemoryRouter initialEntries={["/settings/carousels/new"]}>
+        <Routes>
+          <Route path="/settings/carousels/new" element={<CarouselBuilder />} />
+          <Route path="/settings" element={<div>Settings</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+/** Adds a row of `key` in a container's waiting row; focus goes to its value */
+const addRow = (container: string, key: string) => {
+  fireEvent.change(
+    screen.getByRole("combobox", { name: `Add a filter to ${container}` }),
+    { target: { value: key } }
+  );
+};
+
+/** Sets the focused value control (a choice row's select, a text box) */
+const setFocused = (value: string) => {
+  const control = document.activeElement;
+  if (
+    !(control instanceof HTMLSelectElement) &&
+    !(control instanceof HTMLInputElement)
+  ) {
+    throw new Error("focus is not on a value control");
+  }
+  fireEvent.change(control, { target: { value } });
+};
+
+/** The field selects' values in `scope`, in order, outside any group when `rootOnly` */
+const fieldsIn = (scope: HTMLElement, rootOnly = false) =>
+  within(scope)
+    .queryAllByRole("combobox", { name: "Filter" })
+    .filter((select) => !rootOnly || select.closest('[role="group"]') === null)
+    .map((select) => (select as HTMLSelectElement).value);
+
 /** What a kept row reads */
 const KEPT = "A rule this editor can't show";
+
+/** A flat rule set as the root "all" tree the builder saves it as */
+const rootAll = (flat: Record<string, unknown>) => ({
+  match: "all",
+  rules: Object.entries(flat).map(([field, criterion]) => ({
+    field,
+    criterion,
+  })),
+});
+const leaf = (field: string, criterion: unknown) => ({ field, criterion });
 
 /** The row waiting at the end of the rules, whose field select adds a rule */
 const waitingRow = () =>
@@ -60,111 +111,6 @@ const waitingRow = () =>
 describe("CarouselBuilder", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-  });
-
-  it("editing a carousel keeps a rule it cannot edit", async () => {
-    const tags = { value: ["284"], modifier: "INCLUDES_ALL" };
-    const stored = { ...CAROUSEL, rules: { tagged: true, tags } };
-    const fetchMock = stubApi({
-      "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
-      "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
-      "/library/tags/minimal": () => jsonResponse(200, { tags: [] }),
-    });
-    renderEditor(createQueryClient());
-
-    const title = await screen.findByDisplayValue("Highly rated");
-    fireEvent.change(title, { target: { value: "Renamed" } });
-    fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
-    const update = await screen.findByRole("button", { name: /Update/ });
-    await waitFor(() => expect(update).toBeEnabled());
-    fireEvent.click(update);
-    await screen.findByText("Settings");
-
-    const bodyOf = (method: string) =>
-      JSON.parse(
-        fetchMock.mock.calls.find(([, init]) => init?.method === method)?.[1]
-          ?.body as string
-      ) as { rules: unknown; title?: string };
-    const preview = fetchMock.mock.calls.find(([url]) =>
-      url.includes("/carousels/preview")
-    );
-    expect(JSON.parse(preview?.[1]?.body as string)).toMatchObject({
-      rules: { tagged: true, tags },
-    });
-    expect(bodyOf("PUT")).toMatchObject({
-      title: "Renamed",
-      rules: { tagged: true, tags },
-    });
-  });
-
-  it("rules it cannot edit show as kept rows, and Remove drops each from the save", async () => {
-    const stored = {
-      ...CAROUSEL,
-      rules: { ...CAROUSEL.rules, tagged: true, o_counter: { value: 1 } },
-    };
-    const fetchMock = stubApi({
-      "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
-      "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
-    });
-    renderEditor(createQueryClient());
-
-    await screen.findByDisplayValue("Highly rated");
-    expect(screen.getAllByText(KEPT)).toHaveLength(2);
-
-    fireEvent.click(must(screen.getAllByRole("button", { name: "Remove" })[0]));
-    expect(screen.getAllByText(KEPT)).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    expect(screen.queryByText(KEPT)).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
-    const update = await screen.findByRole("button", { name: /Update/ });
-    await waitFor(() => expect(update).toBeEnabled());
-    fireEvent.click(update);
-    await screen.findByText("Settings");
-
-    const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
-    const { rules } = JSON.parse(put?.[1]?.body as string) as {
-      rules: Record<string, unknown>;
-    };
-    expect(Object.keys(rules)).toEqual(["rating100"]);
-  });
-
-  it("a rule added for a field it kept replaces the kept rule, on the line and in the save", async () => {
-    const stored = {
-      ...CAROUSEL,
-      rules: { ...CAROUSEL.rules, tagged: true, o_counter: { value: 1 } },
-    };
-    const fetchMock = stubApi({
-      "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
-      "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
-    });
-    renderEditor(createQueryClient());
-
-    await screen.findByDisplayValue("Highly rated");
-    expect(screen.getAllByText(KEPT)).toHaveLength(2);
-
-    // A new rule of O Count, chosen in the waiting row: the kept O Count is replaced
-    fireEvent.change(waitingRow(), { target: { value: "oCount" } });
-    expect(screen.getAllByText(KEPT)).toHaveLength(1);
-    fireEvent.change(screen.getByRole("spinbutton", { name: /^Minimum O/ }), {
-      target: { value: "3" },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
-    const update = await screen.findByRole("button", { name: /Update/ });
-    await waitFor(() => expect(update).toBeEnabled());
-    fireEvent.click(update);
-    await screen.findByText("Settings");
-
-    const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
-    const { rules } = JSON.parse(put?.[1]?.body as string) as {
-      rules: Record<string, unknown>;
-    };
-    expect(rules).toEqual({
-      rating100: CAROUSEL.rules.rating100,
-      tagged: true,
-      o_counter: { modifier: "BETWEEN", value: 3 },
-    });
   });
 
   it('a Rating Not rated rule saves rating100: { modifier: "IS_NULL" } and survives an edit', async () => {
@@ -205,7 +151,7 @@ describe("CarouselBuilder", () => {
           match(url, init?.method)
         )?.[1]?.body as string
       ) as { rules: unknown };
-    const stays = { rating100: { modifier: "IS_NULL" } };
+    const stays = rootAll({ rating100: { modifier: "IS_NULL" } });
     expect(sent((url) => url.includes("/carousels/preview")).rules).toEqual(
       stays
     );
@@ -288,9 +234,11 @@ describe("CarouselBuilder", () => {
       await screen.findByRole("button", { name: "Exclude Tag B" })
     );
     const saved = await update(first);
-    expect(saved).toEqual({
-      tags: { value: ["5:a"], excludes: ["6:a"], modifier: "INCLUDES" },
-    });
+    expect(saved).toEqual(
+      rootAll({
+        tags: { value: ["5:a"], excludes: ["6:a"], modifier: "INCLUDES" },
+      })
+    );
     cleanup();
     vi.unstubAllGlobals();
 
@@ -353,8 +301,8 @@ describe("CarouselBuilder", () => {
     expect(screen.queryByText(KEPT)).toBeNull();
 
     const { previewed, saved } = await previewAndUpdate(fetchMock);
-    expect(previewed).toEqual({ studios: { modifier: "IS_NULL" } });
-    expect(saved).toEqual({ studios: { modifier: "IS_NULL" } });
+    expect(previewed).toEqual(rootAll({ studios: { modifier: "IS_NULL" } }));
+    expect(saved).toEqual(rootAll({ studios: { modifier: "IS_NULL" } }));
   });
 
   it("a Playlists rule lists own and shared playlists and saves the playlist id", async () => {
@@ -381,9 +329,9 @@ describe("CarouselBuilder", () => {
     fireEvent.click(screen.getByRole("button", { name: "Weekend by alice" }));
 
     const { saved } = await previewAndUpdate(fetchMock);
-    expect(saved).toEqual({
-      playlists: { value: [12, 40], modifier: "INCLUDES" },
-    });
+    expect(saved).toEqual(
+      rootAll({ playlists: { value: [12, 40], modifier: "INCLUDES" } })
+    );
   });
 
   it("a Path Starts with rule saves STARTS_WITH and survives an edit", async () => {
@@ -397,8 +345,8 @@ describe("CarouselBuilder", () => {
     expect(screen.queryByText(KEPT)).toBeNull();
 
     const { previewed, saved } = await previewAndUpdate(fetchMock);
-    expect(previewed).toEqual(stored);
-    expect(saved).toEqual(stored);
+    expect(previewed).toEqual(rootAll(stored));
+    expect(saved).toEqual(rootAll(stored));
   });
 
   it("a three-state favourite and a multi Orientation rule survive an edit", async () => {
@@ -416,8 +364,295 @@ describe("CarouselBuilder", () => {
     expect(screen.getByRole("checkbox", { name: "Square" })).toBeChecked();
 
     const { saved } = await previewAndUpdate(fetchMock);
+    expect(saved).toEqual(rootAll(stored));
+  });
+  /** Previews and saves a new carousel; returns the body the save posted */
+  async function previewAndSaveNew(fetchMock: ReturnType<typeof stubApi>) {
+    fireEvent.change(screen.getByPlaceholderText("My Custom Carousel"), {
+      target: { value: "Favourites of any kind" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+    const save = await screen.findByRole("button", { name: /^Save/ });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+    await screen.findByText("Settings");
+    const post = must(
+      fetchMock.mock.calls.find(
+        ([url, init]) =>
+          init?.method === "POST" && !url.includes("/carousels/preview")
+      )
+    );
+    return JSON.parse(post[1]?.body as string) as { rules: unknown };
+  }
+
+  it("a carousel with a Match any group saves it and reads it back", async () => {
+    const fetchMock = stubApi({
+      "/carousels": () => jsonResponse(200, { carousel: CAROUSEL }),
+      "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+    });
+    renderNew();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add group" }));
+    const group = screen.getByRole("group", { name: "Group 1" });
+    fireEvent.change(
+      within(group).getByRole("combobox", { name: "Match for Group 1" }),
+      { target: { value: "any" } }
+    );
+    addRow("Group 1", "tagFavorite");
+    setFocused("true");
+    addRow("Group 1", "performerFavorite");
+    setFocused("true");
+    addRow("top level", "watched");
+    setFocused("false");
+
+    const { rules } = await previewAndSaveNew(fetchMock);
+    // Root leaves first, then the group; rows in the scene table's order
+    const saved = {
+      match: "all",
+      rules: [
+        leaf("watched", false),
+        {
+          match: "any",
+          rules: [leaf("performer_favorite", true), leaf("tag_favorite", true)],
+        },
+      ],
+    };
+    expect(rules).toEqual(saved);
+    const preview = must(
+      fetchMock.mock.calls.find(([url]) => url.includes("/carousels/preview"))
+    );
+    expect(JSON.parse(preview[1]?.body as string)).toMatchObject({
+      rules: saved,
+    });
+    cleanup();
+    vi.unstubAllGlobals();
+
+    // Loaded again: the same rows and group
+    await openWith(saved);
+    expect(fieldsIn(document.body, true)).toEqual(["watched"]);
+    const loaded = screen.getByRole("group", { name: "Group 1" });
+    expect(
+      within(loaded).getByRole("combobox", { name: "Match for Group 1" })
+    ).toHaveValue("any");
+    expect(fieldsIn(loaded)).toEqual(["performerFavorite", "tagFavorite"]);
+    expect(
+      screen.getByRole("combobox", { name: "Match for top level" })
+    ).toHaveValue("all");
+  });
+
+  it("item 64: two Tags rows in one group save and survive an edit", async () => {
+    const TAGS = {
+      "/library/tags/minimal": () =>
+        jsonResponse(200, {
+          tags: ["A", "B", "C", "D"].map((name, at) => ({
+            id: String(at + 1),
+            instanceId: "a",
+            name: `Tag ${name}`,
+          })),
+        }),
+    };
+    const stored = {
+      match: "all",
+      rules: [
+        {
+          match: "all",
+          rules: [
+            leaf("tags", { value: ["1:a", "2:a"], modifier: "INCLUDES_ALL" }),
+            leaf("tags", { value: ["3:a", "4:a"], modifier: "INCLUDES" }),
+          ],
+        },
+      ],
+    };
+    const fetchMock = await openWith(stored, TAGS);
+
+    const group = screen.getByRole("group", { name: "Group 1" });
+    expect(fieldsIn(group)).toEqual(["tagIds", "tagIds"]);
+    expect(screen.queryByText(KEPT)).toBeNull();
+    fireEvent.change(screen.getByDisplayValue("Highly rated"), {
+      target: { value: "Item 64" },
+    });
+
+    const { previewed, saved } = await previewAndUpdate(fetchMock);
+    expect(previewed).toEqual(stored);
+    expect(saved).toEqual(stored);
+    cleanup();
+    vi.unstubAllGlobals();
+
+    await openWith(saved, TAGS);
+    expect(fieldsIn(screen.getByRole("group", { name: "Group 1" }))).toEqual([
+      "tagIds",
+      "tagIds",
+    ]);
+  });
+
+  it("a field can be used twice", async () => {
+    const fetchMock = stubApi({
+      "/carousels": () => jsonResponse(200, { carousel: CAROUSEL }),
+      "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+    });
+    renderNew();
+
+    addRow("top level", "title");
+    setFocused("beach");
+    addRow("top level", "title");
+    setFocused("sunset");
+    expect(fieldsIn(document.body)).toEqual(["title", "title"]);
+
+    const { rules } = await previewAndSaveNew(fetchMock);
+    expect(rules).toEqual({
+      match: "all",
+      rules: [
+        leaf("title", { value: "beach", modifier: "INCLUDES" }),
+        leaf("title", { value: "sunset", modifier: "INCLUDES" }),
+      ],
+    });
+  });
+
+  it("a stored leaf no row can edit is a kept row in its container, kept on save until removed", async () => {
+    const hasAll = leaf("studios", {
+      value: ["3:a"],
+      modifier: "INCLUDES_ALL",
+    });
+    const notBetween = leaf("duration", {
+      modifier: "NOT_BETWEEN",
+      value: 60,
+      value2: 120,
+    });
+    const stored = {
+      match: "all",
+      rules: [
+        leaf("rating100", { modifier: "BETWEEN", value: 80 }),
+        hasAll,
+        { match: "any", rules: [leaf("favorite", true), notBetween] },
+      ],
+    };
+
+    // Saved unedited but for the title: each kept leaf stays where it was
+    let fetchMock = await openWith(stored);
+    const group = () => screen.getByRole("group", { name: "Group 1" });
+    expect(screen.getAllByText(KEPT)).toHaveLength(2);
+    expect(within(group()).getAllByText(KEPT)).toHaveLength(1);
+    fireEvent.change(screen.getByDisplayValue("Highly rated"), {
+      target: { value: "Renamed" },
+    });
+    const first = await previewAndUpdate(fetchMock);
+    expect(first.previewed).toEqual(stored);
+    expect(first.saved).toEqual(stored);
+    cleanup();
+    vi.unstubAllGlobals();
+
+    // Remove drops the group's kept leaf from the save, and only it
+    fetchMock = await openWith(stored);
+    fireEvent.click(within(group()).getByRole("button", { name: "Remove" }));
+    expect(screen.getAllByText(KEPT)).toHaveLength(1);
+    expect(within(group()).queryByText(KEPT)).toBeNull();
+    const second = await previewAndUpdate(fetchMock);
+    expect(second.saved).toEqual({
+      match: "all",
+      rules: [
+        leaf("rating100", { modifier: "BETWEEN", value: 80 }),
+        hasAll,
+        { match: "any", rules: [leaf("favorite", true)] },
+      ],
+    });
+  });
+
+  it("a group holding only kept leaves keeps its place and its match before a group with rows", async () => {
+    const stored = {
+      match: "all",
+      rules: [
+        {
+          match: "any",
+          rules: [
+            leaf("studios", { value: ["3:a"], modifier: "INCLUDES_ALL" }),
+            leaf("duration", { modifier: "NOT_BETWEEN", value: 60 }),
+          ],
+        },
+        {
+          match: "all",
+          rules: [leaf("favorite", true), leaf("watched", false)],
+        },
+      ],
+    };
+    const fetchMock = await openWith(stored);
+
+    const first = screen.getByRole("group", { name: "Group 1" });
+    expect(within(first).getAllByText(KEPT)).toHaveLength(2);
+    expect(
+      within(first).getByRole("combobox", { name: "Match for Group 1" })
+    ).toHaveValue("any");
+    expect(fieldsIn(screen.getByRole("group", { name: "Group 2" }))).toEqual([
+      "favorite",
+      "watched",
+    ]);
+
+    const { saved } = await previewAndUpdate(fetchMock);
     expect(saved).toEqual(stored);
   });
+
+  describe("Back", () => {
+    const back = () => screen.getByRole("button", { name: "Back" });
+    const prompt = () =>
+      screen.queryByRole("dialog", { name: "Discard changes?" });
+
+    it("Back with unsaved changes asks first", async () => {
+      await openWith(CAROUSEL.rules);
+
+      // Nothing changed: Back leaves at once
+      fireEvent.click(back());
+      expect(prompt()).toBeNull();
+      await screen.findByText("Settings");
+      cleanup();
+      vi.unstubAllGlobals();
+
+      await openWith(CAROUSEL.rules);
+      addRow("top level", "watched");
+      setFocused("false");
+      fireEvent.click(back());
+      const dialog = await screen.findByRole("dialog", {
+        name: "Discard changes?",
+      });
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "Keep editing" })
+      );
+      await waitFor(() => expect(prompt()).toBeNull());
+      expect(screen.queryByText("Settings")).toBeNull();
+      expect(fieldsIn(document.body)).toEqual(["rating", "watched"]);
+
+      fireEvent.click(back());
+      fireEvent.click(
+        within(
+          await screen.findByRole("dialog", { name: "Discard changes?" })
+        ).getByRole("button", { name: "Discard" })
+      );
+      await screen.findByText("Settings");
+    });
+
+    it("Back after Save does not", async () => {
+      const fetchMock = await openWith(CAROUSEL.rules);
+      fireEvent.change(screen.getByDisplayValue("Highly rated"), {
+        target: { value: "Renamed" },
+      });
+
+      await previewAndUpdate(fetchMock);
+
+      expect(prompt()).toBeNull();
+      expect(screen.getByText("Settings")).toBeVisible();
+    });
+
+    it("a change put back as it was is not unsaved", async () => {
+      await openWith(CAROUSEL.rules);
+      const title = screen.getByDisplayValue("Highly rated");
+      fireEvent.change(title, { target: { value: "Renamed" } });
+      fireEvent.change(title, { target: { value: "Highly rated" } });
+
+      fireEvent.click(back());
+
+      expect(prompt()).toBeNull();
+      await screen.findByText("Settings");
+    });
+  });
+
   describe("sort options follow the rules", () => {
     const PLAYLISTS = {
       "/playlists": () =>
@@ -440,23 +675,6 @@ describe("CarouselBuilder", () => {
       within(sortSelect())
         .getAllByRole("option")
         .map((option) => option.textContent);
-
-    /** The builder on a new carousel */
-    function renderNew() {
-      render(
-        <QueryClientProvider client={createQueryClient()}>
-          <MemoryRouter initialEntries={["/settings/carousels/new"]}>
-            <Routes>
-              <Route
-                path="/settings/carousels/new"
-                element={<CarouselBuilder />}
-              />
-              <Route path="/settings" element={<div>Settings</div>} />
-            </Routes>
-          </MemoryRouter>
-        </QueryClientProvider>
-      );
-    }
 
     it("Playlist order is offered with one playlist rule and saved", async () => {
       const fetchMock = stubApi({
@@ -494,7 +712,7 @@ describe("CarouselBuilder", () => {
       );
       expect(JSON.parse(post[1]?.body as string)).toMatchObject({
         sort: "playlist_position",
-        rules: { playlists: { value: [12], modifier: "INCLUDES" } },
+        rules: rootAll({ playlists: { value: [12], modifier: "INCLUDES" } }),
       });
       const preview = must(
         fetchMock.mock.calls.find(([url]) => url.includes("/carousels/preview"))
@@ -515,6 +733,25 @@ describe("CarouselBuilder", () => {
 
       await openWith({ rating100: { modifier: "GREATER_THAN", value: 50 } });
       expect(sortLabels()).not.toContain("Playlist Order");
+    });
+
+    it("Playlist order needs the playlist as a root row of an all tree", async () => {
+      const playlist = leaf("playlists", { value: [12], modifier: "INCLUDES" });
+      await openWith(
+        { match: "all", rules: [{ match: "all", rules: [playlist] }] },
+        PLAYLISTS
+      );
+      expect(sortLabels()).not.toContain("Playlist Order");
+      cleanup();
+      vi.unstubAllGlobals();
+
+      await openWith({ match: "any", rules: [playlist] }, PLAYLISTS);
+      expect(sortLabels()).not.toContain("Playlist Order");
+      cleanup();
+      vi.unstubAllGlobals();
+
+      await openWith({ match: "all", rules: [playlist] }, PLAYLISTS);
+      expect(sortLabels()).toContain("Playlist Order");
     });
 
     it("Scene Number is offered only with a collection rule", async () => {
@@ -594,7 +831,7 @@ describe("CarouselBuilder", () => {
       expect(screen.queryByText(/sorted by Random/)).toBeNull();
 
       const { saved } = await previewAndUpdate(fetchMock);
-      expect(saved).toEqual(stored.rules);
+      expect(saved).toEqual(rootAll(stored.rules));
       const put = must(
         fetchMock.mock.calls.find(([, init]) => init?.method === "PUT")
       );

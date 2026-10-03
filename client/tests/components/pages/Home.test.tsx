@@ -74,13 +74,6 @@ vi.mock("@/constants/carousels", () => ({
 vi.mock("@/utils/entityLinks", () => ({
   getEntityPath: vi.fn(() => "/scene/1"),
 }));
-vi.mock("@/utils/filterConfig", () => ({
-  carouselRulesToFilterState: vi.fn(() => ({ state: {}, kept: {} })),
-  SCENE_FILTER_OPTIONS: [],
-}));
-vi.mock("@/utils/urlParams", () => ({
-  buildSearchParams: vi.fn(() => new URLSearchParams()),
-}));
 
 // Mock lucide-react: Home's own icons; the rest (the navigation's) are real
 vi.mock("lucide-react", async (importOriginal) => ({
@@ -126,15 +119,21 @@ vi.mock("@/components/ui/index", async () => ({
   PageLayout: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="page-layout">{children}</div>
   ),
-  SceneCarousel: ({ title, scenes, loading }: Record<string, unknown>) => (
-    <div data-testid="scene-carousel" data-loading={String(loading)}>
+  SceneCarousel: ({
+    title,
+    scenes,
+    loading,
+    seeMoreUrl,
+  }: Record<string, unknown>) => (
+    <div
+      data-testid="scene-carousel"
+      data-loading={String(loading)}
+      data-see-more={seeMoreUrl as string | undefined}
+    >
       {title as string} ({(scenes as unknown[]).length} scenes)
     </div>
   ),
 }));
-
-// Mock shared-types
-vi.mock("@peek/shared-types", () => ({}));
 
 let client: QueryClient;
 
@@ -381,6 +380,71 @@ describe("Home", () => {
 
       expect(await screen.findByText("Mine (2 scenes)")).toBeInTheDocument();
       expect(executeCarousel).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("See More of a custom carousel", () => {
+    /** Home showing one custom carousel with these rules; resolves to its See More */
+    async function seeMoreOf(rules: unknown) {
+      vi.mocked(libraryApi.executeCarousel).mockResolvedValue({
+        carousel: { id: "c1", title: "Mine", icon: "Film" },
+        scenes: [{ id: "1" }],
+      } as never);
+      mockGetCarousels.mockResolvedValue({
+        carousels: [
+          {
+            id: "c1",
+            title: "Mine",
+            icon: "Film",
+            rules,
+            sort: "random",
+            direction: "DESC",
+          },
+        ],
+      });
+      mockMigrateCarouselPreferences.mockReturnValue([
+        { id: "custom-c1", enabled: true, order: 0 },
+      ]);
+      const view = await renderHome();
+      await screen.findByText("Mine (1 scenes)");
+      const url = screen
+        .getByTestId("scene-carousel")
+        .getAttribute("data-see-more");
+      view.unmount();
+      client.clear();
+      return url;
+    }
+    const leaf = (field: string, criterion: unknown) => ({ field, criterion });
+
+    it("See More of a grouped carousel opens /scenes with the group in the URL", async () => {
+      const url = await seeMoreOf({
+        match: "all",
+        rules: [
+          leaf("watched", false),
+          {
+            match: "any",
+            rules: [
+              leaf("tag_favorite", true),
+              leaf("performer_favorite", true),
+            ],
+          },
+        ],
+      });
+
+      expect(url).toBe(
+        "/scenes?g1=any&g1.performerFavorite=true&g1.tagFavorite=true&watched=false&sort=random&dir=DESC"
+      );
+    });
+
+    it("the Goddesses See More is unchanged, from its flat stored shape and from its tree", async () => {
+      const tags = { value: ["284"], modifier: "INCLUDES_ALL" };
+      const goddesses =
+        "/scenes?tagIds=284&tagIdsModifier=INCLUDES_ALL&sort=random&dir=DESC";
+
+      expect(await seeMoreOf({ tags })).toBe(goddesses);
+      expect(
+        await seeMoreOf({ match: "all", rules: [leaf("tags", tags)] })
+      ).toBe(goddesses);
     });
   });
 
