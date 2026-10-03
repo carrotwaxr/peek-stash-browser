@@ -4,6 +4,9 @@
  * by id and instance, under the roots that hold its type), and nowhere
  * else. The rollback it returns puts the previous values back.
  * markLibraryStale marks the library stale without fetching it.
+ * cancelEntityQueries cancels the entity's list fetches around a write, but
+ * never a signed link's (a cancelled first fetch would leave Safari with no
+ * sources and fail a cast start).
  */
 import {
   type QueryClient,
@@ -12,10 +15,10 @@ import {
 } from "@tanstack/react-query";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { patchEntityInCache } from "@/api/entityCache";
+import { cancelEntityQueries, patchEntityInCache } from "@/api/entityCache";
 import { markLibraryStale } from "@/api/hooks/useLibraryReady";
 import { createQueryClient } from "@/api/queryClient";
-import { queryKeys } from "@/api/queryKeys";
+import { isLinkQuery, queryKeys } from "@/api/queryKeys";
 
 /** The cached data under a key, read as a plain object for assertions. */
 function read(client: QueryClient, key: QueryKey): unknown {
@@ -357,5 +360,65 @@ describe("markLibraryStale", () => {
       expect(query?.isStale(), JSON.stringify(key)).toBe(true);
     }
     unsubscribe();
+  });
+});
+
+describe("cancelEntityQueries", () => {
+  let client: QueryClient;
+
+  beforeEach(() => {
+    client = createQueryClient();
+  });
+
+  afterEach(() => {
+    client.clear();
+  });
+
+  /** A fetch under `key` that answers only when `answer` is called */
+  function pendingFetch(key: QueryKey) {
+    let answer: (value: unknown) => void = () => {};
+    const fetched = client.fetchQuery({
+      queryKey: key,
+      queryFn: () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+      retry: false,
+    });
+    return { fetched, answer: (value: unknown) => answer(value) };
+  }
+
+  it("a rating write during a pending media-link fetch does not cancel it", async () => {
+    const linkKey = queryKeys.scenes.mediaLink("inst-a", "12");
+    const playerLinkKey = queryKeys.scenes.externalPlayerLink("inst-a", "12");
+    const listKey = queryKeys.scenes.list(undefined, { page: 1 });
+    const link = pendingFetch(linkKey);
+    const playerLink = pendingFetch(playerLinkKey);
+    const list = pendingFetch(listKey);
+    // A list fetch that is cancelled rejects; caught so it is not unhandled
+    const listOutcome = list.fetched.then(
+      () => "answered",
+      () => "cancelled"
+    );
+
+    await cancelEntityQueries(client, "scene");
+    link.answer({ expiresAt: "later" });
+    playerLink.answer({ url: "signed" });
+    list.answer({ rows: [] });
+
+    await expect(link.fetched).resolves.toEqual({ expiresAt: "later" });
+    await expect(playerLink.fetched).resolves.toEqual({ url: "signed" });
+    expect(client.getQueryState(linkKey)?.status).toBe("success");
+    // The scene list's fetch is still cancelled, as the write needs
+    await expect(listOutcome).resolves.toBe("cancelled");
+  });
+
+  it("isLinkQuery names the two signed link queries and nothing else", () => {
+    expect(isLinkQuery(queryKeys.scenes.mediaLink("inst-a", "12"))).toBe(true);
+    expect(
+      isLinkQuery(queryKeys.scenes.externalPlayerLink("inst-a", "12"))
+    ).toBe(true);
+    expect(isLinkQuery(queryKeys.scenes.detail("inst-a", "12"))).toBe(false);
+    expect(isLinkQuery(queryKeys.scenes.list(undefined, {}))).toBe(false);
   });
 });

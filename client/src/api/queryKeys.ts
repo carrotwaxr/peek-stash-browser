@@ -18,6 +18,19 @@ export interface WatchedScenesKeyParams {
   count?: boolean;
 }
 
+/**
+ * The user's signed link queries (the media link and the external-player
+ * link). A refetch mints a new link (and reloads a Safari video), and a
+ * cancelled first fetch leaves the player and a cast start without one, so
+ * neither a library invalidation nor a write's cancel touches them.
+ */
+export function isLinkQuery(queryKey: readonly unknown[]): boolean {
+  const [root, , kind] = queryKey;
+  return (
+    root === "scenes" && (kind === "mediaLink" || kind === "externalPlayerLink")
+  );
+}
+
 export const queryKeys = {
   // ── Library (entity search) ──────────────────────────────────────────
   scenes: {

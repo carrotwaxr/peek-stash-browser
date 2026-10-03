@@ -7,6 +7,7 @@
  */
 import type { RatableEntityType } from "@peek/shared-types";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
+import { isLinkQuery } from "./queryKeys";
 
 /** One entity on one Stash instance */
 export interface EntityRef {
@@ -52,7 +53,8 @@ const FIELD_KEYS: Record<keyof UserDataPatch, readonly string[]> = {
 /**
  * Cancels the requests in flight under the roots that hold the entity's
  * type. Called around a write: a list fetch that began before the server
- * stored the value would answer with the old one and undo the patch.
+ * stored the value would answer with the old one and undo the patch. The
+ * signed link queries hold no user data and are never cancelled.
  */
 export function cancelEntityQueries(
   client: QueryClient,
@@ -62,7 +64,11 @@ export function cancelEntityQueries(
   return client.cancelQueries({
     predicate: (query) => {
       const [root] = query.queryKey;
-      return typeof root === "string" && roots.includes(root);
+      return (
+        typeof root === "string" &&
+        roots.includes(root) &&
+        !isLinkQuery(query.queryKey)
+      );
     },
   });
 }
@@ -180,7 +186,11 @@ export function patchEntityInCache(
   const queries = client.getQueryCache().findAll({
     predicate: (query) => {
       const [root] = query.queryKey;
-      return typeof root === "string" && roots.includes(root);
+      return (
+        typeof root === "string" &&
+        roots.includes(root) &&
+        !isLinkQuery(query.queryKey)
+      );
     },
   });
   for (const query of queries) {

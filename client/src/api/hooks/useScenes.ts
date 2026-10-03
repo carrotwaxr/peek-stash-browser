@@ -107,7 +107,8 @@ export const sceneMediaLinkQuery = (sceneId: string, instanceId: string) => ({
  * receiver is given, captions and poster, all on the user's personal link.
  * `enabled` is the caller's flag, so only a tab that needs it (Safari, or a
  * cast in progress) mints one. Renewed hourly like the external-player link,
- * and never refetched by a library invalidation (`isLibraryQuery`).
+ * never refetched by a library invalidation nor cancelled by a rating or
+ * favourite write (`isLinkQuery`).
  */
 export function useSceneMediaLink(
   sceneId: string,

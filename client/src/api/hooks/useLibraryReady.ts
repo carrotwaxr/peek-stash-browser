@@ -17,7 +17,7 @@ import {
 } from "@tanstack/react-query";
 import { ApiError, apiGet } from "../client";
 import { invalidateExclusionDependents } from "../invalidateExclusionDependents";
-import { queryKeys } from "../queryKeys";
+import { isLinkQuery, queryKeys } from "../queryKeys";
 
 /**
  * Whether a request failed because the library is initializing: the
@@ -42,12 +42,9 @@ const LIBRARY_ENTITY_ROOTS = new Set([
 
 /** The queries that read the library: entity lists, details, pickers, clips, carousels and the watched scenes. */
 function isLibraryQuery(queryKey: QueryKey): boolean {
-  const [root, , kind] = queryKey;
+  const [root] = queryKey;
   if (typeof root !== "string") return false;
-  if (LIBRARY_ENTITY_ROOTS.has(root)) {
-    // A refetch of either mints a link (and reloads a Safari video)
-    return kind !== "externalPlayerLink" && kind !== "mediaLink";
-  }
+  if (LIBRARY_ENTITY_ROOTS.has(root)) return !isLinkQuery(queryKey);
   return (
     root === "clips" ||
     root === "homeCarousel" ||
