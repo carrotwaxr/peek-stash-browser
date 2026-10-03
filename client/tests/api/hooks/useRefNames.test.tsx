@@ -30,9 +30,9 @@ vi.mock("@/api/playlists", () => ({
   getSharedPlaylists: vi.fn(),
 }));
 
-function setup() {
+function setup(staleTime = 0) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, staleTime } },
   });
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -208,5 +208,44 @@ describe("useRefNames", () => {
     // Under the playlists root, which a playlist change invalidates
     expect(client.getQueryData(queryKeys.playlists.names(ids))).toBeDefined();
     expect(queryKeys.playlists.names(ids)[0]).toBe("playlists");
+  });
+
+  it("a new set of playlist ids reads the cached lists; a playlist change asks again", async () => {
+    vi.mocked(getPlaylists).mockResolvedValue(
+      untrusted({ playlists: [{ id: 12, name: "Road trip" }] })
+    );
+    vi.mocked(getSharedPlaylists).mockResolvedValue(
+      untrusted({
+        playlists: [{ id: 40, name: "Weekend", owner: { username: "alice" } }],
+      })
+    );
+    // The app's lists stay fresh for minutes
+    const { client, wrapper } = setup(5 * 60 * 1000);
+
+    const { result, rerender } = renderHook(
+      ({ ids }: { ids: string[] }) => useRefNames("playlists", ids),
+      { wrapper, initialProps: { ids: ["12"] } }
+    );
+    await waitFor(() =>
+      expect(result.current.data).toEqual({
+        names: ["Road trip"],
+        unavailable: 0,
+      })
+    );
+
+    rerender({ ids: ["40"] });
+    await waitFor(() =>
+      expect(result.current.data).toEqual({
+        names: ["Weekend"],
+        unavailable: 0,
+      })
+    );
+    expect(getPlaylists).toHaveBeenCalledTimes(1);
+    expect(getSharedPlaylists).toHaveBeenCalledTimes(1);
+
+    // A playlist change invalidates the root: the lists are asked again
+    await client.invalidateQueries({ queryKey: queryKeys.playlists.all() });
+    await waitFor(() => expect(getPlaylists).toHaveBeenCalledTimes(2));
+    expect(getSharedPlaylists).toHaveBeenCalledTimes(2);
   });
 });
