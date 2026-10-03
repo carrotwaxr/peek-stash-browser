@@ -23,8 +23,10 @@ import {
   getUserStashInstances,
   hideEntities,
   hideEntity,
+  overwriteFilterPreset,
   putFilterPins,
   regenerateRecoveryKey,
+  renameFilterPreset,
   resetFilterPins,
   saveFilterPreset,
   setDefaultFilterPreset,
@@ -62,6 +64,14 @@ router.post("/complete-setup", authenticated(completeSetup));
 // Filter preset routes
 router.get("/filter-presets", authenticated(getFilterPresets));
 router.post("/filter-presets", authenticated(saveFilterPreset));
+router.put(
+  "/filter-presets/:artifactType/:presetId",
+  authenticated(overwriteFilterPreset)
+);
+router.patch(
+  "/filter-presets/:artifactType/:presetId",
+  authenticated(renameFilterPreset)
+);
 router.delete(
   "/filter-presets/:artifactType/:presetId",
   authenticated(deleteFilterPreset)

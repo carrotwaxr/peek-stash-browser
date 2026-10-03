@@ -355,6 +355,138 @@ describe("cleanPresetState", () => {
     expect(asked).toEqual(["tag 280", "studio 31", "tag 8"]);
   });
 
+  it("keeps prefixed keys and their companions", () => {
+    const stored = preset({
+      filters: {
+        match: "any",
+        g1: "any",
+        g2: "all",
+        "g1.tagIds": ["5:a"],
+        "g1.tagIdsModifier": "SOMETIMES",
+        "g1.tagIdsDepth": -1,
+        "2.tagIds": ["6:a"],
+        "2.tagIdsModifier": "INCLUDES",
+        "g2.3.rating": { min: "3" },
+      },
+    });
+
+    const { value, report } = cleanPresetState("scene", stored);
+
+    expect(value).toEqual(
+      preset({
+        filters: {
+          match: "any",
+          g1: "any",
+          g2: "all",
+          "g1.tagIds": ["5:a"],
+          "g1.tagIdsDepth": -1,
+          "2.tagIds": ["6:a"],
+          "2.tagIdsModifier": "INCLUDES",
+          "g2.3.rating": { min: "3" },
+        },
+      })
+    );
+    expect(report.droppedKeys).toEqual(["g1.tagIdsModifier"]);
+  });
+
+  it("drops a prefixed key the grammar or the list does not know, a match that is not all or any, and a contract field under a prefix", () => {
+    const stored = preset({
+      filters: {
+        tagIds: ["5:a"],
+        g1: "some",
+        match: "none",
+        g6: "any",
+        "g6.tagIds": ["7:a"],
+        "21.tagIds": ["8:a"],
+        "g1.nope": 1,
+        "g1.tags": { value: ["9:a"], modifier: "INCLUDES" },
+        tags: { value: ["9:a"], modifier: "INCLUDES" },
+      },
+    });
+
+    const { value, report } = cleanPresetState("scene", stored);
+
+    expect(value).toEqual(
+      preset({
+        filters: {
+          tagIds: ["5:a"],
+          tags: { value: ["9:a"], modifier: "INCLUDES" },
+        },
+      })
+    );
+    expect(report.droppedKeys).toEqual([
+      "g1",
+      "match",
+      "g6",
+      "g6.tagIds",
+      "21.tagIds",
+      "g1.nope",
+      "g1.tags",
+    ]);
+  });
+
+  it('a multi row\'s lone value becomes a list: {"gender":"FEMALE"} becomes {"gender":["FEMALE"]}', () => {
+    const stored = preset({
+      filters: {
+        gender: "FEMALE",
+        "g1.gender": "MALE",
+        genderModifier: "INCLUDES",
+      },
+    });
+
+    const { value, changed, report } = cleanPresetState("performer", stored);
+
+    expect(changed).toBe(true);
+    expect(report.valuesListed).toBe(2);
+    expect(value).toEqual(
+      preset({
+        filters: {
+          gender: ["FEMALE"],
+          "g1.gender": ["MALE"],
+          genderModifier: "INCLUDES",
+        },
+      })
+    );
+    expect(cleanPresetState("performer", value).changed).toBe(false);
+  });
+
+  it("a bare id in a prefixed picker is tied like a root one", () => {
+    const lookup = lookupOf({ tag: { "466": "default" } });
+    const stored = preset({
+      filters: {
+        "g1.tagIds": ["466", "467"],
+        "g2.3.tagIdsExclude": ["466"],
+        "2.studioId": "772",
+      },
+    });
+
+    const { value, report } = cleanPresetState("scene", stored, lookup);
+
+    expect(value).toEqual(
+      preset({
+        filters: {
+          "g1.tagIds": ["466:default", "467"],
+          "g2.3.tagIdsExclude": ["466:default"],
+          "2.studioId": ["772"],
+        },
+      })
+    );
+    expect(report.refsRewritten).toBe(2);
+    expect(report.refsLeftBare).toBe(2);
+  });
+
+  it("a scene View sorted by recommended is kept; another list's is reset", () => {
+    const scene = preset({ sort: "recommended", direction: "DESC" });
+
+    expect(cleanPresetState("scene", scene).value).toBe(scene);
+    expect(
+      cleanPresetState(
+        "performer",
+        preset({ sort: "recommended", direction: "DESC" })
+      ).report.sortReset
+    ).toBe(true);
+  });
+
   it("a clean of a clean changes nothing", () => {
     const lookup = lookupOf({ tag: { "1": "a" } });
     const first = cleanPresetState(
@@ -381,7 +513,7 @@ describe("cleanFilterPresets", () => {
   it("cleans each preset under its type and keeps the others as they are", () => {
     const performer = preset({
       id: "p",
-      filters: { gender: "FEMALE" },
+      filters: { gender: ["FEMALE"] },
       sort: "rating",
     });
     const stored = {
@@ -404,22 +536,34 @@ describe("cleanFilterPresets", () => {
     ]);
   });
 
-  it("keeps beta.7's one gender and the several genders and condition a later panel saves", () => {
+  it("lists beta.7's one gender and keeps the several genders and condition a later panel saves", () => {
+    const later = [
+      preset({
+        id: "new",
+        filters: { gender: ["MALE", "FEMALE"], genderModifier: "EXCLUDES" },
+      }),
+      preset({ id: "none", filters: { genderModifier: "IS_NULL" } }),
+    ];
     const stored = {
       performer: [
         preset({ id: "old", filters: { gender: "FEMALE" } }),
-        preset({
-          id: "new",
-          filters: { gender: ["MALE", "FEMALE"], genderModifier: "EXCLUDES" },
-        }),
-        preset({ id: "none", filters: { genderModifier: "IS_NULL" } }),
+        ...later,
       ],
     };
 
-    const { value, changed } = cleanFilterPresets(stored);
+    const { value, results } = cleanFilterPresets(stored);
 
-    expect(changed).toBe(false);
-    expect(value).toBe(stored);
+    expect(value).toEqual({
+      performer: [
+        preset({ id: "old", filters: { gender: ["FEMALE"] } }),
+        ...later,
+      ],
+    });
+    expect(results.map((result) => result.changed)).toEqual([
+      true,
+      false,
+      false,
+    ]);
   });
 
   it("leaves presets with nothing to clean as the same object", () => {
