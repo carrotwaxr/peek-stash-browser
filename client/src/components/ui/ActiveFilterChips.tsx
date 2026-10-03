@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { ListKind } from "@peek/shared-types";
 import { LucideX } from "lucide-react";
 import { useRefNames } from "../../api/hooks";
@@ -22,6 +23,11 @@ interface Props {
   /** The panel's options the page leaves free: a locked field has no chip */
   filterOptions: readonly FilterOption[];
   onRemoveFilter: (key: string) => void;
+  /**
+   * Moves focus out of the chips when the last one goes (the Filters
+   * button): a removed chip's button unmounts with focus on it
+   */
+  onFocusLeave?: () => void;
   onChipClick?: (key: string) => void;
   permanentFilters?: Record<string, unknown>;
   permanentFiltersMetadata?: PermanentFiltersMetadata;
@@ -91,7 +97,7 @@ interface ChipProps {
   parts: ChipParts;
   /** The panel option's entity (`tags`), for resolving names */
   entityType: string | undefined;
-  onRemove: () => void;
+  onRemove: (button: HTMLElement) => void;
   onOpen: () => void;
 }
 
@@ -121,7 +127,8 @@ const FilterChip = ({ parts, entityType, onRemove, onOpen }: ChipProps) => {
         {text}
       </button>
       <Button
-        onClick={onRemove}
+        onClick={(event) => onRemove(event.currentTarget)}
+        data-chip-remove=""
         variant="tertiary"
         className="hover:opacity-70 !p-0 !border-0"
         aria-label={`Remove filter: ${text}`}
@@ -137,11 +144,28 @@ const ActiveFilterChips = ({
   filters,
   filterOptions,
   onRemoveFilter,
+  onFocusLeave,
   onChipClick,
   permanentFilters = {},
   permanentFiltersMetadata = {},
 }: Props) => {
   const { unitPreference } = useUnitPreference();
+  const chipsRef = useRef<HTMLDivElement>(null);
+
+  // The removed chip's button goes with it: focus moves first to the next
+  // chip's, else the previous one's, else out of the chips
+  const removeChip = (key: string, button: HTMLElement) => {
+    const buttons = [
+      ...(chipsRef.current?.querySelectorAll<HTMLElement>(
+        "[data-chip-remove]"
+      ) ?? []),
+    ];
+    const at = buttons.indexOf(button);
+    const neighbour = at < 0 ? undefined : (buttons[at + 1] ?? buttons[at - 1]);
+    if (neighbour) neighbour.focus();
+    else onFocusLeave?.();
+    onRemoveFilter(key);
+  };
 
   // A detail page's own filters: a plain label, no edit and no remove
   const permanentLabels = [
@@ -168,7 +192,7 @@ const ActiveFilterChips = ({
   }
 
   return (
-    <div className="flex flex-wrap gap-2 mb-4">
+    <div ref={chipsRef} className="flex flex-wrap gap-2 mb-4">
       {permanentLabels.map((label, index) => (
         <div
           key={`${index}-${label}`}
@@ -190,7 +214,7 @@ const ActiveFilterChips = ({
           entityType={
             filterOptions.find((option) => option.key === key)?.entityType
           }
-          onRemove={() => onRemoveFilter(key)}
+          onRemove={(button) => removeChip(key, button)}
           onOpen={() => onChipClick?.(key)}
         />
       ))}

@@ -550,6 +550,7 @@ const SearchControls = ({
                 filters={filters}
                 filterOptions={filterOptions}
                 onRemoveFilter={removeFilter}
+                onFocusLeave={focusFiltersButton}
                 onChipClick={handleFilterChipClick}
                 permanentFilters={permanentFilters}
                 permanentFiltersMetadata={permanentFiltersMetadata}
