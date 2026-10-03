@@ -18,13 +18,17 @@ import {
   MATCHES,
   type Match,
   WHERE_LIMITS,
+  anyMergeCap,
+  anyMergeKey,
 } from "@peek/shared-types/filters/index.js";
 import type {
+  FilterRef,
   ParsedFilter,
   ParsedListRequest,
   ParsedWhereGroup,
   ParsedWhereLeaf,
 } from "../types/parsedFilters.js";
+import { entityKey } from "./entityRef.js";
 import {
   type Problems,
   isEmptyCriterion,
@@ -33,7 +37,7 @@ import {
   walk,
 } from "./listRequest.js";
 
-type ParsedWhereNode<E extends ListKind> =
+export type ParsedWhereNode<E extends ListKind> =
   | ParsedWhereLeaf<E>
   | ParsedWhereGroup<E>;
 
@@ -45,7 +49,7 @@ function hasOwn(object: object, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(object, key);
 }
 
-function isParsedGroup<E extends ListKind>(
+export function isParsedGroup<E extends ListKind>(
   node: ParsedWhereNode<E>
 ): node is ParsedWhereGroup<E> {
   return "rules" in node;
@@ -325,4 +329,131 @@ export function isWhereShape(
   if (!isPlainObject(raw)) return false;
   const keys = Object.keys(raw);
   return keys.length === 2 && hasOwn(raw, "match") && hasOwn(raw, "rules");
+}
+
+/**
+ * The values a parsed criterion names, in its own shape: a ref criterion's
+ * `refs` (deduplicated by `entityKey`), a playlist criterion's `ids` and a
+ * multi-valued enum's `values` (each deduplicated by value); undefined for
+ * any other criterion
+ */
+type MergeValues =
+  | { readonly kind: "refs"; readonly list: readonly FilterRef[] }
+  | { readonly kind: "ids"; readonly list: readonly number[] }
+  | { readonly kind: "values"; readonly list: readonly string[] };
+
+function mergeValuesOf(criterion: unknown): MergeValues | undefined {
+  if (!isPlainObject(criterion)) return undefined;
+  const { refs, ids, values } = criterion;
+  // The parser's shapes: each list holds only its own kind of value
+  if (Array.isArray(refs)) return { kind: "refs", list: refs as FilterRef[] };
+  if (Array.isArray(ids)) return { kind: "ids", list: ids as number[] };
+  if (Array.isArray(values)) {
+    return { kind: "values", list: values as string[] };
+  }
+  return undefined;
+}
+
+/** The union of two lists of one kind, in order, or undefined when it passes `cap` */
+function unionOf(
+  first: MergeValues,
+  second: MergeValues,
+  cap: number
+): MergeValues | undefined {
+  let list: readonly unknown[];
+  if (first.kind === "refs" && second.kind === "refs") {
+    const seen = new Set<string>();
+    list = [...first.list, ...second.list].filter((ref) => {
+      const k = entityKey(ref.id, ref.instanceId ?? "");
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  } else if (first.kind === second.kind) {
+    list = [...new Set<unknown>([...first.list, ...second.list])];
+  } else {
+    return undefined;
+  }
+  if (list.length > cap) return undefined;
+  // The boundary cast: the union holds the values of `first`'s kind
+  return { kind: first.kind, list } as MergeValues;
+}
+
+/** A merged leaf's criterion: INCLUDES over the union, the first leaf's other keys kept */
+function mergedCriterion(criterion: unknown, values: MergeValues): unknown {
+  const own = isPlainObject(criterion) ? criterion : {};
+  return { ...own, [values.kind]: values.list, modifier: "INCLUDES" };
+}
+
+/**
+ * The container's rows with the same-field rows an "any" container can
+ * merge made one: the rows `anyMergeKey` gives one key (a ref, playlist or
+ * multi-valued enum field read as "any of its values", at one depth, with
+ * no excludes) become one INCLUDES over the union of their values, at the
+ * first row's place, so twenty one-tag rows read the junction once. A
+ * union over the field's cap (`anyMergeCap`) stays apart: the row that
+ * would pass it starts the key's next merged row. Groups pass through
+ * unchanged, and an "all" container is returned as it is.
+ */
+export function mergeAnyLeaves<E extends ListKind>(
+  entity: ListKind,
+  group: ParsedWhereGroup<E>
+): ParsedWhereGroup<E> {
+  if (group.match !== "any") return group;
+  const fields: Readonly<Record<string, FieldSpec>> = LIST_FIELDS[entity];
+  const rules: ParsedWhereNode<E>[] = [];
+  /** The merge key's current row: its place in `rules` and its values */
+  const open = new Map<string, { at: number; values: MergeValues }>();
+  for (const node of group.rules) {
+    if (isParsedGroup(node)) {
+      rules.push(node);
+      continue;
+    }
+    const spec = hasOwn(fields, node.field) ? fields[node.field] : undefined;
+    const values = mergeValuesOf(node.criterion);
+    const criterion: Readonly<Record<string, unknown>> = isPlainObject(
+      node.criterion
+    )
+      ? node.criterion
+      : {};
+    const key =
+      spec === undefined || values === undefined
+        ? undefined
+        : anyMergeKey(node.field, spec, {
+            modifier:
+              typeof criterion.modifier === "string"
+                ? criterion.modifier
+                : null,
+            depth: typeof criterion.depth === "number" ? criterion.depth : null,
+            excludes: Array.isArray(criterion.excludes)
+              ? criterion.excludes
+              : null,
+            valueCount: values.list.length,
+          });
+    if (key === undefined || spec === undefined || values === undefined) {
+      rules.push(node);
+      continue;
+    }
+    const current = open.get(key);
+    const union =
+      current === undefined
+        ? undefined
+        : unionOf(current.values, values, anyMergeCap(spec));
+    if (current !== undefined && union !== undefined) {
+      const first = rules[current.at];
+      if (first !== undefined && !isParsedGroup(first)) {
+        // The boundary cast: the merged criterion is a parsed one of the
+        // first row's own field, INCLUDES over values of its kind
+        rules[current.at] = {
+          field: first.field,
+          criterion: mergedCriterion(first.criterion, union),
+        } as ParsedWhereLeaf<E>;
+      }
+      open.set(key, { at: current.at, values: union });
+      continue;
+    }
+    open.set(key, { at: rules.length, values });
+    rules.push(node);
+  }
+  return { match: group.match, rules };
 }

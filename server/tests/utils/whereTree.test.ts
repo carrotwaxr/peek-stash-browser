@@ -12,6 +12,7 @@ import type {
 import { type IgnoredInput, Problems } from "../../utils/listRequest.js";
 import {
   isWhereShape,
+  mergeAnyLeaves,
   parseWhere,
   topLevelCriteria,
   topLevelLeaves,
@@ -423,5 +424,154 @@ describe("whereOfFlatFilter and isWhereShape", () => {
     expect(isWhereShape({ tags: { value: ["1"] } })).toBe(false);
     expect(isWhereShape([])).toBe(false);
     expect(isWhereShape(null)).toBe(false);
+  });
+});
+
+describe("mergeAnyLeaves merges what an any group can merge", () => {
+  const any = (...rules: unknown[]) =>
+    must(parsed("scene", { match: "any", rules }), "an any root");
+  const ids = (from: number, count: number, instance = "a") =>
+    Array.from({ length: count }, (_, i) => `${from + i}:${instance}`);
+  const refsOf = (values: readonly string[]) =>
+    values.map((value) => {
+      const [id = "", instanceId] = value.split(":");
+      return { id, instanceId };
+    });
+
+  it("two tags INCLUDES rows of equal depth become one with the union, at the first row's place, ids deduplicated by entityKey", () => {
+    const where = any(
+      tagRow("1:a", "2:a"),
+      { field: "favorite", criterion: true },
+      // "2" with no instance is another ref than "2:a"
+      tagRow("2:a", "3:b", "2")
+    );
+
+    expect(mergeAnyLeaves("scene", where)).toEqual({
+      match: "any",
+      rules: [
+        {
+          field: "tags",
+          criterion: {
+            refs: refsOf(["1:a", "2:a", "3:b", "2"]),
+            modifier: "INCLUDES",
+            depth: 0,
+          },
+        },
+        { field: "favorite", criterion: true },
+      ],
+    });
+  });
+
+  it("a one-value INCLUDES_ALL tags row merges with an INCLUDES one", () => {
+    const where = any(tagRow("1:a"), {
+      field: "tags",
+      criterion: { value: ["2:a"], modifier: "INCLUDES_ALL" },
+    });
+
+    expect(mergeAnyLeaves("scene", where).rules).toEqual([
+      {
+        field: "tags",
+        criterion: {
+          refs: refsOf(["1:a", "2:a"]),
+          modifier: "INCLUDES",
+          depth: 0,
+        },
+      },
+    ]);
+  });
+
+  it("rows of another depth, with excludes, INCLUDES_ALL with two or more values, EXCLUDES and presence stay apart", () => {
+    const where = any(
+      tagRow("1:a"),
+      { field: "tags", criterion: { value: ["2:a"], depth: -1 } },
+      {
+        field: "tags",
+        criterion: { value: ["3:a"], excludes: ["4:a"], modifier: "INCLUDES" },
+      },
+      {
+        field: "tags",
+        criterion: { value: ["5:a", "6:a"], modifier: "INCLUDES_ALL" },
+      },
+      { field: "tags", criterion: { value: ["7:a"], modifier: "EXCLUDES" } },
+      { field: "tags", criterion: { modifier: "IS_NULL" } }
+    );
+
+    expect(mergeAnyLeaves("scene", where)).toEqual(where);
+  });
+
+  it("two playlists INCLUDES rows merge, ids deduplicated by value", () => {
+    const where = any(
+      { field: "playlists", criterion: { value: [1, 2] } },
+      { field: "playlists", criterion: { value: [2, 3] } }
+    );
+
+    expect(mergeAnyLeaves("scene", where).rules).toEqual([
+      {
+        field: "playlists",
+        criterion: { ids: [1, 2, 3], modifier: "INCLUDES" },
+      },
+    ]);
+  });
+
+  it("two multi-valued orientation INCLUDES rows merge, values deduplicated", () => {
+    const where = any(
+      {
+        field: "orientation",
+        criterion: { value: ["LANDSCAPE"], modifier: "INCLUDES" },
+      },
+      {
+        field: "orientation",
+        criterion: { value: ["PORTRAIT", "LANDSCAPE"], modifier: "INCLUDES" },
+      }
+    );
+
+    expect(mergeAnyLeaves("scene", where).rules).toEqual([
+      {
+        field: "orientation",
+        criterion: { values: ["LANDSCAPE", "PORTRAIT"], modifier: "INCLUDES" },
+      },
+    ]);
+  });
+
+  it("a union over the field's cap stays apart: MAX_REF_VALUES for refs, MAX_PLAYLIST_VALUES for playlists", () => {
+    const refs = any(
+      tagRow(...ids(1, 600)),
+      tagRow(...ids(1001, 600)),
+      tagRow("5000:a")
+    );
+    const merged = mergeAnyLeaves("scene", refs);
+    // The third row joins the second, the last one under the cap
+    expect(
+      merged.rules.map((rule) => "field" in rule && rule.criterion)
+    ).toEqual([
+      { refs: refsOf(ids(1, 600)), modifier: "INCLUDES", depth: 0 },
+      {
+        refs: refsOf([...ids(1001, 600), "5000:a"]),
+        modifier: "INCLUDES",
+        depth: 0,
+      },
+    ]);
+
+    const playlistIds = (from: number) =>
+      Array.from({ length: 60 }, (_, i) => from + i);
+    const playlists = any(
+      { field: "playlists", criterion: { value: playlistIds(1) } },
+      { field: "playlists", criterion: { value: playlistIds(101) } }
+    );
+    expect(mergeAnyLeaves("scene", playlists)).toEqual(playlists);
+  });
+
+  it("an all group is never merged, nor a group inside an any root", () => {
+    const all = must(
+      parsed("scene", { match: "all", rules: [tagRow("1:a"), tagRow("2:a")] }),
+      "an all root"
+    );
+    expect(mergeAnyLeaves("scene", all)).toEqual(all);
+
+    const nested = any(
+      { match: "any", rules: [tagRow("1:a"), tagRow("2:a")] },
+      tagRow("3:a")
+    );
+    expect(mergeAnyLeaves("scene", nested)).toEqual(nested);
   });
 });

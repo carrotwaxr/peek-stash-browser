@@ -1761,3 +1761,39 @@ describe("every scene field clause", () => {
     }
   );
 });
+
+describe("the where tree on scenes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+  });
+
+  it("Scene Number sorts by a collection row at the root of an all where", async () => {
+    await run({
+      sort: { field: "scene_index", direction: "ASC", seed: undefined },
+      where: {
+        match: "all",
+        rules: [
+          {
+            field: "groups",
+            criterion: {
+              refs: [{ id: "33", instanceId: "inst-a" }],
+              modifier: "INCLUDES",
+              depth: 0,
+            },
+          },
+        ],
+      },
+    });
+
+    const { sql, params } = pageStatement();
+    expect(sql).toContain(
+      "JOIN SceneGroup sgi ON sgi.sceneId = s.id AND sgi.sceneInstanceId = s.stashInstanceId AND sgi.groupId = ? AND sgi.groupInstanceId = ?"
+    );
+    expect(sql).toContain(
+      "ORDER BY sgi.sceneIndex IS NULL, sgi.sceneIndex ASC"
+    );
+    const at = params.indexOf("33");
+    expect(params.slice(at, at + 2)).toEqual(["33", "inst-a"]);
+  });
+});

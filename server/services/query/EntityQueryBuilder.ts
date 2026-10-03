@@ -24,21 +24,30 @@
  * A builder's filter clauses are a table with one function per field
  * (`fieldClauses`) and a `searchClause`: the base reads the filter as
  * leaves, one criterion of one field each, builds each leaf's clause through
- * `clauseFor` in the table's order, and appends the search last. Every CTE a
- * clause adds is named from its leaf's name, unique in the statement
- * (`combine` refuses two of one name). A ref criterion's `excludes` become
- * a leaf of their own (`<field>_not`, EXCLUDES), so a field's clause never
- * sees them.
+ * `clauseFor` in the table's order, then the request's `where` tree
+ * (`whereClauses`), then the search: `<base> AND <filter> AND <where> AND
+ * <search>`. The base clauses are never inside the tree, so no "any" group
+ * ever ORs with the exclusion join or the allowed instances (invariants 3
+ * and 11). Every CTE a clause adds is named from its leaf's name, unique in
+ * the statement (`combine` refuses two of one name): a filter leaf's field,
+ * a tree leaf's `w<n>_<field>`. A ref criterion's `excludes` become a leaf
+ * of their own (`<field>_not`, EXCLUDES), so a field's clause never sees
+ * them; in the tree they stay AND-ed with their leaf, one disjunct of an
+ * "any" group.
  */
 import type {
   ListKind,
+  Match,
   SortDirection,
 } from "@peek/shared-types/filters/index.js";
 import prisma from "../../prisma/singleton.js";
 import type {
   ClipListRequest,
   FilterRef,
+  ParsedFilter,
   ParsedListRequest,
+  ParsedWhereGroup,
+  ParsedWhereLeaf,
   RefCriterion,
   RefFieldCriterion,
 } from "../../types/parsedFilters.js";
@@ -55,19 +64,28 @@ import {
   type FilterClause,
   type JunctionTarget,
   PAIR_INLINE_LIMIT,
+  type RefClauseOptions,
   type SqlFragment,
   type SqlParam,
   allOf,
+  anyOf,
   combine,
   countForms,
   exclusionJoin,
   idClause,
   instanceClause,
+  noClause,
   randomOrder,
   refClause,
   refPresenceClause,
   specificInstanceClause,
 } from "../../utils/sqlClauses.js";
+import {
+  isParsedGroup,
+  mergeAnyLeaves,
+  topLevelCriteria,
+  topLevelLeaves,
+} from "../../utils/whereTree.js";
 
 /** `UserExcludedEntity.entityType` */
 export type ExclusionEntityType =
@@ -207,13 +225,56 @@ export interface NamedLeaf<
 export interface LeafContext extends QueryContext {
   /** Unique in the statement; every CTE the clause adds is named from it (`tags`, `tags_refs`) */
   readonly name: string;
-  /** Under an "any" group (9b): take the read-once shape whatever the sort. Always false in 9a. */
+  /**
+   * Under an "any" group, the root's included: take the read-once shape
+   * whatever the sort (`refOptionsOf`), since an OR of clauses cannot walk
+   * one of them in a sort index's order
+   */
   readonly underAny: boolean;
   /**
-   * Set by a builder's `leafContextFor` from the whole filter: the clip
+   * Set by a builder's `leafContextFor` from the top-level leaves: the clip
    * list's, when no studio or scene criterion drives the statement
    */
   readonly lists?: boolean;
+}
+
+/** A leaf's ref options: its CTE name, the viewer's instances, and the read-once shape under an any group */
+export function refOptionsOf(
+  ctx: LeafContext
+): Pick<RefClauseOptions, "name" | "allowedInstanceIds" | "sortedByIndex"> {
+  return {
+    name: ctx.name,
+    allowedInstanceIds: ctx.allowedInstanceIds,
+    ...(ctx.underAny ? { sortedByIndex: false } : {}),
+  };
+}
+
+/**
+ * The clause of `match` over `children`: under "all" an empty child (no
+ * filter) drops; under "any" an empty child is TRUE, so the group is no
+ * clause. No live child is no clause, one is itself without parentheses.
+ * A group whose children have count forms (`FilterClause.count`) keeps
+ * theirs as its own count form, so the count reads every match in no order.
+ */
+function groupClause(
+  match: Match,
+  children: readonly FilterClause[]
+): FilterClause {
+  const live = children.filter((c) => c.sql !== "");
+  if (match === "any" && live.length < children.length) return noClause();
+  const [only] = live;
+  if (only === undefined) return noClause();
+  if (live.length === 1) return only;
+  const page = match === "all" ? allOf(live) : anyOf(live);
+  return live.some((c) => c.count !== undefined)
+    ? {
+        ...page,
+        count: groupClause(
+          match,
+          live.map((c) => c.count ?? c)
+        ),
+      }
+    : page;
 }
 
 /** One field's clause: the criterion's WHERE fragment, named from the leaf */
@@ -355,10 +416,12 @@ export function refFieldClause(
   if (criterion.modifier === "IS_NULL" || criterion.modifier === "NOT_NULL") {
     return refPresence(target, criterion.modifier, ctx, { related });
   }
-  return refClause(target, criterion.refs, criterion.modifier, {
-    name: ctx.name,
-    allowedInstanceIds: ctx.allowedInstanceIds,
-  });
+  return refClause(
+    target,
+    criterion.refs,
+    criterion.modifier,
+    refOptionsOf(ctx)
+  );
 }
 
 /**
@@ -373,12 +436,14 @@ export function refFieldClause(
  * `sortedByIndex` the clause is the page's shape for it, and its count form
  * (`FilterClause.count`) the shape for reading every match in no order
  * (`sortedByIndex: false`, L9); the refs are expanded once for both.
+ * Under an any group the shape defaults to the read-once one
+ * (`sortedByIndex: false`).
  */
 export async function hierarchicalRefClause(
   kind: HierarchyKind,
   target: JunctionTarget | ColumnTarget,
   criterion: RefFieldCriterion,
-  ctx: QueryContext,
+  ctx: LeafContext,
   opts: {
     name: string;
     inheritedJunction?: JunctionTarget;
@@ -387,7 +452,8 @@ export async function hierarchicalRefClause(
     related?: RelatedTable;
   }
 ): Promise<FilterClause> {
-  const { sortedByIndex, related, ...rest } = opts;
+  const { sortedByIndex: asked, related, ...rest } = opts;
+  const sortedByIndex = asked ?? (ctx.underAny ? false : undefined);
   if (criterion.modifier === "IS_NULL" || criterion.modifier === "NOT_NULL") {
     return refPresence(target, criterion.modifier, ctx, {
       related,
@@ -621,12 +687,13 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
   protected abstract searchClause(q: string, ctx: QueryContext): FilterClause;
 
   /**
-   * The context a leaf's clause reads, for facts of the whole filter a
-   * single field cannot see (the clip list's `lists`); the leaf's own
-   * context by default
+   * The context a leaf's clause reads, for facts of the whole request a
+   * single field cannot see (the clip list's `lists`), read from its
+   * top-level leaves (`topLevelLeaves`: the filter's, then the root rows of
+   * an "all" where); the leaf's own context by default
    */
   protected leafContextFor(
-    _filter: ListFilterOf<K>,
+    _top: readonly Leaf<K>[],
     ctx: LeafContext
   ): LeafContext {
     return ctx;
@@ -666,26 +733,127 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     return clause(leaf.criterion, ctx);
   }
 
-  /**
-   * The filter's clauses: each leaf's, named from its field, in the table's
-   * order, then the search's
-   */
+  /** The filter's clauses: each leaf's, named from its field, in the table's order */
   private async clausesOf(
     filter: ListFilterOf<K>,
-    q: string | undefined,
+    top: readonly Leaf<K>[],
     ctx: QueryContext
   ): Promise<FilterClause[]> {
     const clauses: FilterClause[] = [];
     for (const leaf of this.leavesOf(filter)) {
-      const leafCtx = this.leafContextFor(filter, {
+      const leafCtx = this.leafContextFor(top, {
         ...ctx,
         name: leaf.name,
         underAny: false,
       });
       clauses.push(await this.clauseFor(leaf, leafCtx));
     }
-    if (q !== undefined) clauses.push(this.searchClause(q, ctx));
     return clauses;
+  }
+
+  /**
+   * One tree leaf's clauses: the leaf and its excludes' `_not` leaf
+   * (`splitExcludes`), each named from the leaf's name
+   */
+  private async leafClauses(
+    leaf: NamedLeaf<K>,
+    underAny: boolean,
+    top: readonly Leaf<K>[],
+    ctx: QueryContext
+  ): Promise<FilterClause[]> {
+    const parts: FilterClause[] = [];
+    for (const part of splitExcludes(leaf)) {
+      const leafCtx = this.leafContextFor(top, {
+        ...ctx,
+        name: part.name,
+        underAny,
+      });
+      parts.push(await this.clauseFor(part, leafCtx));
+    }
+    return parts;
+  }
+
+  /**
+   * The `where` tree's clauses, after the filter's. Leaves are numbered
+   * depth-first and named `w<n>_<field>`; an "any" container first merges
+   * its same-field rows (`mergeAnyLeaves`), and every leaf under one (the
+   * root's included) takes the read-once shape (`underAny`). A leaf's parts
+   * (its excludes) are AND-ed into one clause, so they stay one disjunct of
+   * an "any" group. An "all" root gives its children as separate clauses,
+   * so a flat tree's statement is the filter object's but for the CTE
+   * names; an "any" root gives one clause.
+   */
+  private async whereClauses(
+    where: ParsedWhereGroup<K> | undefined,
+    top: readonly Leaf<K>[],
+    ctx: QueryContext
+  ): Promise<FilterClause[]> {
+    if (where === undefined) return [];
+    const kind = this.spec.entityType;
+    let n = 0;
+    const leafOf = (leaf: ParsedWhereLeaf<K>, underAny: boolean) => {
+      // The boundary cast: a parsed row is a leaf of the builder's own
+      // field table, as the filter's criteria are
+      const own = leaf as unknown as Leaf<K>;
+      const named: NamedLeaf<K> = { ...own, name: `w${n}_${own.field}` };
+      n += 1;
+      return this.leafClauses(named, underAny, top, ctx);
+    };
+
+    const root = mergeAnyLeaves(kind, where);
+    const rootAny = root.match === "any";
+    const children: FilterClause[][] = [];
+    for (const node of root.rules) {
+      if (!isParsedGroup(node)) {
+        children.push(await leafOf(node, rootAny));
+        continue;
+      }
+      const group = mergeAnyLeaves(kind, node);
+      const underAny = rootAny || group.match === "any";
+      const clauses: FilterClause[] = [];
+      for (const leaf of group.rules) {
+        // A group holds rows only (the parser refuses a deeper group)
+        if (isParsedGroup(leaf)) continue;
+        clauses.push(groupClause("all", await leafOf(leaf, underAny)));
+      }
+      children.push([groupClause(group.match, clauses)]);
+    }
+    return rootAny
+      ? [
+          groupClause(
+            "any",
+            children.map((parts) => groupClause("all", parts))
+          ),
+        ]
+      : children.flat();
+  }
+
+  /**
+   * The request's filter and where as one parsed request of the builder's
+   * list: the boundary cast `ListRequests[K]` cannot carry for a generic K
+   */
+  private treeOf(request: ListRequests[K]): {
+    readonly filter: ParsedFilter<K>;
+    readonly where: ParsedWhereGroup<K> | undefined;
+  } {
+    const parsed = request as unknown as ParsedListRequest<K>;
+    return { filter: parsed.filter, where: parsed.where };
+  }
+
+  /** The leaves the whole request's facts read: the filter's, then the root rows of an "all" where */
+  private topLeaves(request: ListRequests[K]): Leaf<K>[] {
+    // The boundary cast: a parsed row is a leaf of the builder's own table
+    return topLevelLeaves(this.treeOf(request)) as unknown as Leaf<K>[];
+  }
+
+  /**
+   * The criteria a sort reads: the filter's, then a field's first root row
+   * of an "all" where (`topLevelCriteria`)
+   */
+  private sortCriteria(request: ListRequests[K]): ListFilterOf<K> {
+    const { filter, where } = this.treeOf(request);
+    // The boundary cast: the parsed filter of the builder's own list
+    return topLevelCriteria(filter, where) as unknown as ListFilterOf<K>;
   }
 
   protected abstract populateRelations(
@@ -890,7 +1058,7 @@ ORDER BY period`;
     if (field === "random") return field;
     const map = this.sortMap(
       direction === "ASC" ? "ASC" : "DESC",
-      request.filter,
+      this.sortCriteria(request),
       ctx
     );
     return Object.prototype.hasOwnProperty.call(map, field)
@@ -932,7 +1100,9 @@ ORDER BY period`;
       : "";
     const extraJoins = spec.extraJoins?.(ctx) ?? [];
 
-    // The base clauses, then the entity's own
+    // The base clauses, then the filter's, the where tree's and the search
+    const top = this.topLeaves(request);
+    const { where } = this.treeOf(request);
     const idsCriterion = (request.filter as { ids?: RefCriterion }).ids;
     const idRefs = refs ?? idsCriterion?.refs ?? [];
     const idModifier =
@@ -954,7 +1124,9 @@ ORDER BY period`;
             }),
           ]
         : []),
-      ...(await this.clausesOf(request.filter, request.q, ctx)),
+      ...(await this.clausesOf(request.filter, top, ctx)),
+      ...(await this.whereClauses(where, top, ctx)),
+      ...(request.q === undefined ? [] : [this.searchClause(request.q, ctx)]),
     ];
 
     const { field, seed } = request.sort;
@@ -962,7 +1134,13 @@ ORDER BY period`;
     // anything else never reaches ORDER BY (item 3)
     const direction: SortDirection =
       request.sort.direction === "ASC" ? "ASC" : "DESC";
-    const sortExpr = this.sortExpr(field, direction, seed, request.filter, ctx);
+    const sortExpr = this.sortExpr(
+      field,
+      direction,
+      seed,
+      this.sortCriteria(request),
+      ctx
+    );
     // The primary key last makes the order total: rows equal on every other
     // term (one name twice, one id on two servers, one random value, NULLs)
     // keep one order in every page's statement, so paging never repeats or

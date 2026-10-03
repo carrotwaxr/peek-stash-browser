@@ -632,6 +632,50 @@ describeWithDb("Ref clause shapes", () => {
     expect(countPlan).not.toContain("CORRELATED");
   });
 
+  // W3: an any group's same-field rows merge into one INCLUDES, read once
+  // from the junctions' tag indexes as one list, not one subquery per row
+  it("an any group of 20 one-tag rows plans as one IN list", async () => {
+    const rows = childRefs(20).map((r) => ({
+      field: "tags" as const,
+      criterion: { refs: [r], modifier: "INCLUDES" as const, depth: 0 },
+    }));
+    const recorder = recordStatements();
+    let total: number | null = null;
+    try {
+      ({ total } = await sceneQueryBuilder.execute({
+        userId: u,
+        allowedInstanceIds: [A],
+        request: { ...request({}), where: { match: "any", rules: rows } },
+      }));
+    } finally {
+      recorder.restore();
+    }
+    expect(total).toBe(20);
+    const [page, count] = recorder.statements.filter((statement) =>
+      statement.sql.includes("FROM StashScene s")
+    );
+
+    for (const statement of [page, count]) {
+      const lines = await scenePlanOf(must(statement));
+      const plan = lines.join("\n");
+      const count = (pattern: RegExp) =>
+        lines.filter((line) => pattern.test(line)).length;
+      // One list (twenty rows unmerged would be twenty), built once from a
+      // SceneTag arm and a SceneInheritedTag arm, each read by its tag index
+      expect(count(/LIST SUBQUERY/)).toBe(1);
+      expect(count(/^UNION ALL$/)).toBe(1);
+      expect(count(/^SEARCH st /)).toBe(
+        count(/^SEARCH st USING INDEX SceneTag_tagId_tagInstanceId_idx/)
+      );
+      expect(count(/^SEARCH sit /)).toBe(
+        count(
+          /^SEARCH sit USING INDEX SceneInheritedTag_tagId_tagInstanceId_idx/
+        )
+      );
+      expect(plan).not.toContain("CORRELATED");
+    }
+  });
+
   it.each([
     ["created_at", "DESC"],
     ["title", "ASC"],

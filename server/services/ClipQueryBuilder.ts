@@ -52,6 +52,7 @@ import {
   EntityQueryBuilder,
   type EntitySpec,
   type FieldClauses,
+  type Leaf,
   type LeafContext,
   type QueryContext,
   type SortExpr,
@@ -211,12 +212,15 @@ const SCENE_STUDIO: ColumnTarget = {
   instanceCol: "stashInstanceId",
 };
 
-/** A clip ref clause's options: the CTE name, and the index shape when the list drives */
+/**
+ * A clip ref clause's options: the CTE name, and the index shape when the
+ * list drives or the leaf sits under an any group
+ */
 function refOptions(ctx: LeafContext, name: string): RefClauseOptions {
   return {
     name,
     allowedInstanceIds: ctx.allowedInstanceIds,
-    ...(ctx.lists === true ? { sortedByIndex: false } : {}),
+    ...(ctx.lists === true || ctx.underAny ? { sortedByIndex: false } : {}),
   };
 }
 
@@ -279,9 +283,10 @@ async function clipTagClause(
 }
 
 /** A ref criterion that names the clips the statement drives from: a studio's or scenes' INCLUDES */
-function drives(criterion: RefCriterion | undefined): boolean {
+function drives(criterion: Leaf<"clip">["criterion"]): boolean {
   return (
-    criterion !== undefined &&
+    typeof criterion === "object" &&
+    "refs" in criterion &&
     criterion.modifier !== "EXCLUDES" &&
     criterion.refs.length > 0
   );
@@ -381,10 +386,13 @@ class ClipQueryBuilder extends EntityQueryBuilder<
    * themselves; beside one each other filter probes those clips (EXISTS),
    * which is cheaper than reading a common tag's whole list first (a studio
    * and a clip tag: 10 ms, against 13 with the list). Has NONE keeps its NOT
-   * EXISTS per clip. Whether a studio or scenes drive is a fact of the whole
-   * filter, which `leafContextFor` hands each clause as `lists`. The CTE
-   * names stay the ones the statement always had; a field's excludes take
-   * their leaf's (`cteName`).
+   * EXISTS per clip. Whether a studio or scenes drive is a fact of the top
+   * level (the filter and the root rows of an "all" where), which
+   * `leafContextFor` hands each clause as `lists`; a leaf under an any group
+   * reads its list whatever drives (an OR cannot probe a driver's clips
+   * alone). The CTE names stay the ones the statement always had; a field's
+   * excludes take their leaf's (`cteName`), a where row's its own
+   * (`w<n>_<field>`).
    */
   protected override readonly fieldClauses: FieldClauses<"clip"> = {
     is_generated: (isGenerated) => ({
@@ -425,14 +433,22 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     title: (c) => buildTextFilter(c, "c.title"),
   };
 
-  /** No studio and no scenes include: the filter's clauses list by their junctions' indexes */
+  /**
+   * No studio and no scenes include at the top level (the filter, or a root
+   * row of an "all" where): the clauses list by their junctions' indexes. A
+   * studio inside an any group drives nothing.
+   */
   protected override leafContextFor(
-    filter: ClipListRequest["filter"],
+    top: readonly Leaf<"clip">[],
     ctx: LeafContext
   ): LeafContext {
     return {
       ...ctx,
-      lists: !drives(filter.studios) && !drives(filter.scenes),
+      lists: !top.some(
+        (leaf) =>
+          (leaf.field === "studios" || leaf.field === "scenes") &&
+          drives(leaf.criterion)
+      ),
     };
   }
 

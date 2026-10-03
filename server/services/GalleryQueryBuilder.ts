@@ -66,6 +66,7 @@ import {
   favoriteRefs,
   hierarchicalRefClause,
   refFieldClause,
+  refOptionsOf,
   refPresence,
 } from "./query/EntityQueryBuilder.js";
 import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
@@ -267,8 +268,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     // index to walk, so every statement reads the matches in no order.
     performer_tags: (c, ctx) =>
       performerTagsFieldClause(GALLERY_PERFORMERS, c, {
-        name: ctx.name,
-        allowedInstanceIds: ctx.allowedInstanceIds,
+        ...refOptionsOf(ctx),
         viewerId: ctx.applyExclusions ? ctx.userId : null,
       }),
 
@@ -380,10 +380,12 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     };
     if (kind === "tag") return this.tagClause(criterion, ctx);
     if (kind === "studio") return this.studioClause(criterion, ctx);
-    return refClause(GALLERY_PERFORMERS, refs, criterion.modifier, {
-      name: ctx.name,
-      allowedInstanceIds: ctx.allowedInstanceIds,
-    });
+    return refClause(
+      GALLERY_PERFORMERS,
+      refs,
+      criterion.modifier,
+      refOptionsOf(ctx)
+    );
   }
 
   /**

@@ -8,9 +8,11 @@
  * list matches nothing), the exclusion join, the joined count and the
  * random sort's bound seed.
  */
-import type {
-  EntityKind,
-  SortDirection,
+import {
+  type EntityKind,
+  LIST_FIELDS,
+  type ListKind,
+  type SortDirection,
 } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../../prisma/singleton.js";
@@ -31,12 +33,20 @@ import {
   type QueryContext,
   type SortExpr,
   favoriteRefs,
+  refOptionsOf,
 } from "../../../services/query/EntityQueryBuilder.js";
 import type {
   ClipListRequest,
+  FilterRef,
   ParsedListRequest,
+  ParsedWhereGroup,
 } from "../../../types/parsedFilters.js";
-import { type FilterClause, combine } from "../../../utils/sqlClauses.js";
+import {
+  type FilterClause,
+  combine,
+  noClause,
+} from "../../../utils/sqlClauses.js";
+import { alternatesOf, samplesOf } from "../../helpers/fieldSamples.js";
 import {
   parsedClipRequest,
   parsedListRequest,
@@ -1312,4 +1322,377 @@ describe("favoriteRefs", () => {
     );
     expect(params.slice(1)).toEqual([7, "tag"]);
   });
+});
+
+/**
+ * A scene-shaped builder on three fields, for the where tree: each clause
+ * is plain text with one CTE named from its leaf, and records its leaf's
+ * name and whether it sits under an any group. `favorite: false` builds no
+ * clause, as a favourite filter with no favourites does.
+ */
+class TreeBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "scene"> {
+  protected readonly spec: EntitySpec = {
+    table: "StashScene",
+    alias: "s",
+    entityType: "scene",
+    userJoins: [],
+    selectColumns: () => ({ sql: "s.id, s.stashInstanceId", params: [] }),
+    defaultSort: "created_at",
+  };
+
+  readonly calls: string[] = [];
+
+  private named(field: string, ctx: LeafContext, clause: FilterClause) {
+    this.calls.push(`${field}:${ctx.name}:${String(ctx.underAny)}`);
+    return {
+      ...clause,
+      ctes: [
+        {
+          name: ctx.name,
+          sql: `${ctx.name}(id) AS MATERIALIZED (SELECT 1)`,
+          params: [],
+        },
+      ],
+    };
+  }
+
+  protected override readonly fieldClauses = {
+    tags: (c: { refs: readonly FilterRef[]; modifier: string }, ctx) =>
+      this.named("tags", ctx, {
+        sql: `tags_${c.modifier}(?)`,
+        params: [c.refs.map((r) => r.id).join(",")],
+      }),
+    favorite: (on: boolean, ctx) =>
+      on
+        ? this.named("favorite", ctx, { sql: "r.favorite = 1", params: [] })
+        : noClause(),
+    organized: (on: boolean, ctx) =>
+      this.named("organized", ctx, {
+        sql: "s.organized = ?",
+        params: [on ? 1 : 0],
+      }),
+  } as Pick<
+    FieldClauses<"scene">,
+    "tags" | "favorite" | "organized"
+  > as FieldClauses<"scene">;
+
+  protected override searchClause(q: string): FilterClause {
+    return { sql: "s.title LIKE ?", params: [q] };
+  }
+
+  protected sortMap(dir: "ASC" | "DESC"): Record<string, SortExpr> {
+    return { created_at: { sql: `s.stashCreatedAt ${dir}`, params: [] } };
+  }
+
+  protected transformRow(row: FakeRow): FakeEntity {
+    return { id: row.id, instanceId: row.stashInstanceId };
+  }
+
+  protected populateRelations(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
+/** The text between WHERE and ORDER BY */
+function whereText(sql: string): string {
+  const from = sql.indexOf("\nWHERE ") + "\nWHERE ".length;
+  const to = sql.indexOf("\nORDER BY");
+  return sql.slice(from, to === -1 ? undefined : to);
+}
+
+/** The names of a statement's CTEs, in order */
+function cteNames(sql: string): string[] {
+  return [...sql.matchAll(/(?:WITH |,\n)(\w+)\(/g)].map((m) => must(m[1]));
+}
+
+describe("the where tree", () => {
+  const BASE =
+    "s.deletedAt IS NULL AND e.id IS NULL AND s.stashInstanceId IN (?)";
+  const tags = (
+    modifier: "INCLUDES" | "EXCLUDES",
+    ids: string[],
+    excludes?: string[]
+  ) =>
+    ({
+      field: "tags",
+      criterion: {
+        refs: ids.map((id) => ({ id, instanceId: "a" })),
+        modifier,
+        depth: 0,
+        ...(excludes
+          ? { excludes: excludes.map((id) => ({ id, instanceId: "a" })) }
+          : {}),
+      },
+    }) as const;
+  const favorite = (on: boolean) =>
+    ({ field: "favorite", criterion: on }) as const;
+  const organized = { field: "organized", criterion: true } as const;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+  });
+
+  async function pageOf(
+    tree: TreeBuilder,
+    overrides: Partial<ParsedListRequest<"scene">>
+  ): Promise<string> {
+    mockPrisma.$queryRawUnsafe.mockClear();
+    await tree.execute({
+      userId: 5,
+      allowedInstanceIds: ["a"],
+      request: request(overrides),
+    });
+    return must(statements()[0]).sql;
+  }
+
+  it("a where of root rows gives the filter object's statement but the CTE names", async () => {
+    const tree = new TreeBuilder();
+    const flat = await pageOf(tree, {
+      filter: { favorite: true, organized: true },
+    });
+    const where = await pageOf(tree, {
+      where: { match: "all", rules: [favorite(true), organized] },
+    });
+
+    expect(whereText(where)).toBe(whereText(flat));
+    expect(whereText(where)).toBe(
+      `${BASE} AND r.favorite = 1 AND s.organized = ?`
+    );
+    expect(cteNames(flat)).toEqual(["favorite", "organized"]);
+    expect(cteNames(where)).toEqual(["w0_favorite", "w1_organized"]);
+    expect(tree.calls.slice(-2)).toEqual([
+      "favorite:w0_favorite:false",
+      "organized:w1_organized:false",
+    ]);
+  });
+
+  it("an any group is one OR clause after the base clauses, between the filter and the search", async () => {
+    const tree = new TreeBuilder();
+    const page = await pageOf(tree, {
+      q: "kiss",
+      filter: { organized: true },
+      where: { match: "any", rules: [favorite(true), tags("INCLUDES", ["1"])] },
+    });
+
+    // The exclusion and the instances are never inside the parentheses
+    // (invariants 3 and 11)
+    expect(whereText(page)).toBe(
+      `${BASE} AND s.organized = ? AND (r.favorite = 1 OR tags_INCLUDES(?)) AND s.title LIKE ?`
+    );
+    expect(tree.calls).toEqual([
+      "organized:organized:false",
+      "favorite:w0_favorite:true",
+      "tags:w1_tags:true",
+    ]);
+  });
+
+  it("a leaf's excludes stay one disjunct under any", async () => {
+    const tree = new TreeBuilder();
+    const page = await pageOf(tree, {
+      where: {
+        match: "any",
+        rules: [tags("INCLUDES", ["1"], ["2"]), favorite(true)],
+      },
+    });
+
+    expect(whereText(page)).toBe(
+      `${BASE} AND ((tags_INCLUDES(?) AND tags_EXCLUDES(?)) OR r.favorite = 1)`
+    );
+    expect(cteNames(page)).toEqual(["w0_tags", "w0_tags_not", "w1_favorite"]);
+  });
+
+  it("a group that compiles to nothing is no clause; an any group with a TRUE child is no clause; a one-rule group is its rule without parentheses", async () => {
+    const tree = new TreeBuilder();
+    const where = (
+      ...rules: ParsedWhereGroup<"scene">["rules"]
+    ): ParsedWhereGroup<"scene"> => ({ match: "all", rules });
+
+    expect(
+      whereText(
+        await pageOf(tree, {
+          where: where({ match: "all", rules: [favorite(false)] }),
+        })
+      )
+    ).toBe(BASE);
+    expect(
+      whereText(
+        await pageOf(tree, {
+          where: where({ match: "any", rules: [favorite(false), organized] }),
+        })
+      )
+    ).toBe(BASE);
+    expect(
+      whereText(
+        await pageOf(tree, {
+          where: { match: "any", rules: [favorite(false), organized] },
+        })
+      )
+    ).toBe(BASE);
+    expect(
+      whereText(
+        await pageOf(tree, {
+          where: where({ match: "any", rules: [organized] }),
+        })
+      )
+    ).toBe(`${BASE} AND s.organized = ?`);
+    expect(
+      whereText(
+        await pageOf(tree, { where: { match: "any", rules: [organized] } })
+      )
+    ).toBe(`${BASE} AND s.organized = ?`);
+  });
+
+  it("a group keeps its children's count forms", async () => {
+    const tag = (id: string) => ({
+      field: "tags" as const,
+      criterion: {
+        refs: [{ id, instanceId: "a" }],
+        modifier: "INCLUDES" as const,
+        depth: 0,
+      },
+    });
+    await sceneQueryBuilder.execute({
+      userId: 5,
+      allowedInstanceIds: ["a"],
+      request: parsedListRequest("scene", {
+        sort: { field: "created_at", direction: "DESC", seed: undefined },
+        where: {
+          match: "all",
+          rules: [{ match: "all", rules: [tag("1"), tag("2")] }],
+        },
+      }),
+    });
+
+    const [page, count] = statements();
+    // The page walks the sort index and probes each scene's tags; the count
+    // reads every match from the tag index
+    expect(must(page).sql).toContain(
+      "EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id"
+    );
+    expect(must(count).sql).toContain("SELECT COUNT(*) AS total");
+    expect(whereText(must(count).sql)).toContain(
+      "(s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?))"
+    );
+    expect(whereText(must(count).sql)).not.toContain(
+      "EXISTS (SELECT 1 FROM SceneTag"
+    );
+  });
+
+  it("every leaf under any takes the read-once shape", async () => {
+    const ctx: LeafContext = {
+      userId: 5,
+      applyExclusions: true,
+      allowedInstanceIds: ["a"],
+      specificInstanceId: undefined,
+      sortField: "created_at",
+      timeZone: "UTC",
+      hasExclusionsOf: () => Promise.resolve(false),
+      name: "w0_tags",
+      underAny: false,
+    };
+    expect(refOptionsOf({ ...ctx, underAny: true })).toEqual({
+      name: "w0_tags",
+      allowedInstanceIds: ["a"],
+      sortedByIndex: false,
+    });
+    expect(refOptionsOf(ctx)).toEqual({
+      name: "w0_tags",
+      allowedInstanceIds: ["a"],
+    });
+
+    const performers = {
+      field: "performers" as const,
+      criterion: {
+        refs: [{ id: "9", instanceId: "a" }],
+        modifier: "INCLUDES" as const,
+        depth: 0,
+      },
+    };
+    const pageFor = async (match: "all" | "any") => {
+      mockPrisma.$queryRawUnsafe.mockClear();
+      await sceneQueryBuilder.execute({
+        userId: 5,
+        allowedInstanceIds: ["a"],
+        request: parsedListRequest("scene", {
+          sort: { field: "created_at", direction: "DESC", seed: undefined },
+          where: { match, rules: [performers] },
+        }),
+      });
+      return whereText(must(statements()[0]).sql);
+    };
+
+    expect(await pageFor("any")).toContain(
+      "(s.id, s.stashInstanceId) IN (SELECT sp.sceneId, sp.sceneInstanceId FROM ScenePerformer sp WHERE ((sp.performerId = ? AND sp.performerInstanceId = ?)))"
+    );
+    expect(await pageFor("all")).toContain(
+      "EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND ((sp.performerId = ? AND sp.performerInstanceId = ?)))"
+    );
+  });
+});
+
+describe("no field clause joins", () => {
+  const BUILDERS = {
+    scene: sceneQueryBuilder,
+    performer: performerQueryBuilder,
+    studio: studioQueryBuilder,
+    tag: tagQueryBuilder,
+    group: groupQueryBuilder,
+    gallery: galleryQueryBuilder,
+    image: imageQueryBuilder,
+    clip: clipQueryBuilder,
+  } as const;
+
+  /** Each builder's field samples and alternates, as `[label, kind, sample]` rows */
+  const rows = (Object.keys(BUILDERS) as ListKind[]).flatMap((kind) =>
+    [...samplesOf(LIST_FIELDS[kind]), ...alternatesOf(LIST_FIELDS[kind])]
+      // `ids` is the base's, no field clause
+      .filter(([, sample]) => sample.field !== "ids")
+      .map(([label, sample]) => [`${kind} ${label}`, kind, sample] as const)
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.tagRating.findMany.mockResolvedValue([
+      partialRow({ tagId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.studioRating.findMany.mockResolvedValue([
+      partialRow({ studioId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.performerRating.findMany.mockResolvedValue([
+      partialRow({ performerId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.findFirst.mockResolvedValue(null);
+    // The hierarchies a depth expands through: none beyond the refs
+    mockPrisma.stashTag.findMany.mockResolvedValue([]);
+    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
+    mockPrisma.groupRelation.findMany.mockResolvedValue([]);
+  });
+
+  // `anyOf` refuses a clause that joins, so every field may sit in an any group
+  it.each(rows)(
+    "%s builds a clause without a join",
+    async (_label, kind, sample) => {
+      for (const underAny of [false, true]) {
+        const clause = await BUILDERS[kind].clauseFor(
+          // Each sample is a valid criterion of its own field
+          { field: sample.field, criterion: sample.criterion } as never,
+          {
+            userId: 5,
+            applyExclusions: true,
+            allowedInstanceIds: ["inst-a"],
+            specificInstanceId: undefined,
+            sortField: "created_at",
+            timeZone: "UTC",
+            hasExclusionsOf: () => Promise.resolve(true),
+            name: `w0_${sample.field}`,
+            underAny,
+          }
+        );
+        expect(clause.joins).toBeUndefined();
+      }
+    }
+  );
 });
