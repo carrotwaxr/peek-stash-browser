@@ -60,6 +60,7 @@ import {
   heightBoundToCm,
   kgToLbs,
 } from "../unitConversions";
+import { shownBound } from "./display";
 
 /** The panel's filters: each row's key and companions, as the URL and presets hold them */
 export type PanelState = Readonly<Record<string, unknown>>;
@@ -590,7 +591,7 @@ const asList = (value: unknown): unknown => {
 
 // ── Chips ─────────────────────────────────────────────────────────────────
 
-/** The row's name on a chip: its label without the unit in brackets ("Rating (0-100)") */
+/** The row's name on a chip: its label without the unit in brackets ("Duration (minutes)") */
 const chipLabel = (field: PanelField): string =>
   field.label.replace(/ \([^)]*\)$/, "");
 
@@ -766,6 +767,18 @@ function numberChip(
         (shown[0] ?? shown[1])?.unit
       ),
     };
+  }
+  const { display } = field;
+  if (display !== undefined) {
+    // Shown as the editor shows it (rating100 68 is 6.8); text that is no
+    // number shows as it is
+    const shown = (bound: string | undefined) => {
+      const stored = Number(bound);
+      return bound === undefined || !Number.isFinite(stored)
+        ? bound
+        : String(shownBound(stored, display));
+    };
+    return { label, ...rangeParts(shown(low), shown(high)) };
   }
   return {
     label,

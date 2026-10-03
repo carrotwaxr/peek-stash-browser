@@ -37,6 +37,7 @@ export {
   withRefValue,
 } from "./filterState";
 export { type FilterOption, filterOptionsOf, rowKeysOf } from "./options";
+export { type NumberDisplay, shownBound, storedBound } from "./display";
 export {
   type KeptLeaf,
   type PanelRow,

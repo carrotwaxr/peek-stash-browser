@@ -3,7 +3,12 @@
 import { COMPARISON_MODIFIERS } from "../criteria.js";
 import type { IMAGE_FIELDS } from "../fields.js";
 import { RESOLUTION_CHOICES } from "./scene.js";
-import { HAS_MODIFIERS, HAS_ONE_MODIFIERS, type PanelField } from "./types.js";
+import {
+  HAS_MODIFIERS,
+  HAS_ONE_MODIFIERS,
+  type PanelField,
+  RATING_DISPLAY,
+} from "./types.js";
 
 /** Has ALL, ANY or NONE of these, or none or any at all */
 const HAS_OR_PRESENCE = [...HAS_MODIFIERS, "IS_NULL", "NOT_NULL"] as const;
@@ -98,12 +103,13 @@ export const IMAGE_PANEL = [
   {
     key: "rating",
     field: "rating100",
-    label: "Rating (0-100)",
+    label: "Rating",
     group: "common",
     editor: "number",
     modifierKey: "ratingModifier",
     presenceLabels: { isNull: "Not rated", notNull: "Rated" },
     bounds: { min: 0, max: 100 },
+    display: RATING_DISPLAY,
     pinnedByDefault: true,
   },
   {

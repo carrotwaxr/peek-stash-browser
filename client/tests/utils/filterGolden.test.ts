@@ -184,8 +184,10 @@ function samplesOf(
       values = [plain("checked", true)];
       break;
     case "range": {
-      const low = option.min ?? 0;
-      const high = option.max ?? 100;
+      // In the stored scale, as the state holds it (a rating's 0 to 10 is 0 to 100)
+      const divisor = option.display?.divisor ?? 1;
+      const low = (option.min ?? 0) * divisor;
+      const high = (option.max ?? 100) * divisor;
       const min = String(low + Math.round((high - low) / 4));
       const max = String(low + Math.round((3 * (high - low)) / 4));
       values = [

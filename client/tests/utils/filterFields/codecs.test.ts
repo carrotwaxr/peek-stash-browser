@@ -187,6 +187,23 @@ describe("the chip member", () => {
   });
 });
 
+describe("the rating chip", () => {
+  it("a rating reads on the 0 to 10 scale ratings show, from the rating100 state", () => {
+    const row = field("scene", "rating");
+    const spec = SPECS.scene[row.field];
+    if (spec === undefined) throw new Error("No field rating100");
+
+    expect(codecOf(row).chip(row, spec, { rating: { min: 60 } })).toEqual({
+      label: "Rating",
+      condition: "at least",
+      values: ["6"],
+    });
+    expect(
+      codecOf(row).chip(row, spec, { rating: { min: "68", max: 100 } })
+    ).toEqual({ label: "Rating", values: ["6.8 to 10"] });
+  });
+});
+
 describe("the URL members", () => {
   const write = (row: PanelField, state: Record<string, unknown>): string => {
     const params = new URLSearchParams();

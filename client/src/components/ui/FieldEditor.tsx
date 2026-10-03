@@ -156,6 +156,7 @@ const FieldEditor = forwardRef<HTMLDivElement, FieldEditorProps>(
       ...(option.min === undefined ? {} : { min: option.min }),
       ...(option.max === undefined ? {} : { max: option.max }),
       ...(option.measure === undefined ? {} : { measure: option.measure }),
+      ...(option.display === undefined ? {} : { display: option.display }),
       ...(option.entityType === undefined
         ? {}
         : { entityType: option.entityType }),

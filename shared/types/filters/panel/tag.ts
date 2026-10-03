@@ -1,7 +1,12 @@
 // shared/types/filters/panel/tag.ts
 /** The Tags panel's rows, in the panel's order */
 import type { TAG_FIELDS } from "../fields.js";
-import { HAS_MODIFIERS, INCLUDES_ONLY, type PanelField } from "./types.js";
+import {
+  HAS_MODIFIERS,
+  INCLUDES_ONLY,
+  type PanelField,
+  RATING_DISPLAY,
+} from "./types.js";
 
 /** A text box's condition select: contains or not, or has none or any */
 const TEXT_OR_PRESENCE = [
@@ -32,12 +37,13 @@ export const TAG_PANEL = [
   {
     key: "rating",
     field: "rating100",
-    label: "Rating (0-100)",
+    label: "Rating",
     group: "common",
     editor: "number",
     modifierKey: "ratingModifier",
     presenceLabels: { isNull: "Not rated", notNull: "Rated" },
     bounds: { min: 0, max: 100 },
+    display: RATING_DISPLAY,
     pinnedByDefault: true,
   },
   {

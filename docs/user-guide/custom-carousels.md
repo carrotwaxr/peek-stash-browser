@@ -48,7 +48,7 @@ A scene appears when it matches at least one of the four. Add rules at the top l
 | Galleries | Scenes linked to specific galleries |
 | Playlists | Scenes in specific playlists: your own and those shared with you |
 | In any of my playlists | Scenes in one of your own playlists, or in none of them |
-| Rating (0-100) | Scenes within a rating range |
+| Rating | Scenes within a rating range, from 0 to 10 as ratings show |
 | Duration (minutes) | Scene length in minutes |
 | Resolution | Video quality, from 144p to 8K and Huge |
 | Bitrate (Mbps) | Video bitrate in Mbps; decimals such as 2.5 are kept |

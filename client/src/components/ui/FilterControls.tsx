@@ -1,9 +1,11 @@
 import { forwardRef } from "react";
+import type { NumberDisplay } from "../../utils/filterFields";
 import CheckboxGroup from "./CheckboxGroup";
 import {
   ImperialHeightRange,
   ImperialLengthRange,
   ImperialWeightRange,
+  ShownRange,
 } from "./MeasureInputs";
 import SearchableSelect from "./SearchableSelect";
 
@@ -99,6 +101,11 @@ export interface FilterControlProps {
    * inches, held in metric (a `range` draws the weight or length editor)
    */
   measure?: "height" | "weight" | "length";
+  /**
+   * A range shown and typed in another scale than it is stored (a
+   * rating100 as 0 to 10)
+   */
+  display?: NumberDisplay | undefined;
   entityType?: string;
   /** A picker takes several; a select of values draws a box for each */
   multi?: boolean;
@@ -143,6 +150,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
       min,
       max,
       measure,
+      display,
       entityType,
       multi,
       noBlank = false,
@@ -448,6 +456,16 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                 value={value}
                 onChange={onChange}
                 label={label}
+                inputClasses={inputClasses}
+                inputStyle={baseInputStyle}
+              />
+            ) : display !== undefined ? (
+              <ShownRange
+                id={boundsId}
+                value={value}
+                onChange={onChange}
+                label={label}
+                display={display}
                 inputClasses={inputClasses}
                 inputStyle={baseInputStyle}
               />

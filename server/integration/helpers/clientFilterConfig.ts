@@ -32,6 +32,8 @@ export interface ClientOption {
   readonly excludeKey?: string;
   readonly min?: number;
   readonly max?: number;
+  /** Bounds shown over this divisor (a rating100 as 0 to 10); the state holds the stored value */
+  readonly display?: { readonly divisor: number };
 }
 
 /** A select's value or a sort option */
@@ -424,9 +426,11 @@ function sampleValues(option: ClientOption, refs: RefPool): SampleValue[] {
     case "checkbox":
       return [plain("checked", true)];
     case "range": {
-      // Strings, as the panel's inputs hold them, inside the option's bounds
-      const low = option.min ?? 0;
-      const high = option.max ?? 100;
+      // Strings, as the panel's inputs hold them, inside the option's
+      // bounds in the stored scale
+      const divisor = option.display?.divisor ?? 1;
+      const low = (option.min ?? 0) * divisor;
+      const high = (option.max ?? 100) * divisor;
       const min = String(low + Math.round((high - low) / 4));
       const max = String(low + Math.round((3 * (high - low)) / 4));
       return [

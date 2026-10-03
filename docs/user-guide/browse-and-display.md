@@ -208,7 +208,7 @@ The filter bar sits under the search toolbar. Only the filters you use take spac
 
 ### Chips
 
-Each active filter shows as a chip that names its picks and its condition, such as "Tags: none of Anal, with sub-tags" or "Rating: 40 to 80"; a pick that is no longer visible to you reads as "unavailable". Click a chip, or press Enter on it, to open its filter in a panel right under it. The **x** on a chip removes the filter.
+Each active filter shows as a chip that names its picks and its condition, such as "Tags: none of Anal, with sub-tags" or "Rating: 4 to 8"; a pick that is no longer visible to you reads as "unavailable". Click a chip, or press Enter on it, to open its filter in a panel right under it. The **x** on a chip removes the filter.
 
 - **Changes apply as you make them.** Picking a tag, an option or a Yes / No applies at once; typing a number, a date or text applies a moment after you stop, so a rating typed as `60` is one search, not two. Close the panel with Escape, with a click outside it, or by clicking the chip again.
 - **Back undoes the whole edit.** Everything you changed in one open panel is one step in your browser history, so Back returns to how the list was before you opened it.

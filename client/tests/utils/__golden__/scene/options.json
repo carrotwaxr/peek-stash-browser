@@ -194,11 +194,15 @@
     },
     {
       "key": "rating",
-      "label": "Rating (0-100)",
+      "label": "Rating",
       "type": "range",
       "defaultValue": {},
       "min": 0,
-      "max": 100,
+      "max": 10,
+      "display": {
+        "divisor": 10,
+        "decimals": 1
+      },
       "modifierOptions": [
         {
           "value": "BETWEEN",

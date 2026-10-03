@@ -130,6 +130,29 @@ describe("filterOptionsOf", () => {
     );
   });
 
+  it.each([
+    "scene",
+    "performer",
+    "studio",
+    "tag",
+    "group",
+    "gallery",
+    "image",
+  ] as const)(
+    "the Rating row is shown and typed on the 0 to 10 scale ratings show: %s",
+    (kind) => {
+      expect(
+        filterOptionsOf(kind).find((option) => option.key === "rating")
+      ).toMatchObject({
+        label: "Rating",
+        type: "range",
+        min: 0,
+        max: 10,
+        display: { divisor: 10, decimals: 1 },
+      });
+    }
+  );
+
   it("an unknown unit preference is metric", () => {
     expect(filterOptionsOf("performer", "")).toEqual(
       filterOptionsOf("performer")

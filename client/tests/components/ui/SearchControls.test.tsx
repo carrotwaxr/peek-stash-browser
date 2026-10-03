@@ -699,6 +699,7 @@ describe("SearchControls", () => {
     });
 
     it("choosing Not rated hides the bounds and sends IS_NULL", async () => {
+      const BOUND = /^(Minimum|Maximum) Rating$/;
       const list = renderSearchControls({}, { url: "/scenes?rating_min=40" });
       expect(
         sentFilter(await firstQuery(list.onQueryChange), "scene_filter")
@@ -707,16 +708,26 @@ describe("SearchControls", () => {
       });
 
       const { user, editor } = await openChip("Rating");
-      expect(within(editor).getAllByRole("spinbutton")).toHaveLength(2);
+      // The bounds read on the 0 to 10 scale ratings show
+      expect(
+        within(editor).getAllByRole("textbox", { name: BOUND })
+      ).toHaveLength(2);
+      expect(
+        within(editor).getByRole("textbox", { name: "Minimum Rating" })
+      ).toHaveValue("4");
       const condition = within(editor).getByRole("combobox", {
-        name: "Rating (0-100) condition",
+        name: "Rating condition",
       });
       expect(condition).toHaveDisplayValue("Between");
 
       await user.selectOptions(condition, "Not rated");
-      expect(within(editor).queryAllByRole("spinbutton")).toHaveLength(0);
+      expect(
+        within(editor).queryAllByRole("textbox", { name: BOUND })
+      ).toHaveLength(0);
       await user.selectOptions(condition, "Between");
-      expect(within(editor).getAllByRole("spinbutton")).toHaveLength(2);
+      expect(
+        within(editor).getAllByRole("textbox", { name: BOUND })
+      ).toHaveLength(2);
       await user.selectOptions(condition, "Not rated");
 
       await waitFor(() =>

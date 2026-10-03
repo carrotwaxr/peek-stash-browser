@@ -607,7 +607,7 @@ describe("pins", () => {
       within(must(first))
         .getAllByRole("option")
         .map((each) => each.textContent)
-    ).toEqual(["Rating (0-100)", "Tags"]);
+    ).toEqual(["Rating", "Tags"]);
     // Listed once: not again under their sections
     expect(optionNames().filter((name) => name === "Tags")).toHaveLength(1);
   });

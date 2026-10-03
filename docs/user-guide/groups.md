@@ -24,7 +24,7 @@ Groups support two view modes:
 | **Performers** | Performers in any scene within the group you can see. Supports ANY / ALL / NONE modifiers |
 | **Studio** | Filter by studio: ANY or NONE, with **Include sub-studios**, and Has none / Has any |
 | **Tags** | Filter by tags. Supports ANY / ALL / NONE modifiers, with "Include sub-tags": "all of" then matches a collection tagged with any sub-tag of each chosen tag; Has none / Has any |
-| **Rating (0-100)** | A range on the stored 0-100 scale, which is ten times the rating shown (a collection shown as 7.5 is 75), or Rated / Not rated |
+| **Rating** | A range from 0 to 10, as ratings show (one decimal), or Rated / Not rated |
 | **Scene Count**, **Tag Count** | Range filters for the number of scenes and tags you can see |
 | **Duration** | Range filter for total duration in minutes; **Not set** lists collections with no duration |
 | **O Count**, **Play Count** | Your own O count and plays, summed over the collection's scenes you can see |

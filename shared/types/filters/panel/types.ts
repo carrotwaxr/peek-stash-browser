@@ -66,6 +66,8 @@ export const HAS_MODIFIERS = ["INCLUDES_ALL", "INCLUDES", "EXCLUDES"] as const;
 export const HAS_ONE_MODIFIERS = ["INCLUDES", "EXCLUDES"] as const;
 /** A picker with no condition select */
 export const INCLUDES_ONLY = ["INCLUDES"] as const;
+/** A rating100 shown and typed as the 0 to 10 the app shows, one decimal */
+export const RATING_DISPLAY = { divisor: 10, decimals: 1 } as const;
 
 /** Where a picker counts its options (`count_filter`) */
 export type CountContext =
@@ -140,6 +142,16 @@ export interface NumberField<F extends string = string> extends FieldBase<F> {
   readonly unit?: "minutes" | "seconds" | "Mbps" | "fps" | "years";
   /** Shown in the viewer's unit system */
   readonly measure?: "height" | "weight" | "length";
+  /**
+   * Shown and typed as the stored value over `divisor`, to `decimals`
+   * places: a rating100 as the 0 to 10 the app shows (10, 1). The bounds,
+   * state, URL, presets and requests hold the stored value; the editor and
+   * the chip convert.
+   */
+  readonly display?: {
+    readonly divisor: number;
+    readonly decimals: number;
+  };
   /**
    * The words of the "is not set" and "is set" choices a field whose spec
    * takes IS_NULL offers ("Not rated" and "Rated"); "Not set" and "Set"

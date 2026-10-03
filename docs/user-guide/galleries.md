@@ -28,7 +28,7 @@ Galleries support five view modes:
 | **Studios** | Filter by studio (ANY or NONE, include or exclude, Has none / Has any), including sub-studios |
 | **Tags** | Filter by tags, with "Include sub-tags". With sub-tags on, "has all of" matches a gallery tagged with any sub-tag of each chosen tag. Include or exclude per tag, Has none / Has any |
 | **Performer Tags** | Galleries with a performer who has the tag (ANY, ALL or NONE, with sub-tags) |
-| **Rating (0-100)** | A range on the stored 0-100 scale, which is ten times the rating shown (a gallery shown as 7.5 is 75), or Rated / Not rated |
+| **Rating** | A range from 0 to 10, as ratings show (one decimal), or Rated / Not rated |
 | **Image Count** | Range filter for number of images |
 | **Tag Count**, **Performer Count** | Range filters; 0 to 0 on Tag Count lists the untagged galleries |
 | **Performer Age** | A performer's age on the gallery's date, as on Scenes |

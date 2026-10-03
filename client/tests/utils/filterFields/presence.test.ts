@@ -269,7 +269,7 @@ describe("presence choices on number fields", () => {
     expect(
       chipsOf("scene", { ratingModifier: "BETWEEN", rating: { min: "20" } })[0]
         ?.parts
-    ).toEqual({ label: "Rating", condition: "at least", values: ["20"] });
+    ).toEqual({ label: "Rating", condition: "at least", values: ["2"] });
     expect(chipsOf("scene", { ratingModifier: "BETWEEN" })).toEqual([]);
   });
 });

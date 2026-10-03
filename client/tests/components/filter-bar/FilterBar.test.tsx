@@ -360,7 +360,7 @@ describe("chip text", () => {
       favorite: true,
     });
 
-    expect(await edit("Rating: 40 to 80")).toBeInTheDocument();
+    expect(await edit("Rating: 4 to 8")).toBeInTheDocument();
     expect(await edit("O Count: at least 40")).toBeInTheDocument();
     expect(await edit("Performer Count: at most 40")).toBeInTheDocument();
     expect(await edit("Scene Date: from 2020-01-01")).toBeInTheDocument();
@@ -637,21 +637,22 @@ describe("the chip's editor", () => {
     await act(() => vi.advanceTimersByTimeAsync(0));
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Edit filter: Rating: at most 90" })
+      screen.getByRole("button", { name: "Edit filter: Rating: at most 9" })
     );
-    const min = within(dialog()).getByRole("spinbutton", {
+    const min = within(dialog()).getByRole("textbox", {
       name: /^Minimum Rating/,
     });
     fireEvent.change(min, { target: { value: "6" } });
     await act(() => vi.advanceTimersByTimeAsync(100));
-    fireEvent.change(min, { target: { value: "60" } });
+    fireEvent.change(min, { target: { value: "6.5" } });
 
     await act(() => vi.advanceTimersByTimeAsync(299));
     expect(list.params().has("rating_min")).toBe(false);
     expect(list.actions).toEqual([]);
 
     await act(() => vi.advanceTimersByTimeAsync(1));
-    expect(list.params().get("rating_min")).toBe("60");
+    // Typed on the 0 to 10 scale, held as rating100
+    expect(list.params().get("rating_min")).toBe("65");
     expect(list.actions).toEqual(["PUSH"]);
     await act(() => vi.advanceTimersByTimeAsync(1000));
     expect(list.actions).toEqual(["PUSH"]);
@@ -698,12 +699,12 @@ describe("the chip's editor", () => {
     await act(() => vi.advanceTimersByTimeAsync(0));
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Edit filter: Rating: at most 90" })
+      screen.getByRole("button", { name: "Edit filter: Rating: at most 9" })
     );
-    const min = within(dialog()).getByRole("spinbutton", {
+    const min = within(dialog()).getByRole("textbox", {
       name: /^Minimum Rating/,
     });
-    fireEvent.change(min, { target: { value: "60" } });
+    fireEvent.change(min, { target: { value: "6" } });
     await act(() => vi.advanceTimersByTimeAsync(100));
     fireEvent.keyDown(min, { key: "Escape" });
     await act(() => vi.advanceTimersByTimeAsync(0));
@@ -712,7 +713,7 @@ describe("the chip's editor", () => {
     expect(list.params().get("rating_min")).toBe("60");
     expect(list.actions).toEqual(["PUSH"]);
     expect(
-      screen.getByRole("button", { name: "Edit filter: Rating: 60 to 90" })
+      screen.getByRole("button", { name: "Edit filter: Rating: 6 to 9" })
     ).toHaveFocus();
   });
 
@@ -725,11 +726,11 @@ describe("the chip's editor", () => {
     await act(() => vi.advanceTimersByTimeAsync(0));
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Edit filter: Rating: at most 90" })
+      screen.getByRole("button", { name: "Edit filter: Rating: at most 9" })
     );
     fireEvent.change(
-      within(dialog()).getByRole("spinbutton", { name: /^Minimum Rating/ }),
-      { target: { value: "60" } }
+      within(dialog()).getByRole("textbox", { name: /^Minimum Rating/ }),
+      { target: { value: "6" } }
     );
     await act(() => vi.advanceTimersByTimeAsync(100));
     fireEvent.click(screen.getByRole("button", { name: "Unwatched" }));
@@ -746,11 +747,11 @@ describe("the chip's editor", () => {
     await act(() => vi.advanceTimersByTimeAsync(0));
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Edit filter: Rating: at most 90" })
+      screen.getByRole("button", { name: "Edit filter: Rating: at most 9" })
     );
     fireEvent.change(
-      within(dialog()).getByRole("spinbutton", { name: /^Minimum Rating/ }),
-      { target: { value: "60" } }
+      within(dialog()).getByRole("textbox", { name: /^Minimum Rating/ }),
+      { target: { value: "6" } }
     );
     await act(() => vi.advanceTimersByTimeAsync(100));
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
@@ -759,10 +760,10 @@ describe("the chip's editor", () => {
     expect(list.params().get("rating_min")).toBe("60");
     const view = screen.getByRole("dialog", { name: "Advanced filters" });
     expect(
-      within(view).getByRole<HTMLInputElement>("spinbutton", {
+      within(view).getByRole<HTMLInputElement>("textbox", {
         name: /^Minimum Rating/,
       }).value
-    ).toBe("60");
+    ).toBe("6");
     expect(
       within(view).queryByText(/The list's filters changed/)
     ).not.toBeInTheDocument();

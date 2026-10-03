@@ -22,6 +22,7 @@ import {
   type RefFieldModifier,
   type TextField,
 } from "@peek/shared-types";
+import { shownBound } from "./display";
 
 /** Shared type for filter configuration objects used across filter UI, URL serialization, and filter chips */
 export interface FilterOption {
@@ -62,6 +63,13 @@ export interface FilterOption {
    * presets and requests hold metric either way.
    */
   measure?: NonNullable<NumberField["measure"]>;
+  /**
+   * A number shown and typed in another scale than it is stored (a
+   * rating100 as 0 to 10): `min` and `max` are shown values, and the editor
+   * converts on input and display. The state, URL, presets and requests
+   * hold the stored value.
+   */
+  display?: NonNullable<NumberField["display"]>;
   collapsible?: boolean;
   defaultOpen?: boolean;
 }
@@ -291,7 +299,15 @@ function numberOption(
     unitPreference === IMPERIAL && row.measure !== undefined
       ? IMPERIAL_EDITORS[row.measure]
       : undefined;
-  const bounds = imperial?.bounds ?? row.bounds;
+  const { display } = row;
+  const bounds =
+    imperial?.bounds ??
+    (display === undefined
+      ? row.bounds
+      : {
+          min: shownBound(row.bounds.min, display),
+          max: shownBound(row.bounds.max, display),
+        });
   return {
     key: row.key,
     label: imperial
@@ -305,6 +321,7 @@ function numberOption(
       ? {}
       : { step: row.bounds.step }),
     ...(imperial === undefined ? {} : { measure: row.measure }),
+    ...(display === undefined ? {} : { display }),
     ...presenceOptions(row, spec),
   };
 }

@@ -130,7 +130,7 @@ With **Include sub-tags** on, a chosen tag also matches its sub-tags, and "has a
 | **Path** | The image file's path: **Contains**, **Excludes**, **Equals** or **Starts with**. No regular expressions |
 | **URL** | Text search on any of the image's links |
 | **Performers**, **Studios**, **Tags**, **Galleries** | ANY / ALL / NONE (a studio: ANY or NONE), include or exclude each value, and **Has none / Has any** (see [Browse and Display](browse-and-display.md#include-or-exclude-each-value)) |
-| **Rating (0-100)** | A range on the stored 0-100 scale, which is ten times the rating shown, or Rated / Not rated. It uses your own ratings |
+| **Rating** | A range from 0 to 10, as ratings show (one decimal), or Rated / Not rated. It uses your own ratings |
 | **Favorite Images** | Show only your favorited images |
 | **O Count** | A range on your own O count |
 | **Performer Tags** | Images with a performer who has the tag, with sub-tags |
