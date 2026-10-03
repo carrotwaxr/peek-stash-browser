@@ -68,7 +68,7 @@ const renderCriteriaFeedback = (criteria: RecommendationCriteria) => {
 
   if (!hasAnyActivity) {
     return (
-      <div className="text-gray-400 text-sm mt-2">
+      <div className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
         <p>
           To get personalized suggestions, try favoriting or rating (7.0+)
           performers, studios, tags, or scenes you enjoy. Or just keep watching:
@@ -79,7 +79,7 @@ const renderCriteriaFeedback = (criteria: RecommendationCriteria) => {
   }
 
   return (
-    <div className="text-gray-400 text-sm mt-2">
+    <div className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
       <p className="mb-2">Your current activity:</p>
       <ul className="list-disc list-inside space-y-1">
         <li>

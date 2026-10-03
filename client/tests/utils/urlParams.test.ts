@@ -812,6 +812,18 @@ describe("list-owned keys (useListUrlState)", () => {
     expect(next.has("page")).toBe(false);
   });
 
+  it("writeListParams drops a filter key under a prefix past the limits (`g6.`, `21.`), which no read holds, on the next filter write", () => {
+    const prev = new URLSearchParams(
+      "g6=any&g6.tagIds=1:abc&21.tagIds=2:abc&g1.21.favorite=true&tab=scenes&g6.unknown=x"
+    );
+    const next = writeListParams(prev, { filters: {} }, ctx);
+    expect([...next.keys()].sort()).toEqual(["filters", "g6.unknown", "tab"]);
+    // A write that names no filters leaves them
+    expect(writeListParams(prev, { page: 2 }, ctx).get("g6.tagIds")).toBe(
+      "1:abc"
+    );
+  });
+
   it("writeListParams writes a presentation key only when it differs from what the page shows without it", () => {
     const prev = new URLSearchParams("per_page=24&view=table");
     const next = writeListParams(

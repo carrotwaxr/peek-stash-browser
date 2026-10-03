@@ -513,6 +513,23 @@ export function isFilterUrlKey(kind: ListKind, key: string): boolean {
     : prefixedUrlKeys.has(rowKey.key);
 }
 
+/** A key read loosely: any `gN.` and `N.` prefix, then the rest */
+const LOOSE_ROW_KEY = /^(?:g\d+\.)?(?:\d+\.)?(.+)$/;
+
+/**
+ * A URL key shaped as the list's filters under a prefix past the limits
+ * (`g6`, `g6.tagIds`, `21.tagIds`, `g1.21.favorite`): no read holds it, and
+ * a filter write drops it, so it does not stay in a shared link
+ */
+export function isStaleFilterUrlKey(kind: ListKind, key: string): boolean {
+  if (isFilterUrlKey(kind, key)) return false;
+  if (/^g\d+$/.test(key)) return true;
+  const base = LOOSE_ROW_KEY.exec(key)?.[1];
+  if (base === undefined || base === key) return false;
+  const { urlKeys, prefixedUrlKeys } = indexOf(PANEL_FIELDS[kind]);
+  return urlKeys.has(base) || prefixedUrlKeys.has(base);
+}
+
 // ── The wire ──────────────────────────────────────────────────────────────
 
 /** A criterion's parts the merge rule reads */
