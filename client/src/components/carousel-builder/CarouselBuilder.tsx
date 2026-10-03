@@ -166,6 +166,20 @@ const CarouselBuilder = () => {
   }, [id, isEditing]);
 
   /**
+   * A rule now edits this field: the kept rule of the same field goes, as
+   * the save would overwrite it
+   */
+  const replaceKept = (filterKey: string) => {
+    const field = CAROUSEL_FIELDS.find((row) => row.key === filterKey)?.field;
+    if (field === undefined) return;
+    setKept((current) => {
+      if (!(field in current)) return current;
+      const { [field]: _replaced, ...rest } = current;
+      return rest;
+    });
+  };
+
+  /**
    * Add a new rule
    */
   const addRule = () => {
@@ -191,6 +205,7 @@ const CarouselBuilder = () => {
     };
 
     setRules([...rules, newRule]);
+    replaceKept(newRule.filterKey);
     setPreviewValid(false);
     setPreviewScenes(null);
   };
@@ -200,6 +215,7 @@ const CarouselBuilder = () => {
    */
   const updateRule = (ruleId: string, updates: Partial<CarouselRule>) => {
     setRules(rules.map((r) => (r.id === ruleId ? { ...r, ...updates } : r)));
+    if (updates.filterKey !== undefined) replaceKept(updates.filterKey);
     setPreviewValid(false);
     setPreviewScenes(null);
   };
