@@ -465,7 +465,8 @@ const StashInstanceSection = () => {
                   className="text-xs mt-1"
                   style={{ color: "var(--text-tertiary)" }}
                 >
-                  Lower numbers = higher priority for deduplication
+                  Orders the servers in lists. On a name clash, the lowest
+                  number's items show without a server name
                 </p>
               </div>
             </div>
@@ -756,8 +757,9 @@ const StashInstanceSection = () => {
             {instances.length > 1 && (
               <StatusMessage variant="info" title={null} className="text-sm">
                 Content from all enabled instances is combined in your library.
-                When duplicates are found (via StashDB IDs), the instance with
-                the lowest priority number is used as the primary source.
+                Priority orders the servers in lists. When two servers have an
+                item with the same name, the one from the lowest priority number
+                shows without a server name.
               </StatusMessage>
             )}
           </div>

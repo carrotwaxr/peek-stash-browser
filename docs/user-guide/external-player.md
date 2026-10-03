@@ -195,6 +195,8 @@ Firefox handles custom protocols differently from Edge/Chrome and may not respec
 | iOS | VLC x-callback | `vlc-x-callback://x-callback-url/stream?url=...` |
 | Desktop | VLC protocol | `vlc://https://peek.example.com/api/scene/123/proxy-stream/stream?instanceId=…&uid=…&exp=…&sig=…` |
 
+On Android, the `type` in the intent is the real type of the scene's file, taken from its extension: `video/mp4` for an MP4, `video/x-matroska` for an MKV, and so on. A file with an unknown extension gets `video/*`, which any video app accepts. This lets players that pick by type open MKV, AVI and WMV files too.
+
 ### Stream URL
 
 The stream URL points to Peek's proxy endpoint, not directly to Stash. This ensures:
