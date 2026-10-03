@@ -2,7 +2,7 @@
 
 Track your viewing engagement with detailed statistics, rankings, and highlights across your library.
 
-**Location:** Navigation menu → **User Stats** (or set as your landing page in [Personalization](personalization.md))
+**Location:** Your user menu (your name, top right) → **My Stats**. You can also make it your landing page in [Personalization](personalization.md)
 
 ## Overview
 
@@ -24,7 +24,7 @@ The hero section at the top displays your cumulative activity:
 | Metric | What It Measures |
 |--------|------------------|
 | **Watch Time** | Total time spent watching scenes |
-| **Play Count** | Number of play sessions (5+ minutes counts as one play) |
+| **Play Count** | Number of plays. A watch counts as one play once you have watched the Minimum Play Percent of the scene (20% by default; change it in Settings → User Preferences → Playback) |
 | **O Count** | Combined O counter increments across scenes and images |
 | **Scenes Watched** | Unique scenes watched and percentage of library coverage |
 | **Images Viewed** | Unique images viewed |
@@ -75,7 +75,7 @@ Four highlight cards showcase your single best-of entries:
 
 ## Refreshing Stats
 
-Performer, studio and tag rankings are recalculated at most once an hour. When you sign in, open this page or load Recommended and your rankings are more than an hour old, Peek recalculates them: this page waits for the new rankings, while signing in and Recommended carry on and use them next time. After you clear your watch history, or an admin imports your data with Sync from Stash, the next recalculation does not wait for the hour. Top Scenes are ranked from your watch history each time the page loads. The **Refresh** button reloads the page's numbers; it does not force a recalculation.
+Performer, studio and tag rankings are recalculated at most once an hour. When you sign in, open this page or load Recommended and your rankings are more than an hour old, Peek recalculates them: this page waits for the new rankings, while signing in and Recommended carry on and use them next time. After you clear your watch history, or an admin imports your data with Sync from Stash, the next recalculation does not wait for the hour. Top Scenes are ranked from your watch history each time the page loads. The **Refresh** button recalculates your rankings now instead of waiting for the hour, then reloads the page's numbers. It recalculates at most once a minute for you, so a second press within the minute just reloads.
 
 Stats update in real-time as you watch scenes and interact with content. The performer, studio and tag rankings are the only part that recalculates periodically.
 
