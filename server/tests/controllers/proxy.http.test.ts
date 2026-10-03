@@ -541,6 +541,8 @@ describe("the media proxy and a browser that reads slowly", () => {
   let stashSent = 0;
   let peekUrl: string;
   let closePeek: () => Promise<void>;
+  /** Peek's response to the browser in the latest transfer. */
+  let peekResponse: http.ServerResponse | undefined;
   let setTimeoutSpy: { mockRestore: () => void } | undefined;
   let dateNowSpy: { mockRestore: () => void } | undefined;
 
@@ -571,7 +573,8 @@ describe("the media proxy and a browser that reads slowly", () => {
     state.stashUrl = `http://127.0.0.1:${(stashServer.address() as AddressInfo).port}`;
 
     const peek = await startTestApp((app) => {
-      app.use((req, _res, next) => {
+      app.use((req, res, next) => {
+        peekResponse = res;
         (req as AuthenticatedRequest).user = {
           id: 1,
           username: "u",
@@ -593,6 +596,7 @@ describe("the media proxy and a browser that reads slowly", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stashSent = 0;
+    peekResponse = undefined;
   });
 
   afterEach(() => {
@@ -655,7 +659,8 @@ describe("the media proxy and a browser that reads slowly", () => {
   /**
    * Every buffer between the browser and Stash fills: Peek stops reading
    * from Stash because the browser stopped reading from Peek, and Stash
-   * sends nothing more
+   * sends nothing more. Peek's response waits to drain, as the proxy's idle
+   * timeout checks: a quiet spell alone can pass before that
    */
   async function untilStashStops(): Promise<void> {
     let lastSent = -1;
@@ -664,6 +669,9 @@ describe("the media proxy and a browser that reads slowly", () => {
         const moved = stashSent !== lastSent;
         lastSent = stashSent;
         expect(moved).toBe(false);
+        expect(
+          must(peekResponse, "Peek's response to the browser").writableNeedDrain
+        ).toBe(true);
       },
       { timeout: 10000, interval: 200 }
     );
@@ -731,12 +739,20 @@ describe("the media proxy and a browser that reads slowly", () => {
     const clock = fakeClock(1_000_000);
     must(timeouts[0], "the first idle timeout").fire();
 
-    // The browser reads a megabyte and stops again
+    // The browser reads until Peek's response drains, the proxy's sign that
+    // the browser read, and stops again. A fixed amount can fall short: the
+    // browser's kernel can take a megabyte from its own buffer without
+    // telling Peek's (no window update until enough of it is free), and Peek
+    // then sees nothing read
     const readFirst = await new Promise<number>((resolve) => {
       let bytes = 0;
+      let drained = false;
+      must(peekResponse, "Peek's response to the browser").once("drain", () => {
+        drained = true;
+      });
       const onData = (chunk: Buffer): void => {
         bytes += chunk.length;
-        if (bytes < 1024 * 1024) return;
+        if (!drained) return;
         res.off("data", onData);
         res.pause();
         resolve(bytes);
