@@ -14,6 +14,7 @@ import {
   rowState,
   sameRowState,
   setRow,
+  withRefValue,
 } from "@/utils/filterFields";
 
 const sceneRow = (key: string): PanelField =>
@@ -160,5 +161,55 @@ describe("filterState", () => {
         { tagIds: ["1:a"], tagIdsModifier: "INCLUDES" }
       )
     ).toBe(true);
+  });
+});
+
+describe("withRefValue", () => {
+  it("adds an id to the row's values, keeps the condition, drops the id from the exclude companion, and on a single row replaces the value", () => {
+    const state: PanelState = {
+      tagIds: ["1:a"],
+      tagIdsModifier: "INCLUDES_ALL",
+      tagIdsExclude: ["2:a", "3:a"],
+      "2.tagIds": ["9:a"],
+      favorite: true,
+    };
+
+    const next = withRefValue("scene", state, "tagIds", "2:a");
+
+    expect(next).toEqual({
+      tagIds: ["1:a", "2:a"],
+      tagIdsModifier: "INCLUDES_ALL",
+      tagIdsExclude: ["3:a"],
+      "2.tagIds": ["9:a"],
+      favorite: true,
+    });
+    // The same id again changes nothing; the last exclusion going drops the key
+    expect(withRefValue("scene", next, "tagIds", "2:a")).toEqual(next);
+    expect(
+      withRefValue("scene", { tagIdsExclude: ["2:a"] }, "tagIds", "2:a")
+    ).toEqual({ tagIds: ["2:a"] });
+    // A row not there yet is added at the root
+    expect(withRefValue("scene", {}, "tagIds", "5:a")).toEqual({
+      tagIds: ["5:a"],
+    });
+    // A single row's value is replaced; its condition and depth stay
+    expect(
+      withRefValue(
+        "group",
+        { studioId: "1:a", studioIdModifier: "EXCLUDES", studioIdDepth: 1 },
+        "studioId",
+        "2:a"
+      )
+    ).toEqual({
+      studioId: "2:a",
+      studioIdModifier: "EXCLUDES",
+      studioIdDepth: 1,
+    });
+  });
+
+  it("a Has none / Has any condition gives way to the value", () => {
+    expect(
+      withRefValue("scene", { tagIdsModifier: "IS_NULL" }, "tagIds", "2:a")
+    ).toEqual({ tagIds: ["2:a"] });
   });
 });

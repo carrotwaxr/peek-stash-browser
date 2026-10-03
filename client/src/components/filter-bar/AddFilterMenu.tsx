@@ -11,9 +11,14 @@ import { WHERE_LIMITS } from "@peek/shared-types";
 import { LucidePlus } from "lucide-react";
 import type { ListFilters } from "../../hooks/useListFilters";
 import { useRovingFocus } from "../../hooks/useRovingFocus";
-import { type FilterOption, treeCounts } from "../../utils/filterFields";
+import {
+  type FilterOption,
+  treeCounts,
+  withRefValue,
+} from "../../utils/filterFields";
 import Button from "../ui/Button";
 import Popover from "../ui/Popover";
+import { type ValueResult, useValueSearch } from "./useValueSearch";
 
 interface AddFilterMenuProps {
   filters: ListFilters;
@@ -30,6 +35,12 @@ interface Section {
   readonly key: string;
   readonly label: string;
   readonly options: readonly FilterOption[];
+}
+
+/** A found entity as a menu option: the field it filters, its id and name */
+interface ValueOption extends ValueResult {
+  readonly key: string;
+  readonly field: FilterOption;
 }
 
 const NO_PINS: readonly string[] = [];
@@ -80,6 +91,11 @@ function sectionsOf(
  * the first goes back to the box; Enter or a click picks one, and Escape
  * closes the menu with focus back on "+ Filter".
  *
+ * Two characters or more also search the names of the entities the list's
+ * ref fields take (tags, performers, studios, collections, galleries), under
+ * a Values heading after the fields ("Tags: Outdoor"): picking one adds it
+ * to that field's first root row and applies it at once (`useValueSearch`).
+ *
  * At the row limit (`WHERE_LIMITS.rows`) the menu says so, and only fields
  * already in use at the root stay pickable: picking one opens its chip.
  */
@@ -115,9 +131,24 @@ const AddFilterMenu = ({
       }))
       .filter((section) => section.options.length > 0);
   }, [options, pinnedFields, query]);
-  const shown = sections.flatMap((section) => section.options);
+  const valueGroups = useValueSearch(options, open ? query : "");
+  const values = useMemo(
+    () =>
+      valueGroups.flatMap((group) =>
+        group.results.map(
+          (result): ValueOption => ({
+            ...result,
+            key: `${group.field.key}|${result.ref}`,
+            field: group.field,
+          })
+        )
+      ),
+    [valueGroups]
+  );
+  const shown = [...sections.flatMap((section) => section.options), ...values];
   const isDisabled = (option: FilterOption) =>
     atLimit && !inUse.has(option.key);
+  const isValueDisabled = (value: ValueOption) => isDisabled(value.field);
 
   const toggle = () => {
     if (!open) setQuery("");
@@ -128,6 +159,15 @@ const AddFilterMenu = ({
     if (isDisabled(option)) return;
     setOpen(false);
     onPick(option);
+  };
+
+  const pickValue = (value: ValueOption) => {
+    if (isValueDisabled(value)) return;
+    setOpen(false);
+    filters.commit(
+      withRefValue(filters.kind, filters.filters, value.field.key, value.ref)
+    );
+    triggerRef.current?.focus();
   };
 
   const enabledOptions = () =>
@@ -141,8 +181,14 @@ const AddFilterMenu = ({
       enabledOptions()[0]?.focus();
     } else if (event.key === "Enter") {
       event.preventDefault();
-      const first = shown.find((option) => !isDisabled(option));
+      const first = sections
+        .flatMap((section) => section.options)
+        .find((option) => !isDisabled(option));
       if (first !== undefined) pick(first);
+      else {
+        const value = values.find((each) => !isValueDisabled(each));
+        if (value !== undefined) pickValue(value);
+      }
     }
   };
 
@@ -157,11 +203,11 @@ const AddFilterMenu = ({
 
   const handleOptionKeyDown = (
     event: KeyboardEvent<HTMLDivElement>,
-    option: FilterOption
+    pickIt: () => void
   ) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    pick(option);
+    pickIt();
   };
 
   return (
@@ -256,7 +302,7 @@ const AddFilterMenu = ({
                         aria-disabled={disabled || undefined}
                         onClick={() => pick(option)}
                         onKeyDown={(event) =>
-                          handleOptionKeyDown(event, option)
+                          handleOptionKeyDown(event, () => pick(option))
                         }
                         className={`px-2 py-1.5 rounded text-sm ${
                           disabled
@@ -272,6 +318,42 @@ const AddFilterMenu = ({
                 </div>
               );
             })}
+            {values.length > 0 && (
+              <div role="group" aria-labelledby={`add-filter-${id}-values`}>
+                <div
+                  id={`add-filter-${id}-values`}
+                  role="presentation"
+                  className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Values
+                </div>
+                {values.map((value) => {
+                  const disabled = isValueDisabled(value);
+                  return (
+                    <div
+                      key={value.key}
+                      role="option"
+                      tabIndex={-1}
+                      aria-selected={false}
+                      aria-disabled={disabled || undefined}
+                      onClick={() => pickValue(value)}
+                      onKeyDown={(event) =>
+                        handleOptionKeyDown(event, () => pickValue(value))
+                      }
+                      className={`px-2 py-1.5 rounded text-sm ${
+                        disabled
+                          ? "cursor-not-allowed opacity-50"
+                          : "cursor-pointer hover:bg-[var(--bg-tertiary)] focus:bg-[var(--bg-tertiary)]"
+                      }`}
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {`${labelOf(value.field)}: ${value.name || "Unknown"}`}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </Popover>

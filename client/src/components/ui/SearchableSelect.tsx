@@ -8,7 +8,6 @@ import {
 } from "react";
 import {
   type MinimalEntity,
-  type MinimalRequest,
   type MinimalScope,
   Q_MAX_LENGTH,
 } from "@peek/shared-types";
@@ -18,10 +17,11 @@ import {
   LucideSearch,
   LucideX,
 } from "lucide-react";
-import { getPlaylists, getSharedPlaylists, libraryApi } from "../../api";
+import { getPlaylists, getSharedPlaylists } from "../../api";
 import { useDebouncedValue } from "../../hooks/useDebounce";
 import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
 import Button from "./Button";
+import { type MinimalEntityType, minimalFinder } from "./minimalFinder";
 
 /**
  * Searchable select for scenes, performers, studios, tags, groups and
@@ -76,14 +76,6 @@ interface SelectOption {
   owner?: string | undefined;
 }
 
-type MinimalEntityType =
-  | "scenes"
-  | "performers"
-  | "studios"
-  | "tags"
-  | "groups"
-  | "galleries";
-
 type EntityType = MinimalEntityType | "playlists";
 
 /** Options listed per search: one page */
@@ -91,31 +83,6 @@ const PAGE_SIZE = 50;
 
 /** Ids one request looks up: the server's limit (MINIMAL_IDS_MAX) */
 const IDS_PER_REQUEST = 100;
-
-type FindMinimal = (
-  params: MinimalRequest,
-  signal?: AbortSignal
-) => Promise<MinimalEntity[]>;
-
-/** The entity's `/minimal` endpoint; undefined for a type that has none */
-function minimalFinder(entityType: string): FindMinimal | undefined {
-  const finders: Record<MinimalEntityType, FindMinimal> = {
-    // The scene endpoint takes neither a scope nor a count filter
-    scenes: ({ ids, filter }, signal) =>
-      libraryApi.findScenesMinimal(
-        { ...(ids ? { ids } : {}), ...(filter ? { filter } : {}) },
-        signal
-      ),
-    performers: libraryApi.findPerformersMinimal,
-    studios: libraryApi.findStudiosMinimal,
-    tags: libraryApi.findTagsMinimal,
-    groups: libraryApi.findGroupsMinimal,
-    galleries: libraryApi.findGalleriesMinimal,
-  };
-  return Object.prototype.hasOwnProperty.call(finders, entityType)
-    ? finders[entityType as MinimalEntityType]
-    : undefined;
-}
 
 /**
  * A pick's icon buttons draw in the pick's own text colour: the tertiary

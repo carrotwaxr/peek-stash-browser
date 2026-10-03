@@ -50,6 +50,8 @@ export const queryKeys = {
     // The names of the ids a filter chip shows (`useRefNames`)
     names: (ids: readonly string[]) =>
       ["performers", undefined, "names", ids] as const,
+    // The entities a "+ Filter" search finds (`useValueSearch`)
+    search: (q: string) => ["performers", undefined, "search", q] as const,
   },
   studios: {
     all: (instanceId?: string) => ["studios", instanceId] as const,
@@ -65,6 +67,8 @@ export const queryKeys = {
     // The names of the ids a filter chip shows (`useRefNames`)
     names: (ids: readonly string[]) =>
       ["studios", undefined, "names", ids] as const,
+    // The entities a "+ Filter" search finds (`useValueSearch`)
+    search: (q: string) => ["studios", undefined, "search", q] as const,
   },
   tags: {
     all: (instanceId?: string) => ["tags", instanceId] as const,
@@ -82,6 +86,8 @@ export const queryKeys = {
     // The names of the ids a filter chip shows (`useRefNames`)
     names: (ids: readonly string[]) =>
       ["tags", undefined, "names", ids] as const,
+    // The entities a "+ Filter" search finds (`useValueSearch`)
+    search: (q: string) => ["tags", undefined, "search", q] as const,
   },
   galleries: {
     all: (instanceId?: string) => ["galleries", instanceId] as const,
@@ -97,6 +103,8 @@ export const queryKeys = {
     // The names of the ids a filter chip shows (`useRefNames`)
     names: (ids: readonly string[]) =>
       ["galleries", undefined, "names", ids] as const,
+    // The entities a "+ Filter" search finds (`useValueSearch`)
+    search: (q: string) => ["galleries", undefined, "search", q] as const,
   },
   groups: {
     all: (instanceId?: string) => ["groups", instanceId] as const,
@@ -112,6 +120,8 @@ export const queryKeys = {
     // The names of the ids a filter chip shows (`useRefNames`)
     names: (ids: readonly string[]) =>
       ["groups", undefined, "names", ids] as const,
+    // The entities a "+ Filter" search finds (`useValueSearch`)
+    search: (q: string) => ["groups", undefined, "search", q] as const,
   },
   images: {
     all: (instanceId?: string) => ["images", instanceId] as const,
