@@ -62,6 +62,8 @@ vi.mock("../../services/TooltipRelations.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 
 const ALLOWED = ["inst-a", "inst-b"];
+/** Career Length's years, the current year bound as its one parameter */
+const CAREER = careerYearsSql("p.careerLength", 0).sql;
 /** A performer's age: to their death date, else to today's day number, bound */
 const AGE = `CAST((CASE WHEN p.deathDate IS NULL THEN ? ELSE ${dayNumberSql("p.deathDate")} END) - ${dayNumberSql("p.birthdate")} AS INTEGER)`;
 const ref = (id: string, instanceId = "inst-a"): FilterRef => ({
@@ -237,7 +239,7 @@ describe("PerformerQueryBuilder", () => {
     it.each([
       ["weight", "p.weightKg ASC"],
       ["measurements", "p.measurements COLLATE NOCASE ASC"],
-      ["career_length", `${careerYearsSql("p.careerLength")} ASC NULLS LAST`],
+      ["career_length", `${CAREER} ASC NULLS LAST`],
     ] as const)("sorts by %s, then by name", async (field, expr) => {
       await run({ sort: { field, direction: "ASC", seed: undefined } });
 
@@ -252,7 +254,7 @@ describe("PerformerQueryBuilder", () => {
       });
 
       expect(pageStatement().sql).toContain(
-        `ORDER BY ${careerYearsSql("p.careerLength")} DESC NULLS LAST, p.name`
+        `ORDER BY ${CAREER} DESC NULLS LAST, p.name`
       );
     });
 
@@ -469,6 +471,28 @@ describe("PerformerQueryBuilder", () => {
       }
     });
 
+    it("career length counts to the current year in the viewer's zone: at 03:00 UTC on 1 January 2027 it is still 2026 in Chicago", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2027-01-01T03:00:00Z"));
+      try {
+        await run(
+          { filter: { career_length: { modifier: "EQUALS", value: 5 } } },
+          { timeZone: "America/Chicago" }
+        );
+        const { params } = pageStatement();
+        // The year binds just before the length it is compared with
+        expect(params[params.indexOf(2026) + 1]).toBe(5);
+
+        mockPrisma.$queryRawUnsafe.mockClear();
+        await run({
+          sort: { field: "career_length", direction: "ASC", seed: undefined },
+        });
+        expect(pageStatement().params).toContain(2027);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("age not 30 leaves out performers with no birthdate", async () => {
       await run({ filter: { age: { modifier: "NOT_EQUALS", value: 30 } } });
 
@@ -514,7 +538,7 @@ describe("PerformerQueryBuilder", () => {
         "(p.tattoos IS NULL OR p.tattoos NOT LIKE ? ESCAPE '\\')",
         "(p.piercings IS NOT NULL AND p.piercings != '')",
         "LOWER(p.measurements) = LOWER(?)",
-        `${careerYearsSql("p.careerLength")} BETWEEN ? AND ?`,
+        `${CAREER} BETWEEN ? AND ?`,
         `substr(${fullDateSql("p.birthdate")}, 1, 10) > ?`,
         "p.deathDate IS NULL",
         "p.stashCreatedAt < ?",

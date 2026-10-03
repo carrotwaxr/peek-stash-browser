@@ -270,8 +270,16 @@ function ageClause(timeZone: string): FilterClause {
   };
 }
 
-/** The years of the performer's career, from Stash's free-text career field */
-const CAREER_YEARS = careerYearsSql("p.careerLength");
+/**
+ * The years of the performer's career, from Stash's free-text career field,
+ * to the current year in the viewer's zone ("2015 - present")
+ */
+function careerYears(timeZone: string): FilterClause {
+  return careerYearsSql(
+    "p.careerLength",
+    Number(zonedToday(timeZone).slice(0, 4))
+  );
+}
 
 /**
  * A number derived from a date column (a year, an age): a performer without
@@ -346,6 +354,7 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       sql: `${sql} ${dir}`,
       params: [],
     });
+    const career = careerYears(ctx.timeZone);
     return {
       // Performer metadata, the name case-insensitive
       name: column("p.name COLLATE NOCASE"),
@@ -356,7 +365,10 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       weight: column("p.weightKg"),
       measurements: column("p.measurements COLLATE NOCASE"),
       penis_length: column("p.penisLength"),
-      career_length: { sql: `${CAREER_YEARS} ${dir} NULLS LAST`, params: [] },
+      career_length: {
+        sql: `${career.sql} ${dir} NULLS LAST`,
+        params: career.params,
+      },
 
       // Counts, as the viewer sees them
       scene_count: column(visibleCount(ctx, "p.sceneCount", "scenes")),
@@ -438,7 +450,14 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
 
     // Career: a performer without a value (or with text that names no years)
     // matches only IS_NULL
-    career_length: (c) => buildNumericFilter(c, CAREER_YEARS),
+    career_length: (c, ctx) => {
+      // buildNumericFilter writes the expression once, ahead of its values
+      const years = careerYears(ctx.timeZone);
+      const clause = buildNumericFilter(c, years.sql);
+      return clause.sql
+        ? { sql: clause.sql, params: [...years.params, ...clause.params] }
+        : clause;
+    },
 
     // Compared whole, ignoring case
     gender: (c) => genderClause(c),
