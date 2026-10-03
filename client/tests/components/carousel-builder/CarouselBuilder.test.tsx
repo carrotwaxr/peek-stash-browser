@@ -596,6 +596,32 @@ describe("CarouselBuilder", () => {
     expect(saved).toEqual(stored);
   });
 
+  it("over 20 rules, Preview and Save are refused with the Advanced view's message, and nothing is sent", async () => {
+    const fetchMock = await openWith({
+      match: "all",
+      rules: Array.from({ length: 19 }, (_, at) =>
+        leaf("title", { value: `title ${at}`, modifier: "INCLUDES" })
+      ),
+    });
+    // Two rows added while empty (the waiting row stays below 20 filled
+    // rules), then both filled: 21 rules, as the server counts them
+    addRow("top level", "title");
+    const first = document.activeElement;
+    addRow("top level", "title");
+    setFocused("sunset");
+    fireEvent.change(must(first, "the first title box"), {
+      target: { value: "beach" },
+    });
+
+    expect(
+      screen.getByText("21 of 20 rules. Remove 1 to apply.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Preview/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+    expect(screen.getByRole("button", { name: /Update/ })).toBeDisabled();
+    expect(requestsTo(fetchMock, "/carousels/preview")).toEqual([]);
+  });
+
   describe("Back", () => {
     const back = () => screen.getByRole("button", { name: "Back" });
     const prompt = () =>

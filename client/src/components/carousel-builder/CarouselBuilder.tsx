@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { PreviewCarouselResponse } from "@peek/shared-types";
+import { type PreviewCarouselResponse, isWhereGroup } from "@peek/shared-types";
 import { AlertCircle, ArrowLeft, Eye, Loader2, Save } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useSaveCarousel } from "../../api/hooks/useCarousels";
@@ -14,6 +14,7 @@ import {
   type EditTree,
   type PanelTable,
   countRows,
+  overLimit,
   panelTableOf,
   panelTreeOf,
   stateOf,
@@ -94,6 +95,9 @@ const CarouselBuilder = () => {
   // The rules a preview and a save send
   const body = carouselBody(tree);
   const ruleCount = countRows(tree, "scene");
+  // Over the limits, as the Advanced view refuses them: the editor's rows
+  // (a container past 20 would lose rows silently) and the groups sent
+  const refused = overLimit(ruleCount, body.rules.filter(isWhereGroup).length);
 
   // A sort the rules do not offer (its rule was removed, or it sits in a
   // group or under "Match any") reads as Random
@@ -188,6 +192,10 @@ const CarouselBuilder = () => {
       setPreviewError("Add at least one rule to preview");
       return;
     }
+    if (refused !== null) {
+      setPreviewError(refused);
+      return;
+    }
 
     setPreviewing(true);
     setPreviewError(null);
@@ -224,6 +232,11 @@ const CarouselBuilder = () => {
       return;
     }
 
+    if (refused !== null) {
+      setError(refused);
+      return;
+    }
+
     if (!previewValid) {
       setError("Preview must succeed before saving");
       return;
@@ -255,7 +268,8 @@ const CarouselBuilder = () => {
   };
 
   const IconComponent = getCarouselIcon(icon);
-  const canSave = title.trim() && ruleCount > 0 && previewValid;
+  const canSave =
+    title.trim() && ruleCount > 0 && refused === null && previewValid;
 
   if (loading) {
     return (
@@ -302,7 +316,7 @@ const CarouselBuilder = () => {
             <Button
               variant="secondary"
               onClick={() => void handlePreview()}
-              disabled={previewing || ruleCount === 0}
+              disabled={previewing || ruleCount === 0 || refused !== null}
               icon={
                 previewing ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -425,6 +439,9 @@ const CarouselBuilder = () => {
             allowGroups
             pickFromAll
           />
+          {refused !== null && (
+            <StatusMessage variant="info" title={null} message={refused} />
+          )}
         </div>
 
         {/* Sort Options */}

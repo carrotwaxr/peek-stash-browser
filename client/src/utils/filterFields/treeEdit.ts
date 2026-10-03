@@ -468,6 +468,20 @@ export function countRows(tree: EditTree, kind: ListKind): number {
 /** The groups the editor holds, empty ones included */
 export const countGroups = (tree: EditTree): number => tree.groups.length;
 
+/**
+ * Why rules over `WHERE_LIMITS` are refused (the Advanced view's Apply, the
+ * carousel builder's Preview and Save), or null within the limits
+ */
+export const overLimit = (rows: number, groups: number): string | null => {
+  if (rows > WHERE_LIMITS.rows) {
+    return `${rows} of ${WHERE_LIMITS.rows} rules. Remove ${rows - WHERE_LIMITS.rows} to apply.`;
+  }
+  if (groups > WHERE_LIMITS.groups) {
+    return `${groups} of ${WHERE_LIMITS.groups} groups. Remove ${groups - WHERE_LIMITS.groups} to apply.`;
+  }
+  return null;
+};
+
 /** Another row would fit under `WHERE_LIMITS.rows` */
 export const canAddRow = (tree: EditTree, kind: ListKind): boolean =>
   countRows(tree, kind) < WHERE_LIMITS.rows;
