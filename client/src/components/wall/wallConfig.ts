@@ -110,7 +110,9 @@ export const wallConfig = {
       const item = asClip(row);
       const parts: string[] = [];
       if (item.scene?.title) parts.push(item.scene.title);
-      if (item.primaryTag?.name) parts.push(item.primaryTag.name);
+      // An untitled clip already shows its tag as its title
+      if (item.primaryTag?.name && item.title?.trim())
+        parts.push(item.primaryTag.name);
       return parts.join(" • ");
     },
     hasPreview: true,
