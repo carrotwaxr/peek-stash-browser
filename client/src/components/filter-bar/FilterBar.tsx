@@ -373,18 +373,27 @@ const FilterBar = ({
     setEditor({ session: keyOf(at), at, fromMenu: false });
   };
 
-  // A field picked in "+ Filter": its first chip's editor, else a pending
-  // chip's for a new row of the field
+  // A field picked in "+ Filter": its first chip's editor (a first row a
+  // pressed pin draws is its chip too), else a pending chip's for a new row
+  // of the field
   const pick = (option: FilterOption) => {
     if (editor !== null) closeRef.current?.();
     const chip = drawn.find((each) => each.at.key === option.key);
+    const covered = pinnedFilters.some(
+      ({ pin, on }) => on && pin.key === option.key
+    );
     const at = chip?.at ?? {
       group: 0,
-      occurrence:
-        tree.rows.filter((row) => row.field.key === option.key).length + 1,
+      occurrence: covered
+        ? 1
+        : tree.rows.filter((row) => row.field.key === option.key).length + 1,
       key: option.key,
     };
-    setEditor({ session: keyOf(at), at, fromMenu: chip === undefined });
+    setEditor({
+      session: keyOf(at),
+      at,
+      fromMenu: chip === undefined && !covered,
+    });
   };
 
   // The open editor closed, applying what waits: the list's filters after
