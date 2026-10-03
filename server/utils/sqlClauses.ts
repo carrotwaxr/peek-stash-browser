@@ -590,24 +590,42 @@ export interface RefPresenceOptions {
  * "Has any" (`present`) or "has none" of a ref relation, whatever the ids:
  * on a column its IS NOT NULL or IS NULL; on a junction a keyed EXISTS or
  * NOT EXISTS, one per junction with an inherited one (any in either, none
- * in both). With `liveRef` a junction row counts only when its related row
- * is live and, for a viewer, has no exclusion row on its own instance or on
- * every one (`exclusionJoin` under the junction's alias plus `_x`, never
- * `e`, the list's own).
+ * in both). With `liveRef` a junction row, or the row a column names,
+ * counts only when the related row is live and, for a viewer, has no
+ * exclusion row on its own instance or on every one (`exclusionJoin` under
+ * the junction's alias, or `<parent alias>_<column>`, plus `_x`, never `e`,
+ * the list's own). A column needs it only where hiding the related entity
+ * does not cascade to the row (a collection's studio).
  */
 export function refPresenceClause(
   target: JunctionTarget | ColumnTarget,
   present: boolean,
   opts: RefPresenceOptions = {}
 ): FilterClause {
+  const { liveRef } = opts;
   if (target.kind === "column") {
     const col = `${target.parentAlias}.${target.idCol}`;
+    if (liveRef === undefined) {
+      return {
+        sql: `(${col} ${present ? "IS NOT NULL" : "IS NULL"})`,
+        params: [],
+      };
+    }
+    const r = `${target.parentAlias}_${target.idCol}_ref`;
+    const keyed = `${r}.id = ${col} AND ${r}.stashInstanceId = ${target.parentAlias}.${target.instanceCol} AND ${r}.deletedAt IS NULL`;
+    const negate = present ? "" : "NOT ";
+    if (liveRef.userId === null) {
+      return {
+        sql: `${negate}EXISTS (SELECT 1 FROM ${liveRef.table} ${r} WHERE ${keyed})`,
+        params: [],
+      };
+    }
+    const x = `${target.parentAlias}_${target.idCol}_x`;
     return {
-      sql: `(${col} ${present ? "IS NOT NULL" : "IS NULL"})`,
-      params: [],
+      sql: `${negate}EXISTS (SELECT 1 FROM ${liveRef.table} ${r} ${exclusionJoin(x, liveRef.entityType, `${r}.id`, `${r}.stashInstanceId`)} WHERE ${keyed} AND ${x}.id IS NULL)`,
+      params: [liveRef.userId],
     };
   }
-  const { liveRef } = opts;
   const exists = (t: JunctionTarget): FilterClause => {
     const j = t.alias;
     const [id, instance] = parentKeyOf(t);
