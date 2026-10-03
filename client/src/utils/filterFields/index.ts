@@ -75,6 +75,7 @@ export {
   mergeNotes,
   moveRow,
   normalizeEditTree,
+  overLimit,
   panelTreeOf,
   removeEditGroup,
   removeEditRow,

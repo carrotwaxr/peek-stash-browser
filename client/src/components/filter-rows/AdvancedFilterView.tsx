@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { type ListKind, WHERE_LIMITS } from "@peek/shared-types";
+import type { ListKind } from "@peek/shared-types";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useTVMode } from "../../hooks/useTVMode";
@@ -11,6 +11,7 @@ import {
   editTreeOf,
   filtersEqual,
   normalizeEditTree,
+  overLimit,
   panelTreeOf,
   stateOf,
   treeOf,
@@ -49,17 +50,6 @@ const chipText = ({ parts }: FilterChip): string => {
   return shown.length === 0
     ? parts.label
     : `${parts.label}: ${shown.join(" ")}`;
-};
-
-/** Why Apply is refused, or null within the limits */
-const overLimit = (rows: number, groups: number): string | null => {
-  if (rows > WHERE_LIMITS.rows) {
-    return `${rows} of ${WHERE_LIMITS.rows} rules. Remove ${rows - WHERE_LIMITS.rows} to apply.`;
-  }
-  if (groups > WHERE_LIMITS.groups) {
-    return `${groups} of ${WHERE_LIMITS.groups} groups. Remove ${groups - WHERE_LIMITS.groups} to apply.`;
-  }
-  return null;
 };
 
 /** The open view: its draft lives as long as it is open */
