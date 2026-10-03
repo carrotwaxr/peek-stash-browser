@@ -627,6 +627,11 @@ model StashInstance {
   // computed; until then nobody sees it (UserInstanceService). A new URL
   // sets it back to null
   firstSyncedAt DateTime?
+  // The admin's override of the VR tag: a tag id on this instance. Null
+  // means use Stash's own setting
+  vrTagId String?
+  // Stash's configuration.ui.vrTag as last read: a tag name
+  stashVrTag String?
 
   // Relations
   userSelections UserStashInstance[]

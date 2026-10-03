@@ -51,6 +51,8 @@ const INSTANCE_A = {
   updatedAt: new Date(),
   lastFullPassAt: null,
   firstSyncedAt: null,
+  vrTagId: null,
+  stashVrTag: null,
 };
 
 const INSTANCE_B = {
@@ -66,6 +68,8 @@ const INSTANCE_B = {
   updatedAt: new Date(),
   lastFullPassAt: null,
   firstSyncedAt: null,
+  vrTagId: null,
+  stashVrTag: null,
 };
 
 describe("StashInstanceManager", () => {

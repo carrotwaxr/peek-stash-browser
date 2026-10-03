@@ -94,6 +94,8 @@ export function stashInstanceRow(
     updatedAt: EPOCH,
     lastFullPassAt: null,
     firstSyncedAt: EPOCH,
+    vrTagId: null,
+    stashVrTag: null,
     ...overrides,
   };
 }
