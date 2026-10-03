@@ -37,8 +37,8 @@ const CAROUSEL_TABLE: PanelTable = {
   rows: CAROUSEL_FIELDS,
 };
 
-/** Where the builder goes back to */
-const SETTINGS = "/settings?section=user&tab=customization";
+/** Where the builder goes back to: the carousel list, under Settings, User Preferences, Navigation */
+const SETTINGS = "/settings?section=user&tab=navigation";
 
 /** What a save sends, as compared for unsaved changes */
 interface Draft {
