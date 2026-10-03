@@ -1,6 +1,16 @@
-import { type Locator, type Page, expect, test } from "@playwright/test";
+import {
+  type APIRequestContext,
+  type Browser,
+  type Locator,
+  type Page,
+  expect,
+  test,
+} from "@playwright/test";
 import { ListPage } from "./pages/ListPage";
+import { mustOk } from "./support/api";
 import { requireData } from "./support/data";
+import { uniqueName } from "./support/names";
+import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
 /**
  * E2E tests for TV mode's arrow keys (item 50): focus moves to the item
@@ -49,6 +59,57 @@ async function pressUntil(
     if (await reached()) return true;
   }
   return false;
+}
+
+/** Focuses `target` with `key` (checked before each press), at most `max` presses */
+async function reach(
+  page: Page,
+  key: string,
+  target: Locator,
+  max: number
+): Promise<boolean> {
+  const there = () => target.evaluate((el) => el === document.activeElement);
+  if (await there()) return true;
+  return pressUntil(page, key, there, max);
+}
+
+/**
+ * From the sheet's focused + Filter: OK opens its menu, the field's name is
+ * typed and OK picks it (a new row, focus in it)
+ */
+async function pickInSheet(page: Page, label: string) {
+  await page.keyboard.press("Enter");
+  const find = page.getByRole("combobox", { name: "Find a filter" });
+  await expect(find).toBeFocused();
+  await page.keyboard.type(label);
+  await expect(
+    page
+      .getByRole("listbox", { name: "Filters" })
+      .getByRole("option", { name: label, exact: true })
+  ).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(find).toHaveCount(0);
+}
+
+/**
+ * A throwaway user in TV mode on a 1920 px page, for a test that changes
+ * per-user state (pins, Views)
+ */
+async function tvUser(
+  browser: Browser,
+  baseURL: string | undefined,
+  request: APIRequestContext,
+  purpose: string
+) {
+  const user = await createUser(request, purpose);
+  const context = await signIn(browser, baseURL, user);
+  await completeSetup(context);
+  await context.addInitScript(() => {
+    localStorage.setItem("peek-tv-mode", "true");
+  });
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  return { user, context, page };
 }
 
 /** Opens the scene list at `path` and waits for its cards */
@@ -373,37 +434,47 @@ test.describe("TV mode", () => {
     await expect(list.viewModeButton).toBeFocused();
   });
 
-  test("with the D-pad, open + Filter, pick Tags, pick a tag; it applies at once", async ({
+  test("`/` focuses the search box, and Down from it lands on the first pin", async ({
+    page,
+  }) => {
+    const { list, cards } = await openScenes(page, "/scenes");
+
+    await cards.first().focus();
+    await page.keyboard.press("/");
+    await expect(list.searchInput).toBeFocused();
+    await expect(list.searchInput).toHaveValue("");
+
+    await page.keyboard.press("ArrowDown");
+    const first = list.filterBar.locator("button").first();
+    await expect(first).toBeFocused();
+    await expect(first).toHaveAttribute("aria-pressed", /true|false/);
+  });
+
+  test("with the D-pad, the pinned Tags chip opens the sheet at Tags; pick a tag; Show N applies", async ({
     page,
   }) => {
     const { list } = await openScenes(page, "/scenes");
 
-    // Enter on + Filter opens the menu with focus in its search box
-    await list.addFilterButton.focus();
+    // Enter on the pinned field's empty chip opens the sheet at its row
+    const chip = page.getByRole("button", {
+      name: "Edit filter: Tags",
+      exact: true,
+    });
+    await chip.focus();
     await page.keyboard.press("Enter");
-    await expect(
-      page.getByRole("combobox", { name: "Find a filter" })
-    ).toBeFocused();
+    await expect(list.sheet).toBeVisible();
+    const row = list.sheetRow("Tags");
+    await expect(row.locator(":focus")).toHaveCount(1);
 
-    // Down moves into the list of fields, and on through it
-    const fields = page.getByRole("listbox", { name: "Filters" });
-    await page.keyboard.press("ArrowDown");
-    await expect(fields.getByRole("option").first()).toBeFocused();
-    const tags = fields.getByRole("option", { name: "Tags", exact: true });
-    const reachedTags = await pressUntil(
-      page,
-      "ArrowDown",
-      () => tags.evaluate((el) => el === document.activeElement),
-      10
-    );
-    expect(reachedTags, "Down reaches Tags in the list").toBe(true);
-
-    // Enter picks it: the Tags editor opens under a new chip, its list open
-    // with focus in the list's search box; Down reaches an option
+    // Down to the picker; Enter opens its list, already holding a page of
+    // tags, so nothing need be typed
+    const picker = row.getByRole("button", { name: /^Tags: Select tags/ });
+    expect(
+      await reach(page, "ArrowDown", picker, 3),
+      "Down reaches the picker"
+    ).toBe(true);
     await page.keyboard.press("Enter");
-    const editor = list.chipEditor("Tags");
-    await expect(editor).toBeVisible();
-    const search = editor.getByPlaceholder("Type to search...");
+    const search = row.getByPlaceholder("Type to search...");
     await expect(search).toBeFocused();
     const dropdown = search.locator(
       "xpath=ancestor::div[contains(@class, 'absolute')][1]"
@@ -417,28 +488,47 @@ test.describe("TV mode", () => {
     const tagName = (await option.innerText()).trim();
     await page.keyboard.press("Enter");
     await expect(option).toHaveAttribute("aria-pressed", "true");
+    // Nothing applies before Show N
+    expect(page.url()).not.toMatch(/[?&]tagIds=/);
 
-    // The pick applies at once
-    await expect(page).toHaveURL(/[?&]tagIds=/);
-
-    // Escape closes the list, then the editor, with focus on the chip
+    // Escape closes the list, back on the picker, inside the sheet
     await page.keyboard.press("Escape");
     await expect(search).toHaveCount(0);
-    await expect(editor).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(editor).toHaveCount(0);
-    const chip = page.getByRole("button", { name: /^Edit filter: Tags/ });
-    await expect(chip).toContainText(tagName);
-    await expect(chip).toBeFocused();
+    await expect(list.sheet).toBeVisible();
+    await expect(row.getByRole("button", { name: /^Tags: / })).toBeFocused();
+
+    // Down reaches Show N results; OK applies and closes the sheet
+    await expect(list.showResults).toBeVisible({ timeout: 15_000 });
+    expect(
+      await reach(page, "ArrowDown", list.showResults, 6),
+      "Down reaches Show N results"
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(list.sheet).toHaveCount(0);
+    await expect(page).toHaveURL(/[?&]tagIds=/);
+    await expect(
+      page.getByRole("button", { name: /^Edit filter: Tags: / })
+    ).toContainText(tagName);
   });
 
-  test("in a chip's editor, Left and Right cross a range's number fields; Space and Enter (a remote's OK) tick the Orientation boxes", async ({
+  test("in the sheet, Right crosses a number range's Min and Max; Space and Enter (a remote's OK) tick an Orientation box", async ({
     page,
   }) => {
     const { list } = await openScenes(page, "/scenes");
 
+    // "Filters" opens the sheet; Down reaches its + Filter
+    await list.filtersButton.focus();
+    await page.keyboard.press("Enter");
+    await expect(list.sheet).toBeVisible();
+    const add = list.sheet.getByRole("button", { name: "Add filter" });
+    expect(
+      await reach(page, "ArrowDown", add, 12),
+      "Down reaches + Filter"
+    ).toBe(true);
+
     // An empty number field hands Left and Right on
-    const bitrate = await list.addFilter("Bitrate");
+    await pickInSheet(page, "Bitrate (Mbps)");
+    const bitrate = list.sheetRow("Bitrate (Mbps)");
     const min = bitrate.getByPlaceholder("Min");
     const max = bitrate.getByPlaceholder("Max");
     await expect(min).toBeFocused();
@@ -446,15 +536,19 @@ test.describe("TV mode", () => {
     await expect(max).toBeFocused();
     await page.keyboard.press("ArrowLeft");
     await expect(min).toBeFocused();
-    await list.closeEditor();
 
-    // The Orientation editor opens on its first box
-    const orientation = await list.addFilter("Orientation");
+    // Down from the row reaches + Filter again; the Orientation row opens on
+    // its first box
+    expect(
+      await reach(page, "ArrowDown", add, 4),
+      "Down reaches + Filter"
+    ).toBe(true);
+    await pickInSheet(page, "Orientation");
+    const orientation = list.sheetRow("Orientation");
     const landscape = orientation.getByRole("checkbox", { name: "Landscape" });
     await expect(landscape).toBeFocused();
     await page.keyboard.press("Space");
     await expect(landscape).toBeChecked();
-    await expect(page).toHaveURL(/[?&]orientation=LANDSCAPE(&|$)/);
 
     // Down reaches the next box; Enter ticks and unticks it
     const portrait = orientation.getByRole("checkbox", { name: "Portrait" });
@@ -465,6 +559,212 @@ test.describe("TV mode", () => {
     await page.keyboard.press("Enter");
     await expect(portrait).not.toBeChecked();
     await expect(portrait).toBeFocused();
+
+    // Show N applies the box ticked, not the empty range
+    expect(
+      await reach(page, "ArrowDown", list.showResults, 8),
+      "Down reaches Show N results"
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/[?&]orientation=LANDSCAPE(&|$)/);
+    expect(page.url()).not.toMatch(/[?&]bitrate/i);
+  });
+
+  test("`f` opens the sheet at + Filter, and the D-pad stays inside its open menu", async ({
+    page,
+  }) => {
+    const { list, cards } = await openScenes(page, "/scenes");
+
+    await cards.first().focus();
+    await page.keyboard.press("f");
+    await expect(list.sheet).toBeVisible();
+    const add = list.sheet.getByRole("button", { name: "Add filter" });
+    await expect(add).toBeFocused();
+
+    // The menu over the sheet: Up from its search box has nowhere to go
+    // inside it, so focus stays, never on the rows behind
+    await page.keyboard.press("Enter");
+    const find = page.getByRole("combobox", { name: "Find a filter" });
+    await expect(find).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(find).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(find).toBeFocused();
+
+    // Down into the fields and back; Escape closes the menu onto + Filter
+    await page.keyboard.press("ArrowDown");
+    const fields = page.getByRole("listbox", { name: "Filters" });
+    await expect(fields.getByRole("option").first()).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(find).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(find).toHaveCount(0);
+    await expect(add).toBeFocused();
+    await expect(list.sheet).toBeVisible();
+  });
+
+  test("a pinned filter toggles with OK and the list follows", async ({
+    page,
+  }) => {
+    const { list } = await openScenes(page, "/scenes");
+
+    // The seeded Unwatched pin, reached along the chip row
+    const unwatched = list.filterBar.getByRole("button", {
+      name: "Unwatched",
+      exact: true,
+    });
+    await expect(unwatched).toHaveAttribute("aria-pressed", "false");
+    await list.searchInput.focus();
+    await page.keyboard.press("ArrowDown");
+    expect(
+      await reach(page, "ArrowRight", unwatched, 6),
+      "Right reaches Unwatched"
+    ).toBe(true);
+
+    const filtered = page.waitForRequest(
+      (request) =>
+        request.url().endsWith("/api/library/scenes") &&
+        request.method() === "POST" &&
+        JSON.stringify(request.postDataJSON()).includes('"watched"')
+    );
+    await page.keyboard.press("Enter");
+    await filtered;
+    await expect(page).toHaveURL(/[?&]watched=false(&|$)/);
+    await expect(unwatched).toHaveAttribute("aria-pressed", "true");
+    await expect(unwatched).toBeFocused();
+
+    await page.keyboard.press("Enter");
+    await expect(page).not.toHaveURL(/[?&]watched=/);
+    await expect(unwatched).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("pin Studios from the sheet by D-pad", async ({
+    browser,
+    baseURL,
+    request,
+  }) => {
+    // Pins are per-user state: a throwaway user of its own
+    const { context, page, user } = await tvUser(
+      browser,
+      baseURL,
+      request,
+      "tv-pin"
+    );
+    try {
+      const { list } = await openScenes(page, "/scenes");
+      const studios = page.getByRole("button", {
+        name: "Edit filter: Studios",
+        exact: true,
+      });
+      await expect(studios).toHaveCount(0);
+
+      // + Filter in the bar opens the sheet at its + Filter; pick Studios
+      await list.addFilterButton.focus();
+      await page.keyboard.press("Enter");
+      await expect(list.sheet).toBeVisible();
+      await expect(
+        list.sheet.getByRole("button", { name: "Add filter" })
+      ).toBeFocused();
+      await pickInSheet(page, "Studios");
+      const row = list.sheetRow("Studios");
+      await expect(row.locator(":focus")).toHaveCount(1);
+
+      // Up to the row's header: Pin, then OK
+      const pin = row.getByRole("button", { name: "Pin Studios" });
+      await page.keyboard.press("ArrowUp");
+      expect(
+        (await reach(page, "ArrowLeft", pin, 3)) ||
+          (await reach(page, "ArrowRight", pin, 3)),
+        "Up, then along the header, reaches Pin"
+      ).toBe(true);
+      await page.keyboard.press("Enter");
+      await expect(
+        row.getByRole("button", { name: "Unpin Studios" })
+      ).toBeVisible();
+
+      // Closed, the pinned chip sits with the pinned fields, before every
+      // other chip and the row's buttons
+      await page.keyboard.press("Escape");
+      await expect(list.sheet).toHaveCount(0);
+      await expect(studios).toBeVisible();
+      const names = await list.filterBar
+        .locator("button")
+        .evaluateAll((els) =>
+          els.map((el) => el.getAttribute("aria-label") ?? el.textContent)
+        );
+      const at = names.indexOf("Edit filter: Studios");
+      expect(at).toBeGreaterThan(0);
+      expect(
+        names.slice(0, at).every((name) => !/^Filters/.test(name ?? ""))
+      ).toBe(true);
+      expect(
+        names.findIndex((name) => /^Filters/.test(name ?? ""))
+      ).toBeGreaterThan(at);
+
+      // Still pinned after a reload
+      await page.reload();
+      await expect(studios).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await context.close();
+      await deleteUser(request, user.id);
+    }
+  });
+
+  test("the Views menu opens with OK and a view loads", async ({
+    browser,
+    baseURL,
+    request,
+  }) => {
+    // Views are per-user state: a throwaway user of its own
+    const { context, page, user } = await tvUser(
+      browser,
+      baseURL,
+      request,
+      "tv-views"
+    );
+    try {
+      const name = uniqueName("by title");
+      const saved = await mustOk(
+        await context.request.post("/api/user/filter-presets", {
+          data: {
+            artifactType: "scene",
+            context: "scene",
+            name,
+            filters: {},
+            sort: "title",
+            direction: "ASC",
+            viewMode: "grid",
+            zoomLevel: "medium",
+            gridDensity: "medium",
+            tableColumns: null,
+            perPage: 24,
+            setAsDefault: false,
+          },
+        }),
+        "Saving a scene View"
+      );
+      const { preset } = (await saved.json()) as { preset: { id: string } };
+
+      const { list } = await openScenes(page, "/scenes");
+      await list.viewsButton.focus();
+      await page.keyboard.press("Enter");
+      const dialog = page.getByRole("dialog", { name: "Views" });
+      await expect(dialog).toBeVisible();
+      const view = dialog.getByRole("button", { name });
+      await expect(view).toBeFocused();
+
+      await page.keyboard.press("Enter");
+      await expect(dialog).toHaveCount(0);
+      await expect(page).toHaveURL(
+        new RegExp(`[?&]savedView=${preset.id}(&|$)`)
+      );
+      await expect(page).toHaveURL(/[?&]sort=title(&|$)/);
+      await expect(list.viewsButton).toHaveAccessibleName(`Views: ${name}`);
+      await expect(list.viewsButton).toBeFocused();
+    } finally {
+      await context.close();
+      await deleteUser(request, user.id);
+    }
   });
 
   test("Up and Down leave a range slider; Left and Right change it", async ({

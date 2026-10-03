@@ -11,6 +11,14 @@ export class ListPage {
   readonly filterBar: Locator;
   /** "+ Filter", which opens the list of fields to filter by */
   readonly addFilterButton: Locator;
+  /** "Filters (n)" on a phone or a TV, which opens the filter sheet */
+  readonly filtersButton: Locator;
+  /** "Views" or "Views: <name>", the saved Views menu */
+  readonly viewsButton: Locator;
+  /** The filter sheet (a phone or a TV) */
+  readonly sheet: Locator;
+  /** The sheet's "Show N results", once the count is in */
+  readonly showResults: Locator;
   readonly sortControl: Locator;
   readonly sortDirection: Locator;
   readonly viewModeButton: Locator;
@@ -27,6 +35,14 @@ export class ListPage {
     this.searchInput = page.getByPlaceholder("Search...");
     this.addFilterButton = page.getByRole("button", { name: "Add filter" });
     this.filterBar = page.getByRole("group", { name: "Filters", exact: true });
+    this.filtersButton = page.getByRole("button", {
+      name: /^Filters( \(\d+\))?$/,
+    });
+    this.viewsButton = page.getByRole("button", { name: /^Views(:|$)/ });
+    this.sheet = page.getByRole("dialog", { name: "Filters", exact: true });
+    this.showResults = this.sheet.getByRole("button", {
+      name: /^Show [\d,]+ results?$/,
+    });
     this.sortControl = page.locator('[data-tv-search-item="sort-control"]');
     this.sortDirection = page.locator('[data-tv-search-item="sort-direction"]');
     this.viewModeButton = page.locator('button[aria-label*="View mode"]');
@@ -102,6 +118,13 @@ export class ListPage {
     const name = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return this.page.getByRole("dialog", {
       name: new RegExp(`^${name}( \\(.+\\))? filter$`),
+    });
+  }
+
+  /** A row of the filter sheet, by its field's name (the row's heading) */
+  sheetRow(label: string): Locator {
+    return this.sheet.locator("[data-sheet-row]").filter({
+      has: this.page.getByRole("heading", { name: label, exact: true }),
     });
   }
 

@@ -33,6 +33,11 @@ const { mockApiGet, mockApiPost, mockApiPut, mockApiPatch, mockApiDelete } =
     mockApiDelete: vi.fn<(path: string) => Promise<unknown>>(),
   }));
 
+let tv = false;
+vi.mock("@/hooks/useTVMode", () => ({
+  useTVMode: () => ({ isTVMode: tv }),
+}));
+
 vi.mock("@/api", () => ({
   apiGet: mockApiGet,
   apiPost: mockApiPost,
@@ -187,6 +192,7 @@ async function loadByClick(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  tv = false;
   mockApiGet.mockImplementation((path) =>
     Promise.resolve(
       path === "/user/filter-presets"
@@ -626,5 +632,44 @@ describe("ViewsMenu", () => {
     await actAsync(() => list.state.setSort("title"));
     expect(list.params().has("savedView")).toBe(false);
     expect(list.params().get("sort")).toBe("title");
+  });
+
+  it("in TV mode the menu opens as a dialog listing views as buttons, actions below", async () => {
+    tv = true;
+    const user = userEvent.setup();
+    const list = renderMenu();
+    await user.click(viewsButton());
+
+    const dialog = await screen.findByRole("dialog", { name: "Views" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    const fave = within(dialog).getByRole("button", { name: /^Fave Ladies/ });
+    const big = within(dialog).getByRole("button", { name: /^Big table/ });
+    const actions = [
+      "Save changes",
+      "Save as new view",
+      "Rename view",
+      "Delete view",
+      "Set as default for All Scenes page",
+    ].map((name) => within(dialog).getByRole("button", { name }));
+    const before = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(before(fave, big)).toBe(true);
+    for (const action of actions) expect(before(big, action)).toBe(true);
+    expect(fave).toHaveAttribute("aria-pressed", "false");
+    // Focus starts on the first view, so OK loads it
+    expect(fave).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(list.params().get("savedView")).toBe("v1"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const button = screen.getByRole("button", { name: /^Views: Fave Ladies/ });
+    await waitFor(() => expect(button).toHaveFocus());
+
+    // Reopened, the active view is pressed and has focus
+    await user.click(button);
+    const again = await screen.findByRole("dialog", { name: "Views" });
+    const active = within(again).getByRole("button", { name: /^Fave Ladies/ });
+    expect(active).toHaveAttribute("aria-pressed", "true");
+    expect(active).toHaveFocus();
   });
 });

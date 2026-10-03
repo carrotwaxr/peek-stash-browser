@@ -277,6 +277,19 @@ function pickFrom(
 }
 
 /**
+ * Where TV focus moves: inside the open dialog that holds focus, a
+ * `Popover` (a chip's editor, a menu) as much as a `Modal`, so an arrow
+ * never leaves a popover for the page behind it (Escape closes it), else
+ * inside `outer` (the top modal, else the page).
+ */
+export function focusRoot(outer: Element): Element {
+  const active = document.activeElement;
+  const dialog =
+    active instanceof Element ? active.closest('[role="dialog"]') : null;
+  return dialog !== null && outer.contains(dialog) ? dialog : outer;
+}
+
+/**
  * Moves focus from the focused element to the nearest candidate in
  * `direction` inside `root` (with nothing focused there, to the first item in
  * view). Focuses without the browser's scroll, then scrolls the element just

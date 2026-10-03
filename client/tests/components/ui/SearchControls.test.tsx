@@ -15,6 +15,7 @@ import type { FilterPreset } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -28,6 +29,7 @@ import {
 } from "@tests/helpers/ListControls";
 import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { pinsAnswer } from "@tests/helpers/filterPins";
+import { matchMediaQueries } from "@tests/helpers/matchMedia";
 import { sentFilter } from "@tests/helpers/sentFilter";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
 import { must } from "@tests/testUtils";
@@ -38,14 +40,16 @@ import {
   presetsQueryOptions,
 } from "../../../src/api/hooks/usePresets";
 import { queryKeys } from "../../../src/api/queryKeys";
+import { SHEET_QUERY } from "../../../src/hooks/useFilterSurface";
 import type { ListView } from "../../../src/hooks/useListUrlState";
 import {
   WALL_VIEW_SETTINGS,
   useWallPlayback,
 } from "../../../src/hooks/useWallPlayback";
 
+let tvMode = false;
 vi.mock("../../../src/hooks/useTVMode", () => ({
-  useTVMode: () => ({ isTVMode: false }),
+  useTVMode: () => ({ isTVMode: tvMode }),
 }));
 
 vi.mock("../../../src/contexts/UnitPreferenceContext", () => ({
@@ -1388,5 +1392,139 @@ describe("SearchControls text condition (F22b)", () => {
         name: "Remove filter: Path: starts with /media",
       })
     ).toBeInTheDocument();
+  });
+});
+
+describe("keys", () => {
+  const searchBox = () => screen.getByPlaceholderText("Search...");
+  const findFilter = () =>
+    screen.queryByRole("combobox", { name: "Find a filter" });
+  let restore: (() => void) | null = null;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(apiModule.apiGet).mockImplementation(() =>
+      Promise.resolve({ presets: {}, defaults: {} })
+    );
+  });
+
+  afterEach(() => {
+    tvMode = false;
+    restore?.();
+    restore = null;
+  });
+
+  /** The list's controls beside another text field, as on a page */
+  const WithField = (props: ListControlsProps) => (
+    <>
+      <input type="text" aria-label="Another field" />
+      <ListControls {...props} />
+    </>
+  );
+
+  it("`/` focuses the search box from the list (not while typing in a field)", async () => {
+    const user = userEvent.setup();
+    const list = renderSearchControls({}, { element: WithField });
+    await firstQuery(list.onQueryChange);
+
+    // From the sort direction button: focus moves, nothing is typed
+    screen.getByRole("button", { name: /^Sort direction/ }).focus();
+    await user.keyboard("/");
+    expect(searchBox()).toHaveFocus();
+    expect(searchBox()).toHaveValue("");
+
+    // In a text field the key is the field's
+    const field = screen.getByRole("textbox", { name: "Another field" });
+    await user.click(field);
+    await user.keyboard("a/b");
+    expect(field).toHaveFocus();
+    expect(field).toHaveValue("a/b");
+  });
+
+  it("`f` opens + Filter on desktop and the sheet on phone and TV", async () => {
+    const user = userEvent.setup();
+    const pressF = async () => {
+      const list = renderSearchControls();
+      await firstQuery(list.onQueryChange);
+      screen.getByRole("button", { name: /^Sort direction/ }).focus();
+      await user.keyboard("f");
+    };
+
+    // A desktop: the bar's + Filter menu, focus in its search box
+    await pressF();
+    expect(findFilter()).toHaveFocus();
+    expect(
+      screen.queryByRole("dialog", { name: "Filters" })
+    ).not.toBeInTheDocument();
+    cleanup();
+
+    // A phone: the sheet at its field list
+    restore = matchMediaQueries([SHEET_QUERY]);
+    await pressF();
+    let sheet = await screen.findByRole("dialog", { name: "Filters" });
+    await waitFor(() =>
+      expect(
+        within(sheet).getByRole("combobox", { name: "Find a filter" })
+      ).toHaveFocus()
+    );
+    cleanup();
+    restore();
+    restore = null;
+
+    // TV mode: the sheet at its + Filter button
+    tvMode = true;
+    await pressF();
+    sheet = await screen.findByRole("dialog", { name: "Filters" });
+    await waitFor(() =>
+      expect(
+        within(sheet).getByRole("button", { name: "Add filter" })
+      ).toHaveFocus()
+    );
+  });
+
+  it("neither runs inside a dialog (overlay scope) or the player", async () => {
+    const user = userEvent.setup();
+    const WithPlayer = (props: ListControlsProps) => (
+      <>
+        <div className="video-js">
+          <button type="button">Play</button>
+        </div>
+        <ListControls {...props} />
+      </>
+    );
+    const list = renderSearchControls({}, { element: WithPlayer });
+    await firstQuery(list.onQueryChange);
+
+    // The player: its keys, not the list's
+    screen.getByRole("button", { name: "Play" }).focus();
+    await user.keyboard("/");
+    await user.keyboard("f");
+    expect(searchBox()).not.toHaveFocus();
+    expect(findFilter()).not.toBeInTheDocument();
+
+    // A dialog (the Advanced view, a Modal): no page key runs
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
+    const dialog = await screen.findByRole("dialog");
+    within(dialog).getAllByRole("button")[0]?.focus();
+    await user.keyboard("/");
+    await user.keyboard("f");
+    expect(searchBox()).not.toHaveFocus();
+    expect(findFilter()).not.toBeInTheDocument();
+  });
+
+  it("`f` does nothing while the list is not filterable (the Tags hierarchy)", async () => {
+    const user = userEvent.setup();
+    const list = renderSearchControls(
+      { artifactType: "tag", filterable: false },
+      { url: "/tags" }
+    );
+    await firstQuery(list.onQueryChange);
+    screen.getByRole("button", { name: /^Sort direction/ }).focus();
+    await user.keyboard("f");
+    expect(findFilter()).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Sort direction/ })
+    ).toHaveFocus();
   });
 });

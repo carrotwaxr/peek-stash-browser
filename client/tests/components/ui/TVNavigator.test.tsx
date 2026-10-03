@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FilterControl } from "@/components/ui/FilterControls";
 import GlobalLayout from "@/components/ui/GlobalLayout";
+import Popover from "@/components/ui/Popover";
 import TVNavigator from "@/components/ui/TVNavigator";
 import { AuthContext } from "@/contexts/AuthContextProvider";
 import { ShortcutScopeProvider } from "@/contexts/ShortcutScopeContext";
@@ -112,6 +113,48 @@ describe("TVNavigator", () => {
     // An arrow it leaves moves focus inside it only
     fireEvent.keyDown(byId("lb-top"), { key: "ArrowDown" });
     expect(document.activeElement?.id).toBe("lb-bottom");
+  });
+
+  it("with a popover open (not modal), arrows stay inside it", () => {
+    /** A popover over the page, as a chip's editor or a menu opens */
+    const WithPopover = () => {
+      const anchorRef = useRef<HTMLButtonElement>(null);
+      return (
+        <main>
+          <button ref={anchorRef} id="anchor">
+            Open
+          </button>
+          <div id="card-a" data-tv-item tabIndex={-1} />
+          <div id="card-b" data-tv-item tabIndex={-1} />
+          <Popover anchorRef={anchorRef} open onClose={() => {}} label="Menu">
+            <button id="pop-top">First</button>
+            <button id="pop-bottom">Second</button>
+          </Popover>
+        </main>
+      );
+    };
+    renderWithNavigator(<WithPopover />);
+    placeById("anchor", { left: 0, top: 0, width: 50, height: 30 });
+    placeById("pop-top", { left: 0, top: 40, width: 200, height: 30 });
+    placeById("pop-bottom", { left: 0, top: 400, width: 200, height: 30 });
+    // Cards behind the popover: nearer below than its own next control
+    placeById("card-a", { left: 0, top: 100, width: 100, height: 100 });
+    placeById("card-b", { left: 0, top: 500, width: 100, height: 100 });
+    // The popover focused its first control on open
+    expect(document.activeElement?.id).toBe("pop-top");
+
+    fireEvent.keyDown(byId("pop-top"), { key: "ArrowDown" });
+    expect(document.activeElement?.id).toBe("pop-bottom");
+
+    // Nothing further inside it: focus stays, never on the page behind
+    fireEvent.keyDown(byId("pop-bottom"), { key: "ArrowDown" });
+    expect(document.activeElement?.id).toBe("pop-bottom");
+    fireEvent.keyDown(byId("pop-bottom"), { key: "ArrowLeft" });
+    expect(document.activeElement?.id).toBe("pop-bottom");
+    fireEvent.keyDown(byId("pop-bottom"), { key: "ArrowUp" });
+    expect(document.activeElement?.id).toBe("pop-top");
+    fireEvent.keyDown(byId("pop-top"), { key: "ArrowUp" });
+    expect(document.activeElement?.id).toBe("pop-top");
   });
 
   it("arrows in the search input move the caret; Up leaves the input", () => {

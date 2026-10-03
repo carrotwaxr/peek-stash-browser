@@ -5,7 +5,7 @@ import {
   useShortcutScopeContext,
 } from "../../hooks/useShortcutScope";
 import { isSlider } from "../../utils/keyTargets";
-import { type Direction, moveFocus } from "../../utils/spatialFocus";
+import { type Direction, focusRoot, moveFocus } from "../../utils/spatialFocus";
 
 /** How long after a route change the first item may still take focus */
 const ROUTE_FOCUS_WAIT_MS = 5000;
@@ -13,8 +13,9 @@ const ROUTE_FOCUS_WAIT_MS = 5000;
 /**
  * TV mode's arrow keys (item 50), mounted by `GlobalLayout` while TV mode is
  * on. A `tv` scope: an arrow moves focus to the nearest item in that
- * direction by position (`utils/spatialFocus.ts`), inside the top modal when
- * one is open (the dispatcher hands a modal's unused arrows here), else the
+ * direction by position (`utils/spatialFocus.ts`), inside the popover or
+ * dialog that holds focus (`focusRoot`), else inside the top modal when one
+ * is open (the dispatcher hands a modal's unused arrows here), else the
  * whole page. PageUp and PageDown are left to the page's own scope. On a
  * closed select the arrows move focus too and Enter opens it; on a slider Up
  * and Down move focus while Left and Right change its value (the rules are
@@ -33,7 +34,9 @@ const TVNavigator = () => {
   const location = useLocation();
 
   const move = (direction: Direction) => (event: KeyboardEvent) => {
-    if (moveFocus(direction, topModalRoot() ?? document.body)) return true;
+    if (moveFocus(direction, focusRoot(topModalRoot() ?? document.body))) {
+      return true;
+    }
     // Nowhere to go: a select or slider that handed the arrow over still
     // takes it (handled), so the browser does not step its value
     const target = event.target;
