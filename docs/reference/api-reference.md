@@ -1,7 +1,7 @@
 # API Reference
 
 > Generated from the server's source by `cd server && npm run generate-api-docs`; do not edit it by hand.
-> Last updated: 2026-10-02
+> Last updated: 2026-10-03
 
 **Authentication** names who may call a route: **None** (anyone), **Session** (a signed-in Peek user), **Admin** (a signed-in admin), **Session or signed link** (a session, or the personal link the external player gets), or **None until setup starts, then Admin** (open to the setup wizard while Peek has no user and no Stash server).
 
@@ -1809,6 +1809,33 @@ type FindScenesRequest = ListRequestInput<"scene">;
 
 ---
 
+### POST /api/library/scenes/minimal
+
+Minimal data for the scene picker (a clip filter's scenes)
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+type FindScenesMinimalRequest = Omit<
+  MinimalRequest,
+  "scope" | "count_filter"
+>;
+```
+
+**Response:**
+
+```typescript
+interface FindScenesMinimalResponse {
+  scenes: MinimalEntity[];
+}
+```
+
+**Handler:** `findScenesMinimal` in `server/controllers/library/scenes.ts`
+
+---
+
 ### GET /api/library/scenes/:id/similar
 
 Find similar scenes
@@ -2202,6 +2229,24 @@ type FindImagesRequest = ListRequestInput<"image">;
 
 ---
 
+### POST /api/library/clips
+
+Find clips with the clip filter body (GET /api/clips keeps the old parameters)
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+type FindClipsRequest = ClipListRequestInput;
+```
+
+**Response:** `FindClipsResponse<ListCount>`
+
+**Handler:** `findClips` in `server/controllers/clips.ts`
+
+---
+
 ## Clips
 
 Clips (scene markers from Stash).
@@ -2308,9 +2353,46 @@ interface GetClipByIdParams extends Record<string, string> {
 
 Date distribution for the timeline view.
 
+### POST /api/timeline/:entityType/distribution
+
+The bars of a list: the list's own request (filter, search, ids) plus the period
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+type PostDateDistributionRequest<
+  E extends TimelineEntityType = TimelineEntityType,
+> = ListRequestInput<E> & {
+  /** Default "months" */
+  granularity?: TimelineGranularity;
+};
+```
+
+**URL Parameters:**
+
+```typescript
+interface GetDateDistributionParams extends Record<string, string> {
+  entityType: string;
+}
+```
+
+**Response:**
+
+```typescript
+interface GetDateDistributionResponse {
+  distribution: DateDistributionEntry[];
+}
+```
+
+**Handler:** `postDateDistribution` in `server/controllers/timelineController.ts`
+
+---
+
 ### GET /api/timeline/:entityType/distribution
 
-Get date distribution for entity type
+The documented form: one entity parameter (performerId, tagId, ...)
 
 **Authentication:** Session
 
