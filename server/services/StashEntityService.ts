@@ -21,10 +21,9 @@ import type { EntityRef } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
-  STREAM_RESOLUTIONS,
-  type StreamResolution,
+  type SceneStreamSource,
   buildSceneStreams,
-  inferStashStreamOptions,
+  streamOptionsOf,
 } from "../utils/sceneStreams.js";
 import { instanceColumnClause } from "../utils/sqlClauses.js";
 import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
@@ -74,18 +73,6 @@ interface SceneWithRelations extends StashScene {
   groups?: SceneGroupWithGroup[];
   galleries?: SceneGalleryWithGallery[];
 }
-
-/** The stored stream choices and file fields a scene's stream list is built from */
-type SceneStreamSource = Pick<
-  StashScene,
-  | "streamDirect"
-  | "streamMkv"
-  | "streamResolutions"
-  | "filePath"
-  | "fileAudioCodec"
-  | "fileWidth"
-  | "fileHeight"
->;
 
 /**
  * Default user fields for scenes (when no user data is merged)
@@ -517,24 +504,7 @@ class StashEntityService {
     instanceId: string,
     source: SceneStreamSource
   ): SceneStream[] {
-    const { streamDirect, streamMkv, streamResolutions } = source;
-    const options =
-      streamDirect != null && streamMkv != null && streamResolutions != null
-        ? {
-            direct: streamDirect,
-            mkv: streamMkv,
-            resolutions: streamResolutions
-              .split(",")
-              .filter((r): r is StreamResolution =>
-                (STREAM_RESOLUTIONS as readonly string[]).includes(r)
-              ),
-          }
-        : inferStashStreamOptions({
-            path: source.filePath,
-            audioCodec: source.fileAudioCodec,
-            width: source.fileWidth,
-            height: source.fileHeight,
-          });
+    const options = streamOptionsOf(source);
     return buildSceneStreams(sceneId, instanceId, options);
   }
 

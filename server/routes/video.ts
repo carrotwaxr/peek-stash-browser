@@ -2,6 +2,7 @@ import express from "express";
 import { proxyScenePoster } from "../controllers/proxy.js";
 import {
   createExternalPlayerLink,
+  createSceneMediaLink,
   getCaption,
   proxyStashStream,
 } from "../controllers/video.js";
@@ -55,6 +56,14 @@ router.post(
   "/scene/:sceneId/external-player-link",
   authenticate,
   authenticated(createExternalPlayerLink)
+);
+
+// One signed media link per scene: Direct and HLS, captions and poster, for a
+// Cast receiver or Safari's native player
+router.post(
+  "/scene/:sceneId/media-link",
+  authenticate,
+  authenticated(createSceneMediaLink)
 );
 
 export default router;

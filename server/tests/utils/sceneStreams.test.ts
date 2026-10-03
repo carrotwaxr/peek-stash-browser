@@ -7,8 +7,13 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  type CastFile,
+  type StashStreamOptions,
+  type StreamResolution,
   buildSceneStreams,
+  chooseCastSource,
   inferStashStreamOptions,
+  streamOptionsOf,
   summarizeStashStreams,
 } from "../../utils/sceneStreams.js";
 
@@ -340,5 +345,162 @@ describe("sceneStreams", () => {
     expect(
       inferStashStreamOptions(file("/v/a.mp4", "aac", 0, 0)).resolutions
     ).toEqual(ALL_RESOLUTIONS);
+  });
+});
+
+const ALL_TIERS: StreamResolution[] = [
+  "ORIGINAL",
+  "FOUR_K",
+  "FULL_HD",
+  "STANDARD_HD",
+  "STANDARD",
+  "LOW",
+];
+
+describe("chooseCastSource", () => {
+  const options = (
+    direct: boolean,
+    resolutions: StreamResolution[] = ALL_TIERS
+  ): StashStreamOptions => ({ direct, mkv: false, resolutions });
+  const castFile = (parts: Partial<CastFile> = {}): CastFile => ({
+    filePath: "/v/a.mp4",
+    fileVideoCodec: "h264",
+    fileAudioCodec: "aac",
+    fileWidth: 1920,
+    fileHeight: 1080,
+    ...parts,
+  });
+
+  it("picks Direct for MP4 H.264 AAC and for WebM VP9 Opus", () => {
+    expect(chooseCastSource(options(true), castFile())).toEqual({
+      kind: "direct",
+      contentType: "video/mp4",
+    });
+    expect(
+      chooseCastSource(
+        options(true),
+        castFile({
+          filePath: "/v/a.webm",
+          fileVideoCodec: "vp9",
+          fileAudioCodec: "opus",
+        })
+      )
+    ).toEqual({ kind: "direct", contentType: "video/webm" });
+  });
+
+  it("picks Direct for a file with no audio track", () => {
+    expect(
+      chooseCastSource(options(true), castFile({ fileAudioCodec: null }))?.kind
+    ).toBe("direct");
+  });
+
+  it("gets HLS for MKV, for HEVC, for AVI, for MP4 with AC3 audio", () => {
+    for (const file of [
+      castFile({ filePath: "/v/a.mkv" }),
+      castFile({ fileVideoCodec: "hevc" }),
+      castFile({ filePath: "/v/a.avi" }),
+      castFile({ fileAudioCodec: "ac3" }),
+    ]) {
+      expect(chooseCastSource(options(true), file)).toEqual({
+        kind: "hls",
+        contentType: "application/x-mpegurl",
+        resolution: "FULL_HD",
+      });
+    }
+  });
+
+  it("gets HLS for MP4 H.264 AAC with direct: false", () => {
+    expect(chooseCastSource(options(false), castFile())).toEqual({
+      kind: "hls",
+      contentType: "application/x-mpegurl",
+      resolution: "FULL_HD",
+    });
+  });
+
+  it("gets Direct with video/mp4 for a .mov H.264 AAC file", () => {
+    expect(
+      chooseCastSource(options(true), castFile({ filePath: "/v/a.MOV" }))
+    ).toEqual({ kind: "direct", contentType: "video/mp4" });
+  });
+
+  it("gets STANDARD_HD for a 720p file that is not Direct", () => {
+    const file = castFile({ fileWidth: 1280, fileHeight: 720 });
+    const offered = inferStashStreamOptions({
+      path: "/v/a.mp4",
+      audioCodec: "aac",
+      width: 1280,
+      height: 720,
+    });
+    expect(offered.resolutions).not.toContain("FULL_HD");
+    expect(chooseCastSource({ ...offered, direct: false }, file)).toEqual({
+      kind: "hls",
+      contentType: "application/x-mpegurl",
+      resolution: "STANDARD_HD",
+    });
+  });
+
+  it("gets ORIGINAL when only ORIGINAL is offered", () => {
+    expect(chooseCastSource(options(false, ["ORIGINAL"]), castFile())).toEqual({
+      kind: "hls",
+      contentType: "application/x-mpegurl",
+      resolution: "ORIGINAL",
+    });
+  });
+
+  it("gets HLS at FULL_HD, not Direct, for a 2160p H.264 MP4", () => {
+    expect(
+      chooseCastSource(
+        options(true),
+        castFile({ fileWidth: 3840, fileHeight: 2160 })
+      )
+    ).toEqual({
+      kind: "hls",
+      contentType: "application/x-mpegurl",
+      resolution: "FULL_HD",
+    });
+  });
+
+  it("falls to FOUR_K only after every smaller tier", () => {
+    expect(
+      chooseCastSource(options(false, ["FOUR_K"]), castFile())?.resolution
+    ).toBe("FOUR_K");
+  });
+
+  it("is null when the scene offers neither", () => {
+    expect(chooseCastSource(options(false, []), castFile())).toBeNull();
+  });
+});
+
+describe("streamOptionsOf", () => {
+  it("infers the options from the file fields when the stream columns are null", () => {
+    expect(
+      streamOptionsOf({
+        streamDirect: null,
+        streamMkv: null,
+        streamResolutions: null,
+        filePath: "/v/b.mkv",
+        fileAudioCodec: "ac3",
+        fileWidth: 1920,
+        fileHeight: 1080,
+      })
+    ).toEqual({
+      direct: false,
+      mkv: true,
+      resolutions: ["ORIGINAL", "FULL_HD", "STANDARD_HD", "STANDARD", "LOW"],
+    });
+  });
+
+  it("uses the stored choices when all three columns are present", () => {
+    expect(
+      streamOptionsOf({
+        streamDirect: true,
+        streamMkv: false,
+        streamResolutions: "ORIGINAL,LOW,BOGUS",
+        filePath: "/v/a.avi",
+        fileAudioCodec: "aac",
+        fileWidth: 720,
+        fileHeight: 404,
+      })
+    ).toEqual({ direct: true, mkv: false, resolutions: ["ORIGINAL", "LOW"] });
   });
 });

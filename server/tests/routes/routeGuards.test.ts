@@ -337,6 +337,14 @@ describe("route guards", () => {
     expect(unguarded).toEqual([]);
   });
 
+  it("guards the scene media link with a session", () => {
+    const link = routes.find(
+      (r) => r.key === "POST /api/scene/:sceneId/media-link"
+    );
+    expect(link).toBeDefined();
+    expect(link?.before).toContain(authenticate);
+  });
+
   it("guards the scene poster with authenticatePosterRequest", () => {
     const poster = routes.find(
       (r) => r.key === "GET /api/scene/:sceneId/poster"

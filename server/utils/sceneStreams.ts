@@ -60,6 +60,12 @@ const CONTAINER_BY_EXTENSION: Record<string, Container> = {
   webm: "webm",
 };
 
+/** The container a file's extension names, undefined when Stash cannot direct-play it. */
+function containerOf(path: string | null): Container | undefined {
+  const extension = path?.match(/\.([^./\\]+)$/)?.[1]?.toLowerCase();
+  return extension ? CONTAINER_BY_EXTENSION[extension] : undefined;
+}
+
 /** Audio codecs a browser plays in each container (Stash's browser.go). */
 const VALID_AUDIO: Record<Container, string[]> = {
   mp4: ["aac", "mp3", "opus"],
@@ -80,6 +86,43 @@ export function summarizeStashStreams(labels: string[]): StashStreamOptions {
   };
 }
 
+/** The stored stream choices and file fields a scene's stream list is built from. */
+export interface SceneStreamSource {
+  streamDirect: boolean | null;
+  streamMkv: boolean | null;
+  streamResolutions: string | null;
+  filePath: string | null;
+  fileAudioCodec: string | null;
+  fileWidth: number | null;
+  fileHeight: number | null;
+}
+
+/**
+ * A scene's stream options: the choices Stash recorded at sync (Direct, MKV,
+ * resolution tiers) when all three are stored, else Stash's rules applied to
+ * the cached file fields (rows synced before the columns existed).
+ */
+export function streamOptionsOf(source: SceneStreamSource): StashStreamOptions {
+  const { streamDirect, streamMkv, streamResolutions } = source;
+  if (streamDirect != null && streamMkv != null && streamResolutions != null) {
+    return {
+      direct: streamDirect,
+      mkv: streamMkv,
+      resolutions: streamResolutions
+        .split(",")
+        .filter((r): r is StreamResolution =>
+          (STREAM_RESOLUTIONS as readonly string[]).includes(r)
+        ),
+    };
+  }
+  return inferStashStreamOptions({
+    path: source.filePath,
+    audioCodec: source.fileAudioCodec,
+    width: source.fileWidth,
+    height: source.fileHeight,
+  });
+}
+
 /** Stash's rules from cached file fields, for rows synced before the columns existed. */
 export function inferStashStreamOptions(file: {
   path: string | null;
@@ -87,8 +130,7 @@ export function inferStashStreamOptions(file: {
   width: number | null;
   height: number | null;
 }): StashStreamOptions {
-  const extension = file.path?.match(/\.([^./\\]+)$/)?.[1]?.toLowerCase();
-  const container = extension ? CONTAINER_BY_EXTENSION[extension] : undefined;
+  const container = containerOf(file.path);
   const audio = (file.audioCodec ?? "").toLowerCase();
   const direct =
     container !== undefined &&
@@ -142,4 +184,86 @@ export function buildSceneStreams(
     }
   }
   return streams;
+}
+
+/** The file fields the cast source rule reads. */
+export interface CastFile {
+  filePath: string | null;
+  fileVideoCodec: string | null;
+  fileAudioCodec: string | null;
+  fileWidth: number | null;
+  fileHeight: number | null;
+}
+
+export interface CastSource {
+  kind: "direct" | "hls";
+  contentType: string;
+  /** The HLS tier; absent for Direct. */
+  resolution?: StreamResolution;
+}
+
+/** What a Cast receiver decodes straight from the file, by container. */
+const CAST_DIRECT: Record<
+  "mp4" | "webm",
+  { contentType: string; video: string[]; audio: string[] }
+> = {
+  mp4: {
+    contentType: "video/mp4",
+    video: ["h264"],
+    audio: ["aac", "mp3"],
+  },
+  webm: {
+    contentType: "video/webm",
+    video: ["vp8", "vp9"],
+    audio: ["opus", "vorbis"],
+  },
+};
+
+/** Older Chromecasts decode H.264 only up to 1080p (the shorter side). */
+const CAST_DIRECT_MAX_SIDE = 1080;
+
+/** The HLS tier a receiver is given, first offered wins. */
+const CAST_HLS_ORDER: StreamResolution[] = [
+  "FULL_HD",
+  "STANDARD_HD",
+  "STANDARD",
+  "LOW",
+  "ORIGINAL",
+  "FOUR_K",
+];
+
+const CAST_HLS_CONTENT_TYPE = "application/x-mpegurl";
+
+/**
+ * The one source a Cast receiver is given: Direct when Stash offers it and
+ * the file's container and codecs play on a receiver as they are, else HLS
+ * at the first offered tier, else null. The content type comes from the
+ * container, never from the file's MIME type (`.mov` says
+ * `video/quicktime`, and its H.264 plays as `video/mp4`).
+ */
+export function chooseCastSource(
+  options: StashStreamOptions,
+  file: CastFile
+): CastSource | null {
+  const container = containerOf(file.filePath);
+  if (options.direct && (container === "mp4" || container === "webm")) {
+    const rule = CAST_DIRECT[container];
+    const video = (file.fileVideoCodec ?? "").toLowerCase();
+    const audio = (file.fileAudioCodec ?? "").toLowerCase();
+    const shorterSide = Math.min(file.fileWidth ?? 0, file.fileHeight ?? 0);
+    if (
+      rule.video.includes(video) &&
+      (audio === "" || rule.audio.includes(audio)) &&
+      shorterSide <= CAST_DIRECT_MAX_SIDE
+    ) {
+      return { kind: "direct", contentType: rule.contentType };
+    }
+  }
+  const resolution = CAST_HLS_ORDER.find((r) =>
+    options.resolutions.includes(r)
+  );
+  if (resolution) {
+    return { kind: "hls", contentType: CAST_HLS_CONTENT_TYPE, resolution };
+  }
+  return null;
 }

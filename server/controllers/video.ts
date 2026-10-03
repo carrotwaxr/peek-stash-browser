@@ -1,6 +1,8 @@
 import type {
   ExternalPlayerLinkRequest,
   ExternalPlayerLinkResponse,
+  SceneMediaLinkRequest,
+  SceneMediaLinkResponse,
 } from "@peek/shared-types/api/video.js";
 import type { Response } from "express";
 import { NotFoundError } from "../middleware/errorHandler.js";
@@ -21,6 +23,12 @@ import {
   canUserLoadMedia,
   isValidInstanceId,
 } from "../utils/mediaAccess.js";
+import {
+  buildSceneStreams,
+  chooseCastSource,
+  streamOptionsOf,
+} from "../utils/sceneStreams.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
 import {
   INSTANCE_ID_PATTERN,
   SCENE_ID_PATTERN,
@@ -740,5 +748,163 @@ export const createExternalPlayerLink = async (
     ),
     expiresAt: new Date(exp * 1000).toISOString(),
     mimeType: videoMimeType(scene?.filePath ?? null),
+  });
+};
+
+// ============================================================================
+// MEDIA LINK
+// ============================================================================
+
+/**
+ * Mint one signed media link for a scene (scope `media`) and answer every URL
+ * a Cast receiver or Safari's native player needs: Direct and the HLS tiers,
+ * the one cast source, the captions and the poster.
+ * POST /api/scene/:sceneId/media-link { instanceId }
+ *
+ * Every URL is a path, signed with the same claims, so the server never
+ * trusts the Host header and the client prefixes its own origin. The signed
+ * parameters are merged with `set` into URLs that already hold `instanceId`,
+ * so each key appears once. The link opens only this scene on this instance,
+ * and every request it makes runs the access check again (middleware/streamAuth.ts).
+ */
+export const createSceneMediaLink = async (
+  req: TypedAuthRequest<SceneMediaLinkRequest, { sceneId: string }>,
+  res: TypedResponse<SceneMediaLinkResponse | ApiErrorResponse>
+) => {
+  const { sceneId } = req.params;
+  const instanceId = (req.body as { instanceId?: unknown } | undefined)
+    ?.instanceId;
+
+  if (
+    !SCENE_ID_PATTERN.test(sceneId) ||
+    typeof instanceId !== "string" ||
+    !INSTANCE_ID_PATTERN.test(instanceId)
+  ) {
+    res.status(400).json({ error: "Invalid scene or instance" });
+    return;
+  }
+
+  if (!(await canUserAccessEntity(req.user.id, "scene", sceneId, instanceId))) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { passwordChangedAt: true },
+  });
+  if (!user) {
+    res.status(401).json({ error: "Session expired" });
+    return;
+  }
+
+  const scene = await prisma.stashScene.findFirst({
+    where: { id: sceneId, stashInstanceId: instanceId, deletedAt: null },
+    select: {
+      streamDirect: true,
+      streamMkv: true,
+      streamResolutions: true,
+      filePath: true,
+      fileVideoCodec: true,
+      fileAudioCodec: true,
+      fileWidth: true,
+      fileHeight: true,
+      captions: true,
+      pathScreenshot: true,
+    },
+  });
+  if (!scene) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  const exp = Math.floor(Date.now() / 1000) + STREAM_LINK_TTL_SECONDS;
+  const claims: StreamLinkClaims = {
+    userId: req.user.id,
+    sceneId,
+    instanceId,
+    exp,
+    passwordChangedAtMs: user.passwordChangedAt?.getTime() ?? 0,
+    scope: "media",
+  };
+  const signed = signedQuery(
+    claims,
+    signStreamLink(claims, getStreamLinkKey())
+  );
+
+  /** A path with its own query plus the signed one, one of each key. */
+  const sign = (path: string, query?: string): string => {
+    const params = new URLSearchParams(query);
+    applySignedQuery(params, signed);
+    return `${path}?${params}`;
+  };
+
+  const options = streamOptionsOf(scene);
+  const streams = buildSceneStreams(sceneId, instanceId, options)
+    .filter((s) => /\/stream(\.m3u8)?\?/.test(s.url))
+    .map((s) => {
+      const [path = "", query] = s.url.split("?");
+      // buildSceneStreams always sets both; the type only allows null
+      return {
+        url: sign(path, query),
+        mime_type: s.mime_type ?? "",
+        label: s.label ?? "",
+      };
+    });
+
+  const choice = chooseCastSource(options, scene);
+  const castStream = choice
+    ? streams.find((s) => {
+        const url = new URL(s.url, "http://peek.invalid");
+        return choice.kind === "direct"
+          ? url.pathname.endsWith("/stream")
+          : url.pathname.endsWith("/stream.m3u8") &&
+              url.searchParams.get("resolution") === choice.resolution;
+      })
+    : undefined;
+  const cast =
+    choice && castStream
+      ? {
+          url: castStream.url,
+          contentType: choice.contentType,
+          kind: choice.kind,
+        }
+      : null;
+
+  const captions = parseJsonArray<{
+    language_code?: unknown;
+    caption_type?: unknown;
+  }>(scene.captions).flatMap((c) => {
+    const lang = c.language_code;
+    const type = c.caption_type;
+    // Only what the caption route would serve
+    if (
+      typeof lang !== "string" ||
+      typeof type !== "string" ||
+      !isAllowedCaption(lang, type)
+    ) {
+      return [];
+    }
+    const query = new URLSearchParams({ lang, type });
+    return [
+      {
+        url: sign(`/api/scene/${sceneId}/caption`, query.toString()),
+        lang,
+        type,
+      },
+    ];
+  });
+
+  const poster = scene.pathScreenshot
+    ? sign(`/api/scene/${sceneId}/poster`)
+    : null;
+
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    expiresAt: new Date(exp * 1000).toISOString(),
+    streams,
+    cast,
+    captions,
+    poster,
   });
 };
