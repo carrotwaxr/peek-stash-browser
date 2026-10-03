@@ -984,6 +984,41 @@ describe("pins", () => {
     expect(chipNames()[1]).toBe("Edit filter: Organized: Yes");
   });
 
+  it("+ Filter's pick of a field a pressed pin covers opens that row's editor, not a second row", async () => {
+    const user = userEvent.setup();
+    const FAVORITES: PinnedFilter = {
+      id: "fedcba9876543210fedcba9876543210",
+      key: "favorite",
+      state: { favorite: "true" },
+      label: "Favorites",
+    };
+    const list = renderListControls(
+      {},
+      {
+        url: "/scenes?favorite=true",
+        pins: { scene: { fields: [], filters: [FAVORITES] } },
+      }
+    );
+    await list.firstQuery();
+    expect(await toggle("Favorites")).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(addFilter());
+    await user.click(
+      await screen.findByRole("option", { name: "Favorite Scenes" })
+    );
+    const editor = await screen.findByRole("dialog", {
+      name: "Favorite Scenes filter",
+    });
+    const select = within(editor).getByRole<HTMLSelectElement>("combobox", {
+      name: "Favorite Scenes",
+    });
+    expect(select.value).toBe("true");
+    await user.selectOptions(select, "false");
+
+    await waitFor(() => expect(list.params().get("favorite")).toBe("false"));
+    expect(list.params().has("2.favorite")).toBe(false);
+  });
+
   it("one tap on a pinned filter applies at once with one history entry", async () => {
     const user = userEvent.setup();
     const list = renderListControls(
