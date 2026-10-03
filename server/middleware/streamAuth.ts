@@ -25,6 +25,7 @@ import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
 import {
   STREAM_LINK_TTL_SECONDS,
   type StreamLinkClaims,
+  type VerifiedStreamLink,
   getStreamLinkKey,
   isStreamLinkSignatureValid,
 } from "../utils/streamLink.js";
@@ -45,17 +46,12 @@ const queryString = (value: unknown): string | undefined =>
 
 type LinkScope = StreamLinkClaims["scope"];
 
-/** The verified claims of a signed request, on res.locals.streamLink. */
-export interface VerifiedStreamLink {
-  uid: number;
-  exp: number;
-  scope: LinkScope;
-  sig: string;
-}
-
 declare module "express-serve-static-core" {
   interface Locals {
-    /** Set by the stream guards for a signed request; absent for a session. */
+    /**
+     * The verified claims of a signed request, set by the stream guards;
+     * absent for a session.
+     */
     streamLink?: VerifiedStreamLink;
   }
 }

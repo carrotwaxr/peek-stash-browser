@@ -90,11 +90,41 @@ export function isStreamLinkSignatureValid(
  * `sig`, in that order. Nothing else builds one.
  */
 export function signedQuery(c: StreamLinkClaims, sig: string): URLSearchParams {
+  return buildSignedQuery(c.instanceId, c.userId, c.exp, c.scope, sig);
+}
+
+/** The claims of a request whose signature the guard verified. */
+export interface VerifiedStreamLink {
+  uid: number;
+  exp: number;
+  scope: StreamLinkClaims["scope"];
+  sig: string;
+}
+
+/**
+ * The signed query for the URLs a verified request's playlist lists: the
+ * same query as `signedQuery`, built from the verified fields and the
+ * request's instance. It signs nothing, so it needs no password stamp.
+ */
+export function signedQueryOf(
+  link: VerifiedStreamLink,
+  instanceId: string
+): URLSearchParams {
+  return buildSignedQuery(instanceId, link.uid, link.exp, link.scope, link.sig);
+}
+
+function buildSignedQuery(
+  instanceId: string,
+  userId: number,
+  exp: number,
+  scope: StreamLinkClaims["scope"],
+  sig: string
+): URLSearchParams {
   const q = new URLSearchParams();
-  q.set("instanceId", c.instanceId);
-  q.set("uid", String(c.userId));
-  q.set("exp", String(c.exp));
-  if (c.scope !== undefined) q.set("scope", c.scope);
+  q.set("instanceId", instanceId);
+  q.set("uid", String(userId));
+  q.set("exp", String(exp));
+  if (scope !== undefined) q.set("scope", scope);
   q.set("sig", sig);
   return q;
 }

@@ -3122,6 +3122,14 @@ class StashSyncService extends EventEmitter {
     stashInstanceId: string,
     run: SyncRunContext
   ): Promise<void> {
+    // The address and the stored value as they are before Stash is asked:
+    // the write below names that address, so an admin who changes it
+    // meanwhile drops the write (the sync that change queues reads again)
+    const instance = await prisma.stashInstance.findUnique({
+      where: { id: stashInstanceId },
+      select: { url: true, stashVrTag: true },
+    });
+    if (!instance) return;
     let vrTag: string | null;
     try {
       const stash = this.getStashClient(stashInstanceId);
@@ -3144,17 +3152,14 @@ class StashSyncService extends EventEmitter {
       return;
     }
 
-    const instance = await prisma.stashInstance.findUnique({
-      where: { id: stashInstanceId },
-      select: { stashVrTag: true },
-    });
-    if (!instance || instance.stashVrTag === vrTag) return;
-    await dbWrite("sync.vrTag", () =>
+    if (instance.stashVrTag === vrTag) return;
+    const { count } = await dbWrite("sync.vrTag", () =>
       prisma.stashInstance.updateMany({
-        where: { id: stashInstanceId },
+        where: { id: stashInstanceId, url: instance.url },
         data: { stashVrTag: vrTag },
       })
     );
+    if (count === 0) return;
     bumpLibrary();
     logger.info("Stash's VR tag changed", { stashInstanceId, vrTag });
   }

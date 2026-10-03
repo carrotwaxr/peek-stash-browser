@@ -250,11 +250,14 @@ export function chooseCastSource(
     const rule = CAST_DIRECT[container];
     const video = (file.fileVideoCodec ?? "").toLowerCase();
     const audio = (file.fileAudioCodec ?? "").toLowerCase();
-    const shorterSide = Math.min(file.fileWidth ?? 0, file.fileHeight ?? 0);
+    // A file with no recorded size is not known to fit a receiver: HLS
+    const { fileWidth, fileHeight } = file;
     if (
       rule.video.includes(video) &&
       (audio === "" || rule.audio.includes(audio)) &&
-      shorterSide <= CAST_DIRECT_MAX_SIDE
+      fileWidth &&
+      fileHeight &&
+      Math.min(fileWidth, fileHeight) <= CAST_DIRECT_MAX_SIDE
     ) {
       return { kind: "direct", contentType: rule.contentType };
     }

@@ -18,6 +18,7 @@ import {
   isStreamLinkSignatureValid,
   signStreamLink,
   signedQuery,
+  signedQueryOf,
 } from "../../utils/streamLink.js";
 
 vi.mock("../../utils/jwtSecret.js", () => ({
@@ -156,6 +157,19 @@ describe("streamLink", () => {
     expect(buildStreamLinkPath({ ...claims, scope: "media" }, "SIG")).toBe(
       "/api/scene/123/proxy-stream/stream?instanceId=inst-a&uid=7&exp=1790208000&scope=media&sig=SIG"
     );
+  });
+
+  it("signedQueryOf builds the same query from a verified link, with no password stamp", () => {
+    const sig = "S".repeat(43);
+    for (const scope of [undefined, "media"] as const) {
+      const link = { uid: claims.userId, exp: claims.exp, sig, scope };
+      expect(signedQueryOf(link, claims.instanceId).toString()).toBe(
+        signedQuery(
+          { ...claims, ...(scope !== undefined && { scope }) },
+          sig
+        ).toString()
+      );
+    }
   });
 
   it("signedQuery orders instanceId, uid, exp, scope, sig and leaves out scope for v1", () => {

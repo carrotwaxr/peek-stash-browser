@@ -7,6 +7,7 @@ import { NO_DATE_BEFORE } from "../utils/stashDate.js";
 import { entityImageCountService } from "./EntityImageCountService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
+import { bumpLibrary } from "./LibraryStamp.js";
 import { linkCountService } from "./LinkCountService.js";
 import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
 import { stashSyncService } from "./StashSyncService.js";
@@ -942,6 +943,8 @@ const migrations: Migration[] = [
     run: async () => {
       const cleared = await clearYearOneDates();
       logger.info("[Migration 013] Cleared the year-1 dates", cleared);
+      // Lists served the old dates; open tabs refetch on the next stamp
+      if (Object.values(cleared).some((count) => count > 0)) bumpLibrary();
     },
   },
 ];

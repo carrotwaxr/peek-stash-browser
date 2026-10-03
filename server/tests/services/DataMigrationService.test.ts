@@ -10,6 +10,7 @@ import prisma from "../../prisma/singleton.js";
 import { entityImageCountService } from "../../services/EntityImageCountService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
+import { bumpLibrary } from "../../services/LibraryStamp.js";
 import { linkCountService } from "../../services/LinkCountService.js";
 import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
@@ -63,6 +64,8 @@ vi.mock("../../services/EntityImageCountService.js", () => ({
 vi.mock("../../services/LinkCountService.js", () => ({
   linkCountService: { rebuildLinkCounts: vi.fn() },
 }));
+vi.mock("../../services/LibraryStamp.js", () => ({ bumpLibrary: vi.fn() }));
+
 vi.mock("../../services/StashSyncService.js", () => ({
   stashSyncService: { computeTagSceneCountsViaPerformers: vi.fn() },
 }));
@@ -584,6 +587,24 @@ describe("DataMigrationService", () => {
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith({
         data: { name: "013_clear_year_one_dates" },
       });
+    });
+
+    it("moves the library stamp after migration 013 cleared dates, and not when it cleared none", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("013_clear_year_one_dates")
+      );
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
+
+      mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+      await (await importFresh()).runPendingMigrations();
+      expect(bumpLibrary).not.toHaveBeenCalled();
+
+      mockPrisma.$executeRawUnsafe
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(3)
+        .mockResolvedValue(0);
+      await (await importFresh()).runPendingMigrations();
+      expect(bumpLibrary).toHaveBeenCalledOnce();
     });
 
     it("does not mark 008 as applied when a delete throws", async () => {

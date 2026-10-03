@@ -44,6 +44,7 @@ import {
   getStreamLinkKey,
   signStreamLink,
   signedQuery,
+  signedQueryOf,
 } from "../utils/streamLink.js";
 import {
   HEAD_PROBE_RANGE,
@@ -485,19 +486,7 @@ export const proxyStashStream = async (
     if (playlistContent === undefined) return;
     // A playlist fetched with a media link signs every URL it lists
     const link = res.locals.streamLink;
-    const signed = link
-      ? signedQuery(
-          {
-            userId: link.uid,
-            sceneId,
-            instanceId,
-            exp: link.exp,
-            passwordChangedAtMs: 0,
-            ...(link.scope !== undefined && { scope: link.scope }),
-          },
-          link.sig
-        )
-      : undefined;
+    const signed = link ? signedQueryOf(link, instanceId) : undefined;
     const rewrittenContent = rewriteHlsPlaylist(
       playlistContent,
       sceneId,

@@ -388,6 +388,17 @@ describe("chooseCastSource", () => {
     ).toEqual({ kind: "direct", contentType: "video/webm" });
   });
 
+  it("gets HLS, not Direct, for a file without both dimensions", () => {
+    for (const file of [
+      castFile({ fileWidth: null }),
+      castFile({ fileHeight: null }),
+      castFile({ fileWidth: null, fileHeight: null }),
+      castFile({ fileWidth: 0, fileHeight: 0 }),
+    ]) {
+      expect(chooseCastSource(options(true), file)?.kind).toBe("hls");
+    }
+  });
+
   it("picks Direct for a file with no audio track", () => {
     expect(
       chooseCastSource(options(true), castFile({ fileAudioCodec: null }))?.kind

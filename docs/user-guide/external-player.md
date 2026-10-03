@@ -50,20 +50,21 @@ Don't share it: anyone who has it can watch that scene as you until it expires. 
 If a reverse proxy with its own login (Authelia, Authentik, or any front end that sets `PROXY_AUTH_HEADER`) sits in front of Peek, an external player and a cast device cannot pass that login: VLC and a Chromecast cannot sign in. Both get a personal signed link instead, and Peek checks the link itself. Let these requests through the proxy without authentication, and keep everything else behind it:
 
 - the methods `GET`, `HEAD` and `OPTIONS` (the last is a Cast device's cross-origin preflight)
-- on the paths `/api/scene/<id>/proxy-stream/...`, `/api/scene/<id>/caption` and `/api/scene/<id>/poster`
-- only when the query string has a `sig` parameter
+- on only the paths Peek serves for a signed link: `/api/scene/<id>/proxy-stream/stream`, `/api/scene/<id>/proxy-stream/stream.m3u8`, `/api/scene/<id>/proxy-stream/stream.m3u8/<n>.ts` (`<n>` a number), `/api/scene/<id>/caption` and `/api/scene/<id>/poster`
+- only when the query string has a `sig` parameter of exactly 43 characters (letters, digits, `-` and `_`)
 
 As a regular expression on the path and query, for a proxy that matches that way (Authelia's `resources`, for example):
 
 ```text
-^/api/scene/[0-9]+/(proxy-stream/.*|caption|poster)[?](.*&)?sig=.*$
+^/api/scene/[0-9]+/(proxy-stream/(stream|stream\.m3u8(/[0-9]+\.ts)?)|caption|poster)[?](.*&)?sig=[A-Za-z0-9_-]{43}(&.*)?$
 ```
 
-Adapt it to your proxy's own syntax, and let the proxy pass Peek's `Access-Control-*` headers and the browser's `Range` header on those requests unchanged. A proxy that adds its own CORS headers there breaks casting.
+The pattern names each path and does not match `..`, so a proxy that normalises the path before forwarding cannot carry a request to another Peek route. Adapt it to your proxy's own syntax, and let the proxy pass Peek's `Access-Control-*` headers and the browser's `Range` header on those requests unchanged. A proxy that adds its own CORS headers there breaks casting.
 
 What this lets through is narrow:
 
 - **Peek checks every signed request itself:** the signature, the user it names, its expiry, and that user's access to the scene. An expired, tampered or foreign link is refused with 401, a scene the user has hidden or may not see answers 404, and the link opens only the one scene it was made for. The bypass lets no one past Peek's own checks.
+- **The proxy must overwrite its user header on these requests.** If Peek reads the user from `PROXY_AUTH_HEADER`, the proxy has to set that header itself on a request it lets through, or remove it, and never pass on one the client sent. A signed request needs no user header, and one the client sends must not reach Peek.
 - **A link works for 12 hours.** Logging out does not revoke it. Only a password change or reset (or a change of the server's `JWT_SECRET`) does.
 - **The external player button's link opens only the direct stream** (`proxy-stream/stream`). The link Peek makes for casting also opens the HLS playlist and its segments, the captions and the scene's poster, and nothing else.
 - **Safari now asks Peek for a signed link every time it plays a scene,** not only when you press a link button, so a login proxy that blocks signed requests can affect Safari playback too. If Safari fails to play behind such a proxy, apply the bypass.

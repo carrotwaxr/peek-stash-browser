@@ -80,10 +80,13 @@ function stashUi(ui: unknown): void {
   } as Awaited<ReturnType<StashClient["configurationUi"]>>);
 }
 
+/** The address Peek holds for the instance when the sync starts */
+const STASH_URL = "http://stash.test:9999/graphql";
+
 /** The value Peek stored at the last sync. */
 function stored(value: string | null): void {
   mockPrisma.stashInstance.findUnique.mockResolvedValue(
-    partialRow({ stashVrTag: value })
+    partialRow({ stashVrTag: value, url: STASH_URL })
   );
 }
 
@@ -148,9 +151,31 @@ describe("StashSyncService: the VR tag read", () => {
     await syncOnce();
 
     expect(mockPrisma.stashInstance.updateMany).toHaveBeenCalledExactlyOnceWith(
-      { where: { id: INSTANCE }, data: { stashVrTag: "VR" } }
+      { where: { id: INSTANCE, url: STASH_URL }, data: { stashVrTag: "VR" } }
     );
     expect(vrTagWrites()).toBe(1);
+  });
+
+  it("writes only to the address it read from: the URL is read before Stash is asked", async () => {
+    const order: string[] = [];
+    mockPrisma.stashInstance.findUnique.mockImplementation((() => {
+      order.push("url");
+      return Promise.resolve(partialRow({ stashVrTag: null, url: STASH_URL }));
+    }) as never);
+    client.configurationUi.mockImplementation((() => {
+      order.push("stash");
+      return Promise.resolve({ configuration: { ui: { vrTag: "VR" } } });
+    }) as never);
+
+    await syncOnce();
+
+    expect(order.slice(0, 2)).toEqual(["url", "stash"]);
+    expect(mockPrisma.stashInstance.findUnique).toHaveBeenCalledWith(
+      objectContaining({ select: objectContaining({ url: true }) })
+    );
+    expect(mockPrisma.stashInstance.updateMany).toHaveBeenCalledWith(
+      objectContaining({ where: { id: INSTANCE, url: STASH_URL } })
+    );
   });
 
   it.each([
@@ -168,7 +193,7 @@ describe("StashSyncService: the VR tag read", () => {
     await syncOnce();
 
     expect(mockPrisma.stashInstance.updateMany).toHaveBeenCalledExactlyOnceWith(
-      { where: { id: INSTANCE }, data: { stashVrTag: null } }
+      { where: { id: INSTANCE, url: STASH_URL }, data: { stashVrTag: null } }
     );
   });
 
