@@ -19,7 +19,7 @@ import {
   rowKeyOf,
 } from "@peek/shared-types";
 import { normalizePanelState } from "./build";
-import { type PanelState, codecOf } from "./codecs";
+import { type PanelState, codecOf, valuesOf } from "./codecs";
 import { stateOf, treeOf } from "./tree";
 
 const GROUP_DECLARATION = /^g([1-5])$/;
@@ -141,3 +141,54 @@ export const sameRowState = (
 ): boolean =>
   JSON.stringify(canonical(normalizePanelState(kind, a))) ===
   JSON.stringify(canonical(normalizePanelState(kind, b)));
+
+/**
+ * The state with one entity picked on a ref field's first root row
+ * (`{ group: 0, occurrence: 1, key }`): the id joins the row's values (once),
+ * leaves its exclusions (picking an excluded value includes it), and the
+ * row's condition stays as it is, but for a presence choice ("Has none",
+ * "Has any"), which ids cannot sit beside. A single row's value is replaced;
+ * a row that is not there is added. `id` is the entity's `"id:instanceId"`.
+ */
+export function withRefValue(
+  kind: ListKind,
+  state: PanelState,
+  key: string,
+  id: string
+): PanelState {
+  const field = fieldOf(kind, key);
+  if (field === undefined || field.editor !== "ref") return state;
+  const at: RowKey = { group: 0, occurrence: 1, key };
+  const row = rowState(kind, state, at);
+
+  const values = valuesOf(row[key]);
+  const picked = field.multi
+    ? values.includes(id)
+      ? values
+      : [...values, id]
+    : id;
+  // The id leaves the row's exclusions; the last one going drops the key
+  const excluded =
+    field.excludeKey === undefined
+      ? []
+      : valuesOf(row[field.excludeKey]).filter((each) => each !== id);
+  // A presence choice gives way to the value
+  const presence =
+    field.modifierKey !== undefined &&
+    (row[field.modifierKey] === "IS_NULL" ||
+      row[field.modifierKey] === "NOT_NULL");
+
+  const next = Object.fromEntries(
+    Object.entries(row).filter(
+      ([each]) =>
+        each !== field.excludeKey && !(presence && each === field.modifierKey)
+    )
+  );
+  return setRow(kind, state, at, {
+    ...next,
+    [key]: picked,
+    ...(field.excludeKey !== undefined && excluded.length > 0
+      ? { [field.excludeKey]: excluded }
+      : {}),
+  });
+}

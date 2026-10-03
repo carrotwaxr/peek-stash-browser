@@ -33,6 +33,7 @@ export {
   rowState,
   sameRowState,
   setRow,
+  withRefValue,
 } from "./filterState";
 export { type FilterOption, filterOptionsOf, rowKeysOf } from "./options";
 export {

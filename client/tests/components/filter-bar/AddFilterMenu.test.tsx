@@ -24,15 +24,20 @@ interface Known {
   name: string;
 }
 
-/** `/minimal`: with `ids` a composite id matches its instance; else the page */
+/**
+ * `/minimal`: with `ids` a composite id matches its instance; with
+ * `filter.q` the names containing it; else the page
+ */
 const minimalOf =
   (known: Known[]) =>
-  ({ ids }: { ids?: string[] } = {}) =>
+  ({ ids, filter }: { ids?: string[]; filter?: { q?: string } } = {}) =>
     Promise.resolve(
-      ids === undefined
-        ? known
-        : known.filter((entity) =>
+      ids !== undefined
+        ? known.filter((entity) =>
             ids.includes(`${entity.id}:${entity.instanceId}`)
+          )
+        : known.filter((entity) =>
+            entity.name.toLowerCase().includes((filter?.q ?? "").toLowerCase())
           )
     );
 
@@ -425,5 +430,125 @@ describe("in the bar", () => {
       screen.queryByRole("button", { name: "Clear all" })
     ).not.toBeInTheDocument();
     expect(addFilter()).toHaveFocus();
+  });
+});
+
+describe("values", () => {
+  it("typing `out` lists `Tags: Outdoor` under a Values heading after the fields", async () => {
+    const list = renderListControls();
+    await list.firstQuery();
+    const user = await openMenu();
+
+    await user.keyboard("out");
+
+    const outdoor = await screen.findByRole("option", {
+      name: "Tags: Outdoor",
+    });
+    const values = within(screen.getByRole("listbox")).getByRole("group", {
+      name: "Values",
+    });
+    expect(values).toContainElement(outdoor);
+    // After the fields: the Values group is the listbox's last
+    const groups = within(screen.getByRole("listbox")).getAllByRole("group");
+    expect(groups.at(-1)).toBe(values);
+    expect(minimal.findTagsMinimal).toHaveBeenCalledWith(
+      { filter: { q: "out", per_page: 5 } },
+      expect.any(AbortSignal)
+    );
+    // Not a field: Blonde does not match
+    expect(
+      within(values).queryByRole("option", { name: "Tags: Blonde" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("a name matching no field and no value says so; a value alone keeps the list", async () => {
+    const list = renderListControls();
+    await list.firstQuery();
+    const user = await openMenu();
+
+    await user.keyboard("outdoor");
+
+    // No field is named Outdoor: the one value is the list
+    expect(
+      await screen.findByRole("option", { name: "Tags: Outdoor" })
+    ).toBeInTheDocument();
+    expect(optionNames()).toEqual(["Tags: Outdoor"]);
+
+    await user.clear(searchBox());
+    await user.keyboard("zzz");
+    await waitFor(() => expect(minimal.findTagsMinimal).toHaveBeenCalled());
+    expect(screen.getByText("No filter matches “zzz”")).toBeInTheDocument();
+  });
+
+  it("picking it adds Outdoor to Tags with the row's default modifier and leaves other tags in place", async () => {
+    const list = renderListControls({}, { url: "/scenes?tagIds=1:a" });
+    await list.firstQuery();
+    const user = await openMenu();
+    await user.keyboard("out");
+
+    await user.click(
+      await screen.findByRole("option", { name: "Tags: Outdoor" })
+    );
+
+    await waitFor(() => expect(list.params().get("tagIds")).toBe("1:a,2:a"));
+    // No condition was written: the row's default stays the default
+    expect(list.params().has("tagIdsModifier")).toBe(false);
+    expect(list.actions).toEqual(["PUSH"]);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /^Edit filter: Tags/ })
+    ).toBeInTheDocument();
+    expect(addFilter()).toHaveFocus();
+  });
+
+  it("a value picked with no Tags row yet starts the row, and the request carries it", async () => {
+    const list = renderListControls();
+    await list.firstQuery();
+    const user = await openMenu();
+    await user.keyboard("out{ArrowDown}");
+    expect(
+      await screen.findByRole("option", { name: "Tags: Outdoor" })
+    ).toBeInTheDocument();
+
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(list.params().get("tagIds")).toBe("2:a"));
+    expect(
+      must((list.lastQuery().where as { rules: { field: string }[] }).rules[0])
+        .field
+    ).toBe("tags");
+  });
+
+  it("picking a value of an active excluded row includes it", async () => {
+    const list = renderListControls(
+      {},
+      { url: "/scenes?tagIdsExclude=2:a,1:a" }
+    );
+    await list.firstQuery();
+    const user = await openMenu();
+    await user.keyboard("out");
+
+    await user.click(
+      await screen.findByRole("option", { name: "Tags: Outdoor" })
+    );
+
+    await waitFor(() => expect(list.params().get("tagIds")).toBe("2:a"));
+    expect(list.params().get("tagIdsExclude")).toBe("1:a");
+  });
+
+  it("at the 20-row limit a value of a field not in use is disabled, one of a field in use still adds", async () => {
+    const rows = Array.from(
+      { length: 20 },
+      (_, index) => `${index === 0 ? "" : `${index + 1}.`}performerIds=1:a`
+    ).join("&");
+    const list = renderListControls({}, { url: `/scenes?${rows}` });
+    await list.firstQuery();
+    const user = await openMenu();
+    await user.keyboard("out");
+
+    // Tags is not in use: its value cannot add a row
+    expect(
+      await screen.findByRole("option", { name: "Tags: Outdoor" })
+    ).toHaveAttribute("aria-disabled", "true");
   });
 });
