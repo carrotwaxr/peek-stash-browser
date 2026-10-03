@@ -464,6 +464,19 @@ describe("AdvancedFilterView", () => {
     expect(fieldsIn(view(), true)).toEqual(["watched"]);
   });
 
+  it("the list changing underneath (Back) is not an edit: Cancel closes at once", async () => {
+    const list = renderList(["/scenes?favorite=true", "/scenes?watched=true"]);
+    await waitFor(() => expect(findScenes).toHaveBeenCalledTimes(1));
+    openView();
+    await act(() => list.router.navigate(-1));
+
+    fireEvent.click(footerButton("Cancel"));
+    expect(discardPrompt()).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Advanced filters" })
+    ).not.toBeInTheDocument();
+  });
+
   it("a page's permanent filter shows as fixed", async () => {
     const performer = { value: ["7:a"], modifier: "INCLUDES" };
     renderList("/performer/7", {
