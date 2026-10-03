@@ -9,13 +9,28 @@ import {
   type PanelField,
   SCENE_FIELDS,
 } from "@peek/shared-types";
+import { untrusted } from "@tests/helpers/untrusted";
+import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
+import { buildCustomCarouselUrl } from "@/utils/carouselUrl";
 import {
   CAROUSEL_FILTER_DEFINITIONS,
+  SCENE_FILTER_OPTIONS,
+  buildCarouselRules,
   buildSceneFilter,
+  carouselBody,
+  carouselEditTree,
   carouselRulesToFilterState,
 } from "@/utils/filterConfig";
-import { buildPanelFilter, readPanelFilter } from "@/utils/filterFields";
+import {
+  type EditTree,
+  buildPanelFilter,
+  editTreeOf,
+  readPanelFilter,
+  stateOfWhere,
+  treeOf,
+} from "@/utils/filterFields";
+import { buildSearchParams } from "@/utils/urlParams";
 
 const SCENE_ROWS: readonly PanelField[] = PANEL_FIELDS.scene;
 
@@ -212,6 +227,30 @@ const ROUND_TRIPS: Record<
     state: { inProgress: "false" },
   },
 };
+
+/** Each row's state alone, then the rows 20 at a time (WHERE_LIMITS.rows) */
+const ROW_STATES: readonly Record<string, unknown>[] = (() => {
+  const states = Object.values(ROUND_TRIPS).map((each) => each.state);
+  return [
+    ...states,
+    ...[0, 20, 40].map(
+      (from) =>
+        Object.assign({}, ...states.slice(from, from + 20)) as Record<
+          string,
+          unknown
+        >
+    ),
+  ];
+})();
+
+/** A flat rule set as the root "all" tree the server serves it as */
+const rootAll = (flat: Record<string, unknown>) => ({
+  match: "all" as const,
+  rules: Object.entries(flat).map(([field, criterion]) => ({
+    field,
+    criterion,
+  })),
+});
 
 describe("carousel rules", () => {
   it("a Performer Age rule survives an edit", () => {
@@ -450,27 +489,211 @@ describe("carousel rules stored as a tree", () => {
     });
   });
 
-  it("a tree with a group, a repeated field or an any root is kept whole", () => {
-    const trees = [
-      {
+  it("a tree with a group, a repeated field or an any root reads as rows", () => {
+    const tags = { tagIds: ["284"], tagIdsModifier: "INCLUDES_ALL" };
+
+    expect(
+      carouselRulesToFilterState({
         match: "all",
         rules: [
           leaf("tags", GODDESSES.tags),
           { match: "any", rules: [leaf("favorite", true)] },
         ],
-      },
-      {
+      })
+    ).toEqual({
+      state: { ...tags, g1: "any", "g1.favorite": "true" },
+      kept: {},
+    });
+    expect(
+      carouselRulesToFilterState({
         match: "all",
         rules: [leaf("tags", GODDESSES.tags), leaf("tags", GODDESSES.tags)],
+      })
+    ).toEqual({
+      state: {
+        ...tags,
+        "2.tagIds": ["284"],
+        "2.tagIdsModifier": "INCLUDES_ALL",
       },
-      { match: "any", rules: [leaf("tags", GODDESSES.tags)] },
-    ];
-    for (const tree of trees) {
-      expect(carouselRulesToFilterState(tree)).toEqual({
-        state: {},
-        kept: tree,
-      });
+      kept: {},
+    });
+    expect(
+      carouselRulesToFilterState({
+        match: "any",
+        rules: [leaf("tags", GODDESSES.tags)],
+      })
+    ).toEqual({ state: { ...tags, match: "any" }, kept: {} });
+  });
+
+  it("a flat stored carousel and its root-all tree read to the same state", () => {
+    for (const definition of CAROUSEL_FILTER_DEFINITIONS) {
+      const { rules } = must(ROUND_TRIPS[definition.key], definition.key);
+      const tree = rootAll(rules);
+
+      const fromFlat = carouselRulesToFilterState(rules);
+      expect(carouselRulesToFilterState(tree), definition.key).toEqual(
+        fromFlat
+      );
+      expect(stateOfWhere("scene", tree).state, definition.key).toEqual(
+        fromFlat.state
+      );
+      expect(
+        carouselBody(carouselEditTree({ rules: untrusted(rules) })),
+        definition.key
+      ).toEqual(carouselBody(carouselEditTree({ rules: untrusted(tree) })));
     }
+  });
+
+  it("carouselBody of a state with only root rows is a root all tree whose leaves equal buildCarouselRules(state) field by field", () => {
+    for (const state of ROW_STATES) {
+      const body = carouselBody(editTreeOf("scene", treeOf("scene", state)));
+
+      expect(body.match).toBe("all");
+      expect(body.rules.every((node) => "field" in node)).toBe(true);
+      expect(
+        Object.fromEntries(
+          body.rules.map((node) =>
+            "field" in node ? [node.field, node.criterion] : []
+          )
+        )
+      ).toEqual(buildCarouselRules(state));
+    }
+  });
+
+  it("See More of root rows is the URL the flat writer gave, byte for byte", () => {
+    for (const state of ROW_STATES) {
+      const rules = buildCarouselRules(state);
+      const flatWriter = buildSearchParams({
+        searchText: "",
+        sortField: "created_at",
+        sortDirection: "ASC",
+        currentPage: 1,
+        perPage: 24,
+        filters: state,
+        filterOptions: SCENE_FILTER_OPTIONS,
+        viewMode: "grid",
+        zoomLevel: "medium",
+        gridDensity: "medium",
+        timelinePeriod: null,
+      }).toString();
+
+      expect(buildCustomCarouselUrl(rules, "created_at", "ASC")).toBe(
+        `/scenes?${flatWriter}`
+      );
+      expect(buildCustomCarouselUrl(rootAll(rules), "created_at", "ASC")).toBe(
+        `/scenes?${flatWriter}`
+      );
+    }
+  });
+
+  it("a repeated root field gives two leaves", () => {
+    const state = {
+      tagIds: ["1:a", "2:a"],
+      tagIdsModifier: "INCLUDES_ALL",
+      "2.tagIds": ["3:a"],
+      "2.tagIdsModifier": "INCLUDES",
+    };
+
+    expect(carouselBody(editTreeOf("scene", treeOf("scene", state)))).toEqual({
+      match: "all",
+      rules: [
+        leaf("tags", { value: ["1:a", "2:a"], modifier: "INCLUDES_ALL" }),
+        leaf("tags", { value: ["3:a"], modifier: "INCLUDES" }),
+      ],
+    });
+  });
+
+  it("an empty tree saves an empty root all tree", () => {
+    expect(
+      carouselBody(carouselEditTree({ rules: { match: "all", rules: [] } }))
+    ).toEqual({
+      match: "all",
+      rules: [],
+    });
+  });
+});
+
+describe("a stored carousel tree in the builder", () => {
+  const leaf = (field: string, criterion: unknown) => ({ field, criterion });
+  /** Leaves no scene row can read: Has ALL of studios, a duration NOT_BETWEEN */
+  const UNREAD = [
+    leaf("studios", { value: ["3:a"], modifier: "INCLUDES_ALL" }),
+    leaf("duration", { modifier: "NOT_BETWEEN", value: 60, value2: 120 }),
+  ];
+  const kinds = (tree: EditTree) => ({
+    match: tree.match,
+    rows: tree.rows.map((item) => item.kind),
+    groups: tree.groups.map((group) => ({
+      match: group.match,
+      rows: group.rows.map((item) =>
+        item.kind === "row" ? item.field.key : item.kind
+      ),
+    })),
+  });
+
+  it("a kept leaf stays in its container, after the rows, and saves there", () => {
+    const stored = {
+      match: "all" as const,
+      rules: [
+        leaf("rating100", { modifier: "BETWEEN", value: 80 }),
+        must(UNREAD[0]),
+        {
+          match: "any" as const,
+          rules: [leaf("favorite", true), must(UNREAD[1])],
+        },
+      ],
+    };
+
+    const tree = carouselEditTree({ rules: untrusted(stored) });
+
+    expect(kinds(tree)).toEqual({
+      match: "all",
+      rows: ["row", "kept"],
+      groups: [{ match: "any", rows: ["favorite", "kept"] }],
+    });
+    expect(carouselBody(tree)).toEqual(stored);
+  });
+
+  it("a group holding only kept leaves keeps its place and its match before a group with rows", () => {
+    const stored = {
+      match: "all" as const,
+      rules: [
+        { match: "any" as const, rules: UNREAD },
+        {
+          match: "all" as const,
+          rules: [leaf("favorite", true), leaf("watched", false)],
+        },
+      ],
+    };
+
+    const tree = carouselEditTree({ rules: untrusted(stored) });
+
+    expect(kinds(tree)).toEqual({
+      match: "all",
+      rows: [],
+      groups: [
+        { match: "any", rows: ["kept", "kept"] },
+        { match: "all", rows: ["favorite", "watched"] },
+      ],
+    });
+    expect(carouselBody(tree)).toEqual(stored);
+  });
+
+  it("a group nested in a group is kept whole in its group", () => {
+    const nested = { match: "any" as const, rules: [leaf("favorite", true)] };
+    const stored = {
+      match: "all" as const,
+      rules: [
+        { match: "all" as const, rules: [leaf("watched", false), nested] },
+      ],
+    };
+
+    const tree = carouselEditTree({ rules: untrusted(stored) });
+
+    expect(kinds(tree).groups).toEqual([
+      { match: "all", rows: ["watched", "kept"] },
+    ]);
+    expect(carouselBody(tree)).toEqual(stored);
   });
 });
 

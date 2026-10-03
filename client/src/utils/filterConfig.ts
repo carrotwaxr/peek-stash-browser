@@ -2,11 +2,13 @@
  * Sorting and filtering configuration for all entity types
  */
 import {
+  type CarouselData,
   type ClipFilterInput,
   type GalleryFilterInput,
   type GroupFilterInput,
   type ImageFilterInput,
   type ListKind,
+  type Match,
   PANEL_FIELDS,
   type PanelField,
   type PerformerFilterInput,
@@ -14,16 +16,27 @@ import {
   type StudioFilterInput,
   type TagFilterInput,
   type WhereGroup,
+  type WhereLeaf,
+  type WhereNode,
   isWhereGroup,
 } from "@peek/shared-types";
 import {
+  type EditItem,
+  type EditTree,
   type FilterOption,
+  type KeptLeaf,
+  type PanelRow,
   type PanelTable,
   type ReadPanelFilter,
   buildPanelFilter,
+  editTreeOf,
   filterOptionsOf,
   panelTableOf,
-  readPanelFilter,
+  panelTreeOf,
+  stateOf,
+  stateOfWhere,
+  treeOf,
+  whereOf,
 } from "./filterFields";
 
 export type { FilterOption };
@@ -281,43 +294,139 @@ export const CAROUSEL_FILTER_DEFINITIONS: FilterOption[] = filterOptionsOf(
   .filter((option) => CAROUSEL_KEYS.has(option.key))
   .sort((a, b) => (a.label ?? a.key).localeCompare(b.label ?? b.key));
 
-/**
- * A root "all" tree of rows, each field once, as the flat filter it means
- * (`{ [field]: criterion }`); undefined for a tree no flat filter holds (a
- * group, a repeated field, an "any" root)
- */
-function flatOfRootRows(
-  tree: WhereGroup<ListKind>
-): Record<string, unknown> | undefined {
-  if (tree.match !== "all") return undefined;
-  const flat: Record<string, unknown> = {};
-  for (const node of tree.rules) {
-    if (isWhereGroup(node) || !("field" in node) || node.field in flat) {
-      return undefined;
-    }
-    flat[node.field] = node.criterion;
+/** A stored carousel's rules as a where tree: the tree as stored, a flat rule set (stored before 9b) as its root "all" tree */
+function storedWhereOf(rules: unknown): WhereGroup<"scene"> | undefined {
+  if (isWhereGroup(rules)) return rules as WhereGroup<"scene">;
+  if (typeof rules !== "object" || rules === null || Array.isArray(rules)) {
+    return undefined;
   }
-  return flat;
+  return {
+    match: "all",
+    rules: Object.entries(rules as Readonly<Record<string, unknown>>).map(
+      ([field, criterion]) => ({ field, criterion }) as WhereLeaf<"scene">
+    ),
+  };
 }
 
 /**
- * A carousel's stored rules as the builder edits them: `state` holds what
- * the scene rows read back (each codec's `fromCriterion`; bare ids stay
- * bare, the old lone bounds read back as the bound typed), `kept` every
- * stored rule no row can edit, as stored. The server serves the rules as a
- * where tree: a root "all" tree of rows, each field once, reads as the flat
- * rules it means; any other tree is kept whole, for the builder to save as
- * it is (slice A's builder edits groups). Flat rules read as they are.
+ * A carousel's stored rules, of either shape, as panel state (`stateOfWhere`:
+ * each leaf read by the first scene row of its field that can, a repeated
+ * field as `2.<key>`, a group as `g<n>.<key>`), with the root's rules no row
+ * can edit as a flat filter holds them. A group's unreadable leaves are not
+ * in `kept`: the builder edits stored rules through `carouselEditTree`.
  */
 export const carouselRulesToFilterState = (rules: unknown): ReadPanelFilter => {
-  if (!isWhereGroup(rules)) {
-    return readPanelFilter("scene", rules, CAROUSEL_TABLE);
-  }
-  const flat = flatOfRootRows(rules);
-  return flat === undefined
-    ? { state: {}, kept: { match: rules.match, rules: rules.rules } }
-    : readPanelFilter("scene", flat, CAROUSEL_TABLE);
+  const { state, kept } = stateOfWhere("scene", storedWhereOf(rules));
+  return {
+    state,
+    kept: Object.fromEntries(
+      kept.flatMap(({ group, leaf }) =>
+        group === 0 &&
+        typeof leaf === "object" &&
+        leaf !== null &&
+        "field" in leaf &&
+        typeof leaf.field === "string" &&
+        "criterion" in leaf
+          ? [[leaf.field, leaf.criterion]]
+          : []
+      )
+    ),
+  };
 };
+
+const matchOf = (value: unknown): Match => (value === "any" ? "any" : "all");
+
+/**
+ * One stored container's leaves as panel rows, and the nodes no row reads
+ * (each leaf no row can read; in a group, a group nested deeper than the
+ * editor goes, kept whole)
+ */
+function containerOf(
+  match: Match,
+  nodes: readonly unknown[]
+): { rows: readonly PanelRow[]; kept: readonly unknown[] } {
+  const read = stateOfWhere("scene", {
+    match,
+    rules: nodes.filter((node) => !isWhereGroup(node)),
+  });
+  return {
+    rows: treeOf("scene", read.state).rows,
+    kept: read.kept.map((each) => each.leaf),
+  };
+}
+
+/**
+ * The carousel builder's editing tree of a carousel's stored rules (either
+ * shape): its rows, and each leaf no row can read as a kept row in its own
+ * container, after the rows. Every stored group stays, in its place and
+ * with its match, one holding only kept leaves included, so a save puts
+ * each leaf back where it was.
+ */
+export function carouselEditTree(
+  carousel: Pick<CarouselData, "rules">
+): EditTree {
+  const where = storedWhereOf(carousel.rules);
+  const nodes: readonly unknown[] = where?.rules ?? [];
+  const root = containerOf(matchOf(where?.match), nodes);
+  const groups = nodes.filter(isWhereGroup).map((group) => {
+    const match = matchOf(group.match);
+    const read = containerOf(match, group.rules);
+    return {
+      match,
+      rows: read.rows,
+      kept: [...read.kept, ...group.rules.filter(isWhereGroup)],
+    };
+  });
+  const kept: KeptLeaf[] = [
+    ...root.kept.map((leaf) => ({ group: 0, leaf })),
+    ...groups.flatMap((group, at) =>
+      group.kept.map((leaf) => ({ group: at + 1, leaf }))
+    ),
+  ];
+  return editTreeOf(
+    "scene",
+    {
+      match: matchOf(where?.match),
+      rows: root.rows,
+      groups: groups.map(({ match, rows }) => ({ match, rows })),
+      permanent: {},
+    },
+    kept
+  );
+}
+
+/** One editing container's rules as the wire holds them: its rows (merged under "any") and then its kept leaves */
+function containerRules(
+  match: Match,
+  items: readonly EditItem[]
+): readonly WhereNode<"scene">[] {
+  const { tree, kept } = panelTreeOf({
+    match,
+    rows: items,
+    groups: [],
+    permanent: {},
+  });
+  return whereOf("scene", stateOf("scene", tree), kept)?.rules ?? [];
+}
+
+/**
+ * The rules a carousel saves and previews: the editing tree as a where
+ * tree (Contract 8), each container through `whereOf` (rows that filter,
+ * canonical, same-field rows of an "any" container merged, kept leaves
+ * after the rows), the root's leaves before its groups, every group that
+ * holds a rule in the user's order with its match. Nothing left is an
+ * empty root "all" tree.
+ */
+export function carouselBody(edit: EditTree): WhereGroup<"scene"> {
+  const groups = edit.groups.flatMap((group) => {
+    const rules = containerRules(group.match, group.rows);
+    return rules.length === 0 ? [] : [{ match: group.match, rules }];
+  });
+  return {
+    match: edit.match,
+    rules: [...containerRules(edit.match, edit.rows), ...groups],
+  };
+}
 
 /**
  * The rules a carousel saves and previews: the builder's state built through

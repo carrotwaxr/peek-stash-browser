@@ -4,21 +4,19 @@ import type { PreviewCarouselResponse } from "@peek/shared-types";
 import { AlertCircle, ArrowLeft, Eye, Loader2, Save } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useSaveCarousel } from "../../api/hooks/useCarousels";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import {
   CAROUSEL_FIELDS,
-  buildCarouselRules,
-  carouselRulesToFilterState,
+  carouselBody,
+  carouselEditTree,
 } from "../../utils/filterConfig";
 import {
   type EditTree,
-  type KeptLeaf,
   type PanelTable,
   countRows,
-  editTreeOf,
   panelTableOf,
   panelTreeOf,
   stateOf,
-  treeOf,
 } from "../../utils/filterFields";
 import { sortOptionsFor } from "../../utils/listQuery";
 import FilterRowsEditor from "../filter-rows/FilterRowsEditor";
@@ -39,82 +37,48 @@ const CAROUSEL_TABLE: PanelTable = {
   rows: CAROUSEL_FIELDS,
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+/** Where the builder goes back to */
+const SETTINGS = "/settings?section=user&tab=customization";
 
-/**
- * The stored rules no row can edit, as kept rows at the root: one per
- * field, or one for a stored tree the interim reader keeps whole (A6 reads
- * trees). Each leaf is the part of the stored rules it stands for.
- */
-const keptLeavesOf = (kept: Readonly<Record<string, unknown>>): KeptLeaf[] =>
-  "match" in kept && "rules" in kept
-    ? [{ group: 0, leaf: kept }]
-    : Object.entries(kept).map(([field, criterion]) => ({
-        group: 0,
-        leaf: { [field]: criterion },
-      }));
+/** What a save sends, as compared for unsaved changes */
+interface Draft {
+  readonly title: string;
+  readonly icon: string;
+  readonly rules: string;
+  readonly sort: string;
+  readonly direction: string;
+}
 
-/** The kept rows' rules, as `buildCarouselRules` lays them under the rows */
-const keptRulesOf = (tree: EditTree): Record<string, unknown> =>
-  Object.assign(
-    {},
-    ...panelTreeOf(tree).kept.flatMap((each) =>
-      isRecord(each.leaf) ? [each.leaf] : []
-    )
-  ) as Record<string, unknown>;
-
-/** The editing tree of a carousel's stored rules: its rows and the rules kept as they are */
-const editTreeOfRules = (rules: unknown): EditTree => {
-  const stored = carouselRulesToFilterState(rules);
-  return editTreeOf(
-    "scene",
-    treeOf("scene", stored.state),
-    keptLeavesOf(stored.kept)
-  );
-};
-
-/**
- * A row now edits a field a kept rule holds: the kept rule goes, as the
- * save would overwrite it
- */
-const withoutReplacedKept = (tree: EditTree): EditTree => {
-  const edited = new Set(
-    tree.rows.flatMap((item) => (item.kind === "row" ? [item.field.field] : []))
-  );
-  const replaced = (leaf: unknown) =>
-    isRecord(leaf) &&
-    !("match" in leaf && "rules" in leaf) &&
-    Object.keys(leaf).every((field) => edited.has(field));
-  return tree.rows.some((item) => item.kind === "kept" && replaced(item.leaf))
-    ? {
-        ...tree,
-        rows: tree.rows.filter(
-          (item) => item.kind !== "kept" || !replaced(item.leaf)
-        ),
-      }
-    : tree;
-};
+const NEW_CAROUSEL = {
+  title: "",
+  icon: "Film",
+  sort: "random",
+  direction: "DESC",
+} as const;
 
 /**
  * CarouselBuilder Component
- * Full-page editor for creating and editing custom carousels.
- * Supports adding filter rules, previewing results, and saving.
+ * Full-page editor for creating and editing custom carousels: rules in the
+ * row editor (root rows and "Match any" or "Match all" groups, stored as a
+ * where tree), a preview, and a save.
  */
 const CarouselBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
   const saveCarousel = useSaveCarousel();
+  const { confirm, dialog } = useConfirmDialog();
 
   // Form state
-  const [title, setTitle] = useState("");
-  const [icon, setIcon] = useState("Film");
-  // The rules as an editing tree (root rows only until A6), with the
-  // stored rules no row can edit as kept rows
-  const [tree, setTree] = useState<EditTree>(() => editTreeOfRules({}));
-  const [sort, setSort] = useState("random");
-  const [direction, setDirection] = useState("DESC");
+  const [title, setTitle] = useState<string>(NEW_CAROUSEL.title);
+  const [icon, setIcon] = useState<string>(NEW_CAROUSEL.icon);
+  // The rules as an editing tree, with the stored leaves no row can edit as
+  // kept rows in their containers
+  const [tree, setTree] = useState<EditTree>(() =>
+    carouselEditTree({ rules: { match: "all", rules: [] } })
+  );
+  const [sort, setSort] = useState<string>(NEW_CAROUSEL.sort);
+  const [direction, setDirection] = useState<string>(NEW_CAROUSEL.direction);
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -127,6 +91,37 @@ const CarouselBuilder = () => {
   const [error, setError] = useState<string | null>(null);
   const [previewValid, setPreviewValid] = useState(false);
 
+  // The rules a preview and a save send
+  const body = carouselBody(tree);
+  const ruleCount = countRows(tree, "scene");
+
+  // A sort the rules do not offer (its rule was removed, or it sits in a
+  // group or under "Match any") reads as Random
+  const sortOptions = sortOptionsFor(
+    "scene",
+    stateOf("scene", panelTreeOf(tree).tree)
+  );
+  const effectiveSort = sortOptions.some((option) => option.value === sort)
+    ? sort
+    : "random";
+
+  // What the carousel was when loaded (or a new one), for unsaved changes
+  const draft: Draft = {
+    title: title.trim(),
+    icon,
+    rules: JSON.stringify(body),
+    sort: effectiveSort,
+    direction,
+  };
+  const [base, setBase] = useState<Draft | null>(() =>
+    isEditing ? null : draft
+  );
+  const dirty =
+    base !== null &&
+    (Object.keys(draft) as (keyof Draft)[]).some(
+      (key) => draft[key] !== base[key]
+    );
+
   // Load existing carousel if editing
   useEffect(() => {
     if (!isEditing || !id) return;
@@ -135,13 +130,24 @@ const CarouselBuilder = () => {
       setLoading(true);
       try {
         const { carousel } = await libraryApi.getCarousel(id);
+        const loaded = carouselEditTree(carousel);
         setTitle(carousel.title);
         setIcon(carousel.icon);
         setSort(carousel.sort);
         setDirection(carousel.direction);
-
-        // The stored rules as rows, keeping the rest as they are
-        setTree(editTreeOfRules(carousel.rules));
+        setTree(loaded);
+        // The stored sort as the rules offer it, as the draft reads it
+        const offered = sortOptionsFor(
+          "scene",
+          stateOf("scene", panelTreeOf(loaded).tree)
+        ).some((option) => option.value === carousel.sort);
+        setBase({
+          title: carousel.title.trim(),
+          icon: carousel.icon,
+          rules: JSON.stringify(carouselBody(loaded)),
+          sort: offered ? carousel.sort : "random",
+          direction: carousel.direction,
+        });
       } catch (err) {
         setError((err as Error).message || "Failed to load carousel");
       } finally {
@@ -152,22 +158,26 @@ const CarouselBuilder = () => {
     void loadCarousel();
   }, [id, isEditing]);
 
-  // The rows' state, and the rules a preview and a save send
-  const filterState = stateOf("scene", panelTreeOf(tree).tree);
-  const ruleCount = countRows(tree, "scene");
-  const apiRules = () => buildCarouselRules(filterState, keptRulesOf(tree));
-
-  // A sort the rules do not offer (its rule was removed) reads as Random
-  const sortOptions = sortOptionsFor("scene", filterState);
-  const effectiveSort = sortOptions.some((option) => option.value === sort)
-    ? sort
-    : "random";
-
   /** A rule changed: the preview is stale */
   const changeTree = (next: EditTree) => {
-    setTree(withoutReplacedKept(next));
+    setTree(next);
     setPreviewValid(false);
     setPreviewScenes(null);
+  };
+
+  /** Back to Settings; with unsaved changes, only once the user agrees */
+  const handleBack = async () => {
+    if (dirty) {
+      const discard = await confirm({
+        title: "Discard changes?",
+        message: "Your changes to this carousel are not saved.",
+        confirmText: "Discard",
+        cancelText: "Keep editing",
+        confirmStyle: "danger",
+      });
+      if (!discard) return;
+    }
+    void navigate(SETTINGS);
   };
 
   /**
@@ -184,7 +194,7 @@ const CarouselBuilder = () => {
 
     try {
       const result = await libraryApi.previewCarousel({
-        rules: apiRules(),
+        rules: body,
         sort: effectiveSort,
         direction,
       });
@@ -226,7 +236,7 @@ const CarouselBuilder = () => {
       const carouselData = {
         title: title.trim(),
         icon,
-        rules: apiRules(),
+        rules: body,
         sort: effectiveSort,
         direction,
       };
@@ -234,7 +244,9 @@ const CarouselBuilder = () => {
       // Home's list and every carousel's scenes are asked for again
       await saveCarousel.mutateAsync({ id, data: carouselData });
 
-      void navigate("/settings?section=user&tab=customization");
+      // Saved: nothing is unsaved any more
+      setBase(draft);
+      void navigate(SETTINGS);
     } catch (err) {
       setError((err as Error).message || "Failed to save carousel");
     } finally {
@@ -273,9 +285,7 @@ const CarouselBuilder = () => {
           <div className="flex items-center gap-3">
             <Button
               variant="secondary"
-              onClick={() =>
-                void navigate("/settings?section=user&tab=customization")
-              }
+              onClick={() => void handleBack()}
               icon={<ArrowLeft className="w-4 h-4" />}
             >
               Back
@@ -404,7 +414,7 @@ const CarouselBuilder = () => {
             className="text-sm font-semibold"
             style={{ color: "var(--text-secondary)" }}
           >
-            Filter Rules (ALL must match)
+            Filter Rules
           </h2>
 
           <FilterRowsEditor
@@ -412,7 +422,7 @@ const CarouselBuilder = () => {
             table={CAROUSEL_TABLE}
             tree={tree}
             onChange={changeTree}
-            allowGroups={false}
+            allowGroups
             pickFromAll
           />
         </div>
@@ -518,6 +528,8 @@ const CarouselBuilder = () => {
           </p>
         )}
       </div>
+
+      {dialog}
     </div>
   );
 };

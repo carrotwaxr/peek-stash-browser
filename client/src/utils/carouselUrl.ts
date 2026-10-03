@@ -1,16 +1,19 @@
 /**
  * Where a custom carousel's "See More" opens: the Scenes list holding the
- * carousel's rules as its panel filters
+ * carousel's rules as its filters, groups and repeated rows included
  */
-import {
-  SCENE_FILTER_OPTIONS,
-  carouselRulesToFilterState,
-} from "./filterConfig";
+import { PANEL_FIELDS } from "@peek/shared-types";
+import { carouselRulesToFilterState } from "./filterConfig";
+import { writeTreeUrl } from "./filterFields";
 import { buildSearchParams } from "./urlParams";
 
 /**
  * Build a "See More" URL for a custom carousel from its rules: the where
- * tree the server serves, or the flat rules the builder sends
+ * tree the server serves, or a flat rule set stored before 9b. The rules
+ * are written as the Scenes list's URL writes its filters (`writeTreeUrl`),
+ * then the carousel's sort and the list's presentation params; a carousel
+ * with only root rows gives the URL it gave before groups. A leaf no scene
+ * row can read is left out.
  */
 export const buildCustomCarouselUrl = (
   rules: object | null | undefined,
@@ -21,24 +24,26 @@ export const buildCustomCarouselUrl = (
     return "/scenes";
   }
 
-  // The rules the scene panel can show; a rule it cannot is left out
   const { state } = carouselRulesToFilterState(rules);
+  const params = new URLSearchParams();
+  writeTreeUrl("scene", PANEL_FIELDS.scene, state, params);
 
-  // Build URL params using existing utility
-  const params = buildSearchParams({
+  // The presentation params, as a Scenes list without filters writes them
+  const presentation = buildSearchParams({
     searchText: "",
     sortField: sort === undefined || sort === "" ? "random" : sort,
     sortDirection:
       direction === undefined || direction === "" ? "DESC" : direction,
     currentPage: 1,
     perPage: 24,
-    filters: state,
-    filterOptions: SCENE_FILTER_OPTIONS,
+    filters: {},
+    filterOptions: [],
     viewMode: "grid",
     zoomLevel: "medium",
     gridDensity: "medium",
     timelinePeriod: null,
   });
+  for (const [key, value] of presentation) params.append(key, value);
 
   const queryString = params.toString();
   return queryString ? `/scenes?${queryString}` : "/scenes";
