@@ -23,6 +23,8 @@ interface PopoverProps {
 }
 
 const GAP = 4;
+/** How far in from the screen's sides it stays */
+const EDGE = 8;
 
 const FOCUSABLE =
   'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -63,7 +65,9 @@ const Popover = ({
     onCloseRef.current = onClose;
   });
 
-  // Under the anchor, or above it when the viewport's bottom would cut it off
+  // Under the anchor, or above it when the viewport's bottom would cut it
+  // off; lined up with the anchor's edge, but kept on screen sideways (its
+  // left edge first when it is wider than the screen)
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
@@ -71,17 +75,24 @@ const Popover = ({
       const popover = popoverRef.current;
       if (!anchor || !popover) return;
       const height = popover.offsetHeight;
+      const width = popover.offsetWidth;
       const rect = anchor.getBoundingClientRect();
       const fitsBelow = window.innerHeight - rect.bottom >= height + GAP;
       const up = !fitsBelow && rect.top >= height + GAP;
+      // The wrapper's left edge on screen
+      const origin = rect.left - anchor.offsetLeft;
+      const wanted =
+        placement === "bottom-end"
+          ? anchor.offsetLeft + anchor.offsetWidth - width
+          : anchor.offsetLeft;
       setPosition({
         top: up
           ? anchor.offsetTop - height - GAP
           : anchor.offsetTop + anchor.offsetHeight + GAP,
-        left:
-          placement === "bottom-end"
-            ? anchor.offsetLeft + anchor.offsetWidth
-            : anchor.offsetLeft,
+        left: Math.max(
+          EDGE - origin,
+          Math.min(wanted, window.innerWidth - EDGE - width - origin)
+        ),
         up,
       });
     };
@@ -158,7 +169,6 @@ const Popover = ({
       style={{
         top: position.top,
         left: position.left,
-        transform: placement === "bottom-end" ? "translateX(-100%)" : undefined,
         backgroundColor: "var(--bg-secondary)",
         border: "1px solid var(--border-color)",
       }}
