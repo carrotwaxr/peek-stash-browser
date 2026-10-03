@@ -15,3 +15,7 @@ export const rowControlIds = (rowId: string) => ({
 /** The waiting row's field select in a container */
 export const waitingSelectId = (containerId: ContainerId) =>
   `filter-waiting-${containerId}`;
+
+/** A container's Match select: the root's, or a group's (by its id) */
+export const matchSelectId = (containerId: ContainerId) =>
+  `filter-match-${containerId}`;

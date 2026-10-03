@@ -236,4 +236,53 @@ describe("Modal", () => {
     expect(screen.queryByRole("dialog", { name: "Upper" })).toBeNull();
     expect(screen.getByRole("dialog", { name: "Lower" })).toBeTruthy();
   });
+
+  it("a full Modal's footer stays in view with 30 rows", () => {
+    withScopes(
+      <Modal
+        isOpen
+        onClose={() => {}}
+        title="Sheet"
+        size="full"
+        footer={<button>Apply</button>}
+      >
+        {Array.from({ length: 30 }, (_, at) => (
+          <p key={at}>Row {at + 1}</p>
+        ))}
+      </Modal>
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Sheet" });
+    // Full width and height, no rounding; the dialog itself does not scroll
+    expect(dialog).toHaveClass("h-full", "w-full", "max-w-none");
+    expect(dialog).not.toHaveClass(
+      "max-h-[90vh]",
+      "rounded-lg",
+      "overflow-y-auto"
+    );
+    expect(backdropOf(dialog)).not.toHaveClass("p-4");
+    // The body scrolls, and the footer sits outside it
+    const body = screen.getByText("Row 30").parentElement;
+    expect(body).toHaveClass("overflow-y-auto", "min-h-0", "flex-1");
+    const apply = screen.getByRole("button", { name: "Apply" });
+    expect(body?.contains(apply)).toBe(false);
+    expect(dialog.lastElementChild?.contains(apply)).toBe(true);
+  });
+
+  it("other sizes keep the bounded, rounded dialog that scrolls itself", () => {
+    withScopes(
+      <Modal isOpen onClose={() => {}} title="Dialog" size="xl">
+        <p>Body</p>
+      </Modal>
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Dialog" });
+    expect(dialog).toHaveClass(
+      "max-w-5xl",
+      "max-h-[90vh]",
+      "rounded-lg",
+      "overflow-y-auto"
+    );
+    expect(backdropOf(dialog)).toHaveClass("p-4");
+  });
 });

@@ -16,8 +16,12 @@ interface ModalProps {
   title: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  /** max-w-md / 2xl / 4xl / 5xl; default "md" */
-  size?: "sm" | "md" | "lg" | "xl";
+  /**
+   * max-w-md / 2xl / 4xl / 5xl, or "full": the whole screen, no rounding,
+   * the body scrolling between the title and the footer (phone and TV
+   * sheets); default "md"
+   */
+  size?: "sm" | "md" | "lg" | "xl" | "full";
   /** Default true: Escape, the backdrop and the close button close it */
   dismissible?: boolean;
   /** Focused on open instead of the first focusable element */
@@ -30,6 +34,7 @@ const SIZE_CLASSES = {
   md: "max-w-2xl",
   lg: "max-w-4xl",
   xl: "max-w-5xl",
+  full: "h-full max-w-none",
 } as const;
 
 /**
@@ -65,13 +70,17 @@ const Modal = ({
 
   if (!isOpen) return null;
 
+  // A full dialog fills the screen and its body scrolls, so the title and
+  // the footer stay in view; the others are bounded and scroll themselves
+  const full = size === "full";
+
   // React bubbles a portal's events to its React ancestors (a card's click
   // and mousedown handlers), so the backdrop stops them. That stops the native
   // event too: a listener for a press outside a popover inside a Modal listens
   // on the document in the capture phase
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50${full ? "" : " p-4"}`}
       onMouseDown={(e) => {
         e.stopPropagation();
         pressStartedOnBackdrop.current = e.target === e.currentTarget;
@@ -91,14 +100,18 @@ const Modal = ({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={ariaDescribedBy}
-        className={`flex max-h-[90vh] w-full flex-col overflow-y-auto rounded-lg border shadow-lg ${SIZE_CLASSES[size]}`}
+        className={
+          full
+            ? `flex w-full flex-col border shadow-lg ${SIZE_CLASSES.full}`
+            : `flex max-h-[90vh] w-full flex-col overflow-y-auto rounded-lg border shadow-lg ${SIZE_CLASSES[size]}`
+        }
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
         }}
       >
         <div
-          className="flex items-center justify-between gap-4 border-b px-6 py-4"
+          className="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-4"
           style={{ borderColor: "var(--border-color)" }}
         >
           <h3
@@ -121,13 +134,18 @@ const Modal = ({
           )}
         </div>
 
-        <div className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
+        <div
+          className={
+            full ? "min-h-0 flex-1 overflow-y-auto px-6 py-4" : "px-6 py-4"
+          }
+          style={{ color: "var(--text-secondary)" }}
+        >
           {children}
         </div>
 
         {footer && (
           <div
-            className="flex justify-end gap-3 border-t px-6 py-4"
+            className="flex shrink-0 justify-end gap-3 border-t px-6 py-4"
             style={{ borderColor: "var(--border-color)" }}
           >
             {footer}
