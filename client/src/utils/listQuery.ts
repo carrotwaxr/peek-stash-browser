@@ -13,7 +13,6 @@ import {
   IMAGE_SORT_OPTIONS,
   PERFORMER_SORT_OPTIONS,
   SCENE_SORT_OPTIONS,
-  SCENE_SORT_OPTIONS_BASE,
   STUDIO_SORT_OPTIONS,
   TAG_SORT_OPTIONS,
   buildClipFilter,
@@ -41,6 +40,57 @@ export function hasIncludingCollection(filter: unknown): boolean {
   return Array.isArray(value) && value.length > 0 && modifier !== "EXCLUDES";
 }
 
+/**
+ * The values a filter state names with an including modifier: the page's
+ * permanent criterion in the request's shape (`{ value, modifier }` under the
+ * contract field), or the panel's key with its modifier companion. An
+ * EXCLUDES, "has none" or "has any" criterion names none.
+ */
+function includedValues(
+  filters: Filters,
+  field: string,
+  panelKey?: string,
+  modifierKey?: string
+): unknown[] {
+  const named: unknown[] = [];
+  const take = (value: unknown, modifier: unknown) => {
+    if (!Array.isArray(value) || value.length === 0) return;
+    if (
+      modifier === undefined ||
+      modifier === "INCLUDES" ||
+      modifier === "INCLUDES_ALL"
+    ) {
+      named.push(...(value as unknown[]));
+    }
+  };
+  const permanent = filters[field];
+  if (Array.isArray(permanent)) take(permanent, undefined);
+  else if (typeof permanent === "object" && permanent !== null) {
+    const { value, modifier } = permanent as {
+      value?: unknown;
+      modifier?: unknown;
+    };
+    take(value, modifier);
+  }
+  if (panelKey) {
+    take(filters[panelKey], modifierKey ? filters[modifierKey] : undefined);
+  }
+  return named;
+}
+
+/**
+ * The scene panel's row for the Playlists field: its key and modifier
+ * companion, which the panel's table names
+ */
+const playlistRow = () =>
+  (
+    PANEL_FIELDS.scene as readonly {
+      field: string;
+      key: string;
+      modifierKey?: string;
+    }[]
+  ).find((row) => row.field === "playlists");
+
 /** Whether a filter state, the page's permanent criteria merged in, offers the Scene Number sort */
 export function offersSceneIndex(filters: Filters): boolean {
   return (
@@ -53,20 +103,56 @@ export function offersSceneIndex(filters: Filters): boolean {
 }
 
 /**
- * The sort a query carries for these filters: Scene Number without an
- * including collection filter is a 400 (item 38), so the scene default takes
- * its place.
+ * Whether the filters include exactly one playlist: the server's Playlist
+ * order needs one to read the position from (a 400 otherwise)
+ */
+export function offersPlaylistOrder(filters: Filters): boolean {
+  const row = playlistRow();
+  return (
+    includedValues(filters, "playlists", row?.key, row?.modifierKey).length ===
+    1
+  );
+}
+
+/**
+ * Whether the filters include a parent collection: the server's Collection
+ * order is the index within it (a 400 otherwise)
+ */
+export function offersCollectionOrder(filters: Filters): boolean {
+  return (
+    includedValues(filters, "containing_groups", "groupIds", "groupIdsModifier")
+      .length > 0
+  );
+}
+
+/** Whether a list offers a sort that reads a filter, given these filters */
+function isOffered(
+  artifactType: string,
+  field: string,
+  filters: Filters
+): boolean {
+  if (artifactType === "scene") {
+    if (field === "scene_index") return offersSceneIndex(filters);
+    if (field === "playlist_position") return offersPlaylistOrder(filters);
+  }
+  if (artifactType === "group" && field === "sub_group_order") {
+    return offersCollectionOrder(filters);
+  }
+  return true;
+}
+
+/**
+ * The sort a query carries for these filters: a sort that reads a filter
+ * (Scene Number, Playlist order, Collection order) without it is a 400
+ * (item 38), so the list's default takes its place.
  */
 export function sortOffered(
   artifactType: string,
   field: string,
   filters: Filters
 ): string {
-  return artifactType === "scene" &&
-    field === "scene_index" &&
-    !offersSceneIndex(filters)
-    ? DEFAULT_SORT.scene.field
-    : field;
+  if (isOffered(artifactType, field, filters)) return field;
+  return DEFAULT_SORT[artifactType as keyof typeof DEFAULT_SORT].field;
 }
 
 /** An entity's `<entity>_filter` from the panel's filters (permanent filters merged in) */
@@ -117,16 +203,17 @@ export const getSortOptions = (artifactType: string) => {
 
 /**
  * The sorts a list offers for these filters, the page's permanent filters
- * merged in: the scene list offers Scene Number only beside a collection
- * filter that includes.
+ * merged in: Scene Number only beside a collection filter that includes,
+ * Playlist order only beside exactly one playlist, Collection order only
+ * beside a parent collection.
  */
 export const sortOptionsFor = (
   artifactType: string,
   filters: Filters
 ): readonly { value: string; label: string }[] =>
-  artifactType === "scene" && !offersSceneIndex(filters)
-    ? SCENE_SORT_OPTIONS_BASE
-    : getSortOptions(artifactType);
+  getSortOptions(artifactType).filter((option) =>
+    isOffered(artifactType, option.value, filters)
+  );
 
 /** A random order's seed: the same seed gives the same order from page to page */
 export const freshSeed = () => 10_000_000 + Math.floor(Math.random() * 9e7);
