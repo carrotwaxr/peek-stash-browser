@@ -173,8 +173,22 @@ export function clientList(
 /** Two composite ids (`"id:instanceId"`) of an entity type, on the test instance */
 export type RefPair = readonly [string, string];
 
-/** A searchable select's entity type (`"tags"`, `"scenes"`) to its two ids */
-export type RefPool = (entityType: string) => RefPair;
+/**
+ * A searchable select's entity type (`"tags"`, `"scenes"`) to its two ids.
+ * With `upward` the ids suit a picker that reads up the hierarchy (Child
+ * tags, Sub-collections): the first has parents of its own, so including
+ * sub-items adds refs.
+ */
+export type RefPool = (entityType: string, upward?: boolean) => RefPair;
+
+/**
+ * The pickers whose depth reads up the hierarchy: the rows listing the
+ * parents of what they pick
+ */
+const UPWARD_PICKERS: ReadonlySet<string> = new Set([
+  "childIds",
+  "subGroupIds",
+]);
 
 /**
  * The playlist picker's sample ids: Peek playlist ids, not Stash refs. Any
@@ -184,8 +198,12 @@ export type RefPool = (entityType: string) => RefPair;
 const PLAYLIST_SAMPLE_IDS: RefPair = ["1", "2"];
 
 /** Two ids for a picker: playlists' are Peek's, the rest from the pool */
-const pickerIds = (entityType: string, refs: RefPool): RefPair =>
-  entityType === "playlists" ? PLAYLIST_SAMPLE_IDS : refs(entityType);
+const pickerIds = (
+  entityType: string,
+  refs: RefPool,
+  upward = false
+): RefPair =>
+  entityType === "playlists" ? PLAYLIST_SAMPLE_IDS : refs(entityType, upward);
 
 /**
  * One panel state for one option: a value (one sample per bound or
@@ -389,7 +407,7 @@ function refSamples(option: ClientOption, refs: RefPool): SampleValue[] {
   if (entityType === undefined) {
     throw new Error(`Searchable select ${key} names no entityType`);
   }
-  const [first, second] = pickerIds(entityType, refs);
+  const [first, second] = pickerIds(entityType, refs, UPWARD_PICKERS.has(key));
   const picks: { variant: string; ids: string[] }[] =
     option.multi === true
       ? [

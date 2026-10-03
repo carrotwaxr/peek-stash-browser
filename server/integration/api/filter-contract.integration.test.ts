@@ -17,7 +17,9 @@
  * A new option or sort is walked by construction. KNOWN_GAPS names the cases
  * that fail at this commit, each with why; each must still fail, so closing
  * a gap without deleting its entry fails too, with the SQL diff. The walk
- * reads the replay library and writes nothing.
+ * reads the replay library. It writes only its viewer: a throwaway admin with
+ * one favourite tag, studio and performer (a "No" favourites filter adds
+ * nothing for a viewer with none, by design), removed afterwards.
  */
 import {
   DEFAULT_SORT,
@@ -25,8 +27,11 @@ import {
   LIST_KINDS,
   type ListKind,
 } from "@peek/shared-types/filters/index.js";
-import { makeEntityRef } from "@peek/shared-types/instanceAwareId.js";
-import { beforeAll, describe, expect, it } from "vitest";
+import {
+  makeEntityRef,
+  parseEntityRef,
+} from "@peek/shared-types/instanceAwareId.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ValidationError } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
@@ -66,6 +71,8 @@ const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 const KNOWN_GAPS: Readonly<Record<string, string>> = {};
 
 const PER_PAGE = 24;
+/** The throwaway viewer the walk runs as */
+const WALK_USER = "filter_contract_walk";
 /** The client sends the random sort with an 8-digit seed (`SearchControls`) */
 const RANDOM_SORT = "random_12345678";
 const WALK_TIMEOUT_MS = 180_000;
@@ -559,7 +566,46 @@ async function refPool(instanceId: string): Promise<RefPool> {
     "a studio with a sub-studio"
   );
 
+  // The pickers that read up the hierarchy (Child tags, Sub-collections):
+  // the first id sits under a parent, so including sub-items adds refs. The
+  // second sits at the top, so a union of both still differs.
+  const childTag = must(
+    tags.find((tag) =>
+      parseJsonArray(tag.parentIds).some((id) =>
+        tags.some((other) => other.id === id)
+      )
+    ),
+    "a tag under a parent"
+  ).id;
+  const relations = await prisma.groupRelation.findMany({
+    where: { subInstanceId: instanceId, containingInstanceId: instanceId },
+    select: { containingId: true, subId: true },
+  });
+  const containersOf = (id: string): string[] =>
+    relations.filter((r) => r.subId === id).map((r) => r.containingId);
+  const levelsAbove = (id: string, seen: readonly string[] = []): number =>
+    seen.includes(id)
+      ? 0
+      : Math.max(
+          0,
+          ...containersOf(id).map((c) => 1 + levelsAbove(c, [...seen, id]))
+        );
+  const groups = await prisma.stashGroup.findMany({ where: live, ...ids });
+  const deepGroup = must(
+    [...groups].sort((a, b) => levelsAbove(b.id) - levelsAbove(a.id))[0],
+    "a collection"
+  );
+  const topGroup = must(
+    groups.find((group) => containersOf(group.id).length === 0),
+    "a collection with no parent"
+  );
+
   const pool = new Map<string, RefPair>([
+    ["tags:up", pair("tag", childTag, tags)],
+    [
+      "groups:up",
+      pair("group", deepGroup.id, [{ id: topGroup.id }, ...groups]),
+    ],
     [
       "tags",
       pair("tag", parentTag, [{ id: TEST_ENTITIES.tagWithEntities }, ...tags]),
@@ -604,8 +650,12 @@ async function refPool(instanceId: string): Promise<RefPool> {
       ),
     ],
   ]);
-  return (entityType) =>
-    must(pool.get(entityType), `test ids for entity type ${entityType}`);
+  return (entityType, upward = false) =>
+    must(
+      (upward ? pool.get(`${entityType}:up`) : undefined) ??
+        pool.get(entityType),
+      `test ids for entity type ${entityType}`
+    );
 }
 
 describeWithDb(
@@ -616,17 +666,38 @@ describeWithDb(
 
     beforeAll(async () => {
       client = await loadClientFilterConfig();
-      const admin = await prisma.user.findUniqueOrThrow({
-        where: { username: TEST_ADMIN.username },
-        select: { id: true },
-      });
       await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
       const instanceId = await findTestInstanceId();
-      walk = {
-        userId: admin.id,
-        allowedInstanceIds: [instanceId],
-        refs: await refPool(instanceId),
-      };
+      const refs = await refPool(instanceId);
+      // The viewer has one favourite of each kind, so a "No" favourites
+      // filter has something to leave out
+      await prisma.user.deleteMany({ where: { username: WALK_USER } });
+      const viewer = await prisma.user.create({
+        data: {
+          username: WALK_USER,
+          password: "not-a-real-hash",
+          role: "ADMIN",
+        },
+        select: { id: true },
+      });
+      const base = { userId: viewer.id, instanceId, favorite: true };
+      const idOf = (entityType: string) =>
+        parseEntityRef(refs(entityType)[0]).id;
+      await prisma.tagRating.create({
+        data: { ...base, tagId: idOf("tags") },
+      });
+      await prisma.studioRating.create({
+        data: { ...base, studioId: idOf("studios") },
+      });
+      await prisma.performerRating.create({
+        data: { ...base, performerId: idOf("performers") },
+      });
+      walk = { userId: viewer.id, allowedInstanceIds: [instanceId], refs };
+    });
+
+    afterAll(async () => {
+      // The ratings go with the user
+      await prisma.user.deleteMany({ where: { username: WALK_USER } });
     });
 
     it.each(LIST_KINDS)(

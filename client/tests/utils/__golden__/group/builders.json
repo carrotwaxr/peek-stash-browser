@@ -179,6 +179,120 @@
       }
     },
     {
+      "label": "studioId: INCLUDES one id",
+      "state": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "INCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioId: INCLUDES one id, with sub-items",
+      "state": {
+        "studioId": "1:inst-a",
+        "studioIdDepth": -1,
+        "studioIdModifier": "INCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "studioId: EXCLUDES one id",
+      "state": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioId: EXCLUDES one id, with sub-items",
+      "state": {
+        "studioId": "1:inst-a",
+        "studioIdDepth": -1,
+        "studioIdModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "studioId: IS_NULL one id",
+      "state": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "IS_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioId: IS_NULL one id, with sub-items",
+      "state": {
+        "studioId": "1:inst-a",
+        "studioIdDepth": -1,
+        "studioIdModifier": "IS_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioId: NOT_NULL one id",
+      "state": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "NOT_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioId: NOT_NULL one id, with sub-items",
+      "state": {
+        "studioId": "1:inst-a",
+        "studioIdDepth": -1,
+        "studioIdModifier": "NOT_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
       "label": "studioId: one id",
       "state": {
         "studioId": "1:inst-a"
@@ -189,6 +303,22 @@
             "1:inst-a"
           ],
           "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioId: one id, with sub-items",
+      "state": {
+        "studioId": "1:inst-a",
+        "studioIdDepth": -1
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
         }
       }
     },
@@ -229,6 +359,46 @@
       }
     },
     {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
       "label": "tagIds: INCLUDES one id",
       "state": {
         "tagIds": [
@@ -261,6 +431,46 @@
             "2:inst-b"
           ],
           "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
         }
       }
     },
@@ -301,6 +511,166 @@
       }
     },
     {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: IS_NULL one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: IS_NULL two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: IS_NULL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: IS_NULL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: NOT_NULL one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: NOT_NULL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
       "label": "tagIds: one id",
       "state": {
         "tagIds": [
@@ -331,6 +701,44 @@
             "2:inst-b"
           ],
           "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
         }
       }
     },
@@ -874,6 +1282,234 @@
       }
     },
     {
+      "label": "groupIds: INCLUDES_ALL one id",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "groupIds: INCLUDES_ALL two ids",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "groupIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "groupIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "groupIds: INCLUDES one id",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "groupIds: INCLUDES two ids",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "groupIds: INCLUDES one id, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "groupIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "groupIds: EXCLUDES one id",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "groupIds: EXCLUDES two ids",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "groupIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "groupIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1,
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
       "label": "groupIds: one id",
       "state": {
         "groupIds": [
@@ -903,6 +1539,706 @@
             "1:inst-a",
             "2:inst-b"
           ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "groupIds: one id, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "groupIds: two ids, with sub-items",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1
+      },
+      "request": {
+        "containing_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL one id",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL two ids",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsDepth": -1,
+        "subGroupIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsDepth": -1,
+        "subGroupIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: INCLUDES one id",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: INCLUDES two ids",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: INCLUDES one id, with sub-items",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsDepth": -1,
+        "subGroupIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsDepth": -1,
+        "subGroupIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: EXCLUDES one id",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: EXCLUDES two ids",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsDepth": -1,
+        "subGroupIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsDepth": -1,
+        "subGroupIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: one id",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: two ids",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: one id, with sub-items",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsDepth": -1
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "subGroupIds: two ids, with sub-items",
+      "state": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsDepth": -1
+      },
+      "request": {
+        "sub_groups": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "subGroupCount: min only",
+      "state": {
+        "subGroupCount": {
+          "min": "25"
+        }
+      },
+      "request": {
+        "sub_group_count": {
+          "modifier": "BETWEEN",
+          "value": 25
+        }
+      }
+    },
+    {
+      "label": "subGroupCount: max only",
+      "state": {
+        "subGroupCount": {
+          "max": "75"
+        }
+      },
+      "request": {
+        "sub_group_count": {
+          "modifier": "BETWEEN",
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "subGroupCount: min and max",
+      "state": {
+        "subGroupCount": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "request": {
+        "sub_group_count": {
+          "modifier": "BETWEEN",
+          "value": 25,
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "containingGroupCount: min only",
+      "state": {
+        "containingGroupCount": {
+          "min": "25"
+        }
+      },
+      "request": {
+        "containing_group_count": {
+          "modifier": "BETWEEN",
+          "value": 25
+        }
+      }
+    },
+    {
+      "label": "containingGroupCount: max only",
+      "state": {
+        "containingGroupCount": {
+          "max": "75"
+        }
+      },
+      "request": {
+        "containing_group_count": {
+          "modifier": "BETWEEN",
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "containingGroupCount: min and max",
+      "state": {
+        "containingGroupCount": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "request": {
+        "containing_group_count": {
+          "modifier": "BETWEEN",
+          "value": 25,
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "tagCount: min only",
+      "state": {
+        "tagCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "tag_count": {
+          "modifier": "BETWEEN",
+          "value": 250
+        }
+      }
+    },
+    {
+      "label": "tagCount: max only",
+      "state": {
+        "tagCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "tag_count": {
+          "modifier": "BETWEEN",
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "tagCount: min and max",
+      "state": {
+        "tagCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "tag_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "oCounter: min only",
+      "state": {
+        "oCounter": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "o_counter": {
+          "modifier": "BETWEEN",
+          "value": 250
+        }
+      }
+    },
+    {
+      "label": "oCounter: max only",
+      "state": {
+        "oCounter": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "o_counter": {
+          "modifier": "BETWEEN",
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "oCounter: min and max",
+      "state": {
+        "oCounter": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "o_counter": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "playCount: min only",
+      "state": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "play_count": {
+          "modifier": "BETWEEN",
+          "value": 250
+        }
+      }
+    },
+    {
+      "label": "playCount: max only",
+      "state": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "play_count": {
+          "modifier": "BETWEEN",
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "playCount: min and max",
+      "state": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "play_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "performerFavorite: true",
+      "state": {
+        "performerFavorite": "true"
+      },
+      "request": {
+        "performer_favorite": true
+      }
+    },
+    {
+      "label": "performerFavorite: false",
+      "state": {
+        "performerFavorite": "false"
+      },
+      "request": {
+        "performer_favorite": false
+      }
+    },
+    {
+      "label": "aliases: INCLUDES text",
+      "state": {
+        "aliases": "contract",
+        "aliasesModifier": "INCLUDES"
+      },
+      "request": {
+        "aliases": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "aliases: EXCLUDES text",
+      "state": {
+        "aliases": "contract",
+        "aliasesModifier": "EXCLUDES"
+      },
+      "request": {
+        "aliases": {
+          "value": "contract",
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "aliases: IS_NULL text",
+      "state": {
+        "aliases": "contract",
+        "aliasesModifier": "IS_NULL"
+      },
+      "request": {
+        "aliases": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "aliases: NOT_NULL text",
+      "state": {
+        "aliases": "contract",
+        "aliasesModifier": "NOT_NULL"
+      },
+      "request": {
+        "aliases": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "aliases: text",
+      "state": {
+        "aliases": "contract"
+      },
+      "request": {
+        "aliases": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "url: INCLUDES text",
+      "state": {
+        "url": "contract",
+        "urlModifier": "INCLUDES"
+      },
+      "request": {
+        "url": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "url: EXCLUDES text",
+      "state": {
+        "url": "contract",
+        "urlModifier": "EXCLUDES"
+      },
+      "request": {
+        "url": {
+          "value": "contract",
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "url: IS_NULL text",
+      "state": {
+        "url": "contract",
+        "urlModifier": "IS_NULL"
+      },
+      "request": {
+        "url": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "url: NOT_NULL text",
+      "state": {
+        "url": "contract",
+        "urlModifier": "NOT_NULL"
+      },
+      "request": {
+        "url": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "url: text",
+      "state": {
+        "url": "contract"
+      },
+      "request": {
+        "url": {
+          "value": "contract",
           "modifier": "INCLUDES"
         }
       }

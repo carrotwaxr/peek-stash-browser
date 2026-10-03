@@ -24,6 +24,8 @@
     "performerIds_start",
     "performerIds_end",
     "studioId",
+    "studioIdModifier",
+    "studioIdDepth",
     "studioId_min",
     "studioId_max",
     "studioId_start",
@@ -31,6 +33,7 @@
     "tagIds",
     "tagId",
     "tagIdsModifier",
+    "tagIdsDepth",
     "tagIdsExclude",
     "tagIds_min",
     "tagIds_max",
@@ -75,10 +78,62 @@
     "updatedAt_end",
     "groupIds",
     "groupId",
+    "groupIdsModifier",
+    "groupIdsDepth",
     "groupIds_min",
     "groupIds_max",
     "groupIds_start",
     "groupIds_end",
+    "subGroupIds",
+    "subGroupId",
+    "subGroupIdsModifier",
+    "subGroupIdsDepth",
+    "subGroupIds_min",
+    "subGroupIds_max",
+    "subGroupIds_start",
+    "subGroupIds_end",
+    "subGroupCount",
+    "subGroupCount_min",
+    "subGroupCount_max",
+    "subGroupCount_start",
+    "subGroupCount_end",
+    "containingGroupCount",
+    "containingGroupCount_min",
+    "containingGroupCount_max",
+    "containingGroupCount_start",
+    "containingGroupCount_end",
+    "tagCount",
+    "tagCount_min",
+    "tagCount_max",
+    "tagCount_start",
+    "tagCount_end",
+    "oCounter",
+    "oCounter_min",
+    "oCounter_max",
+    "oCounter_start",
+    "oCounter_end",
+    "playCount",
+    "playCount_min",
+    "playCount_max",
+    "playCount_start",
+    "playCount_end",
+    "performerFavorite",
+    "performerFavorite_min",
+    "performerFavorite_max",
+    "performerFavorite_start",
+    "performerFavorite_end",
+    "aliases",
+    "aliasesModifier",
+    "aliases_min",
+    "aliases_max",
+    "aliases_start",
+    "aliases_end",
+    "url",
+    "urlModifier",
+    "url_min",
+    "url_max",
+    "url_start",
+    "url_end",
     "filters",
     "q",
     "sort",
@@ -207,10 +262,89 @@
       "lossless": true
     },
     {
+      "label": "studioId: INCLUDES one id",
+      "params": "studioId=1%3Ainst-a&studioIdModifier=INCLUDES",
+      "parsed": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: INCLUDES one id, with sub-items",
+      "params": "studioId=1%3Ainst-a&studioIdModifier=INCLUDES&studioIdDepth=-1",
+      "parsed": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "INCLUDES",
+        "studioIdDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: EXCLUDES one id",
+      "params": "studioId=1%3Ainst-a&studioIdModifier=EXCLUDES",
+      "parsed": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: EXCLUDES one id, with sub-items",
+      "params": "studioId=1%3Ainst-a&studioIdModifier=EXCLUDES&studioIdDepth=-1",
+      "parsed": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "EXCLUDES",
+        "studioIdDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: IS_NULL one id",
+      "params": "studioIdModifier=IS_NULL",
+      "parsed": {
+        "studioIdModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioId: IS_NULL one id, with sub-items",
+      "params": "studioIdModifier=IS_NULL",
+      "parsed": {
+        "studioIdModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioId: NOT_NULL one id",
+      "params": "studioIdModifier=NOT_NULL",
+      "parsed": {
+        "studioIdModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioId: NOT_NULL one id, with sub-items",
+      "params": "studioIdModifier=NOT_NULL",
+      "parsed": {
+        "studioIdModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
       "label": "studioId: one id",
       "params": "studioId=1%3Ainst-a",
       "parsed": {
         "studioId": "1:inst-a"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: one id, with sub-items",
+      "params": "studioId=1%3Ainst-a&studioIdDepth=-1",
+      "parsed": {
+        "studioId": "1:inst-a",
+        "studioIdDepth": -1
       },
       "lossless": true
     },
@@ -238,6 +372,31 @@
       "lossless": true
     },
     {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
       "label": "tagIds: INCLUDES one id",
       "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
       "parsed": {
@@ -257,6 +416,31 @@
           "2:inst-b"
         ],
         "tagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
       },
       "lossless": true
     },
@@ -284,6 +468,95 @@
       "lossless": true
     },
     {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: IS_NULL one id",
+      "params": "tagIdsModifier=IS_NULL",
+      "parsed": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: IS_NULL two ids",
+      "params": "tagIdsModifier=IS_NULL",
+      "parsed": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: IS_NULL one id, with sub-items",
+      "params": "tagIdsModifier=IS_NULL",
+      "parsed": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: IS_NULL two ids, with sub-items",
+      "params": "tagIdsModifier=IS_NULL",
+      "parsed": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: NOT_NULL one id",
+      "params": "tagIdsModifier=NOT_NULL",
+      "parsed": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids",
+      "params": "tagIdsModifier=NOT_NULL",
+      "parsed": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: NOT_NULL one id, with sub-items",
+      "params": "tagIdsModifier=NOT_NULL",
+      "parsed": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids, with sub-items",
+      "params": "tagIdsModifier=NOT_NULL",
+      "parsed": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
       "label": "tagIds: one id",
       "params": "tagIds=1%3Ainst-a",
       "parsed": {
@@ -301,6 +574,29 @@
           "1:inst-a",
           "2:inst-b"
         ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
       },
       "lossless": true
     },
@@ -657,6 +953,150 @@
       "lossless": true
     },
     {
+      "label": "groupIds: INCLUDES_ALL one id",
+      "params": "groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: INCLUDES_ALL two ids",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: INCLUDES_ALL one id, with sub-items",
+      "params": "groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES_ALL&groupIdsDepth=-1",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL",
+        "groupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: INCLUDES_ALL two ids, with sub-items",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES_ALL&groupIdsDepth=-1",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL",
+        "groupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: INCLUDES one id",
+      "params": "groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: INCLUDES two ids",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: INCLUDES one id, with sub-items",
+      "params": "groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES&groupIdsDepth=-1",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES",
+        "groupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: INCLUDES two ids, with sub-items",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES&groupIdsDepth=-1",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES",
+        "groupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: EXCLUDES one id",
+      "params": "groupIds=1%3Ainst-a&groupIdsModifier=EXCLUDES",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: EXCLUDES two ids",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=EXCLUDES",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: EXCLUDES one id, with sub-items",
+      "params": "groupIds=1%3Ainst-a&groupIdsModifier=EXCLUDES&groupIdsDepth=-1",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "EXCLUDES",
+        "groupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: EXCLUDES two ids, with sub-items",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=EXCLUDES&groupIdsDepth=-1",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "EXCLUDES",
+        "groupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
       "label": "groupIds: one id",
       "params": "groupIds=1%3Ainst-a",
       "parsed": {
@@ -674,6 +1114,472 @@
           "1:inst-a",
           "2:inst-b"
         ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: one id, with sub-items",
+      "params": "groupIds=1%3Ainst-a&groupIdsDepth=-1",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: two ids, with sub-items",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsDepth=-1",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL one id",
+      "params": "subGroupIds=1%3Ainst-a&subGroupIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL two ids",
+      "params": "subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL one id, with sub-items",
+      "params": "subGroupIds=1%3Ainst-a&subGroupIdsModifier=INCLUDES_ALL&subGroupIdsDepth=-1",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL",
+        "subGroupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL two ids, with sub-items",
+      "params": "subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=INCLUDES_ALL&subGroupIdsDepth=-1",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL",
+        "subGroupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES one id",
+      "params": "subGroupIds=1%3Ainst-a&subGroupIdsModifier=INCLUDES",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES two ids",
+      "params": "subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=INCLUDES",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES one id, with sub-items",
+      "params": "subGroupIds=1%3Ainst-a&subGroupIdsModifier=INCLUDES&subGroupIdsDepth=-1",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES",
+        "subGroupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES two ids, with sub-items",
+      "params": "subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=INCLUDES&subGroupIdsDepth=-1",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES",
+        "subGroupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: EXCLUDES one id",
+      "params": "subGroupIds=1%3Ainst-a&subGroupIdsModifier=EXCLUDES",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: EXCLUDES two ids",
+      "params": "subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=EXCLUDES",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: EXCLUDES one id, with sub-items",
+      "params": "subGroupIds=1%3Ainst-a&subGroupIdsModifier=EXCLUDES&subGroupIdsDepth=-1",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "EXCLUDES",
+        "subGroupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: EXCLUDES two ids, with sub-items",
+      "params": "subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=EXCLUDES&subGroupIdsDepth=-1",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "EXCLUDES",
+        "subGroupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: one id",
+      "params": "subGroupIds=1%3Ainst-a",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: two ids",
+      "params": "subGroupIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: one id, with sub-items",
+      "params": "subGroupIds=1%3Ainst-a&subGroupIdsDepth=-1",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupIds: two ids, with sub-items",
+      "params": "subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsDepth=-1",
+      "parsed": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupCount: min only",
+      "params": "subGroupCount_min=25",
+      "parsed": {
+        "subGroupCount": {
+          "min": "25"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupCount: max only",
+      "params": "subGroupCount_max=75",
+      "parsed": {
+        "subGroupCount": {
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "subGroupCount: min and max",
+      "params": "subGroupCount_min=25&subGroupCount_max=75",
+      "parsed": {
+        "subGroupCount": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "containingGroupCount: min only",
+      "params": "containingGroupCount_min=25",
+      "parsed": {
+        "containingGroupCount": {
+          "min": "25"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "containingGroupCount: max only",
+      "params": "containingGroupCount_max=75",
+      "parsed": {
+        "containingGroupCount": {
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "containingGroupCount: min and max",
+      "params": "containingGroupCount_min=25&containingGroupCount_max=75",
+      "parsed": {
+        "containingGroupCount": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagCount: min only",
+      "params": "tagCount_min=250",
+      "parsed": {
+        "tagCount": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagCount: max only",
+      "params": "tagCount_max=750",
+      "parsed": {
+        "tagCount": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagCount: min and max",
+      "params": "tagCount_min=250&tagCount_max=750",
+      "parsed": {
+        "tagCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCounter: min only",
+      "params": "oCounter_min=250",
+      "parsed": {
+        "oCounter": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCounter: max only",
+      "params": "oCounter_max=750",
+      "parsed": {
+        "oCounter": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCounter: min and max",
+      "params": "oCounter_min=250&oCounter_max=750",
+      "parsed": {
+        "oCounter": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: min only",
+      "params": "playCount_min=250",
+      "parsed": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: max only",
+      "params": "playCount_max=750",
+      "parsed": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: min and max",
+      "params": "playCount_min=250&playCount_max=750",
+      "parsed": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerFavorite: true",
+      "params": "performerFavorite=true",
+      "parsed": {
+        "performerFavorite": "true"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerFavorite: false",
+      "params": "performerFavorite=false",
+      "parsed": {
+        "performerFavorite": "false"
+      },
+      "lossless": true
+    },
+    {
+      "label": "aliases: INCLUDES text",
+      "params": "aliases=contract&aliasesModifier=INCLUDES",
+      "parsed": {
+        "aliases": "contract",
+        "aliasesModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "aliases: EXCLUDES text",
+      "params": "aliases=contract&aliasesModifier=EXCLUDES",
+      "parsed": {
+        "aliases": "contract",
+        "aliasesModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "aliases: IS_NULL text",
+      "params": "aliasesModifier=IS_NULL",
+      "parsed": {
+        "aliasesModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "aliases: NOT_NULL text",
+      "params": "aliasesModifier=NOT_NULL",
+      "parsed": {
+        "aliasesModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "aliases: text",
+      "params": "aliases=contract",
+      "parsed": {
+        "aliases": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "url: INCLUDES text",
+      "params": "url=contract&urlModifier=INCLUDES",
+      "parsed": {
+        "url": "contract",
+        "urlModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "url: EXCLUDES text",
+      "params": "url=contract&urlModifier=EXCLUDES",
+      "parsed": {
+        "url": "contract",
+        "urlModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "url: IS_NULL text",
+      "params": "urlModifier=IS_NULL",
+      "parsed": {
+        "urlModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "url: NOT_NULL text",
+      "params": "urlModifier=NOT_NULL",
+      "parsed": {
+        "urlModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "url: text",
+      "params": "url=contract",
+      "parsed": {
+        "url": "contract"
       },
       "lossless": true
     }
@@ -795,10 +1701,89 @@
       "hasFilters": true
     },
     {
+      "label": "studioId: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdModifier=INCLUDES",
+      "filters": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdModifier=INCLUDES&studioIdDepth=-1",
+      "filters": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "INCLUDES",
+        "studioIdDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdModifier=EXCLUDES",
+      "filters": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdModifier=EXCLUDES&studioIdDepth=-1",
+      "filters": {
+        "studioId": "1:inst-a",
+        "studioIdModifier": "EXCLUDES",
+        "studioIdDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: IS_NULL one id",
+      "written": "instance=inst-a&tab=x&studioIdModifier=IS_NULL",
+      "filters": {
+        "studioIdModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: IS_NULL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioIdModifier=IS_NULL",
+      "filters": {
+        "studioIdModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: NOT_NULL one id",
+      "written": "instance=inst-a&tab=x&studioIdModifier=NOT_NULL",
+      "filters": {
+        "studioIdModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: NOT_NULL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioIdModifier=NOT_NULL",
+      "filters": {
+        "studioIdModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "studioId: one id",
       "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a",
       "filters": {
         "studioId": "1:inst-a"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdDepth=-1",
+      "filters": {
+        "studioId": "1:inst-a",
+        "studioIdDepth": -1
       },
       "hasFilters": true
     },
@@ -826,6 +1811,31 @@
       "hasFilters": true
     },
     {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
       "label": "tagIds: INCLUDES one id",
       "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
       "filters": {
@@ -845,6 +1855,31 @@
           "2:inst-b"
         ],
         "tagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
       },
       "hasFilters": true
     },
@@ -872,6 +1907,95 @@
       "hasFilters": true
     },
     {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: IS_NULL one id",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=IS_NULL",
+      "filters": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: IS_NULL two ids",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=IS_NULL",
+      "filters": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: IS_NULL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=IS_NULL",
+      "filters": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: IS_NULL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=IS_NULL",
+      "filters": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: NOT_NULL one id",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=NOT_NULL",
+      "filters": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=NOT_NULL",
+      "filters": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: NOT_NULL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=NOT_NULL",
+      "filters": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=NOT_NULL",
+      "filters": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "tagIds: one id",
       "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a",
       "filters": {
@@ -889,6 +2013,29 @@
           "1:inst-a",
           "2:inst-b"
         ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
       },
       "hasFilters": true
     },
@@ -1245,6 +2392,150 @@
       "hasFilters": true
     },
     {
+      "label": "groupIds: INCLUDES_ALL one id",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: INCLUDES_ALL two ids",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: INCLUDES_ALL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES_ALL&groupIdsDepth=-1",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL",
+        "groupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: INCLUDES_ALL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES_ALL&groupIdsDepth=-1",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES_ALL",
+        "groupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a&groupIdsModifier=INCLUDES&groupIdsDepth=-1",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "INCLUDES",
+        "groupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: INCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=INCLUDES&groupIdsDepth=-1",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "INCLUDES",
+        "groupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a&groupIdsModifier=EXCLUDES",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=EXCLUDES",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a&groupIdsModifier=EXCLUDES&groupIdsDepth=-1",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsModifier": "EXCLUDES",
+        "groupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: EXCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsModifier=EXCLUDES&groupIdsDepth=-1",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsModifier": "EXCLUDES",
+        "groupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
       "label": "groupIds: one id",
       "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a",
       "filters": {
@@ -1262,6 +2553,472 @@
           "1:inst-a",
           "2:inst-b"
         ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a&groupIdsDepth=-1",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ],
+        "groupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b&groupIdsDepth=-1",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "groupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL one id",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a&subGroupIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL two ids",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a&subGroupIdsModifier=INCLUDES_ALL&subGroupIdsDepth=-1",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL",
+        "subGroupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES_ALL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=INCLUDES_ALL&subGroupIdsDepth=-1",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES_ALL",
+        "subGroupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a&subGroupIdsModifier=INCLUDES",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=INCLUDES",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a&subGroupIdsModifier=INCLUDES&subGroupIdsDepth=-1",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "INCLUDES",
+        "subGroupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: INCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=INCLUDES&subGroupIdsDepth=-1",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "INCLUDES",
+        "subGroupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a&subGroupIdsModifier=EXCLUDES",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=EXCLUDES",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a&subGroupIdsModifier=EXCLUDES&subGroupIdsDepth=-1",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsModifier": "EXCLUDES",
+        "subGroupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: EXCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsModifier=EXCLUDES&subGroupIdsDepth=-1",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsModifier": "EXCLUDES",
+        "subGroupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: one id",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: two ids",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a&subGroupIdsDepth=-1",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a"
+        ],
+        "subGroupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupIds: two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&subGroupIds=1%3Ainst-a%2C2%3Ainst-b&subGroupIdsDepth=-1",
+      "filters": {
+        "subGroupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "subGroupIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupCount: min only",
+      "written": "instance=inst-a&tab=x&subGroupCount_min=25",
+      "filters": {
+        "subGroupCount": {
+          "min": "25"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupCount: max only",
+      "written": "instance=inst-a&tab=x&subGroupCount_max=75",
+      "filters": {
+        "subGroupCount": {
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "subGroupCount: min and max",
+      "written": "instance=inst-a&tab=x&subGroupCount_min=25&subGroupCount_max=75",
+      "filters": {
+        "subGroupCount": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "containingGroupCount: min only",
+      "written": "instance=inst-a&tab=x&containingGroupCount_min=25",
+      "filters": {
+        "containingGroupCount": {
+          "min": "25"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "containingGroupCount: max only",
+      "written": "instance=inst-a&tab=x&containingGroupCount_max=75",
+      "filters": {
+        "containingGroupCount": {
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "containingGroupCount: min and max",
+      "written": "instance=inst-a&tab=x&containingGroupCount_min=25&containingGroupCount_max=75",
+      "filters": {
+        "containingGroupCount": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagCount: min only",
+      "written": "instance=inst-a&tab=x&tagCount_min=250",
+      "filters": {
+        "tagCount": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagCount: max only",
+      "written": "instance=inst-a&tab=x&tagCount_max=750",
+      "filters": {
+        "tagCount": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagCount: min and max",
+      "written": "instance=inst-a&tab=x&tagCount_min=250&tagCount_max=750",
+      "filters": {
+        "tagCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCounter: min only",
+      "written": "instance=inst-a&tab=x&oCounter_min=250",
+      "filters": {
+        "oCounter": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCounter: max only",
+      "written": "instance=inst-a&tab=x&oCounter_max=750",
+      "filters": {
+        "oCounter": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCounter: min and max",
+      "written": "instance=inst-a&tab=x&oCounter_min=250&oCounter_max=750",
+      "filters": {
+        "oCounter": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: min only",
+      "written": "instance=inst-a&tab=x&playCount_min=250",
+      "filters": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: max only",
+      "written": "instance=inst-a&tab=x&playCount_max=750",
+      "filters": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: min and max",
+      "written": "instance=inst-a&tab=x&playCount_min=250&playCount_max=750",
+      "filters": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerFavorite: true",
+      "written": "instance=inst-a&tab=x&performerFavorite=true",
+      "filters": {
+        "performerFavorite": "true"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerFavorite: false",
+      "written": "instance=inst-a&tab=x&performerFavorite=false",
+      "filters": {
+        "performerFavorite": "false"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "aliases: INCLUDES text",
+      "written": "instance=inst-a&tab=x&aliases=contract&aliasesModifier=INCLUDES",
+      "filters": {
+        "aliases": "contract",
+        "aliasesModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "aliases: EXCLUDES text",
+      "written": "instance=inst-a&tab=x&aliases=contract&aliasesModifier=EXCLUDES",
+      "filters": {
+        "aliases": "contract",
+        "aliasesModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "aliases: IS_NULL text",
+      "written": "instance=inst-a&tab=x&aliasesModifier=IS_NULL",
+      "filters": {
+        "aliasesModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "aliases: NOT_NULL text",
+      "written": "instance=inst-a&tab=x&aliasesModifier=NOT_NULL",
+      "filters": {
+        "aliasesModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "aliases: text",
+      "written": "instance=inst-a&tab=x&aliases=contract",
+      "filters": {
+        "aliases": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "url: INCLUDES text",
+      "written": "instance=inst-a&tab=x&url=contract&urlModifier=INCLUDES",
+      "filters": {
+        "url": "contract",
+        "urlModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "url: EXCLUDES text",
+      "written": "instance=inst-a&tab=x&url=contract&urlModifier=EXCLUDES",
+      "filters": {
+        "url": "contract",
+        "urlModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "url: IS_NULL text",
+      "written": "instance=inst-a&tab=x&urlModifier=IS_NULL",
+      "filters": {
+        "urlModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "url: NOT_NULL text",
+      "written": "instance=inst-a&tab=x&urlModifier=NOT_NULL",
+      "filters": {
+        "urlModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "url: text",
+      "written": "instance=inst-a&tab=x&url=contract",
+      "filters": {
+        "url": "contract"
       },
       "hasFilters": true
     }

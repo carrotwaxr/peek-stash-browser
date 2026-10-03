@@ -473,6 +473,13 @@ const textPresenceOf = (
 const TEXT_DEFAULT = "INCLUDES";
 
 /**
+ * What a text row matches with no condition chosen: its field's default
+ * (a StashDB id is equal to one), a substring when the field says nothing
+ */
+const textDefaultOf = (spec: FieldSpec): string =>
+  spec.kind === "text" ? spec.defaultModifier : TEXT_DEFAULT;
+
+/**
  * A text row's modifier: the condition select's when the row offers it and
  * its field takes it, else a substring
  */
@@ -485,7 +492,7 @@ function textModifierOf(
     field.modifierKey === undefined ? undefined : state[field.modifierKey];
   return (
     textModifiersOf(field, spec).find((modifier) => modifier === chosen) ??
-    TEXT_DEFAULT
+    textDefaultOf(spec)
   );
 }
 
@@ -1019,7 +1026,7 @@ function textFromCriterion(
       ? withModifier
       : {};
   }
-  const known = offered.length > 0 ? offered : [TEXT_DEFAULT];
+  const known = offered.length > 0 ? offered : [textDefaultOf(spec)];
   return typeof value === "string" &&
     value.trim() !== "" &&
     known.includes(modifier)
