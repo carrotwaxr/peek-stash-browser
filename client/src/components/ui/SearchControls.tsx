@@ -8,6 +8,7 @@ import React, {
 import deepEqual from "fast-deep-equal";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
 import { type ColumnConfig, presetColumnsOf } from "../../config/tableColumns";
+import { useListFilters } from "../../hooks/useListFilters";
 import { useFilterOptions } from "../../hooks/useListOptions";
 import type { ListUrlState, PresetToLoad } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
@@ -18,7 +19,7 @@ import {
   activeFieldCount,
   rowKeysOf,
 } from "../../utils/filterFields";
-import { sortOptionsFor, withoutLockedOptions } from "../../utils/listQuery";
+import { sortOptionsFor } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
 import {
   ActiveFilterChips,
@@ -120,17 +121,13 @@ const SearchControls = ({
   // The panel and the chips offer every field the view leaves free: a field
   // the page fixes is offered, its rows AND-ed with the page's criterion
   // (FILTERS-12), but not the timeline's date or the open folder's tags
-  const { viewLockedFields } = listState;
   const allFilterOptions = useFilterOptions(artifactType);
-  const filterOptions = useMemo(
-    () =>
-      withoutLockedOptions(
-        artifactType as ListEntity,
-        allFilterOptions,
-        viewLockedFields
-      ),
-    [artifactType, allFilterOptions, viewLockedFields]
+  const listFilters = useListFilters(
+    artifactType as ListEntity,
+    listState,
+    allFilterOptions
   );
+  const filterOptions = listFilters.options;
 
   const {
     filters,
@@ -141,9 +138,7 @@ const SearchControls = ({
     viewMode,
     zoomLevel,
     gridDensity,
-    applyFilters,
     removeFilter,
-    clearFilters,
     setSort,
     setPage,
     setPerPage,
@@ -222,19 +217,19 @@ const SearchControls = ({
 
   // Apply the draft and close the panel
   const handleFilterSubmit = useCallback(() => {
-    applyFilters(panelFilters);
+    listFilters.commit(panelFilters);
     setDraft(null);
     setIsFilterPanelOpen(false);
     focusFiltersButton();
-  }, [applyFilters, panelFilters, focusFiltersButton]);
+  }, [listFilters, panelFilters, focusFiltersButton]);
 
   // Clear All drops every filter and closes the panel
   const handleClearFilters = useCallback(() => {
-    clearFilters();
+    listFilters.clear();
     setDraft(null);
     setIsFilterPanelOpen(false);
     focusFiltersButton();
-  }, [clearFilters, focusFiltersButton]);
+  }, [listFilters, focusFiltersButton]);
 
   // Cancel drops the draft and closes the panel
   const handleFilterCancel = useCallback(() => {

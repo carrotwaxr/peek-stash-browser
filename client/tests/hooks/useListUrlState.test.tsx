@@ -753,6 +753,16 @@ describe("useListUrlState", () => {
       expect(list.actions).toEqual(Array<string>(8).fill("PUSH"));
     });
 
+    it("applyFilters with history replace adds no history entry", async () => {
+      const list = renderList("/scenes?page=3");
+      await actAsync(() =>
+        list.state.applyFilters({ favorite: true }, { history: "replace" })
+      );
+      expect(list.actions).toEqual(["REPLACE"]);
+      expect(list.params().get("favorite")).toBe("true");
+      expect(list.params().has("page")).toBe(false);
+    });
+
     it("setPage writes the page, omitted at 1", async () => {
       const list = renderList("/scenes");
       await actAsync(() => list.state.setPage(3));
