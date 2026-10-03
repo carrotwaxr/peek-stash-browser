@@ -31,11 +31,13 @@ const mockApiGet = vi.fn<ApiMock>();
 const mockApiPost = vi.fn<ApiMock>();
 const mockApiPut = vi.fn<ApiMock>();
 const mockApiDelete = vi.fn<ApiMock>();
+const mockFindTags = vi.fn<ApiMock>();
 vi.mock("../../../src/api", () => ({
   apiGet: (...args: unknown[]) => mockApiGet(...args),
   apiPost: (...args: unknown[]) => mockApiPost(...args),
   apiPut: (...args: unknown[]) => mockApiPut(...args),
   apiDelete: (...args: unknown[]) => mockApiDelete(...args),
+  libraryApi: { findTags: (...args: unknown[]) => mockFindTags(...args) },
 }));
 
 /** Renders the section under a query client, which it refreshes after a change */
@@ -1124,6 +1126,156 @@ describe("StashInstanceSection", () => {
       await waitFor(() => {
         expect(showError).toHaveBeenCalledWith("Failed to delete instance");
       });
+    });
+  });
+
+  describe("VR tag row (admin)", () => {
+    const withVr = (overrides: Record<string, unknown> = {}) => ({
+      ...mockInstance,
+      vrTagId: null,
+      vrTagName: null,
+      stashVrTag: null,
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+        user: { role: "ADMIN" },
+      });
+    });
+
+    it("shows Stash's tag, or says Stash has none", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [
+          withVr({ stashVrTag: "VR" }),
+          withVr({ id: "inst-2", name: "Other", stashVrTag: null }),
+        ],
+      });
+
+      renderSection();
+
+      expect(await screen.findByText("Stash's VR tag: VR")).toBeInTheDocument();
+      expect(screen.getByText("Stash has no VR tag set")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Use Stash's tag" })
+      ).not.toBeInTheDocument();
+    });
+
+    it("names a chosen tag, and one that is gone", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [
+          withVr({ vrTagId: "7", vrTagName: "Virtual reality" }),
+          withVr({ id: "inst-2", name: "Other", vrTagId: "9" }),
+        ],
+      });
+
+      renderSection();
+
+      expect(
+        await screen.findByText("Chosen here: Virtual reality")
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Chosen here: a tag that no longer exists")
+      ).toBeInTheDocument();
+    });
+
+    it("picking a tag searches that instance, then sends the bare tag id and refreshes the library", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [withVr({ stashVrTag: "VR" })],
+      });
+      mockFindTags.mockResolvedValue({
+        findTags: {
+          count: 1,
+          tags: [{ id: "7", instanceId: "test-instance-1", name: "Virtual" }],
+        },
+      });
+      mockApiPut.mockResolvedValue({ success: true });
+      const client = new QueryClient();
+      const statusKey = queryKeys.setup.status();
+      client.setQueryData(statusKey, { stashInstanceCount: 1 });
+
+      renderSection(client);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Choose VR tag" })
+      );
+
+      // The search is scoped to the instance
+      const choice = await screen.findByRole("button", { name: "Virtual" });
+      expect(mockFindTags.mock.calls[0]?.[0]).toMatchObject({
+        tag_filter: { instance_id: "test-instance-1" },
+      });
+
+      fireEvent.change(screen.getByRole("searchbox"), {
+        target: { value: "vir" },
+      });
+      await waitFor(() => {
+        expect(mockFindTags.mock.calls.at(-1)?.[0]).toMatchObject({
+          tag_filter: { instance_id: "test-instance-1" },
+          filter: { q: "vir" },
+        });
+      });
+
+      fireEvent.click(choice);
+
+      await waitFor(() => {
+        expect(mockApiPut).toHaveBeenCalledWith(
+          "/setup/stash-instance/test-instance-1",
+          { vrTagId: "7" }
+        );
+      });
+      await waitFor(() => {
+        expect(client.getQueryState(statusKey)?.isInvalidated).toBe(true);
+      });
+    });
+
+    it("Use Stash's tag sends null", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [
+          withVr({ vrTagId: "7", vrTagName: "Virtual", stashVrTag: "VR" }),
+        ],
+      });
+      mockApiPut.mockResolvedValue({ success: true });
+
+      renderSection();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Use Stash's tag" })
+      );
+
+      await waitFor(() => {
+        expect(mockApiPut).toHaveBeenCalledWith(
+          "/setup/stash-instance/test-instance-1",
+          { vrTagId: null }
+        );
+      });
+    });
+
+    it("a refused save toasts the server's message and keeps the row", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [withVr({ vrTagId: "7", vrTagName: "Virtual" })],
+      });
+      mockApiPut.mockRejectedValue(new Error("That tag is not a tag"));
+
+      renderSection();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Use Stash's tag" })
+      );
+
+      await waitFor(() => {
+        expect(showError).toHaveBeenCalledWith("That tag is not a tag");
+      });
+      expect(screen.getByText("Chosen here: Virtual")).toBeInTheDocument();
+    });
+
+    it("a non-admin sees no VR tag row", async () => {
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+        user: { role: "USER" },
+      });
+      mockApiGet.mockResolvedValue({ instance: withVr({ stashVrTag: "VR" }) });
+
+      renderSection();
+
+      await screen.findByText("Test Stash");
+      expect(screen.queryByText(/VR tag/)).not.toBeInTheDocument();
     });
   });
 });

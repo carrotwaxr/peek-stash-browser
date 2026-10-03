@@ -88,6 +88,10 @@ export const getSetupStatus = async (
   });
 };
 
+/** What the admin reads when a VR tag is not a live tag of the instance */
+const VR_TAG_NOT_FOUND_MESSAGE =
+  "That tag is not a tag of this Stash instance. Pick one from its tag list.";
+
 /** What the admin reads when a change would leave no enabled instance */
 const LAST_ENABLED_INSTANCE_MESSAGE =
   "Peek needs an enabled Stash instance. Add another instance first, or change this one's address under Edit.";
@@ -529,16 +533,49 @@ export const createFirstStashInstance = async (
   });
 };
 
-/** A Stash instance row as the responses send it: dates as ISO strings */
+/**
+ * A Stash instance row as the responses send it: dates as ISO strings, and
+ * the VR tag's name (null when none is chosen or the chosen tag is gone)
+ */
 function toStashInstanceData<
   T extends { createdAt: Date; updatedAt: Date; firstSyncedAt: Date | null },
->(instance: T) {
+>(instance: T, vrTagName: string | null) {
   return {
     ...instance,
     createdAt: instance.createdAt.toISOString(),
     updatedAt: instance.updatedAt.toISOString(),
     firstSyncedAt: instance.firstSyncedAt?.toISOString() ?? null,
+    vrTagName,
   };
+}
+
+/**
+ * The names of the instances' chosen VR tags, by instance id. A name comes
+ * from a live tag of that instance only: an override whose tag was deleted in
+ * Stash has none, and the same tag id on another instance never counts.
+ */
+async function vrTagNamesOf(
+  instances: { id: string; vrTagId: string | null }[]
+): Promise<Map<string, string>> {
+  const chosen = instances.filter(
+    (instance): instance is { id: string; vrTagId: string } =>
+      typeof instance.vrTagId === "string"
+  );
+  const names = new Map<string, string>();
+  if (chosen.length === 0) return names;
+
+  const tags = await prisma.stashTag.findMany({
+    where: {
+      deletedAt: null,
+      OR: chosen.map((instance) => ({
+        id: instance.vrTagId,
+        stashInstanceId: instance.id,
+      })),
+    },
+    select: { id: true, stashInstanceId: true, name: true },
+  });
+  for (const tag of tags) names.set(tag.stashInstanceId, tag.name);
+  return names;
 }
 
 /**
@@ -560,18 +597,22 @@ export const getStashInstance = async (
       priority: true,
       createdAt: true,
       updatedAt: true,
+      vrTagId: true,
+      stashVrTag: true,
     },
     orderBy: { priority: "asc" },
   });
 
   // For commit 1, we only support one instance
   const instance = instances[0] ?? null;
+  const vrTagNames = await vrTagNamesOf(instance ? [instance] : []);
 
   res.json({
     instance: instance && {
       ...instance,
       createdAt: instance.createdAt.toISOString(),
       updatedAt: instance.updatedAt.toISOString(),
+      vrTagName: vrTagNames.get(instance.id) ?? null,
     },
     instanceCount: instances.length,
   });
@@ -602,11 +643,18 @@ export const getAllStashInstances = async (
       createdAt: true,
       updatedAt: true,
       firstSyncedAt: true,
+      vrTagId: true,
+      stashVrTag: true,
     },
     orderBy: { priority: "asc" },
   });
+  const vrTagNames = await vrTagNamesOf(instances);
 
-  res.json({ instances: instances.map(toStashInstanceData) });
+  res.json({
+    instances: instances.map((instance) =>
+      toStashInstanceData(instance, vrTagNames.get(instance.id) ?? null)
+    ),
+  });
 };
 
 /**
@@ -698,6 +746,8 @@ export const createStashInstance = async (
       createdAt: true,
       updatedAt: true,
       firstSyncedAt: true,
+      vrTagId: true,
+      stashVrTag: true,
     },
   });
 
@@ -717,7 +767,7 @@ export const createStashInstance = async (
 
   res.status(201).json({
     success: true,
-    instance: toStashInstanceData(instance),
+    instance: toStashInstanceData(instance, null),
     sync,
   });
 };
@@ -732,7 +782,16 @@ export const updateStashInstance = async (
   res: TypedResponse<UpdateStashInstanceResponse | ApiErrorResponse>
 ) => {
   const { id } = req.params;
-  const { name, description, url, uiUrl, apiKey, enabled, priority } = req.body;
+  const { name, description, url, uiUrl, apiKey, enabled, priority, vrTagId } =
+    req.body;
+
+  if (
+    vrTagId !== undefined &&
+    vrTagId !== null &&
+    typeof vrTagId !== "string"
+  ) {
+    throw new ValidationError("vrTagId must be a tag id or null");
+  }
 
   // Check instance exists
   const existing = await prisma.stashInstance.findUnique({
@@ -794,9 +853,20 @@ export const updateStashInstance = async (
       });
       if (others === 0) throw new LastEnabledInstanceError();
     }
+    // The VR tag is a live tag of this instance, checked in the unit that
+    // saves it so a sync that deletes the tag cannot slip between. A new
+    // address clears it below, so it is not checked then.
+    if (typeof vrTagId === "string" && !urlChanged) {
+      const tag = await tx.stashTag.findFirst({
+        where: { id: vrTagId, stashInstanceId: id, deletedAt: null },
+        select: { id: true },
+      });
+      if (!tag) throw new ValidationError(VR_TAG_NOT_FOUND_MESSAGE);
+    }
     return tx.stashInstance.update({
       where: { id },
       data: {
+        ...(vrTagId !== undefined && { vrTagId }),
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
         ...(url !== undefined && { url }),
@@ -805,8 +875,13 @@ export const updateStashInstance = async (
         ...(enabled !== undefined && { enabled }),
         ...(priority !== undefined && { priority }),
         // Another address may be another Stash: the instance is new again,
-        // hidden from users until its resync's exclusions are computed
-        ...(urlChanged && { firstSyncedAt: null }),
+        // hidden from users until its resync's exclusions are computed, and
+        // its VR tag, the admin's and Stash's, belong to the old library
+        ...(urlChanged && {
+          firstSyncedAt: null,
+          vrTagId: null,
+          stashVrTag: null,
+        }),
       },
       select: {
         id: true,
@@ -819,6 +894,8 @@ export const updateStashInstance = async (
         createdAt: true,
         updatedAt: true,
         firstSyncedAt: true,
+        vrTagId: true,
+        stashVrTag: true,
       },
     });
   }).catch((error: unknown) => {
@@ -861,9 +938,14 @@ export const updateStashInstance = async (
       ? stashSyncService.queueFullSync(instance.id)
       : "none";
 
+  const vrTagNames = await vrTagNamesOf([instance]);
+
   res.json({
     success: true,
-    instance: toStashInstanceData(instance),
+    instance: toStashInstanceData(
+      instance,
+      vrTagNames.get(instance.id) ?? null
+    ),
     sync,
   });
 };

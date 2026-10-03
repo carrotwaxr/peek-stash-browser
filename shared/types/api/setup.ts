@@ -131,6 +131,21 @@ export interface GetStashInstanceResponse {
     priority: number;
     createdAt: string;
     updatedAt: string;
+    /**
+     * The VR tag the admin chose for this server, a bare tag id on it; null
+     * uses Stash's own
+     */
+    vrTagId: string | null;
+    /**
+     * The chosen tag's name; null when none is chosen or the tag was deleted in
+     * Stash (Peek then uses Stash's tag)
+     */
+    vrTagName: string | null;
+    /**
+     * Stash's own VR tag (its `ui.vrTag` setting) by name, as last read by a
+     * sync; null when Stash has none
+     */
+    stashVrTag: string | null;
   } | null;
   instanceCount: number;
 }
@@ -158,6 +173,21 @@ export interface StashInstanceData {
    * after its URL changed
    */
   firstSyncedAt: string | null;
+  /**
+   * The VR tag the admin chose for this server, a bare tag id on it; null
+   * uses Stash's own
+   */
+  vrTagId: string | null;
+  /**
+   * The chosen tag's name; null when none is chosen or the tag was deleted in
+   * Stash (Peek then uses Stash's tag)
+   */
+  vrTagName: string | null;
+  /**
+   * Stash's own VR tag (its `ui.vrTag` setting) by name, as last read by a
+   * sync; null when Stash has none
+   */
+  stashVrTag: string | null;
 }
 
 /**
@@ -208,6 +238,11 @@ export interface UpdateStashInstanceRequest {
   apiKey?: string;
   enabled?: boolean;
   priority?: number;
+  /**
+   * The server's VR tag: a bare id of a live tag on it (400 otherwise), or
+   * null to use Stash's own. A new `url` clears it.
+   */
+  vrTagId?: string | null;
 }
 
 export interface UpdateStashInstanceResponse {

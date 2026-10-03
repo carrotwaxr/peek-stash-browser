@@ -2,15 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   CreateStashInstanceResponse,
   DeleteStashInstanceResponse,
+  FindTagsResponse,
   TestStashConnectionResponse,
   UpdateStashInstanceResponse,
 } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
-import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
+import { apiDelete, apiGet, apiPost, apiPut, libraryApi } from "../../api";
 import { ApiError, getErrorMessage } from "../../api/client";
 import { invalidateInstanceQueries } from "../../api/hooks/useLibraryReady";
 import { useAuth } from "../../hooks/useAuth";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { useDebouncedValue } from "../../hooks/useDebounce";
 import { formatDateTime } from "../../utils/date";
 import { showError, showInfo, showSuccess } from "../../utils/toast";
 import { Button, Paper, StatusMessage } from "../ui/index";
@@ -30,6 +32,12 @@ interface StashInstance {
    * every user
    */
   firstSyncedAt?: string | null;
+  /** Admins only: the VR tag chosen for this server (a bare tag id on it) */
+  vrTagId?: string | null;
+  /** Admins only: the chosen tag's name; null when it is gone */
+  vrTagName?: string | null;
+  /** Admins only: Stash's own VR tag, a name, as last read by a sync */
+  stashVrTag?: string | null;
 }
 
 /** How often the list refreshes while an instance is on its first sync */
@@ -84,6 +92,115 @@ const changedFields = (
   return changes;
 };
 
+/** How many tags the VR tag picker lists at once */
+const VR_TAG_PICKER_SIZE = 20;
+
+interface VrTagChoice {
+  id: string;
+  name: string;
+}
+
+/**
+ * Searches one instance's tags (the library tag search with `instance_id`
+ * set, so the same tag id on another server never shows) and calls `onPick`
+ * with the bare id of the one chosen. Nothing loads until it mounts, each
+ * search aborts the one before it.
+ */
+const VrTagPicker = ({
+  instance,
+  onPick,
+  onCancel,
+  disabled,
+}: {
+  instance: { id: string; name: string };
+  onPick: (tagId: string) => void;
+  onCancel: () => void;
+  disabled: boolean;
+}) => {
+  const [search, setSearch] = useState("");
+  const q = useDebouncedValue(search.trim(), 300);
+  const [tags, setTags] = useState<VrTagChoice[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setFailed(false);
+    libraryApi
+      .findTags(
+        {
+          tag_filter: { instance_id: instance.id },
+          filter: {
+            per_page: VR_TAG_PICKER_SIZE,
+            sort: "name",
+            direction: "ASC",
+            ...(q ? { q } : {}),
+          },
+        },
+        controller.signal
+      )
+      .then((data) => {
+        if (!controller.signal.aborted)
+          setTags((data as FindTagsResponse).findTags.tags);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true);
+      });
+    return () => controller.abort();
+  }, [instance.id, q]);
+
+  return (
+    <div
+      className="mt-2 space-y-2"
+      role="group"
+      aria-label={`Choose the VR tag of ${instance.name}`}
+    >
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={`Search ${instance.name}'s tags`}
+        aria-label={`Search ${instance.name}'s tags`}
+        className="w-full px-3 py-2 rounded-lg border text-sm"
+        style={{
+          backgroundColor: "var(--bg-input)",
+          borderColor: "var(--border-color)",
+          color: "var(--text-primary)",
+        }}
+      />
+      {failed ? (
+        <p className="text-xs" style={{ color: "var(--status-error)" }}>
+          Could not load tags
+        </p>
+      ) : tags === null ? (
+        <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+          Loading tags...
+        </p>
+      ) : tags.length === 0 ? (
+        <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+          No tags found
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {tags.map((tag) => (
+            <Button
+              key={tag.id}
+              variant="secondary"
+              size="sm"
+              disabled={disabled}
+              onClick={() => onPick(tag.id)}
+            >
+              {tag.name}
+            </Button>
+          ))}
+        </div>
+      )}
+      <Button variant="tertiary" size="sm" onClick={onCancel}>
+        Cancel
+      </Button>
+    </div>
+  );
+};
+
 const StashInstanceSection = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
@@ -113,6 +230,9 @@ const StashInstanceSection = () => {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
+  // The instance whose VR tag picker is open, and one whose save is running
+  const [pickingVrTagFor, setPickingVrTagFor] = useState<string | null>(null);
+  const [savingVrTagFor, setSavingVrTagFor] = useState<string | null>(null);
 
   const loadInstances = useCallback(async () => {
     try {
@@ -370,6 +490,24 @@ const StashInstanceSection = () => {
       // A toast, so the list stays: the server refuses to disable the last
       // enabled instance and says what to do instead
       showError(getErrorMessage(err, "Failed to update instance"));
+    }
+  };
+
+  /** Saves the server's VR tag: a bare tag id on it, or null for Stash's own */
+  const handleSetVrTag = async (
+    instance: { id: string },
+    vrTagId: string | null
+  ) => {
+    setSavingVrTagFor(instance.id);
+    try {
+      await apiPut(`/setup/stash-instance/${instance.id}`, { vrTagId });
+      void invalidateInstanceQueries(queryClient);
+      setPickingVrTagFor(null);
+      await loadInstances();
+    } catch (err) {
+      showError(getErrorMessage(err, "Failed to save the VR tag"));
+    } finally {
+      setSavingVrTagFor(null);
     }
   };
 
@@ -721,6 +859,56 @@ const StashInstanceSection = () => {
                         {formatDateTime(instance.createdAt, { empty: "N/A" })}
                       </span>
                     </div>
+                    {isAdmin && (
+                      <div
+                        className="mt-3 text-sm"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        <p>
+                          {instance.stashVrTag
+                            ? `Stash's VR tag: ${instance.stashVrTag}`
+                            : "Stash has no VR tag set"}
+                        </p>
+                        {instance.vrTagId && (
+                          <p>
+                            Chosen here:{" "}
+                            {instance.vrTagName ??
+                              "a tag that no longer exists"}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <Button
+                            variant="tertiary"
+                            size="sm"
+                            onClick={() => setPickingVrTagFor(instance.id)}
+                          >
+                            Choose VR tag
+                          </Button>
+                          {instance.vrTagId && (
+                            <Button
+                              variant="tertiary"
+                              size="sm"
+                              disabled={savingVrTagFor === instance.id}
+                              onClick={() =>
+                                void handleSetVrTag(instance, null)
+                              }
+                            >
+                              Use Stash's tag
+                            </Button>
+                          )}
+                        </div>
+                        {pickingVrTagFor === instance.id && (
+                          <VrTagPicker
+                            instance={instance}
+                            disabled={savingVrTagFor === instance.id}
+                            onPick={(tagId) =>
+                              void handleSetVrTag(instance, tagId)
+                            }
+                            onCancel={() => setPickingVrTagFor(null)}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                   {isAdmin && (
                     <div className="flex items-center gap-2">

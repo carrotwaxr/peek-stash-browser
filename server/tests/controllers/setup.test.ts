@@ -1639,6 +1639,8 @@ describe("Setup Controller", () => {
       expect(updateData()).toEqual({
         url: "http://moved:9999/graphql",
         firstSyncedAt: null,
+        vrTagId: null,
+        stashVrTag: null,
       });
       expect(mockSync.queueFullSync).toHaveBeenCalledExactlyOnceWith("inst-a");
 
