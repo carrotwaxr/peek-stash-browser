@@ -2,9 +2,11 @@ import { createContext } from "react";
 import {
   buildKeyCombo,
   caretAtEdge,
+  isCheckable,
   isEditableTarget,
   isModifierKey,
   isSingleLineTextInput,
+  isTVModeOn,
   targetOwnsKey,
 } from "../utils/keyTargets";
 
@@ -22,7 +24,9 @@ import {
  * 2. In a text field only Escape is dispatched (exception: Up and Down leave a
  *    single-line input, and Left and Right leave it at the caret's edge, to
  *    `tv` scopes only: `caretAtEdge`). A key the focused control owns
- *    (Space on a button, arrows on a slider) is not dispatched.
+ *    (Space on a button, arrows on a slider) is not dispatched. In TV mode
+ *    Enter on a checkbox or radio ticks it, as Space does: a remote's OK is
+ *    Enter, which browsers ignore there.
  * 3. Scopes are walked from the top layer down, the most recently registered
  *    first within a layer, skipping disabled scopes and scopes whose root does
  *    not hold the focus. The first handler that does not return false wins and
@@ -186,6 +190,10 @@ export class ShortcutDispatcher {
       } else if (combo !== "esc") {
         return;
       }
+    } else if (combo === "enter" && isCheckable(target) && isTVModeOn()) {
+      target.click();
+      event.preventDefault();
+      return;
     } else if (targetOwnsKey(target, combo)) {
       return;
     }

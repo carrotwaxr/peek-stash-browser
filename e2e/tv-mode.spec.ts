@@ -440,7 +440,7 @@ test.describe("TV mode", () => {
     ).toContainText(tagName);
   });
 
-  test("Right crosses the number fields of a filter row to the Orientation boxes, and Space ticks one", async ({
+  test("Right crosses the number fields of a filter row to the Orientation boxes; Space and Enter (a remote's OK) tick them", async ({
     page,
   }) => {
     const { list } = await openScenes(page, "/scenes");
@@ -469,6 +469,15 @@ test.describe("TV mode", () => {
     expect(reached, "Right reaches the Orientation boxes").toBe(true);
     await page.keyboard.press("Space");
     await expect(landscape).toBeChecked();
+
+    const portrait = page.getByRole("checkbox", { name: "Portrait" });
+    await page.keyboard.press("ArrowDown");
+    await expect(portrait).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(portrait).toBeChecked();
+    await page.keyboard.press("Enter");
+    await expect(portrait).not.toBeChecked();
+    await expect(portrait).toBeFocused();
   });
 
   test("Up and Down leave a range slider; Left and Right change it", async ({
