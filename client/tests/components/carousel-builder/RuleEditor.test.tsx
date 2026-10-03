@@ -420,3 +420,31 @@ describe("RuleEditor", () => {
     expect(screen.queryByDisplayValue("/media")).toBeNull();
   });
 });
+
+describe("every rule control has a name", () => {
+  it.each([
+    { filterKey: "bitrate", value: {} },
+    { filterKey: "lastPlayedAt", value: {} },
+    { filterKey: "testPath", value: "", modifier: "INCLUDES" },
+    { filterKey: "resolution", value: "" },
+    { filterKey: "favorite", value: "" },
+  ])("$filterKey", (rule) => {
+    const { container } = render(
+      <RuleEditor
+        rule={{ id: "rule-1", ...rule }}
+        usedFilterKeys={new Set([rule.filterKey])}
+        onChange={vi.fn()}
+        onRemove={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue(
+      rule.filterKey
+    );
+    const controls = [...container.querySelectorAll("input, select")];
+    expect(controls.length).toBeGreaterThan(1);
+    for (const control of controls) {
+      expect(control).toHaveAccessibleName();
+    }
+  });
+});

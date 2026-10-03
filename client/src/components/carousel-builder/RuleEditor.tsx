@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Trash2 } from "lucide-react";
 import {
   CAROUSEL_FILTER_DEFINITIONS,
@@ -30,6 +31,7 @@ interface Props {
  * Renders appropriate input based on filter type.
  */
 const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
+  const filterSelectId = useId();
   const filterDef = CAROUSEL_FILTER_DEFINITIONS.find(
     (f) => f.key === rule.filterKey
   );
@@ -75,10 +77,15 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
     >
       {/* Filter Selector */}
       <div className="space-y-1 min-w-[150px]">
-        <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+        <label
+          htmlFor={filterSelectId}
+          className="block text-xs"
+          style={{ color: "var(--text-muted)" }}
+        >
           Filter
         </label>
         <select
+          id={filterSelectId}
           value={rule.filterKey}
           onChange={(e) => handleFilterChange(e.target.value)}
           className="w-full px-3 py-2 rounded-lg border text-sm"
@@ -280,6 +287,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
       }
       return (
         <select
+          aria-label={filterDef.label ?? filterDef.key}
           value={(rule.value as string) || ""}
           onChange={(e) => onChange({ value: e.target.value })}
           className="w-full px-3 py-2 rounded-lg border text-sm"
@@ -302,6 +310,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
       return (
         <input
           type="text"
+          aria-label={filterDef.label ?? filterDef.key}
           value={(rule.value as string) || ""}
           onChange={(e) => onChange({ value: e.target.value })}
           placeholder={filterDef.placeholder || "Enter value..."}
@@ -318,6 +327,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
     case "date-range":
       return (
         <DateRangeInput
+          label={filterDef.label ?? filterDef.key}
           value={rule.value as DateRange | undefined}
           onChange={(val) => onChange({ value: val })}
         />
@@ -359,6 +369,7 @@ const boundOf = (
  * Min/max input for numeric range filters, in the unit its label names.
  */
 const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
+  const label = filterDef.label ?? filterDef.key;
   const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ ...value, min: boundOf(e.target.value, filterDef.step) });
   };
@@ -371,6 +382,7 @@ const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
     <div className="flex items-center gap-2">
       <input
         type="number"
+        aria-label={`Minimum ${label}`}
         value={value?.min ?? ""}
         onChange={handleMinChange}
         placeholder="Min"
@@ -387,6 +399,7 @@ const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
       <span style={{ color: "var(--text-secondary)" }}>to</span>
       <input
         type="number"
+        aria-label={`Maximum ${label}`}
         value={value?.max ?? ""}
         onChange={handleMaxChange}
         placeholder="Max"
@@ -411,6 +424,8 @@ interface DateRange {
 }
 
 interface DateRangeInputProps {
+  /** The rule's field, naming each date ("Last Played from") */
+  label: string;
   value: DateRange | undefined;
   onChange: (value: DateRange) => void;
 }
@@ -419,7 +434,7 @@ interface DateRangeInputProps {
  * DateRangeInput Component
  * Date pickers for date range filters.
  */
-const DateRangeInput = ({ value, onChange }: DateRangeInputProps) => {
+const DateRangeInput = ({ label, value, onChange }: DateRangeInputProps) => {
   const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const start = e.target.value || undefined;
     onChange({ ...value, start });
@@ -434,6 +449,7 @@ const DateRangeInput = ({ value, onChange }: DateRangeInputProps) => {
     <div className="flex items-center gap-2">
       <input
         type="date"
+        aria-label={`${label} from`}
         value={value?.start || ""}
         onChange={handleFromChange}
         className="px-3 py-2 rounded-lg border text-sm"
@@ -446,6 +462,7 @@ const DateRangeInput = ({ value, onChange }: DateRangeInputProps) => {
       <span style={{ color: "var(--text-secondary)" }}>to</span>
       <input
         type="date"
+        aria-label={`${label} to`}
         value={value?.end || ""}
         onChange={handleToChange}
         className="px-3 py-2 rounded-lg border text-sm"

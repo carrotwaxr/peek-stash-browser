@@ -234,6 +234,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               ) : (
                 <select
                   id={hasCondition ? undefined : controlId}
+                  aria-label={hasCondition ? label : undefined}
                   value={
                     typeof value === "boolean"
                       ? String(value)
@@ -451,6 +452,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                 <input
                   id={boundsId}
                   type="number"
+                  aria-label={`Minimum ${label}`}
                   value={rangeVal.min || ""}
                   onChange={(e) =>
                     onChange({ ...rangeVal, min: e.target.value })
@@ -463,6 +465,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                 />
                 <input
                   type="number"
+                  aria-label={`Maximum ${label}`}
                   value={rangeVal.max || ""}
                   onChange={(e) =>
                     onChange({ ...rangeVal, max: e.target.value })
@@ -510,6 +513,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                 <input
                   id={controlId}
                   type="date"
+                  aria-label={`${label} from`}
                   value={dateRangeVal.start || ""}
                   onChange={(e) =>
                     onChange({ ...dateRangeVal, start: e.target.value })
@@ -527,6 +531,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                 </div>
                 <input
                   type="date"
+                  aria-label={`${label} to`}
                   value={dateRangeVal.end || ""}
                   onChange={(e) =>
                     onChange({ ...dateRangeVal, end: e.target.value })
@@ -545,6 +550,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               <input
                 id={controlId}
                 type="time"
+                aria-label={`${label} start`}
                 value={timeRangeVal.start || ""}
                 onChange={(e) =>
                   onChange({ ...timeRangeVal, start: e.target.value })
@@ -555,6 +561,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               />
               <input
                 type="time"
+                aria-label={`${label} end`}
                 value={timeRangeVal.end || ""}
                 onChange={(e) =>
                   onChange({ ...timeRangeVal, end: e.target.value })
