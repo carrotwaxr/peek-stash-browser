@@ -10,8 +10,8 @@ Peek provides three sync strategies, each optimized for different use cases:
 
 | Sync Type | When Used | Performance | Data Freshness |
 |-----------|-----------|-------------|----------------|
-| **Full Sync** | Initial setup, manual trigger, once a day | Slowest | Complete |
-| **Incremental Sync** | Scheduled interval, manual trigger | Medium | Partial |
+| **Full Sync** | Initial setup, the **Full Sync** button, once a day | Slowest | Complete |
+| **Incremental Sync** | Scheduled interval, `POST /api/sync/trigger` | Medium | Partial |
 | **Smart Incremental Sync** | Automatic on startup | Fastest | Optimal |
 
 ---
@@ -24,7 +24,7 @@ Peek provides three sync strategies, each optimized for different use cases:
 
 **Triggered by:**
 - Initial setup (first sync)
-- Manual "Full Sync" button in UI
+- The **Full Sync** button (Settings → Server Settings → Server Configuration → Server Statistics), or `POST /api/sync/trigger` with `{ "type": "full" }`
 - The daily full pass: once a day, automatically (see below)
 - Recovery from corrupted state
 
@@ -34,7 +34,7 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
 
 **Process:**
 1. Sync all entity types in [dependency order](#entity-sync-order), each followed by its [cleanup](#cleanup-safety) and a fetch by id of what Stash lists and no page returned (see [Sync State Tracking](#sync-state-tracking)), on every instance
-2. Then, once for the whole sync: compute scene tag inheritance, apply gallery inheritance (performers, tags, studio, date, etc. propagate from galleries to images), rebuild inherited image counts, rebuild user stats, recompute the exclusions of every user
+2. Then, once for the whole sync: compute scene tag inheritance, apply gallery inheritance (performers, tags, studio, date, etc. propagate from galleries to images), rebuild inherited image counts and the link counts the cards show, rebuild user stats, recompute the exclusions of every user
 
 **Characteristics:**
 - **Always runs every post-sync step**, whole library, whatever changed: it is the catch-all for links Stash edits without moving `updated_at` that no refetch covers, and for a refetch that failed (see [Edits Stash makes without updated_at](#edits-stash-makes-without-updated_at))
@@ -47,10 +47,10 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
 
 **Triggered by:**
 - Scheduled sync intervals, when the daily full pass is not due
-- Manual "Incremental Sync" button with date/time parameter
+- `POST /api/sync/trigger` (admins only; `{ "type": "incremental" }` is the default). The UI has no button for it
 
 **Process:**
-1. Sync all entity types, but only fetch entities with `updated_at > since`
+1. Sync all entity types, but only fetch entities with `updated_at` after that type's own last sync time (see [Sync State Tracking](#sync-state-tracking))
 2. Clean up deleted entities (detect deletions/merges in Stash), then fetch again what linked to them, and the images and scenes of every gallery that changed or was deleted (see [Edits Stash makes without updated_at](#edits-stash-makes-without-updated_at))
 3. After every instance, the [post-sync steps](#post-sync-processing) once, only for what changed; nothing changed means none of them runs
 
@@ -63,8 +63,7 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
 **Purpose:** Efficiently sync only what's needed, per-entity-type.
 
 **Triggered by:**
-- Automatic on server startup, when the daily full pass is not due
-- Manual "Smart Sync" button
+- Automatic on server startup, when the daily full pass is not due and some entity type has synced before. It has no button and no route
 
 **Process:**
 1. For each entity type independently:
@@ -163,7 +162,7 @@ Images can inherit metadata from their parent galleries:
 **Rules:**
 - Only copies metadata if the image field is NULL/empty
 - Never overwrites existing image metadata. An inherited value is stored like the image's own, so it stays until the image is written again from Stash: an incremental sync that sees a gallery change fetches its images again first (see [Edits Stash makes without updated_at](#edits-stash-makes-without-updated_at)), and inheritance then hands down the gallery's current values
-- Uses first gallery if image is in multiple galleries
+- Studio, date, photographer and details come from the first gallery (in gallery ID order) that has a value; performers and tags come from every gallery the image is in, added together
 - Hands down only live performers and tags (a soft-deleted one was deleted or merged in Stash)
 
 **Trigger conditions:**
@@ -178,7 +177,7 @@ Scenes inherit tags from their performers, studio and groups:
 - Studio tags propagate to scenes from that studio
 - Group tags propagate to the scenes in that group
 - A soft-deleted performer, studio, group or tag passes nothing on
-- A scene's own tags are left out; the rest are stored as a JSON array in `StashScene.inheritedTagIds`, which the tag filters and content restrictions read
+- A scene's own tags are left out; the rest are stored as `SceneInheritedTag` rows (one per scene and tag, indexed by tag), which the tag filters, the folder view, the counts and content restrictions read, and as a JSON array in `StashScene.inheritedTagIds`, which the scene's response shows
 
 **Trigger conditions:**
 - Full sync: Always runs, for every scene
@@ -197,6 +196,14 @@ A gallery's own image count is Stash's, stored as synced. Sync writes a new perf
 **Trigger conditions:**
 - Full sync: Always runs, for every performer, studio and tag
 - Incremental and smart sync: Runs after any sync that changed or soft-deleted something, for the performers, studios and tags the change set reaches: the old and new performers, tags and studios of changed images and galleries; the performers, tags and studio of every gallery a changed image joined or left; those of soft-deleted images (with their galleries') and galleries; and every changed performer, studio and tag. Past the change set's limit it runs for every one
+
+### Link Count Rebuild
+
+The count columns on performer, studio, tag, collection and gallery cards (scenes, galleries, images, performers and the like) are Peek's own counts of the synced links, as the list behind the card shows them, with no sub-tags or sub-studios (`LinkCountService`). Sync writes Stash's number when it inserts a row and never when it updates one; the rebuild replaces it with the count of the rows Peek holds, because Stash refreshes an entity's own counts only when that entity changes. It writes only the rows whose count moved, in units of up to 5,000 rows.
+
+**Trigger conditions:**
+- Full sync: Always runs, for every row of those five types
+- Incremental and smart sync: Runs after any sync that changed or soft-deleted something, for the rows the change set reaches (`StashSyncService.countScope`)
 
 The user stats rebuild and the tag counts via performers follow it.
 
@@ -298,6 +305,7 @@ The three sync modes run through one per-instance path (`syncInstance`) and one 
 - Gallery inheritance (scoped to the images written and the changed galleries' images)
 - Scene tag inheritance (scoped to the scenes the change set reaches)
 - Image count rebuild (scoped to the performers, studios and tags the change set reaches)
+- Link count rebuild (scoped to the rows the change set reaches)
 - User stats rebuild
 - Exclusion recomputation
 
