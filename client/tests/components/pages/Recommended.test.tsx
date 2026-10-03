@@ -294,6 +294,66 @@ describe("Recommended", () => {
       ).toBeInTheDocument();
     });
 
+    it("a count of one reads in the singular, line by line", async () => {
+      stubApi({
+        [RECOMMENDED]: () =>
+          jsonResponse(200, {
+            scenes: [],
+            count: 0,
+            page: 1,
+            perPage: 24,
+            message: "No matching recommendations found",
+            criteria: {
+              favoritedPerformers: 1,
+              ratedPerformers: 1,
+              favoritedStudios: 1,
+              ratedStudios: 1,
+              favoritedTags: 1,
+              ratedTags: 1,
+              favoritedScenes: 1,
+              ratedScenes: 1,
+              rankedEntities: 1,
+            },
+          }),
+      });
+
+      renderAt("/recommended");
+
+      await screen.findByText("Your current activity:");
+      const lines = screen.getAllByRole("listitem").map((li) => li.textContent);
+      expect(lines).toEqual([
+        "1 favorited performer, 1 highly-rated",
+        "1 favorited studio, 1 highly-rated",
+        "1 favorited tag, 1 highly-rated",
+        "1 favorited scene, 1 rated scene",
+        "1 performer, studio or tag from your viewing",
+      ]);
+    });
+
+    it("a message without criteria asks for ratings and favorites", async () => {
+      stubApi({
+        [RECOMMENDED]: () =>
+          jsonResponse(200, {
+            scenes: [],
+            count: 0,
+            page: 1,
+            perPage: 24,
+            message: "No recommendations yet",
+          }),
+      });
+
+      renderAt("/recommended");
+
+      expect(
+        await screen.findByText("No recommendations yet")
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Rate or Favorite more items to get personalized recommendations."
+        )
+      ).toBeInTheDocument();
+    });
+
     it("a filter that matches nothing says so", async () => {
       stubApi({ [RECOMMENDED]: () => answer([], 0) });
 
