@@ -1076,6 +1076,11 @@ function nameTaken(
   );
 }
 
+/** A View's presentation fields, each a short string (a mode, a level) */
+const PRESENTATION_FIELDS = ["viewMode", "zoomLevel", "gridDensity"] as const;
+type PresentationField = (typeof PRESENTATION_FIELDS)[number];
+const PRESENTATION_MAX_LENGTH = 32;
+
 /** What a View stores beside its id, name and dates */
 type ViewState = Omit<SavedView, "id" | "name" | "createdAt" | "updatedAt">;
 
@@ -1084,7 +1089,9 @@ type ViewState = Omit<SavedView, "id" | "name" | "createdAt" | "updatedAt">;
  * `validateViewFilters` (a bare id tied to its one instance through the
  * cleaner's lookup, else kept bare and logged), the sort one of the list's
  * (a scene View's may be Recommended's), the direction ASC or DESC in any
- * case, per page held to PER_PAGE_MAX. Every problem is one 400.
+ * case, per page a whole number from 1 held to PER_PAGE_MAX, the view mode,
+ * zoom level and grid density text of at most 32 characters. Every problem
+ * is one 400.
  */
 async function checkedViewState(
   userId: number,
@@ -1112,8 +1119,23 @@ async function checkedViewState(
     issues.push({ path: "direction", message: "Expected ASC or DESC" });
   }
   const perPage = body.perPage ?? null;
-  if (perPage !== null && !(Number.isInteger(perPage) && perPage >= 0)) {
-    issues.push({ path: "perPage", message: "Expected a whole number" });
+  if (perPage !== null && !(Number.isInteger(perPage) && perPage >= 1)) {
+    issues.push({ path: "perPage", message: "Expected a whole number from 1" });
+  }
+  // The body is unvalidated: a presentation field may be any JSON
+  const presentation = body as Partial<Record<PresentationField, unknown>>;
+  for (const field of PRESENTATION_FIELDS) {
+    const value = presentation[field];
+    if (
+      value !== undefined &&
+      value !== null &&
+      !(typeof value === "string" && value.length <= PRESENTATION_MAX_LENGTH)
+    ) {
+      issues.push({
+        path: field,
+        message: `Expected text of at most ${PRESENTATION_MAX_LENGTH} characters`,
+      });
+    }
   }
   if ("issues" in filters || direction === undefined || issues.length > 0) {
     throw new ValidationError("Invalid View", { issues });

@@ -386,7 +386,7 @@ describe("User Controller — Features", () => {
       expect(body.preset.createdAt).toBeDefined();
     });
 
-    it("empty display fields take the defaults and a per page of 0 is kept", async () => {
+    it("empty display fields take the defaults", async () => {
       viewsStored({ filterPresets: {}, defaultFilterPresets: {} });
 
       const req = reqFor(saveFilterPreset, {
@@ -399,7 +399,6 @@ describe("User Controller — Features", () => {
           viewMode: "",
           zoomLevel: "",
           gridDensity: "",
-          perPage: 0,
         },
         user: USER,
       });
@@ -409,7 +408,34 @@ describe("User Controller — Features", () => {
       expect(body.preset.viewMode).toBe("grid");
       expect(body.preset.zoomLevel).toBe("medium");
       expect(body.preset.gridDensity).toBe("comfortable");
-      expect(body.preset.perPage).toBe(0);
+    });
+
+    it("a per page under 1 and a display field that is no short string answer 400 and store nothing", async () => {
+      for (const [path, value] of [
+        ["perPage", 0],
+        ["viewMode", { mode: "grid" }],
+        ["zoomLevel", 3],
+        ["gridDensity", "x".repeat(33)],
+      ] as const) {
+        viewsStored({ filterPresets: {}, defaultFilterPresets: {} });
+        const req = reqFor(saveFilterPreset, {
+          body: malformed({
+            artifactType: "scene",
+            name: "Bad field",
+            filters: {},
+            sort: "rating",
+            direction: "DESC",
+            [path]: value,
+          }),
+          user: USER,
+        });
+
+        await expect(
+          saveFilterPreset(req, resFor(saveFilterPreset)),
+          path
+        ).rejects.toMatchObject({ statusCode: 400, issues: [{ path }] });
+      }
+      expect(mockUpdateUserJson).not.toHaveBeenCalled();
     });
 
     it("an empty context makes the preset the default for its artifact type", async () => {
