@@ -13,6 +13,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "@/api/queryClient";
 import { queryKeys } from "@/api/queryKeys";
@@ -118,6 +119,52 @@ describe("CarouselBuilder", () => {
       rules: Record<string, unknown>;
     };
     expect(Object.keys(rules)).toEqual(["rating100"]);
+  });
+
+  it("a rule added for a field it kept replaces the kept rule, on the line and in the save", async () => {
+    const stored = {
+      ...CAROUSEL,
+      rules: { ...CAROUSEL.rules, tagged: true, o_counter: { value: 1 } },
+    };
+    const fetchMock = stubApi({
+      "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
+      "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+    });
+    renderEditor(createQueryClient());
+
+    await screen.findByDisplayValue("Highly rated");
+    expect(
+      screen.getByText("2 more rules this editor can't show")
+    ).toBeVisible();
+
+    // A new rule, turned into O Count: the kept O Count is replaced
+    fireEvent.click(screen.getByRole("button", { name: /Add Rule/ }));
+    const filters = screen.getAllByRole("combobox", { name: "Filter" });
+    fireEvent.change(must(filters.at(-1), "the new rule's filter"), {
+      target: { value: "oCount" },
+    });
+    expect(
+      screen.getByText("1 more rule this editor can't show")
+    ).toBeVisible();
+    fireEvent.change(screen.getByRole("spinbutton", { name: /^Minimum O/ }), {
+      target: { value: "3" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+    const update = await screen.findByRole("button", { name: /Update/ });
+    await waitFor(() => expect(update).toBeEnabled());
+    fireEvent.click(update);
+    await screen.findByText("Settings");
+
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+    const { rules } = JSON.parse(put?.[1]?.body as string) as {
+      rules: Record<string, unknown>;
+    };
+    expect(rules).toEqual({
+      rating100: CAROUSEL.rules.rating100,
+      tagged: true,
+      o_counter: { modifier: "BETWEEN", value: 3 },
+    });
   });
 
   it('a Rating Not rated rule saves rating100: { modifier: "IS_NULL" } and survives an edit', async () => {
