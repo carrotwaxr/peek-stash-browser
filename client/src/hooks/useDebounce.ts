@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 /**
  * Returns a debounced version of a value.
@@ -71,3 +78,55 @@ export const useDebouncedCallback = (
     [delay]
   );
 };
+
+/** A debounced call that can run at once or be dropped */
+export interface FlushableDebounce<A extends unknown[]> {
+  /** Waits `delay`, then calls with these arguments; a later call replaces it */
+  run: (...args: A) => void;
+  /** Calls the waiting call now; nothing when none waits */
+  flush: () => void;
+  /** Drops the waiting call */
+  cancel: () => void;
+}
+
+/**
+ * A trailing debounce of `callback` with a flush: `run` waits `delay` after
+ * the last call, `flush` runs the waiting call at once (a popover closing
+ * with a change not yet applied) and `cancel` drops it. The functions keep
+ * their identity across renders and call the latest `callback`. An unmount
+ * drops the waiting call, so a caller that must not lose it flushes first.
+ */
+export function useFlushableDebounce<A extends unknown[]>(
+  callback: (...args: A) => void,
+  delay = 300
+): FlushableDebounce<A> {
+  const callbackRef = useRef(callback);
+  useLayoutEffect(() => {
+    callbackRef.current = callback;
+  });
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const waitingRef = useRef<{ args: A } | null>(null);
+
+  const debounce = useMemo<FlushableDebounce<A>>(() => {
+    const cancel = () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      timerRef.current = null;
+      waitingRef.current = null;
+    };
+    const flush = () => {
+      const waiting = waitingRef.current;
+      cancel();
+      if (waiting !== null) callbackRef.current(...waiting.args);
+    };
+    const run = (...args: A) => {
+      cancel();
+      waitingRef.current = { args };
+      timerRef.current = setTimeout(flush, delay);
+    };
+    return { run, flush, cancel };
+  }, [delay]);
+
+  useEffect(() => debounce.cancel, [debounce]);
+
+  return debounce;
+}

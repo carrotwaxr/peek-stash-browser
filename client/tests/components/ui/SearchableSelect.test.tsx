@@ -510,10 +510,12 @@ describe("SearchableSelect as a keyboard control", () => {
     multi = false,
     initial,
     label = "Tags",
+    openOnMount,
   }: {
     multi?: boolean;
     initial: string | string[];
     label?: string;
+    openOnMount?: boolean;
   }) {
     const [value, setValue] = useState<string | string[]>(initial);
     return (
@@ -525,6 +527,7 @@ describe("SearchableSelect as a keyboard control", () => {
           onChange={setValue}
           multi={multi}
           placeholder="Select Tags..."
+          {...(openOnMount === undefined ? {} : { openOnMount })}
         />
         <button type="button">Next field</button>
       </>
@@ -566,6 +569,15 @@ describe("SearchableSelect as a keyboard control", () => {
     expect(
       document.getElementById(must(button.getAttribute("aria-controls")))
     ).toContainElement(search);
+  });
+
+  it("openOnMount opens the list once mounted, focus in its search box", async () => {
+    render(<Harness initial={[]} multi openOnMount />);
+
+    const search = await screen.findByPlaceholderText("Type to search...");
+    expect(search).toHaveFocus();
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByRole("button", { name: /^Tag 1/ })).toBeVisible();
   });
 
   it("the trigger's name carries the selected names", async () => {

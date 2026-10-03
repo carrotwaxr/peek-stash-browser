@@ -214,6 +214,12 @@ interface Props {
    * excluded values show as picks
    */
   excludeToggle?: boolean | undefined;
+  /**
+   * Opens the list once mounted, focus in its search box (a filter chip's
+   * editor on a picker). It opens after the first render, so a popover
+   * around it moves focus in first and the list keeps it.
+   */
+  openOnMount?: boolean | undefined;
 }
 
 const NONE: readonly string[] = [];
@@ -231,6 +237,7 @@ const SearchableSelect = ({
   excluded: excludedProp,
   onSelectionChange,
   excludeToggle = true,
+  openOnMount = false,
 }: Props) => {
   // A stable list while its ids do not change: the names effect depends on it
   const excludedText = multi ? (excludedProp ?? NONE).join("\n") : "";
@@ -487,6 +494,10 @@ const SearchableSelect = ({
       document.removeEventListener("mousedown", handleClickOutside, true);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (openOnMount) setIsOpen(true);
+  }, [openOnMount]);
 
   // Focus search input when dropdown opens
   useEffect(() => {

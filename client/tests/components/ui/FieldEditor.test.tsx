@@ -46,6 +46,7 @@ interface HarnessProps {
   controlId?: string;
   autoFocus?: boolean;
   hideLabel?: boolean;
+  openPicker?: boolean;
 }
 
 /** The state around one editor, as the panel or a builder holds it */
@@ -56,6 +57,7 @@ function Harness({
   controlId,
   autoFocus,
   hideLabel,
+  openPicker,
 }: HarnessProps) {
   const [state, setState] = useState<PanelState>(initial);
   return (
@@ -70,6 +72,7 @@ function Harness({
         {...(controlId === undefined ? {} : { controlId })}
         {...(autoFocus === undefined ? {} : { autoFocus })}
         {...(hideLabel === undefined ? {} : { hideLabel })}
+        {...(openPicker === undefined ? {} : { openPicker })}
       />
       <output data-testid="state">{JSON.stringify(state)}</output>
     </>
@@ -307,6 +310,23 @@ describe("the first control", () => {
     render(<Harness option={optionOf("scene", "title")} autoFocus />);
 
     expect(screen.getByRole("textbox", { name: "Title Search" })).toHaveFocus();
+  });
+
+  it("openPicker opens a ref row's list once drawn, focus in its search box", async () => {
+    render(<Harness option={optionOf("scene", "tagIds")} openPicker />);
+
+    const search = await screen.findByPlaceholderText("Type to search...");
+    expect(search).toHaveFocus();
+    expect(screen.getByRole("button", { name: /^Tags/ })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+  });
+
+  it("without openPicker a ref row's list stays closed", () => {
+    render(<Harness option={optionOf("scene", "tagIds")} />);
+
+    expect(screen.queryByPlaceholderText("Type to search...")).toBeNull();
   });
 
   it("hideLabel keeps the label for assistive technology", () => {

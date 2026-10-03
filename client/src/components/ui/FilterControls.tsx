@@ -128,6 +128,8 @@ export interface FilterControlProps {
   onSelectionChange?:
     | ((included: string[], excluded: string[]) => void)
     | undefined;
+  /** A picker opens its list once drawn (a filter chip's editor) */
+  openPicker?: boolean;
 }
 
 export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
@@ -159,6 +161,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
       hideLabel = false,
       excluded,
       onSelectionChange,
+      openPicker = false,
     },
     ref
   ) => {
@@ -318,6 +321,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                   }
                   excluded={excluded}
                   onSelectionChange={onSelectionChange}
+                  openOnMount={openPicker}
                   excludeToggle={toggleable}
                 />
               )}

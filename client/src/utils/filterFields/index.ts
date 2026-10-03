@@ -24,7 +24,7 @@ export {
   panelTableOf,
   readPanelFilter,
 } from "./build";
-export { type FilterChip, activeFieldCount, chipsOf } from "./chips";
+export { type FilterChip, activeFieldCount, chipsOf, rowChip } from "./chips";
 export {
   clearFilters,
   isRowActive,

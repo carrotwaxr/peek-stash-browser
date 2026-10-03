@@ -928,7 +928,7 @@ describe("SearchControls", () => {
       expect(within(filters).getByText("1")).toBeInTheDocument();
     });
 
-    it("activating a chip opens its field and moves focus to the field's first control", async () => {
+    it("activating a chip opens its editor under it, focus on the field's first control; another chip's closes it", async () => {
       const user = userEvent.setup();
       const list = renderSearchControls(
         {},
@@ -939,20 +939,26 @@ describe("SearchControls", () => {
       await user.click(
         screen.getByRole("button", { name: /^Edit filter: Fav/ })
       );
-      await waitFor(() =>
-        expect(document.activeElement).toBe(
-          document.getElementById("filter-favorite")
-        )
-      );
+      const favorite = screen.getByRole("dialog", {
+        name: "Favorite Scenes filter",
+      });
       expect(document.activeElement?.tagName).toBe("SELECT");
+      expect(favorite).toContainElement(document.activeElement as HTMLElement);
+      // The panel stays closed
+      expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
 
       await user.click(
         screen.getByRole("button", { name: /^Edit filter: Tags/ })
       );
+      expect(
+        screen.queryByRole("dialog", { name: "Favorite Scenes filter" })
+      ).not.toBeInTheDocument();
+      const tags = screen.getByRole("dialog", { name: "Tags filter" });
+      // A picker opens its list at once, focus in its search box
       await waitFor(() =>
-        expect(document.activeElement).toBe(
-          document.getElementById("filter-tagIds")
-        )
+        expect(
+          within(tags).getByPlaceholderText("Type to search...")
+        ).toHaveFocus()
       );
     });
 
