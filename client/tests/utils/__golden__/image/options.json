@@ -222,7 +222,8 @@
           "label": "Any"
         }
       ],
-      "placeholder": "Any"
+      "placeholder": "Any",
+      "noBlank": true
     },
     {
       "type": "section-header",
@@ -481,7 +482,8 @@
           "label": "Any"
         }
       ],
-      "placeholder": "Any"
+      "placeholder": "Any",
+      "noBlank": true
     },
     {
       "key": "studioFavorite",
@@ -502,7 +504,8 @@
           "label": "Any"
         }
       ],
-      "placeholder": "Any"
+      "placeholder": "Any",
+      "noBlank": true
     },
     {
       "key": "tagFavorite",
@@ -523,7 +526,8 @@
           "label": "Any"
         }
       ],
-      "placeholder": "Any"
+      "placeholder": "Any",
+      "noBlank": true
     },
     {
       "key": "performerCount",
