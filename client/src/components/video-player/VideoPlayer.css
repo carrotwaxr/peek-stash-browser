@@ -574,8 +574,13 @@ section.video-container {
   display: none; /* Click-only behavior */
 }
 
+/* Projection names are long. The button sits near the bar's right end, so
+   the menu opens leftwards from its right edge (video.js's default, left
+   -3em, ran past the player and cut the labels) */
 .video-js .vjs-vr-button .vjs-menu {
-  width: 15em; /* Projection names are long */
+  width: 15em;
+  left: auto;
+  right: 0;
 }
 
 .video-js .vjs-vr-button .vjs-menu .vjs-menu-content {

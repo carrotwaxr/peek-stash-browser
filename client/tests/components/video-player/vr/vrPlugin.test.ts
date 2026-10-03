@@ -77,6 +77,8 @@ class FakeFork extends Emitter implements VrPlugin {
 
 class FakePlayer extends Emitter implements VrPlayer {
   state = 0;
+  /** The player's `preload` option: Peek's players start with none */
+  preloading = "none";
   forks: FakeFork[] = [];
   vr = vi.fn((_options: VrOptions) => {
     const fork = new FakeFork();
@@ -84,6 +86,17 @@ class FakePlayer extends Emitter implements VrPlayer {
     return fork;
   });
   readyState = () => this.state;
+  play = vi.fn();
+  /** Set when video.js's HLS engine (VHS) plays the source */
+  vhs: object | undefined = undefined;
+  tech = () => ({ vhs: this.vhs });
+  source = { src: "/api/scene/1/proxy-stream/stream", type: "video/mp4" };
+  currentSource = () => this.source;
+  src = vi.fn();
+  preload(value?: string): string {
+    if (value !== undefined) this.preloading = value;
+    return this.preloading;
+  }
 
   get fork(): FakeFork {
     const fork = this.forks.at(-1);
@@ -150,6 +163,79 @@ describe("peekVr", () => {
     createVrController(player).enable("180_LR");
 
     expect(player.fork.init).not.toHaveBeenCalled();
+  });
+
+  it("enable before metadata asks for it, without playing, and the fork draws once it comes", () => {
+    const player = new FakePlayer();
+    // As the fork: it starts on the player's loadedmetadata
+    player.vr.mockImplementationOnce((_options: VrOptions) => {
+      const fork = new FakeFork();
+      player.forks.push(fork);
+      player.on("loadedmetadata", () => {
+        fork.init();
+      });
+      return fork;
+    });
+
+    createVrController(player).enable("180_LR");
+
+    expect(player.preloading).toBe("metadata");
+    expect(player.play).not.toHaveBeenCalled();
+    expect(player.fork.init).not.toHaveBeenCalled();
+
+    player.state = 1;
+    player.trigger("loadedmetadata");
+
+    expect(player.fork.init).toHaveBeenCalledTimes(1);
+    expect(player.fork.initialized_).toBe(true);
+  });
+
+  it("a native source loads on the preload change: the source is not set again", () => {
+    const player = new FakePlayer();
+
+    createVrController(player).enable("180_LR");
+
+    expect(player.src).not.toHaveBeenCalled();
+  });
+
+  it("VHS, which decided at the source's load to wait for play, is given the source again", () => {
+    const player = new FakePlayer();
+    player.vhs = {};
+    player.source = {
+      src: "/api/scene/1/proxy-stream/stream.m3u8?resolution=STANDARD",
+      type: "application/x-mpegURL",
+    };
+
+    const preloadAtLoad: string[] = [];
+    player.src.mockImplementation(() => {
+      preloadAtLoad.push(player.preloading);
+    });
+
+    createVrController(player).enable("180_LR");
+
+    // After the preload change, so the new load reads "metadata"
+    expect(player.src).toHaveBeenCalledExactlyOnceWith(player.source);
+    expect(preloadAtLoad).toEqual(["metadata"]);
+    expect(player.play).not.toHaveBeenCalled();
+  });
+
+  it("enable with the metadata there leaves the player's preload alone", () => {
+    const player = new FakePlayer();
+    player.state = 1;
+
+    createVrController(player).enable("180_LR");
+
+    expect(player.preloading).toBe("none");
+  });
+
+  it("disable puts back the preload enable changed", () => {
+    const player = new FakePlayer();
+    const vr = createVrController(player);
+    vr.enable("180_LR");
+
+    vr.disable();
+
+    expect(player.preloading).toBe("none");
   });
 
   it("enable after loadedmetadata initialises at once", () => {

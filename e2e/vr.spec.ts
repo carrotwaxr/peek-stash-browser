@@ -95,6 +95,13 @@ async function openMenu(page: Page): Promise<Locator> {
   return menu;
 }
 
+/** The element's box on the page; it must be shown */
+async function boxOf(locator: Locator, what: string) {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`${what} has no box: is it shown?`);
+  return box;
+}
+
 /** Waits until the scene's page has put its control bar up */
 async function controlBarReady(page: Page) {
   await expect(page.locator(".video-js .vjs-control-bar")).toBeAttached();
@@ -121,7 +128,7 @@ test.describe("a VR scene", () => {
     scene = found;
   });
 
-  test("shows the VR button, loads no VR code until the click, and draws a canvas once the video has metadata", async ({
+  test("shows the VR button, loads no VR code until the click, and draws a canvas at the click with no play press", async ({
     page,
   }) => {
     const urls = recordRequests(page);
@@ -137,16 +144,20 @@ test.describe("a VR scene", () => {
     await menu.getByRole("menuitemcheckbox", { name: "VR view" }).click();
 
     // The code is requested at the click. The fork draws its canvas on
-    // `loadedmetadata`, and Peek's player preloads nothing, so before play
-    // there is no metadata and no canvas yet: pressing play brings it
+    // `loadedmetadata`; Peek's player preloads nothing, so turning VR on
+    // asks for the metadata, and the canvas comes without play starting
     await expect(
       vrButton(page).locator('[role="menuitemcheckbox"]')
     ).toHaveAttribute("aria-checked", "true");
     await expect
       .poll(() => urls.filter((url) => VR_CODE.test(url)).length)
       .toBeGreaterThan(0);
-    await startPlaying(page);
     await expect(vrCanvas(page).first()).toBeAttached({ timeout: 15_000 });
+    expect(
+      await page
+        .locator(".video-js video")
+        .evaluate((video: HTMLVideoElement) => video.paused)
+    ).toBe(true);
   });
 
   test("draws the canvas when VR is turned on after play has started", async ({
@@ -164,6 +175,50 @@ test.describe("a VR scene", () => {
     await expect(vrCanvas(page).first()).toBeAttached({ timeout: 15_000 });
     expect(urls.filter((url) => VR_CODE.test(url))).not.toHaveLength(0);
   });
+
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`the VR menu and its labels fit inside the player at ${viewport.width} px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(sceneUrl(scene));
+      await controlBarReady(page);
+
+      const menu = await openMenu(page);
+      const player = await boxOf(page.locator(".video-js"), "the player");
+      const box = await boxOf(menu, "the VR menu");
+      expect(box.x).toBeGreaterThanOrEqual(player.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(player.x + player.width);
+      expect(box.y).toBeGreaterThanOrEqual(player.y);
+      // Above the bar's buttons: none is covered
+      const button = await boxOf(vrButton(page), "the VR button");
+      expect(box.y + box.height).toBeLessThanOrEqual(button.y);
+
+      // Every label shows whole: none overflows its item
+      const labels = menu.locator(".vjs-menu-item-text");
+      expect(await labels.count()).toBeGreaterThan(0);
+      const cut = await labels.evaluateAll((spans) =>
+        spans
+          .filter((span) => {
+            const item = span.closest("li");
+            if (!item) return true;
+            const { left, right } = span.getBoundingClientRect();
+            const outer = item.getBoundingClientRect();
+            return (
+              left < outer.left ||
+              right > outer.right ||
+              span.scrollWidth > span.clientWidth ||
+              item.scrollWidth > item.clientWidth
+            );
+          })
+          .map((span) => span.textContent)
+      );
+      expect(cut).toEqual([]);
+    });
+  }
 
   test("keeps the projection pick over a reload", async ({ page }) => {
     const pick = scene.vr?.projection === "360" ? "180_LR" : "360";

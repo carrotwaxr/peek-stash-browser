@@ -20,6 +20,13 @@ export interface VrPlayer {
   /** The fork's plugin: creates its instance on the first call. */
   vr(options: VrOptions): VrPlugin;
   readyState(): number;
+  /** The media element's `preload`: Peek's players start with "none" */
+  preload(): string;
+  preload(value: string): void;
+  /** `vhs` is set while video.js's HLS engine plays the source */
+  tech(options: { IWillNotUseThisInPlugins: true }): { vhs?: unknown };
+  currentSource(): object;
+  src(source: object): void;
   on(type: string, listener: () => void): void;
   off(type: string, listener: () => void): void;
 }
@@ -93,6 +100,8 @@ function tagPosterOnAssignment(fork: VrPlugin) {
 export function createVrController(player: VrPlayer): PeekVr {
   let fork: VrPlugin | null = null;
   let hud: VrHud | null = null;
+  /** The `preload` enable replaced, put back by disable */
+  let preloadBefore: string | null = null;
   let favorite = false;
 
   // The fork builds a new HUD on each `init()` (a new source), with the
@@ -136,15 +145,31 @@ export function createVrController(player: VrPlayer): PeekVr {
       fork.on("initialized", fixVideoTexture);
       fork.on("initialized", showFavorite);
       player.on("loadedmetadata", fixVideoTexture);
-      // The fork starts on `loadedmetadata`. Peek's players preload nothing,
-      // and a click during playback comes after it: start now when the
-      // metadata is already there
-      if (player.readyState() >= 1) fork.init();
+      // The fork starts on `loadedmetadata`. A click during playback comes
+      // after it: start now when the metadata is already there
+      if (player.readyState() >= 1) {
+        fork.init();
+      } else if (player.preload() === "none") {
+        // Peek's players preload nothing, so before play the fork would wait
+        // for play to draw. Asking for the metadata brings the canvas at the
+        // click; nothing plays, and a seek waiting for the metadata (the
+        // resume point) still applies
+        preloadBefore = player.preload();
+        player.preload("metadata");
+        // A native source (Direct, Safari's HLS) loads on that change. VHS
+        // (HLS elsewhere) decided at the source's load to wait for play: it
+        // gets the source again, and with it the new preload
+        if (player.tech({ IWillNotUseThisInPlugins: true }).vhs) {
+          player.src(player.currentSource());
+        }
+      }
     },
     setProjection,
     disable() {
       if (!fork) return;
       player.off("loadedmetadata", fixVideoTexture);
+      if (preloadBefore !== null) player.preload(preloadBefore);
+      preloadBefore = null;
       const ending = fork;
       fork = null;
       // The fork's dispose runs reset(): the canvas, the VR big play button and

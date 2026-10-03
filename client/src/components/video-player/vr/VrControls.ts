@@ -32,6 +32,9 @@ interface MenuItemLike extends ComponentLike {
 }
 interface MenuButtonLike extends ComponentLike {
   controlText(text: string): void;
+  /** Opens the menu (click, or Up/Down on the button) */
+  pressButton(): void;
+  menu: ComponentLike & { contentEl(): HTMLElement };
 }
 type ComponentClass<T> = new (player: unknown, options: object) => T;
 
@@ -154,6 +157,35 @@ export class VrMenuButton extends MenuButtonBase {
       return [projection, item];
     });
     return items;
+  }
+
+  /**
+   * Opens the menu inside the player. Where the button sits on the bar
+   * depends on the width (mid-bar on a phone), and the player's height on
+   * the file's shape, so the open menu is measured: moved sideways to stay
+   * within the player's edges, and its list capped to the room above it
+   * (the rest scrolls). On a wide player the CSS placement already fits.
+   */
+  override pressButton() {
+    super.pressButton();
+    const menu = this.menu.el();
+    const list = this.menu.contentEl();
+    menu.style.left = menu.style.right = list.style.maxHeight = "";
+    const player = (this.player() as ComponentLike)
+      .el()
+      .getBoundingClientRect();
+    const box = list.getBoundingClientRect();
+    const left = Math.max(
+      player.left,
+      Math.min(box.left, player.right - box.width)
+    );
+    if (left !== box.left) {
+      menu.style.left = `${left - this.el().getBoundingClientRect().left}px`;
+      menu.style.right = "auto";
+    }
+    // Clear of the player's rounded top corners
+    const top = player.top + 8;
+    if (box.top < top) list.style.maxHeight = `${box.bottom - top}px`;
   }
 
   /** Brings the checked states in line with the model, without a rebuild. */
