@@ -4,6 +4,7 @@ import rankingComputeService from "../../services/RankingComputeService.js";
 import { hasAnyCriteria } from "../../services/RecommendationScoringService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { getSceneVr } from "../../services/SceneVrService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import type {
   AmbiguousLookupResponse,
@@ -103,16 +104,17 @@ export const findScenes = async (
   let scenes = addStashUrl(result.items, req.user);
 
   // The Scene page loads one scene by id: only then build its stream
-  // list. Lists keep sceneStreams empty.
+  // list and say whether it is VR. Lists keep sceneStreams empty and carry
+  // no vr.
   if (lookup) {
     scenes = await Promise.all(
-      scenes.map(async (s) => ({
-        ...s,
-        sceneStreams: await stashEntityService.getPlaybackStreams(
-          s.id,
-          s.instanceId
-        ),
-      }))
+      scenes.map(async (s) => {
+        const [sceneStreams, vr] = await Promise.all([
+          stashEntityService.getPlaybackStreams(s.id, s.instanceId),
+          getSceneVr(s.id, s.instanceId),
+        ]);
+        return { ...s, sceneStreams, vr };
+      })
     );
   }
 

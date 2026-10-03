@@ -24,6 +24,7 @@ import { resolveAccessibleInstanceId } from "../../../services/EntityAccessServi
 import rankingComputeService from "../../../services/RankingComputeService.js";
 import { recommendationService } from "../../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
+import { getSceneVr } from "../../../services/SceneVrService.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import type { FindRecommendedScenesRequest } from "../../../types/api/index.js";
 import { logger } from "../../../utils/logger.js";
@@ -54,6 +55,10 @@ vi.mock("../../../services/StashEntityService.js", () => ({
     getPlaybackStreams: vi.fn().mockResolvedValue([]),
     getSimilarSceneCandidates: vi.fn().mockResolvedValue([]),
   },
+}));
+
+vi.mock("../../../services/SceneVrService.js", () => ({
+  getSceneVr: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../../../services/SceneQueryBuilder.js", () => ({
@@ -118,6 +123,7 @@ vi.mock("../../../utils/logger.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockSceneQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockStashEntityService = vi.mocked(stashEntityService);
+const mockGetSceneVr = vi.mocked(getSceneVr);
 const mockResolveInstance = vi.mocked(resolveAccessibleInstanceId);
 const mockLogger = vi.mocked(logger, true);
 const mockRankingService = vi.mocked(rankingComputeService, true);
@@ -328,6 +334,93 @@ describe("findScenes", () => {
     expect(must(res._getOkBody().findScenes.scenes[0]).sceneStreams).toEqual(
       streams
     );
+  });
+
+  it("a single-id lookup carries the scene's vr from its own instance", async () => {
+    const scene = createMockScene({ id: "42", instanceId: "inst-a" });
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      items: [scene],
+      total: 1,
+    });
+    mockGetSceneVr.mockResolvedValueOnce({
+      projection: "FISHEYE_200_LR",
+      source: "tag",
+    });
+
+    const req = reqFor(findScenes, {
+      body: { ids: ["42:inst-a"] },
+      user: testUser(),
+    });
+    const res = resFor(findScenes);
+
+    await findScenes(req, res);
+
+    expect(mockGetSceneVr).toHaveBeenCalledExactlyOnceWith("42", "inst-a");
+    expect(must(res._getOkBody().findScenes.scenes[0]).vr).toEqual({
+      projection: "FISHEYE_200_LR",
+      source: "tag",
+    });
+  });
+
+  it("a single-id lookup of a scene that is not VR carries vr null", async () => {
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      items: [createMockScene({ id: "42", instanceId: "inst-a" })],
+      total: 1,
+    });
+    mockGetSceneVr.mockResolvedValueOnce(null);
+
+    const req = reqFor(findScenes, { body: { ids: ["42"] }, user: testUser() });
+    const res = resFor(findScenes);
+
+    await findScenes(req, res);
+
+    expect(must(res._getOkBody().findScenes.scenes[0]).vr).toBeNull();
+  });
+
+  it("list responses carry no vr and read none", async () => {
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      items: [
+        createMockScene({ id: "1", instanceId: "inst-a" }),
+        createMockScene({ id: "2", instanceId: "inst-a" }),
+      ],
+      total: 2,
+    });
+
+    const req = reqFor(findScenes, {
+      body: { filter: { page: 1, per_page: 40 }, scene_filter: {} },
+      user: testUser(),
+    });
+    const res = resFor(findScenes);
+
+    await findScenes(req, res);
+
+    expect(mockGetSceneVr).not.toHaveBeenCalled();
+    for (const scene of res._getOkBody().findScenes.scenes) {
+      expect(scene).not.toHaveProperty("vr");
+    }
+  });
+
+  it("a scene the user is restricted from answers no scene and reads no vr (the lookup's access path)", async () => {
+    // The builder applies the user's exclusions: a restricted scene is not
+    // in its result, which the Scene page shows as not found
+    mockSceneQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
+
+    const req = reqFor(findScenes, {
+      body: { ids: ["42:inst-a"] },
+      user: testUser(),
+      allowedInstanceIds: ["inst-a"],
+    });
+    const res = resFor(findScenes);
+
+    await findScenes(req, res);
+
+    // The user's exclusions apply: applyExclusions is left at its default
+    const options = must(mockSceneQueryBuilder.execute.mock.calls[0])[0];
+    expect(options.userId).toBe(testUser().id);
+    expect(options.applyExclusions).toBeUndefined();
+    expect(res._getOkBody().findScenes.scenes).toEqual([]);
+    expect(mockGetSceneVr).not.toHaveBeenCalled();
+    expect(mockStashEntityService.getPlaybackStreams).not.toHaveBeenCalled();
   });
 
   it("returns 400 for ambiguous single-ID lookup", async () => {
