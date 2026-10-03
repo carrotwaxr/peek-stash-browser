@@ -1228,6 +1228,52 @@ describe("StashInstanceSection", () => {
       });
     });
 
+    describe("the picker's focus", () => {
+      const openPicker = async () => {
+        mockApiGet.mockResolvedValue({
+          instances: [withVr({ stashVrTag: "VR" })],
+        });
+        mockFindTags.mockResolvedValue({
+          findTags: {
+            count: 1,
+            tags: [{ id: "7", instanceId: "test-instance-1", name: "Virtual" }],
+          },
+        });
+        renderSection();
+        const choose = await screen.findByRole("button", {
+          name: "Choose VR tag",
+        });
+        fireEvent.click(choose);
+        return choose;
+      };
+
+      it("opening it puts the cursor in the search box", async () => {
+        await openPicker();
+
+        expect(await screen.findByRole("searchbox")).toHaveFocus();
+      });
+
+      it("Escape closes it and returns focus to Choose VR tag", async () => {
+        const choose = await openPicker();
+        const search = await screen.findByRole("searchbox");
+
+        fireEvent.keyDown(search, { key: "Escape" });
+
+        expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+        expect(choose).toHaveFocus();
+      });
+
+      it("Cancel closes it and returns focus to Choose VR tag", async () => {
+        const choose = await openPicker();
+        await screen.findByRole("button", { name: "Virtual" });
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+        expect(choose).toHaveFocus();
+      });
+    });
+
     it("Use Stash's tag sends null", async () => {
       mockApiGet.mockResolvedValue({
         instances: [
