@@ -25,10 +25,12 @@ import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  FAVORITE_INLINE_LIMIT,
   type FieldClauses,
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  favoriteRefs,
 } from "../../../services/query/EntityQueryBuilder.js";
 import type {
   ClipListRequest,
@@ -40,6 +42,7 @@ import {
   parsedListRequest,
 } from "../../helpers/fixtures.js";
 import { must } from "../../helpers/must.js";
+import { partialRow } from "../../helpers/prismaMock.js";
 
 vi.mock(
   "../../../prisma/singleton.js",
@@ -1259,5 +1262,54 @@ describe("leavesOf: excludes beside a ref's values", () => {
       expect(page).toContain(`${name}(id, inst) AS MATERIALIZED`);
     }
     expect(page).toContain("IN (SELECT id, inst FROM performers_not_refs)");
+  });
+});
+
+describe("favoriteRefs", () => {
+  const ctx = { userId: 7, applyExclusions: true, allowedInstanceIds: ["a"] };
+  const tagRows = (
+    n: number
+  ): Awaited<ReturnType<typeof prisma.tagRating.findMany>> =>
+    Array.from({ length: n }, (_, i) =>
+      partialRow({ instanceId: "a", tagId: String(i + 1) })
+    );
+
+  beforeEach(() => {
+    // Earlier tests may leave queued answers
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.tagRating.findMany.mockReset();
+    mockPrisma.userExcludedEntity.findMany.mockReset();
+  });
+
+  it("up to the limit, the favourites' exclusions are one lookup by their ids", async () => {
+    mockPrisma.tagRating.findMany.mockResolvedValue(tagRows(3));
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+      partialRow({ entityId: "2", instanceId: "" }),
+    ]);
+
+    expect(await favoriteRefs("tag", ctx)).toEqual([
+      { id: "1", instanceId: "a" },
+      { id: "3", instanceId: "a" },
+    ]);
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("above the limit, the favourites travel as one JSON parameter, not one per favourite", async () => {
+    const n = FAVORITE_INLINE_LIMIT + 1;
+    mockPrisma.tagRating.findMany.mockResolvedValue(tagRows(n));
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ id: "5", inst: "a" }]);
+
+    expect(await favoriteRefs("tag", ctx)).toEqual([
+      { id: "5", instanceId: "a" },
+    ]);
+    expect(mockPrisma.userExcludedEntity.findMany).not.toHaveBeenCalled();
+    const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
+    expect(sql).toContain("json_each(?)");
+    expect(sql).toContain("x.instanceId = ''");
+    expect(params).toHaveLength(3);
+    expect(must(params[0], "the pairs")).toBe(
+      JSON.stringify(Array.from({ length: n }, (_, i) => [String(i + 1), "a"]))
+    );
+    expect(params.slice(1)).toEqual([7, "tag"]);
   });
 });

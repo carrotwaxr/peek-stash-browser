@@ -42,7 +42,7 @@ import type {
   RefCriterion,
   RefFieldCriterion,
 } from "../../types/parsedFilters.js";
-import { entityKey } from "../../utils/entityRef.js";
+import { entityKey, pairsJson } from "../../utils/entityRef.js";
 import {
   type HierarchyKind,
   expandRefs,
@@ -54,6 +54,7 @@ import {
   type CombinedClauses,
   type FilterClause,
   type JunctionTarget,
+  PAIR_INLINE_LIMIT,
   type SqlFragment,
   type SqlParam,
   allOf,
@@ -482,6 +483,9 @@ export function splitExcludes<K extends ListKind>(
   ];
 }
 
+/** Above this many favourites `favoriteRefs` reads their exclusions in SQL */
+export const FAVORITE_INLINE_LIMIT = PAIR_INLINE_LIMIT;
+
 /**
  * The viewer's favourites of one kind on the allowed instances, as refs with
  * their instance (a favourite on one instance never stands for the same id
@@ -490,6 +494,9 @@ export function splitExcludes<K extends ListKind>(
  * dropped (`UserExcludedEntity`, with no instance or the ref's own), so a
  * hidden entity never makes a scene match. Empty when nothing is left: the
  * caller settles that case, since `refClause` reads no refs as no filter.
+ * Up to `FAVORITE_INLINE_LIMIT` favourites the exclusion lookup binds their
+ * ids; above it they travel as one JSON parameter and the anti-join runs in
+ * SQL, so no favourite count reaches SQLite's parameter limit.
  */
 export async function favoriteRefs(
   kind: "tag" | "studio" | "performer",
@@ -522,6 +529,22 @@ export async function favoriteRefs(
     refs = rows.map((r) => ({ id: r.performerId, instanceId: r.instanceId }));
   }
   if (!ctx.applyExclusions || refs.length === 0) return refs;
+
+  if (refs.length > FAVORITE_INLINE_LIMIT) {
+    const kept = await prisma.$queryRawUnsafe<
+      Array<{ id: string; inst: string }>
+    >(
+      `SELECT json_extract(f.value, '$[0]') AS id, json_extract(f.value, '$[1]') AS inst
+FROM json_each(?) f
+WHERE NOT EXISTS (SELECT 1 FROM UserExcludedEntity x WHERE x.userId = ? AND x.entityType = ? AND x.entityId = json_extract(f.value, '$[0]') AND (x.instanceId = '' OR x.instanceId = json_extract(f.value, '$[1]')))`,
+      pairsJson(
+        refs.map((r) => ({ id: r.id, instanceId: r.instanceId ?? "" }))
+      ),
+      ctx.userId,
+      kind
+    );
+    return kept.map((row) => ({ id: row.id, instanceId: row.inst }));
+  }
 
   const excluded = await prisma.userExcludedEntity.findMany({
     where: {
