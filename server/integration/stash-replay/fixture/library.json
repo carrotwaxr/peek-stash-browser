@@ -19,6 +19,9 @@
             "excludeImage": false
           }
         ]
+      },
+      "ui": {
+        "vrTag": "Tag 100002"
       }
     }
   },

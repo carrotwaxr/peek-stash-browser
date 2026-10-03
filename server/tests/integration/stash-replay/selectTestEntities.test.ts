@@ -11,7 +11,10 @@ import {
   type EntityType,
   type ReplayLibrary,
 } from "../../../integration/stash-replay/library.js";
-import { selectTestEntities } from "../../../integration/stash-replay/selectTestEntities.js";
+import {
+  refIds,
+  selectTestEntities,
+} from "../../../integration/stash-replay/selectTestEntities.js";
 import { loadSelections } from "../../../integration/stash-replay/selections.js";
 import {
   type RecordedShape,
@@ -111,6 +114,27 @@ describe("selectTestEntities", () => {
     const thin = generated(shape);
     expect(() => selectTestEntities(thin.library, thin.recorded)).toThrow(
       "studioWithScenes"
+    );
+  });
+
+  it("picks a VR scene carrying Stash's VR tag and a non-VR scene among the picks", () => {
+    const { library, recorded } = generated();
+    const picked = selectTestEntities(library, recorded);
+    const tagsOf = (id: string) =>
+      library.entities.scene
+        .filter((scene) => scene.id === id)
+        .flatMap((scene) => refIds(scene.tags));
+    // Tag 100002 is configuration.ui.vrTag
+    expect(tagsOf(picked.vrScene)).toContain("100002");
+    expect(tagsOf(picked.nonVrScene)).not.toContain("100002");
+    expect(picked.nonVrScene).toBe(picked.sceneWithRelations);
+
+    // The pick must not carry the VR tag
+    const shape = testStashShape();
+    linkScene(shape, picked.sceneWithRelations, "tags", ["100002", "100003"]);
+    const vr = generated(shape);
+    expect(() => selectTestEntities(vr.library, vr.recorded)).toThrow(
+      "nonVrScene"
     );
   });
 

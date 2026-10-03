@@ -13,6 +13,8 @@ import { ClientError, GraphQLClient, type Variables } from "graphql-request";
 import {
   ConfigurationDocument,
   type ConfigurationQueryVariables,
+  ConfigurationUiDocument,
+  type ConfigurationUiQueryVariables,
   FindGalleriesDocument,
   type FindGalleriesQueryVariables,
   FindGalleryDocument,
@@ -453,6 +455,11 @@ export class StashClient {
     variables?: ConfigurationQueryVariables,
     signal?: AbortSignal
   ) => this.run(ConfigurationDocument, "Configuration", variables, signal);
+  /** The Stash user's saved UI settings, a JSON map (`ui.vrTag` is read). */
+  configurationUi = (
+    variables?: ConfigurationUiQueryVariables,
+    signal?: AbortSignal
+  ) => this.run(ConfigurationUiDocument, "ConfigurationUi", variables, signal);
 
   // Version info
   version = (variables?: VersionQueryVariables, signal?: AbortSignal) =>

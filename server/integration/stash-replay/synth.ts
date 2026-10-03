@@ -177,6 +177,10 @@ const CONFIGURATION = {
       { path: "/library/images", excludeVideo: true, excludeImage: false },
     ],
   },
+  // The Stash user's UI settings: the VR tag, by name (ConfigurationUi). A
+  // tag few scenes carry directly (selectTestEntities' vrScene), none of
+  // them another spec's pick or an extension scene
+  ui: { vrTag: "Tag 100002" },
 };
 
 const DAY = 86400;

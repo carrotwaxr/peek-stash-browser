@@ -30,7 +30,9 @@ export type TestEntityKey =
   | "imageWithGalleryInheritance"
   | "imageWithOwnProperties"
   | "sceneWithInheritedTags"
-  | "inheritedTagFromPerformerOrStudio";
+  | "inheritedTagFromPerformerOrStudio"
+  | "vrScene"
+  | "nonVrScene";
 
 export type TestEntities = Record<TestEntityKey, string>;
 
@@ -51,6 +53,10 @@ export function refIds(value: unknown): string[] {
 /** The recorded library: recorded entities, and references to them only. */
 class RecordedView {
   private readonly lists: Record<EntityType, Entity[]>;
+  /** The recorded tag Stash's VR tag (configuration.ui.vrTag) names */
+  readonly vrTagId: string | undefined;
+  /** That tag and its descendants */
+  readonly vrTagIds: ReadonlySet<string>;
 
   constructor(
     library: ReplayLibrary,
@@ -72,6 +78,23 @@ class RecordedView {
       image: lists.image ?? [],
       clip: lists.clip ?? [],
     };
+    const { ui } = library.stash.configuration;
+    const name = isRecord(ui) ? ui.vrTag : undefined;
+    this.vrTagId = this.all("tag").find((tag) => tag.name === name)?.id;
+    this.vrTagIds = this.descendantsOf(this.vrTagId);
+  }
+
+  /** The tag and its recorded descendants. */
+  private descendantsOf(root: string | undefined): Set<string> {
+    const ids = new Set<string>();
+    const pending = root === undefined ? [] : [root];
+    for (let id = pending.pop(); id !== undefined; id = pending.pop()) {
+      if (ids.has(id)) continue;
+      ids.add(id);
+      const tag = this.byId("tag", id);
+      if (tag !== undefined) pending.push(...this.refs(tag, "children", "tag"));
+    }
+    return ids;
   }
 
   all(type: EntityType): Entity[] {
@@ -268,6 +291,23 @@ export const TEST_ENTITY_CRITERIA: readonly Criterion[] = [
       );
     },
   },
+  {
+    key: "vrScene",
+    type: "scene",
+    description: "a scene carrying Stash's VR tag itself",
+    matches: (scene, view) =>
+      view.vrTagId !== undefined &&
+      view.refs(scene, "tags", "tag").includes(view.vrTagId),
+  },
+  {
+    key: "nonVrScene",
+    type: "scene",
+    description:
+      "sceneWithRelations, when it carries neither Stash's VR tag nor a descendant of it",
+    matches: (scene, view, picked) =>
+      scene.id === picked.sceneWithRelations &&
+      !view.refs(scene, "tags", "tag").some((tag) => view.vrTagIds.has(tag)),
+  },
 ];
 
 /**
@@ -313,5 +353,7 @@ export function selectTestEntities(
     imageWithOwnProperties: pick("imageWithOwnProperties"),
     sceneWithInheritedTags: pick("sceneWithInheritedTags"),
     inheritedTagFromPerformerOrStudio: "",
+    vrScene: pick("vrScene"),
+    nonVrScene: pick("nonVrScene"),
   };
 }

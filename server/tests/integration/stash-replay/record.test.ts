@@ -99,6 +99,8 @@ function guardRaw(): RawStash {
           },
         ],
       },
+      // The Stash user's saved UI settings, an open map
+      ui: { vrTag: "Private VR Tag" },
     },
     entities: {
       scene: [

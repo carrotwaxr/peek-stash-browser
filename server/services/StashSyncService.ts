@@ -55,6 +55,7 @@ import {
   distinctRefs,
   entityKey,
 } from "../utils/entityRef.js";
+import { shouldLogOnce } from "../utils/logThrottle.js";
 import { logger } from "../utils/logger.js";
 import { summarizeStashStreams } from "../utils/sceneStreams.js";
 import { stashMediaUrl } from "../utils/stashMediaPath.js";
@@ -472,6 +473,9 @@ function getMostRecentTimestamp(
  * ask for changes after it and see none until that date.
  */
 const WATERMARK_MAX_SKEW_MS = 5 * 60 * 1000;
+
+/** A failed read of Stash's VR tag warns once this long per instance */
+const VR_TAG_WARN_MS = 60 * 60 * 1000;
 
 /** How many ids a log line names at most. */
 const LOGGED_IDS = 20;
@@ -3015,6 +3019,8 @@ class StashSyncService extends EventEmitter {
     try {
       logger.info(`Starting ${name}...`, { stashInstanceId });
 
+      await this.readStashVrTag(stashInstanceId, run);
+
       for (const entityType of SYNC_ORDER) {
         this.checkAbort();
         results.push(
@@ -3100,6 +3106,56 @@ class StashSyncService extends EventEmitter {
 
       throw error;
     }
+  }
+
+  /**
+   * Reads Stash's VR tag (`configuration.ui.vrTag`, a tag name) at the start
+   * of an instance's sync and stores it trimmed in `StashInstance.stashVrTag`
+   * (null when empty, missing or not a string), with one write and only when
+   * the value changed; the library stamp then moves so an open Scene page
+   * refetches its `vr`. A failed read keeps the stored value and the sync
+   * goes on, warning once an hour per instance; an abort ends the sync. The
+   * `ui` map holds every UI setting the Stash user saved: it is never logged.
+   */
+  private async readStashVrTag(
+    stashInstanceId: string,
+    run: SyncRunContext
+  ): Promise<void> {
+    let vrTag: string | null;
+    try {
+      const stash = this.getStashClient(stashInstanceId);
+      const { configuration } = await stash.configurationUi({}, run.signal);
+      throwIfAborted(run.signal);
+      const ui: unknown = configuration.ui;
+      const raw =
+        typeof ui === "object" && ui !== null
+          ? (ui as Record<string, unknown>)["vrTag"]
+          : undefined;
+      vrTag = typeof raw === "string" ? raw.trim() || null : null;
+    } catch (error) {
+      if (this.isAbort(error)) throw new Error("Sync aborted");
+      if (shouldLogOnce(`sync.vrTag:${stashInstanceId}`, VR_TAG_WARN_MS)) {
+        logger.warn(
+          "Could not read Stash's VR tag; the stored value stays until a sync reads it",
+          { stashInstanceId, error: describeStashError(error) }
+        );
+      }
+      return;
+    }
+
+    const instance = await prisma.stashInstance.findUnique({
+      where: { id: stashInstanceId },
+      select: { stashVrTag: true },
+    });
+    if (!instance || instance.stashVrTag === vrTag) return;
+    await dbWrite("sync.vrTag", () =>
+      prisma.stashInstance.updateMany({
+        where: { id: stashInstanceId },
+        data: { stashVrTag: vrTag },
+      })
+    );
+    bumpLibrary();
+    logger.info("Stash's VR tag changed", { stashInstanceId, vrTag });
   }
 
   /**

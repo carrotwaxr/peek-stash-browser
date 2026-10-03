@@ -155,6 +155,8 @@ function stubStash(groupIds: string[], hierarchy: Hierarchy): StubStash {
       Promise.resolve({ findScenes: { ...none, scenes: [] } }),
     findImageIDs: () =>
       Promise.resolve({ findImages: { ...none, images: [] } }),
+    // Stash's UI settings, read at the start of each instance's sync: none
+    configurationUi: () => Promise.resolve({ configuration: { ui: {} } }),
     findGroupRelations: (vars) => {
       stub.hierarchyRequests.push(vars);
       if (stub.failure) return Promise.reject(stub.failure);

@@ -1045,6 +1045,8 @@ function stubStashLibrary(
       );
       return Promise.resolve({ findImages: { count, images: ids } });
     },
+    // Stash's UI settings, read at the start of each instance's sync: none
+    configurationUi: () => Promise.resolve({ configuration: { ui: {} } }),
     // The collection hierarchy, read on every sync: none
     findGroupRelations: () =>
       Promise.resolve({

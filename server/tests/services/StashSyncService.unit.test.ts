@@ -144,6 +144,10 @@ const mockStashClient = {
   findImageIDs: vi
     .fn<StashClient["findImageIDs"]>()
     .mockResolvedValue({ findImages: { images: [], count: 0 } }),
+  // Stash's UI settings, read at the start of each instance's sync
+  configurationUi: vi
+    .fn<StashClient["configurationUi"]>()
+    .mockResolvedValue({ configuration: { ui: {} } }),
   // The collection hierarchy, read on every sync
   findGroupRelations: vi
     .fn<StashClient["findGroupRelations"]>()

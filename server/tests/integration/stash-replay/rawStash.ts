@@ -333,6 +333,8 @@ export function rawStash(shape: RecordedShape): RawStash {
           },
         ],
       },
+      // The Stash user's saved UI settings, an open map
+      ui: { vrTag: "Private VR Tag" },
     },
     entities: {
       scene: list("scene"),

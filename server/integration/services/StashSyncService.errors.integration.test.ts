@@ -238,6 +238,8 @@ function stubClient(): StashClient {
       Promise.resolve({ findScenes: { count: 1, scenes: [{ id: ID }] } }),
     findImageIDs: () =>
       Promise.resolve({ findImages: { count: 1, images: [{ id: ID }] } }),
+    // Stash's UI settings, read at the start of each instance's sync: none
+    configurationUi: () => Promise.resolve({ configuration: { ui: {} } }),
     // The collection hierarchy, read on every sync: none
     findGroupRelations: () =>
       Promise.resolve({

@@ -308,4 +308,6 @@ export const OWNER_TEST_ENTITIES = {
   imageWithOwnProperties: "100005",
   sceneWithInheritedTags: "100002",
   inheritedTagFromPerformerOrStudio: "",
+  vrScene: "100010",
+  nonVrScene: "100003",
 };
