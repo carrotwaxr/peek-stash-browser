@@ -388,12 +388,25 @@ describe("carousel rules", () => {
     expect(kept).toEqual({});
   });
 
-  it("reads an old date LESS_THAN as the end day", () => {
-    const { state } = carouselRulesToFilterState({
+  it("reads an old date LESS_THAN as the day before: saved unedited, it matches the same days", () => {
+    const stored = {
       date: { modifier: "LESS_THAN", value: "2024-05-20" },
-    });
+      created_at: { modifier: "LESS_THAN", value: "2024-05-20" },
+      last_played_at: { modifier: "LESS_THAN", value: "2024-01-01" },
+    };
+    const { state, kept } = carouselRulesToFilterState(stored);
 
-    expect(state).toEqual({ date: { end: "2024-05-20" } });
+    // "Before the 20th" never matched the 20th: the inclusive end is the 19th
+    expect(state).toEqual({
+      date: { end: "2024-05-19" },
+      createdAt: { end: "2024-05-19" },
+      lastPlayedAt: { end: "2023-12-31" },
+    });
+    expect(kept).toEqual({});
+    expect(buildSceneFilter(state).date).toEqual({
+      modifier: "BETWEEN",
+      value2: "2024-05-19",
+    });
   });
 
   it("reads nothing from no rules", () => {

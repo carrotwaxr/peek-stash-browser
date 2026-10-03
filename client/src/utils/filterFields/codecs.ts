@@ -896,11 +896,11 @@ const TIMESTAMP_FIELDS: readonly string[] = [
   "last_played_at",
 ];
 
-/** The day after a `YYYY-MM-DD` day; anything else as it was */
-function nextDay(day: string): string {
+/** The day `by` days from a `YYYY-MM-DD` day; anything else as it was */
+function dayFrom(day: string, by: number): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
   const next = new Date(`${day}T00:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + 1);
+  next.setUTCDate(next.getUTCDate() + by);
   return next.toISOString().slice(0, 10);
 }
 
@@ -909,8 +909,9 @@ function nextDay(day: string): string {
  * two days, or one of them (`value` alone a start, `value2` alone an end); the
  * old lone bounds, GREATER_THAN a start (a calendar date matched from the day
  * after, so its start is the next day; a timestamp matched most of that day,
- * so its start is the day itself) and LESS_THAN an end; undefined for any
- * other shape.
+ * so its start is the day itself) and LESS_THAN an end (before the day, a
+ * timestamp's too, so its end is the day before); undefined for any other
+ * shape.
  */
 function dateRangeFromCriterion(
   criterion: unknown,
@@ -936,10 +937,10 @@ function dateRangeFromCriterion(
   if (from === undefined || parts.value2 !== undefined) return undefined;
   if (parts.modifier === "GREATER_THAN") {
     return {
-      start: TIMESTAMP_FIELDS.includes(contractField) ? from : nextDay(from),
+      start: TIMESTAMP_FIELDS.includes(contractField) ? from : dayFrom(from, 1),
     };
   }
-  if (parts.modifier === "LESS_THAN") return { end: from };
+  if (parts.modifier === "LESS_THAN") return { end: dayFrom(from, -1) };
   return undefined;
 }
 
