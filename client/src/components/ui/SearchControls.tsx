@@ -296,14 +296,15 @@ const SearchControls = ({
   if (!usesSheet && sheet !== null) setSheet(null);
 
   // The list's own keys, enabled in every mode. Not from inside a popover
-  // or a dialog (a Modal's overlay scope stops them anyway) or the player
+  // (the View settings dropdown too), a dialog (a Modal's overlay scope
+  // stops them anyway), an open menu or the player
   const listKey =
     (run: (event: KeyboardEvent) => boolean) =>
     (event: KeyboardEvent): boolean => {
       const target = event.target;
       if (
         target instanceof Element &&
-        target.closest('[role="dialog"], .video-js') !== null
+        target.closest('[role="dialog"], [role="menu"], .video-js') !== null
       ) {
         return false;
       }
