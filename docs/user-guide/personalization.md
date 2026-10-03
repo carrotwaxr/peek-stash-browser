@@ -122,6 +122,8 @@ The homepage displays carousels of content. You can customize which carousels ap
 | **Favorite Tags** | Scenes with your favorite tags, in random order |
 | **Favorite Studios** | Scenes from your favorite studios, in random order |
 
+A carousel with no scenes to show (High Rated before you rate anything, say) is left off Home until it has some.
+
 ### Custom Carousels
 
 Create your own carousels with custom filter rules. See [Custom Carousels](custom-carousels.md) for details on the carousel builder.

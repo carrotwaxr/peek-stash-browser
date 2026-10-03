@@ -66,6 +66,7 @@ const RemoveLastOMenu = ({
       instanceId={image.instanceId}
       oCount={oCount}
       onRemoveLastO={() => void handleRemoveLastO()}
+      reserveSpace
     />
   );
 };

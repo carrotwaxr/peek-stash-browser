@@ -360,6 +360,12 @@ const HomeCarousel = ({
     return null;
   }
 
+  // Nothing to show (High Rated with no rated scenes yet): no empty box, as
+  // for a custom carousel and Continue Watching
+  if (!isLoading && !initializing && carouselScenes.length === 0) {
+    return null;
+  }
+
   return (
     <SceneCarousel
       loading={isLoading || initializing}

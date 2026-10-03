@@ -128,7 +128,7 @@ export function formatDurationCompact(seconds: number) {
  * @param {number} seconds - Duration in seconds
  * @param {Object} options - Formatting options
  * @param {boolean} options.includeDays - Include days in output (default true)
- * @returns {string} Formatted duration string (e.g., "2d 5h 30m", "3h 45m", "12m")
+ * @returns {string} Formatted duration string (e.g., "2d 5h 30m", "3h 45m", "12m", "45s")
  */
 export function formatDurationHumanReadable(
   seconds: number,
@@ -137,6 +137,8 @@ export function formatDurationHumanReadable(
   const { includeDays = true } = options;
 
   if (!seconds || seconds === 0) return "0m";
+  // Under a minute "0m" would say nothing was watched
+  if (seconds < 60) return `${Math.floor(seconds)}s`;
 
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);

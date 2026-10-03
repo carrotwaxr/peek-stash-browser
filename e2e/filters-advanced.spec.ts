@@ -1,5 +1,6 @@
 import {
   type APIRequestContext,
+  type Locator,
   type Page,
   expect,
   test,
@@ -227,6 +228,38 @@ test.describe("Advanced filters", () => {
       await expect(
         again.getByRole("button", { name: `Remove ${tag.name}` })
       ).toHaveCount(1);
+    }
+  });
+
+  test("a value box's clear button stays on the chip's line, narrow or wide", async ({
+    page,
+  }) => {
+    const tag = requireData((await sceneTags(page.request))[0], "a tag");
+    // The middle of a button's box, which the page lays out
+    const middleOf = async (button: Locator) => {
+      const box = await button.boundingBox();
+      if (!box) throw new Error("the button has no box");
+      return box.y + box.height / 2;
+    };
+    for (const width of [1280, 700]) {
+      await page.setViewportSize({ width, height: 720 });
+      const list = new ListPage(page);
+      await list.goto("/scenes");
+      await list.waitForResults("Scene");
+      const dialog = await list.openAdvanced();
+      const row = await addRow(dialog, "top level", "Tags");
+      await pickValues(page, dialog, row, [tag.name]);
+
+      const chip = dialog.getByRole("button", { name: `Remove ${tag.name}` });
+      const clear = dialog.getByRole("button", {
+        name: "Clear all selections",
+      });
+
+      // One line: the two buttons' middles are within a few pixels
+      expect(
+        Math.abs((await middleOf(clear)) - (await middleOf(chip))),
+        `at ${width}px`
+      ).toBeLessThan(8);
     }
   });
 

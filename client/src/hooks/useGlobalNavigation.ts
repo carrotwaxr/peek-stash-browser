@@ -12,6 +12,8 @@ const NAV_MAP: Readonly<Record<string, string>> = {
   c: "/collections",
   v: "/collections",
   l: "/galleries",
+  i: "/images",
+  k: "/clips",
   y: "/playlists",
   z: "/settings",
 };
@@ -27,6 +29,8 @@ const NAV_MAP: Readonly<Record<string, string>> = {
  * - g t → Tags
  * - g c or g v → Collections
  * - g l → Galleries
+ * - g i → Images
+ * - g k → Clips
  * - g y → Playlists
  * - g z → Settings
  *

@@ -616,108 +616,112 @@ const SearchableSelect = ({
       {/* The row: the trigger button, with the values' remove buttons beside it */}
       <div
         onClick={handleRowClick}
-        className="w-full pl-3 pr-[2px] py-2 rounded-md cursor-pointer border text-sm flex flex-wrap items-center gap-1"
+        className="w-full pl-3 pr-[2px] py-2 rounded-md cursor-pointer border text-sm flex items-start gap-1"
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
           color: "var(--text-primary)",
         }}
       >
-        {multi &&
-          selectedItems.map((item) => {
-            const out = toggleable && isExcluded(item.id);
-            return (
-              <span
-                key={item.id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm border"
-                style={
-                  out
-                    ? {
-                        backgroundColor: "var(--status-error-bg)",
-                        borderColor: "var(--status-error-border)",
-                        color: "var(--status-error)",
+        {/* The picks and the trigger wrap among themselves; the clear buttons
+            stay beside them, on the first line, never wrapped under a pick */}
+        <div className="flex flex-1 min-w-0 flex-wrap items-center gap-1">
+          {multi &&
+            selectedItems.map((item) => {
+              const out = toggleable && isExcluded(item.id);
+              return (
+                <span
+                  key={item.id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm border"
+                  style={
+                    out
+                      ? {
+                          backgroundColor: "var(--status-error-bg)",
+                          borderColor: "var(--status-error-border)",
+                          color: "var(--status-error)",
+                        }
+                      : {
+                          backgroundColor: "var(--accent-primary)",
+                          borderColor: "transparent",
+                          color: "white",
+                        }
+                  }
+                >
+                  {toggleable && (
+                    <Button
+                      onClick={(e) => handleToggle(item.id, e)}
+                      variant="tertiary"
+                      // On every pick: an included one's is quiet until
+                      // hovered or focused, an excluded one's at full strength
+                      className={`!p-0 !border-0 rounded ${
+                        out
+                          ? "hover:opacity-70"
+                          : "opacity-60 hover:!opacity-100 focus-visible:!opacity-100"
+                      }`}
+                      style={ICON_ON_PICK}
+                      aria-pressed={out}
+                      aria-label={`Exclude ${shownName(item)}`}
+                      title={
+                        out
+                          ? `Include ${shownName(item)}`
+                          : `Exclude ${shownName(item)}`
                       }
-                    : {
-                        backgroundColor: "var(--accent-primary)",
-                        borderColor: "transparent",
-                        color: "white",
-                      }
-                }
-              >
-                {toggleable && (
+                      icon={<LucideBan size={14} />}
+                    />
+                  )}
+                  <span className={out ? "line-through" : undefined}>
+                    {shownName(item)}
+                  </span>
                   <Button
-                    onClick={(e) => handleToggle(item.id, e)}
+                    data-remove
+                    onClick={(e) => handleRemove(item.id, e)}
                     variant="tertiary"
-                    // On every pick: an included one's is quiet until
-                    // hovered or focused, an excluded one's at full strength
-                    className={`!p-0 !border-0 rounded ${
-                      out
-                        ? "hover:opacity-70"
-                        : "opacity-60 hover:!opacity-100 focus-visible:!opacity-100"
-                    }`}
+                    className="hover:opacity-70 !p-0 !border-0"
                     style={ICON_ON_PICK}
-                    aria-pressed={out}
-                    aria-label={`Exclude ${shownName(item)}`}
-                    title={
-                      out
-                        ? `Include ${shownName(item)}`
-                        : `Exclude ${shownName(item)}`
-                    }
-                    icon={<LucideBan size={14} />}
+                    aria-label={`Remove ${shownName(item)}`}
+                    icon={<LucideX size={14} />}
                   />
-                )}
-                <span className={out ? "line-through" : undefined}>
-                  {shownName(item)}
                 </span>
-                <Button
-                  data-remove
-                  onClick={(e) => handleRemove(item.id, e)}
-                  variant="tertiary"
-                  className="hover:opacity-70 !p-0 !border-0"
-                  style={ICON_ON_PICK}
-                  aria-label={`Remove ${shownName(item)}`}
-                  icon={<LucideX size={14} />}
-                />
-              </span>
-            );
-          })}
-        <button
-          ref={triggerRef}
-          id={id}
-          type="button"
-          aria-expanded={isOpen}
-          aria-controls={listId}
-          aria-label={triggerName}
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex flex-1 items-center justify-between gap-2 min-w-[6rem] py-0.5 text-left bg-transparent border-0 cursor-pointer rounded focus-visible:outline focus-visible:outline-2"
-          style={{ color: "var(--text-primary)" }}
-        >
-          <span
-            className="flex-1 min-w-0"
-            style={
-              selectedItems.length === 0 || multi
-                ? { color: "var(--text-muted)" }
-                : undefined
-            }
+              );
+            })}
+          <button
+            ref={triggerRef}
+            id={id}
+            type="button"
+            aria-expanded={isOpen}
+            aria-controls={listId}
+            aria-label={triggerName}
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex flex-1 items-center justify-between gap-2 min-w-[6rem] py-0.5 text-left bg-transparent border-0 cursor-pointer rounded focus-visible:outline focus-visible:outline-2"
+            style={{ color: "var(--text-primary)" }}
           >
-            {selectedItems.length === 0
-              ? isLoadingInitial
-                ? "Loading..."
-                : placeholder
-              : multi
-                ? "Add more..."
-                : selectedItems[0] && shownName(selectedItems[0])}
-          </span>
-          <LucideChevronDown
-            size={14}
-            className="flex-shrink-0"
-            style={{
-              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.2s",
-              color: "var(--text-muted)",
-            }}
-          />
-        </button>
+            <span
+              className="flex-1 min-w-0"
+              style={
+                selectedItems.length === 0 || multi
+                  ? { color: "var(--text-muted)" }
+                  : undefined
+              }
+            >
+              {selectedItems.length === 0
+                ? isLoadingInitial
+                  ? "Loading..."
+                  : placeholder
+                : multi
+                  ? "Add more..."
+                  : selectedItems[0] && shownName(selectedItems[0])}
+            </span>
+            <LucideChevronDown
+              size={14}
+              className="flex-shrink-0"
+              style={{
+                transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s",
+                color: "var(--text-muted)",
+              }}
+            />
+          </button>
+        </div>
         {!multi && selectedItems[0] && (
           <Button
             data-remove
@@ -726,7 +730,7 @@ const SearchableSelect = ({
               if (selected) handleRemove(selected.id, e);
             }}
             variant="tertiary"
-            className="hover:opacity-70 !p-1 !border-0"
+            className="hover:opacity-70 !p-1 !border-0 shrink-0"
             aria-label={`Remove ${shownName(selectedItems[0])}`}
             icon={<LucideX size={16} />}
           />
@@ -735,7 +739,7 @@ const SearchableSelect = ({
           <Button
             onClick={handleClearAll}
             variant="tertiary"
-            className="hover:opacity-70 !p-1 !border-0"
+            className="hover:opacity-70 !p-1 !border-0 shrink-0"
             aria-label="Clear all selections"
             title="Clear all"
             icon={<LucideX size={16} style={{ color: "var(--text-muted)" }} />}

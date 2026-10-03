@@ -52,6 +52,7 @@ const RemoveLastOMenu = ({
       instanceId={scene.instanceId}
       oCount={oCount}
       onRemoveLastO={() => void handleRemoveLastO()}
+      reserveSpace
     />
   );
 };
@@ -156,7 +157,7 @@ const PlaybackControls = () => {
   const setOCounter = (count: number) =>
     dispatch({ type: "SET_O_COUNTER", payload: count });
   return (
-    <section>
+    <section aria-label="Scene actions">
       <div
         className="p-4 rounded-lg"
         style={{

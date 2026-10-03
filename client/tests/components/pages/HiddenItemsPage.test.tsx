@@ -114,6 +114,16 @@ describe("HiddenItemsPage", () => {
     vi.unstubAllGlobals();
   });
 
+  it("the tab title is Hidden Items - Peek, and Peek again once the page is left", async () => {
+    const { unmount } = renderPage();
+
+    await screen.findByText("A visible scene");
+    expect(document.title).toBe("Hidden Items - Peek");
+
+    unmount();
+    expect(document.title).toBe("Peek");
+  });
+
   it("asks for the first page of every type", async () => {
     renderPage();
 

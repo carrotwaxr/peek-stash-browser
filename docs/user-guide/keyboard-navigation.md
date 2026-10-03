@@ -35,6 +35,8 @@ Press `g`, then a letter, within one second:
 | `g` `t` | Tags |
 | `g` `c` or `g` `v` | Collections |
 | `g` `l` | Galleries |
+| `g` `i` | Images |
+| `g` `k` | Clips |
 | `g` `y` | Playlists |
 | `g` `z` | Settings |
 

@@ -264,14 +264,30 @@ describe("Home", () => {
       await enableCarousel(
         "recentlyAddedScenes",
         "Recently Added",
-        vi.fn().mockResolvedValue([])
+        vi.fn().mockResolvedValue([{ id: "1", instanceId: "a" }])
       );
 
       await renderHome();
 
       expect(screen.getByTestId("scene-carousel")).toHaveTextContent(
-        "Recently Added"
+        "Recently Added (1 scenes)"
       );
+    });
+
+    it("a built-in carousel with nothing to show is left out, as an empty custom one is", async () => {
+      await enableCarousel(
+        "highRatedScenes",
+        "High Rated",
+        vi.fn().mockResolvedValue([])
+      );
+
+      await renderHome();
+
+      await waitFor(() => {
+        expect(mockCarouselQueries["highRatedScenes"]).toHaveBeenCalled();
+      });
+      expect(screen.queryByTestId("scene-carousel")).not.toBeInTheDocument();
+      expect(screen.queryByText(/High Rated/)).not.toBeInTheDocument();
     });
 
     it("renders ContinueWatchingCarousel for special carousel", async () => {

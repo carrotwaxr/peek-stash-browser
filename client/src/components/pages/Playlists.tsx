@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { PlaylistPreviewItem, PlaylistSummary } from "@peek/shared-types";
+import { ListVideo, type LucideIcon, Share2 } from "lucide-react";
 import {
   useCreatePlaylist,
   useDeletePlaylist,
@@ -13,6 +14,7 @@ import { showError, showSuccess } from "../../utils/toast";
 import {
   Button,
   ConfirmDialog,
+  EmptyState,
   Modal,
   PageLayout,
   Paper,
@@ -20,6 +22,16 @@ import {
   TAB_COUNT_LOADING,
   TabNavigation,
 } from "../ui/index";
+
+/** The empty state's icon, drawn like its built-in one (thin, muted, 64 px) */
+const EmptyIcon = ({ icon: Icon }: { icon: LucideIcon }) => (
+  <Icon
+    className="w-16 h-16 mx-auto mb-4"
+    strokeWidth={1}
+    style={{ color: "var(--text-muted)" }}
+    aria-hidden="true"
+  />
+);
 
 interface PlaylistThumbnailGridProps {
   items: PlaylistPreviewItem[];
@@ -198,23 +210,11 @@ const Playlists = () => {
 
           {/* My Playlists Grid */}
           {playlists.length === 0 ? (
-            <div className="text-center py-16">
-              <div
-                className="text-6xl mb-4"
-                style={{ color: "var(--text-muted)" }}
-              >
-                📝
-              </div>
-              <h3
-                className="text-xl font-medium mb-2"
-                style={{ color: "var(--text-primary)" }}
-              >
-                No playlists yet
-              </h3>
-              <p style={{ color: "var(--text-secondary)" }}>
-                Create your first playlist to get started
-              </p>
-            </div>
+            <EmptyState
+              icon={<EmptyIcon icon={ListVideo} />}
+              title="No playlists yet"
+              description="Create your first playlist to get started"
+            />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
               {playlists.map((playlist) => {
@@ -275,20 +275,11 @@ const Playlists = () => {
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
       ) : sharedPlaylists.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
-            📤
-          </div>
-          <h3
-            className="text-xl font-medium mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            No shared playlists
-          </h3>
-          <p style={{ color: "var(--text-secondary)" }}>
-            Playlists shared with your groups will appear here
-          </p>
-        </div>
+        <EmptyState
+          icon={<EmptyIcon icon={Share2} />}
+          title="No shared playlists"
+          description="Playlists shared with your groups will appear here"
+        />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
           {sharedPlaylists.map((playlist) => {

@@ -181,6 +181,8 @@ const HelpModal = ({ onClose }: Props) => {
           { keys: ["g t"], description: "Navigate to Tags page" },
           { keys: ["g c"], description: "Navigate to Collections page" },
           { keys: ["g l"], description: "Navigate to Galleries page" },
+          { keys: ["g i"], description: "Navigate to Images page" },
+          { keys: ["g k"], description: "Navigate to Clips page" },
           { keys: ["g y"], description: "Navigate to Playlists page" },
           { keys: ["g z"], description: "Navigate to Settings page" },
         ],
@@ -504,7 +506,7 @@ const HelpModal = ({ onClose }: Props) => {
                   )}
                 </div>
 
-                {currentPage !== "global" && (
+                {pageShortcuts !== shortcuts.global && (
                   <div>
                     {shortcuts.global.map((category) =>
                       renderShortcutCategory(category)

@@ -91,6 +91,15 @@ describe("HelpModal", () => {
     expect(screen.getByText("Toggle Favorite")).toBeTruthy();
   });
 
+  it("lists every g-then-letter page shortcut, Images and Clips included", () => {
+    renderHelp(vi.fn(), "/scenes");
+
+    // Once each, also on a page with no shortcuts of its own (it falls back
+    // to the global list, which is not shown a second time)
+    expect(screen.getAllByText("Navigate to Images page")).toHaveLength(1);
+    expect(screen.getAllByText("Navigate to Clips page")).toHaveLength(1);
+  });
+
   it("on /collections shows Collections Page Shortcuts", () => {
     renderHelp(vi.fn(), "/collections");
 

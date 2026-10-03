@@ -84,6 +84,42 @@ describe("EntityMenu items", () => {
   });
 });
 
+describe("EntityMenu reserved space", () => {
+  const props = {
+    entityType: "scene",
+    entityId: "7",
+    entityName: "A scene",
+    instanceId: "inst-a",
+  };
+
+  it("with reserveSpace and nothing to offer, a spacer of the button's width stands in", () => {
+    render(
+      <EntityMenu {...props} oCount={0} onRemoveLastO={vi.fn()} reserveSpace />
+    );
+
+    expect(screen.queryByLabelText("More options")).toBeNull();
+    const spacer = screen.getByTestId("entity-menu-spacer");
+    expect(spacer).toHaveClass("w-[26px]");
+    expect(spacer).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("the button takes the spacer's width, so the first O moves nothing", () => {
+    render(
+      <EntityMenu {...props} oCount={1} onRemoveLastO={vi.fn()} reserveSpace />
+    );
+
+    expect(screen.queryByTestId("entity-menu-spacer")).toBeNull();
+    const button = screen.getByLabelText("More options");
+    expect(button.parentElement).toHaveClass("w-[26px]");
+  });
+
+  it("without reserveSpace nothing stands in", () => {
+    render(<EntityMenu {...props} oCount={0} onRemoveLastO={vi.fn()} />);
+
+    expect(screen.queryByTestId("entity-menu-spacer")).toBeNull();
+  });
+});
+
 describe("EntityMenu hit area", () => {
   let restoreMedia: (() => void) | null = null;
   afterEach(() => {

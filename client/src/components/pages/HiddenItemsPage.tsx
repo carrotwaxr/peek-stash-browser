@@ -10,6 +10,7 @@ import {
   useHiddenItems,
 } from "../../hooks/useHiddenEntities";
 import { useNavigationState } from "../../hooks/useNavigationState";
+import { usePageTitle } from "../../hooks/usePageTitle";
 import { formatDate } from "../../utils/date";
 import Button from "../ui/Button";
 import { LazyImage } from "../ui/CardComponents";
@@ -61,6 +62,7 @@ const getEntityName = (item: HiddenEntityItem): string =>
  * it is.
  */
 const HiddenItemsPage = () => {
+  usePageTitle("Hidden Items");
   const { unhideEntity, unhideAll } = useHiddenEntities();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();

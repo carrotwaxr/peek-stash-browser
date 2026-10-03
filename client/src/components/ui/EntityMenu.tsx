@@ -7,7 +7,9 @@ import { useCoarsePointer } from "../../hooks/useHoverCapable";
  * EntityMenu - 3-dot menu for entity cards, the scene page and the image viewer
  * Items: "Remove last O" (when `onRemoveLastO` is given and the O count is
  * above 0) and "Hide [Entity Type]" (when `onHide` is given). A menu with no
- * item to show renders nothing.
+ * item to show renders nothing, or, with `reserveSpace`, a blank of the
+ * button's width, so a menu that appears later (after the first O) moves
+ * nothing beside it.
  * Uses portal to render dropdown outside card stacking context
  */
 interface HidePayload {
@@ -26,6 +28,8 @@ interface Props {
   /** The entity's O count: Remove last O shows only above 0 */
   oCount?: number;
   onRemoveLastO?: () => void;
+  /** Keep the button's 26 px while there is nothing to offer */
+  reserveSpace?: boolean;
 }
 
 const EntityMenu = ({
@@ -36,6 +40,7 @@ const EntityMenu = ({
   onHide,
   oCount = 0,
   onRemoveLastO,
+  reserveSpace = false,
 }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
@@ -124,11 +129,17 @@ const EntityMenu = ({
   if (!showRemoveLastO && !showHide) {
     // Nothing to offer (the last O just went): no button, and closed
     if (isOpen) setIsOpen(false);
-    return null;
+    return reserveSpace ? (
+      <div
+        data-testid="entity-menu-spacer"
+        aria-hidden="true"
+        className="w-[26px] shrink-0"
+      />
+    ) : null;
   }
 
   return (
-    <div className="relative">
+    <div className={reserveSpace ? "relative w-[26px] shrink-0" : "relative"}>
       {/* 3-dot button */}
       <button
         ref={buttonRef}

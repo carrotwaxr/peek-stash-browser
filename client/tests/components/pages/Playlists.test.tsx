@@ -6,6 +6,7 @@ import type {
 } from "@peek/shared-types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouterWithQuery } from "@tests/helpers/MemoryRouterWithQuery";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as clientModule from "@/api/client";
 import Playlists from "@/components/pages/Playlists";
@@ -122,6 +123,28 @@ describe("Playlists page", () => {
     expect(screen.getByText("by bob")).toBeTruthy();
     expect(screen.getByText("via crew")).toBeTruthy();
   });
+
+  it.each([
+    ["mine", "/playlists", "No playlists yet"],
+    ["shared", "/playlists?tab=shared", "No shared playlists"],
+  ])(
+    "the empty %s tab shows an icon, not an emoji, in the shared empty state",
+    async (_tab, url, title) => {
+      playlists = [];
+      shared = [];
+      render(
+        <MemoryRouterWithQuery initialEntries={[url]}>
+          <Playlists />
+        </MemoryRouterWithQuery>
+      );
+
+      const heading = await screen.findByRole("heading", { name: title });
+      const box = must(heading.parentElement);
+
+      expect(box.querySelector("svg")).not.toBeNull();
+      expect(box.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+    }
+  );
 
   it("after an add, the page's count updates without a reload", async () => {
     mockApiPost.mockImplementation(() => {

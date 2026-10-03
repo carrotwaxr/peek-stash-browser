@@ -22,6 +22,16 @@ describe("format utilities", () => {
       expect(formatDurationHumanReadable(0)).toBe("0m");
     });
 
+    it("shows seconds under a minute, not 0m", () => {
+      expect(formatDurationHumanReadable(45)).toBe("45s");
+      expect(formatDurationHumanReadable(1)).toBe("1s");
+      expect(formatDurationHumanReadable(59.9)).toBe("59s");
+      expect(formatDurationHumanReadable(45, { includeDays: false })).toBe(
+        "45s"
+      );
+      expect(formatDurationHumanReadable(60)).toBe("1m");
+    });
+
     it("formats minutes only", () => {
       expect(formatDurationHumanReadable(300)).toBe("5m"); // 5 minutes
       expect(formatDurationHumanReadable(45 * 60)).toBe("45m"); // 45 minutes
@@ -366,8 +376,9 @@ describe("format utilities", () => {
       expect(formatDurationHumanReadable(1800)).toBe("30m");
     });
 
-    it("falls back to 0m for very small durations that round to 0", () => {
-      expect(formatDurationHumanReadable(10)).toBe("0m");
+    it("shows a short duration in seconds, and 0s under one second", () => {
+      expect(formatDurationHumanReadable(10)).toBe("10s");
+      expect(formatDurationHumanReadable(0.4)).toBe("0s");
     });
 
     it("handles includeDays=false with minutes", () => {
