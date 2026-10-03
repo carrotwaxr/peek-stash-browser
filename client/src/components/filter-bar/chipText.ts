@@ -2,6 +2,7 @@
  * A filter chip's words, from its parts (`ChipParts`, the row codec's
  * `chip()`) and the names its ids resolved to.
  */
+import type { Match } from "@peek/shared-types";
 import type { ChipParts } from "../../utils/filterFields";
 
 /** Names a chip looks up: the rest show as a count */
@@ -64,4 +65,17 @@ export function chipText(
   }
   const body = [condition, ...(values ?? [])].filter(Boolean).join(" ");
   return body === "" ? label : `${label}: ${body}${suffix}`;
+}
+
+/**
+ * A group's chip text from its match and its rows' field names, one per
+ * row (a field twice is named twice): "Any of: Favorite Tags, Favorite
+ * Performers". No values are looked up: the row view shows them.
+ */
+export function groupText(match: Match, labels: readonly string[]): string {
+  const shown = labels.slice(0, NAMES_SHOWN).join(", ");
+  const more = labels.length - NAMES_SHOWN;
+  return `${match === "any" ? "Any of" : "All of"}: ${shown}${
+    more > 0 ? ` +${more} more` : ""
+  }`;
 }

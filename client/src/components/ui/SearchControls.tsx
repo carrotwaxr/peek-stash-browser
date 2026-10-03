@@ -68,7 +68,7 @@ const NO_SETTINGS: SettingConfig[] = [];
 
 /**
  * The list's controls: search, sort, Views and the view in row 1, the
- * filter chips with "+ Filter" in row 2, and paging. Every control writes
+ * filter chips with "+ Filter" and "Advanced" in row 2, and paging. Every control writes
  * the URL through the list state; nothing here holds a copy of it.
  */
 const SearchControls = ({
@@ -171,11 +171,14 @@ const SearchControls = ({
     [setSort]
   );
 
-  // Whether any filter is set: the hierarchy view says they don't apply
+  // Whether any filter is set, a group being one: the hierarchy view says
+  // they don't apply
+  const groupCount = listFilters.tree.groups.length;
   const hasActiveFilters = useMemo(
     () =>
+      groupCount > 0 ||
       activeFieldCount(artifactType as ListEntity, filters, filterOptions) > 0,
-    [artifactType, filters, filterOptions]
+    [artifactType, filters, filterOptions, groupCount]
   );
 
   // The sorts this list offers: Scene Number only beside a collection filter
@@ -289,7 +292,7 @@ const SearchControls = ({
           </div>
         </div>
 
-        {/* Row 2: the filter chips, + Filter and Clear all */}
+        {/* Row 2: the filter chips (groups too), + Filter, Advanced and Clear all */}
         {filterable ? (
           <div className="mt-3">
             <FilterBar
