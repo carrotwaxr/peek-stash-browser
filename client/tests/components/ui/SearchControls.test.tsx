@@ -1441,6 +1441,39 @@ describe("keys", () => {
     expect(field).toHaveValue("a/b");
   });
 
+  it("`/` also answers where it takes Shift (a German keyboard's Shift+7)", async () => {
+    const list = renderSearchControls();
+    await firstQuery(list.onQueryChange);
+    const from = screen.getByRole("button", { name: /^Sort direction/ });
+    from.focus();
+
+    fireEvent.keyDown(from, { key: "/", code: "Digit7", shiftKey: true });
+
+    expect(searchBox()).toHaveFocus();
+  });
+
+  it("on a desktop a focused select keeps its letters (typeahead): `f` and `/` do nothing there", async () => {
+    const user = userEvent.setup();
+    const WithSelect = (props: ListControlsProps) => (
+      <>
+        <select aria-label="A select">
+          <option>First</option>
+          <option>Fourth</option>
+        </select>
+        <ListControls {...props} />
+      </>
+    );
+    const list = renderSearchControls({}, { element: WithSelect });
+    await firstQuery(list.onQueryChange);
+
+    screen.getByRole("combobox", { name: "A select" }).focus();
+    await user.keyboard("f");
+    await user.keyboard("/");
+    expect(findFilter()).not.toBeInTheDocument();
+    expect(searchBox()).not.toHaveFocus();
+    expect(screen.getByRole("combobox", { name: "A select" })).toHaveFocus();
+  });
+
   it("`f` opens + Filter on desktop and the sheet on phone and TV", async () => {
     const user = userEvent.setup();
     const pressF = async () => {
