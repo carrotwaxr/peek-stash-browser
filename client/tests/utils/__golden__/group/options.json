@@ -345,7 +345,8 @@
           "value": "false",
           "label": "No"
         }
-      ]
+      ],
+      "noBlank": true
     },
     {
       "key": "aliases",
