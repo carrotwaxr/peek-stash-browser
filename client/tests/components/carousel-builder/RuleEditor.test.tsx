@@ -11,6 +11,7 @@ import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as api from "../../../src/api";
 import RuleEditor from "../../../src/components/carousel-builder/RuleEditor";
+import type * as filterConfig from "../../../src/utils/filterConfig";
 import {
   buildSceneFilter,
   carouselRulesToFilterState,
@@ -21,9 +22,36 @@ type FindMinimalMock = (
   signal?: AbortSignal
 ) => Promise<MinimalEntity[]>;
 
-const { mockFindTagsMinimal } = vi.hoisted(() => ({
+const { mockFindTagsMinimal, PRESENCE_RULE } = vi.hoisted(() => ({
   mockFindTagsMinimal: vi.fn<FindMinimalMock>(),
+  // A test-local ref rule offering presence; the scene rows opt in at F18
+  PRESENCE_RULE: {
+    key: "testTagIds",
+    type: "searchable-select",
+    label: "Test Tags",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    modifierKey: "testTagIdsModifier",
+    modifierOptions: [
+      { value: "INCLUDES", label: "Has ANY of these" },
+      { value: "IS_NULL", label: "Has none" },
+      { value: "NOT_NULL", label: "Has any" },
+    ],
+    defaultModifier: "INCLUDES",
+  },
 }));
+
+vi.mock("../../../src/utils/filterConfig", async (importOriginal) => {
+  const actual = await importOriginal<typeof filterConfig>();
+  return {
+    ...actual,
+    CAROUSEL_FILTER_DEFINITIONS: [
+      ...actual.CAROUSEL_FILTER_DEFINITIONS,
+      PRESENCE_RULE,
+    ],
+  };
+});
 
 vi.mock("../../../src/api", async (importOriginal) => {
   const actual = await importOriginal<typeof api>();
@@ -162,6 +190,89 @@ describe("RuleEditor", () => {
       )
     ).toEqual({
       last_played_at: { modifier: "BETWEEN", value2: "2024-06-30" },
+    });
+  });
+  it("a ref rule offering presence shows Has none and Has any and hides its picker", () => {
+    mockFindTagsMinimal.mockResolvedValue([]);
+    const rule = {
+      id: "rule-1",
+      filterKey: "testTagIds",
+      value: ["5:server-a"],
+      modifier: "IS_NULL",
+    };
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <RuleEditor
+        rule={rule}
+        usedFilterKeys={new Set(["testTagIds"])}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+
+    const condition = screen.getByRole("combobox", { name: "Condition" });
+    expect(condition).toHaveDisplayValue("Has none");
+    expect(
+      [...condition.querySelectorAll("option")].map((each) => each.text)
+    ).toEqual(["Has ANY of these", "Has none", "Has any"]);
+    expect(screen.queryByRole("button", { name: /^Test Tags/ })).toBeNull();
+
+    fireEvent.change(condition, { target: { value: "NOT_NULL" } });
+    expect(must(onChange.mock.calls[0])[0]).toEqual({ modifier: "NOT_NULL" });
+
+    rerender(
+      <RuleEditor
+        rule={{ ...rule, modifier: "INCLUDES" }}
+        usedFilterKeys={new Set(["testTagIds"])}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole("button", { name: /^Test Tags/ })
+    ).toBeInTheDocument();
+  });
+
+  it("a Tags rule's picks each include or exclude", async () => {
+    mockFindTagsMinimal.mockImplementation((params) =>
+      Promise.resolve(
+        params.ids
+          ? [
+              { id: "5", instanceId: "server-a", name: "Rule Tag" },
+              { id: "6", instanceId: "server-a", name: "Other Tag" },
+            ]
+          : []
+      )
+    );
+    const onChange = vi.fn();
+
+    render(
+      <RuleEditor
+        rule={{
+          id: "rule-1",
+          filterKey: "tagIds",
+          value: ["5:server-a"],
+          excludes: ["6:server-a"],
+          modifier: "INCLUDES",
+        }}
+        usedFilterKeys={new Set(["tagIds"])}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+
+    const include = await screen.findByRole("button", {
+      name: "Exclude Rule Tag",
+    });
+    expect(include).toHaveAttribute("aria-pressed", "false");
+    expect(
+      screen.getByRole("button", { name: "Exclude Other Tag" })
+    ).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(include);
+    expect(must(onChange.mock.calls[0])[0]).toEqual({
+      value: [],
+      excludes: ["6:server-a", "5:server-a"],
     });
   });
 });

@@ -50,7 +50,8 @@
       "supportsHierarchy": true,
       "hierarchyKey": "tagIdsDepth",
       "hierarchyLabel": "Include sub-tags",
-      "countFilterContext": "studios"
+      "countFilterContext": "studios",
+      "excludeKey": "tagIdsExclude"
     },
     {
       "key": "rating",

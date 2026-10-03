@@ -42,7 +42,8 @@
       "supportsHierarchy": true,
       "hierarchyKey": "tagIdsDepth",
       "hierarchyLabel": "Include sub-tags",
-      "countFilterContext": "performers"
+      "countFilterContext": "performers",
+      "excludeKey": "tagIdsExclude"
     },
     {
       "key": "gender",
@@ -509,7 +510,8 @@
       "supportsHierarchy": true,
       "hierarchyKey": "tagIdsDepth",
       "hierarchyLabel": "Include sub-tags",
-      "countFilterContext": "performers"
+      "countFilterContext": "performers",
+      "excludeKey": "tagIdsExclude"
     },
     {
       "key": "gender",

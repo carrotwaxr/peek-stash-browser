@@ -1,11 +1,23 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   type MinimalEntity,
   type MinimalRequest,
   type MinimalScope,
   Q_MAX_LENGTH,
 } from "@peek/shared-types";
-import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
+import {
+  LucideBan,
+  LucideChevronDown,
+  LucideSearch,
+  LucideX,
+} from "lucide-react";
 import { libraryApi } from "../../api";
 import { useDebouncedValue } from "../../hooks/useDebounce";
 import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
@@ -29,6 +41,13 @@ import Button from "./Button";
  * leaves the picker closes it). The selected values' remove buttons and Clear
  * all sit beside the trigger, never inside it. In TV mode the trigger is an
  * ordinary focusable element, so the D-pad reaches it.
+ *
+ * With `onSelectionChange` (a filter field that takes exclusions) every
+ * change reports both lists, the excluded values being `excluded`, and each
+ * picked value has an include or exclude toggle beside its remove button,
+ * a button pressed while the value is excluded (not under Has NONE, where
+ * `excludeToggle` is false). The Content Restrictions editor never passes
+ * it.
  *
  * @param {Object} props
  * @param {"performers"|"studios"|"tags"|"groups"|"galleries"} props.entityType - Type of entity to search
@@ -106,7 +125,23 @@ interface Props {
     | null;
   /** Sent with every request; only the Content Restrictions editor sets it */
   scope?: MinimalScope;
+  /** The picked values that exclude (multi only) */
+  excluded?: readonly string[] | undefined;
+  /**
+   * Given, every change reports the included and the excluded values at
+   * once, and each picked value has an include or exclude toggle
+   */
+  onSelectionChange?:
+    | ((included: string[], excluded: string[]) => void)
+    | undefined;
+  /**
+   * False hides the toggles (Has NONE, where every value excludes): the
+   * excluded values show as picks
+   */
+  excludeToggle?: boolean | undefined;
 }
+
+const NONE: readonly string[] = [];
 
 const SearchableSelect = ({
   id,
@@ -118,7 +153,17 @@ const SearchableSelect = ({
   placeholder = "Select...",
   countFilterContext = null,
   scope,
+  excluded: excludedProp,
+  onSelectionChange,
+  excludeToggle = true,
 }: Props) => {
+  // A stable list while its ids do not change: the names effect depends on it
+  const excludedText = multi ? (excludedProp ?? NONE).join("\n") : "";
+  const excluded = useMemo(
+    () => (excludedText === "" ? NONE : excludedText.split("\n")),
+    [excludedText]
+  );
+  const toggleable = multi && onSelectionChange !== undefined && excludeToggle;
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [options, setOptions] = useState<SelectOption[]>([]);
@@ -176,16 +221,18 @@ const SearchableSelect = ({
 
   // Load the selected items' names when the value changes
   useEffect(() => {
-    // Handle empty/null/undefined values - clear selected items
-    if (!value || (Array.isArray(value) && value.length === 0)) {
+    const valueArray: string[] = multi
+      ? [...((value || []) as string[]), ...excluded]
+      : value
+        ? [value as string]
+        : [];
+
+    // Nothing picked: clear selected items
+    if (valueArray.length === 0) {
       setSelectedItems([]);
       setIsLoadingInitial(false);
       return;
     }
-
-    const valueArray: string[] = multi
-      ? (value as string[])
-      : [value as string];
 
     // Names already known: resolved before, or in the options listed now
     const known = new Map<string, SelectOption>();
@@ -219,7 +266,7 @@ const SearchableSelect = ({
         if (!signal.aborted) setIsLoadingInitial(false);
       });
     return () => controller.abort();
-  }, [value, options, entityType, multi, fetchItemsByIds]);
+  }, [value, excluded, options, entityType, multi, fetchItemsByIds]);
 
   // Build count_filter based on context
   const getCountFilter = useCallback(() => {
@@ -331,19 +378,32 @@ const SearchableSelect = ({
     setSearchTerm("");
   };
 
+  /** The included values, as stored */
+  const includedOf = () => (multi ? ((value || []) as string[]) : []);
+
+  /** Whether a stored value is among the excluded ones */
+  const isExcluded = (optionId: string) =>
+    excluded.some((stored) => storedValueIs(stored, optionId));
+
+  /** Reports a multi picker's lists: both with a toggle, else the included */
+  const changeMulti = (included: string[], nextExcluded: string[]) => {
+    if (onSelectionChange) onSelectionChange(included, nextExcluded);
+    else onChange(included);
+  };
+
+  /** Both lists without the option: picked again, or removed */
+  const without = (optionId: string) =>
+    [
+      includedOf().filter((stored) => !storedValueIs(stored, optionId)),
+      excluded.filter((stored) => !storedValueIs(stored, optionId)),
+    ] as const;
+
   const handleSelect = (option: SelectOption) => {
     if (multi) {
-      const currentValue = (value || []) as string[];
-      const isAlreadySelected = currentValue.some((stored) =>
-        storedValueIs(stored, option.id)
-      );
-
-      if (isAlreadySelected) {
-        onChange(
-          currentValue.filter((stored) => !storedValueIs(stored, option.id))
-        );
+      if (isSelected(option.id)) {
+        changeMulti(...without(option.id));
       } else {
-        onChange([...currentValue, option.id]);
+        changeMulti([...includedOf(), option.id], [...excluded]);
       }
     } else {
       // Focus moves before the option that has it unmounts
@@ -363,20 +423,32 @@ const SearchableSelect = ({
     const index = removeButtons.indexOf(e.currentTarget as HTMLElement);
     (removeButtons[index + 1] ?? triggerRef.current)?.focus();
     if (multi) {
-      onChange(
-        ((value || []) as string[]).filter(
-          (stored) => !storedValueIs(stored, optionId)
-        )
-      );
+      changeMulti(...without(optionId));
     } else {
       onChange("");
+    }
+  };
+
+  // A picked value moves between the included and the excluded ones
+  const handleToggle = (optionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const [included, rest] = without(optionId);
+    const stored =
+      [...includedOf(), ...excluded].find((each) =>
+        storedValueIs(each, optionId)
+      ) ?? optionId;
+    if (isExcluded(optionId)) {
+      onSelectionChange?.([...included, stored], rest);
+    } else {
+      onSelectionChange?.(included, [...rest, stored]);
     }
   };
 
   const handleClearAll = (e: React.MouseEvent) => {
     e.stopPropagation(); // Don't toggle dropdown
     triggerRef.current?.focus();
-    onChange(multi ? [] : "");
+    if (multi) changeMulti([], []);
+    else onChange("");
   };
 
   // Escape while the list is open closes it and is handled: the dialog around
@@ -409,17 +481,23 @@ const SearchableSelect = ({
     setIsOpen((open) => !open);
   };
 
-  const isSelected = (optionId: string) => {
+  function isSelected(optionId: string) {
     if (multi) {
-      return ((value || []) as string[]).some((stored) =>
-        storedValueIs(stored, optionId)
+      return (
+        includedOf().some((stored) => storedValueIs(stored, optionId)) ||
+        isExcluded(optionId)
       );
     }
     return typeof value === "string" && storedValueIs(value, optionId);
-  };
+  }
 
-  // The trigger's name: the field, then what is picked (or the placeholder)
-  const pickedNames = selectedItems.map((item) => item.name).join(", ");
+  // The trigger's name: the field, then what is picked (or the placeholder),
+  // an excluded value as "not <name>"
+  const pickedNames = selectedItems
+    .map((item) =>
+      toggleable && isExcluded(item.id) ? `not ${item.name}` : item.name
+    )
+    .join(", ");
   const triggerName = label
     ? `${label}: ${pickedNames || placeholder}`
     : pickedNames
@@ -444,26 +522,53 @@ const SearchableSelect = ({
         }}
       >
         {multi &&
-          selectedItems.map((item) => (
-            <span
-              key={item.id}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm"
-              style={{
-                backgroundColor: "var(--accent-primary)",
-                color: "white",
-              }}
-            >
-              {item.name}
-              <Button
-                data-remove
-                onClick={(e) => handleRemove(item.id, e)}
-                variant="tertiary"
-                className="hover:opacity-70 !p-0 !border-0"
-                aria-label={`Remove ${item.name}`}
-                icon={<LucideX size={14} />}
-              />
-            </span>
-          ))}
+          selectedItems.map((item) => {
+            const out = toggleable && isExcluded(item.id);
+            return (
+              <span
+                key={item.id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm border"
+                style={
+                  out
+                    ? {
+                        backgroundColor: "var(--status-error-bg)",
+                        borderColor: "var(--status-error-border)",
+                        color: "var(--status-error)",
+                      }
+                    : {
+                        backgroundColor: "var(--accent-primary)",
+                        borderColor: "transparent",
+                        color: "white",
+                      }
+                }
+              >
+                {toggleable && (
+                  <Button
+                    onClick={(e) => handleToggle(item.id, e)}
+                    variant="tertiary"
+                    className="hover:opacity-70 !p-0 !border-0 rounded"
+                    aria-pressed={out}
+                    aria-label={`Exclude ${item.name}`}
+                    title={
+                      out ? `Include ${item.name}` : `Exclude ${item.name}`
+                    }
+                    icon={<LucideBan size={14} />}
+                  />
+                )}
+                <span className={out ? "line-through" : undefined}>
+                  {item.name}
+                </span>
+                <Button
+                  data-remove
+                  onClick={(e) => handleRemove(item.id, e)}
+                  variant="tertiary"
+                  className="hover:opacity-70 !p-0 !border-0"
+                  aria-label={`Remove ${item.name}`}
+                  icon={<LucideX size={14} />}
+                />
+              </span>
+            );
+          })}
         <button
           ref={triggerRef}
           id={id}

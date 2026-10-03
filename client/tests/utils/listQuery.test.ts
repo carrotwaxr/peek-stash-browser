@@ -126,6 +126,23 @@ describe("locked fields", () => {
     );
   });
 
+  it("a locked `tags` field drops `tagIdsExclude` too", () => {
+    // A tag page's Scenes tab never keeps a URL's or a preset's exclusion
+    // beside its lock
+    const filters = {
+      tagIds: ["1:a"],
+      tagIdsExclude: ["2:a"],
+      tagIdsModifier: "INCLUDES",
+      favorite: true,
+    };
+    expect(withoutLockedFilters("scene", filters, ["tags"])).toEqual({
+      favorite: true,
+    });
+    expect(
+      withoutLockedFilters("scene", { tagIdsExclude: ["2:a"] }, ["tags"])
+    ).toEqual({});
+  });
+
   it("withoutLockedOptions drops the option, and a section left empty", () => {
     const options = withoutLockedOptions("scene", SCENE_FILTER_OPTIONS, [
       "date",

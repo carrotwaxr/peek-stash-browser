@@ -83,9 +83,11 @@ describe("panel field table", () => {
       const keys = new Set(panel.map((field) => field.key));
       const fieldNames = new Set(Object.keys(TABLES[kind]));
       const companions = panel.flatMap((field) =>
-        [field.modifierKey, field.hierarchyKey].filter(
-          (key): key is string => key !== undefined
-        )
+        [
+          field.modifierKey,
+          field.hierarchyKey,
+          field.editor === "ref" ? field.excludeKey : undefined,
+        ].filter((key): key is string => key !== undefined)
       );
       return companions
         .filter(
@@ -98,6 +100,48 @@ describe("panel field table", () => {
     });
 
     expect(wrong).toEqual([]);
+  });
+
+  it("an `excludeKey` sits only on a multi ref row whose spec is excludable, and is unique per list", () => {
+    const wrong = LIST_KINDS.flatMap((kind) => {
+      const rows = panelOf(kind).flatMap((field) =>
+        field.editor === "ref" ? [field] : []
+      );
+      const excludeKeys = rows.flatMap((field) =>
+        field.excludeKey === undefined ? [] : [field.excludeKey]
+      );
+      return [
+        ...rows.flatMap((field) => {
+          const spec = TABLES[kind][field.field];
+          const excludable =
+            spec?.kind === "ref" && spec.excludable && field.multi;
+          if (field.excludeKey !== undefined && !excludable) {
+            return [`${kind}.${field.key}: excludeKey on a row that cannot`];
+          }
+          // Every existing excludable multi row offers the toggle (F22a)
+          if (field.excludeKey === undefined && excludable) {
+            return [`${kind}.${field.key}: no excludeKey`];
+          }
+          if (
+            field.excludeKey !== undefined &&
+            field.excludeKey !== `${field.key}Exclude`
+          ) {
+            return [`${kind}.${field.key}: excludeKey ${field.excludeKey}`];
+          }
+          return [];
+        }),
+        ...excludeKeys
+          .filter((key, index) => excludeKeys.indexOf(key) !== index)
+          .map((key) => `${kind}.${key}: twice`),
+      ];
+    });
+
+    expect(wrong).toEqual([]);
+    expect(
+      (PANEL_FIELDS.scene as readonly PanelField[]).find(
+        (field) => field.key === "tagIds"
+      )
+    ).toMatchObject({ excludeKey: "tagIdsExclude" });
   });
 
   it("a ref field names a hierarchyKey only when its spec is hierarchical, and a modifierKey only when it offers more than one modifier", () => {

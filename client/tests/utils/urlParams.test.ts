@@ -4,7 +4,7 @@
  * for card indicator click navigation.
  */
 import { type ReactNode, createElement } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import {
   DEFAULT_SORT,
   type GetFilterPresetsResponse,
@@ -12,6 +12,7 @@ import {
   type ListKind,
   PANEL_FIELDS,
   type PanelField,
+  SCENE_FIELDS,
 } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
@@ -1176,5 +1177,179 @@ describe("every companion of a field is written and read, whatever its editor", 
       rows.filter((row) => row.modifierKey !== undefined && sampleOf(row))
         .length
     ).toBeGreaterThan(3);
+  });
+});
+
+describe("include or exclude per value (F22a)", () => {
+  it("include and exclude round-trip through the URL", () => {
+    const state = {
+      tagIds: ["1:a"],
+      tagIdsModifier: "INCLUDES_ALL",
+      tagIdsExclude: ["2:b", "3"],
+    };
+
+    const { query, read } = viaUrl("scene", state);
+
+    expect(new URLSearchParams(query).get("tagIdsExclude")).toBe("2:b,3");
+    expect(read).toEqual(state);
+    expect(buildSceneFilter(read).tags).toEqual({
+      value: ["1:a"],
+      excludes: ["2:b", "3"],
+      modifier: "INCLUDES_ALL",
+    });
+    // Excludes alone keep their key too
+    const alone = viaUrl("scene", { tagIdsExclude: ["2:b"] });
+    expect(alone.query).toBe("tagIdsExclude=2%3Ab");
+    expect(alone.read).toEqual({ tagIdsExclude: ["2:b"] });
+  });
+
+  /** The scene list's state at `url`, and the URL it writes */
+  function renderScenes(url: string) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(presetsQueryOptions.queryKey, { presets: {} });
+    queryClient.setQueryData(defaultPresetsQueryOptions.queryKey, {
+      defaults: {},
+    });
+    const seen = { search: "" };
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(MemoryRouter, { initialEntries: [url] }, children)
+      );
+    const view = renderHook(
+      () => {
+        seen.search = useLocation().search;
+        return useListUrlState({
+          entityType: "scene",
+          filterOptions: SCENE_FILTER_OPTIONS,
+          sortOptions: (filters) => sortOptionsFor("scene", filters),
+          viewModes: ["grid"],
+          defaults: {
+            sort: DEFAULT_SORT.scene.field,
+            direction: "DESC",
+            perPage: 24,
+            viewMode: "grid",
+            zoomLevel: "medium",
+            gridDensity: "medium",
+          },
+        });
+      },
+      { wrapper }
+    );
+    return {
+      state: () => view.result.current,
+      params: () => new URLSearchParams(seen.search),
+    };
+  }
+
+  it("removing the last excluded value, removing the chip and Clear All each drop `tagIdsExclude` from the URL", () => {
+    const url = "/scenes?tagIds=1:a&tagIdsExclude=2:b&favorite=true";
+
+    const last = renderScenes(url);
+    expect(last.state().filters.tagIdsExclude).toEqual(["2:b"]);
+    act(() => {
+      last.state().applyFilters({
+        ...last.state().filters,
+        tagIdsExclude: [],
+      });
+    });
+    expect(last.params().has("tagIdsExclude")).toBe(false);
+    expect(last.params().get("tagIds")).toBe("1:a");
+
+    const chip = renderScenes(url);
+    act(() => {
+      chip.state().removeFilter("tagIds");
+    });
+    expect(chip.params().has("tagIdsExclude")).toBe(false);
+    expect(chip.params().has("tagIds")).toBe(false);
+    expect(chip.params().get("favorite")).toBe("true");
+
+    const excludesAlone = renderScenes("/scenes?tagIdsExclude=2:b");
+    act(() => {
+      excludesAlone.state().removeFilter("tagIds");
+    });
+    expect(excludesAlone.params().has("tagIdsExclude")).toBe(false);
+
+    const clear = renderScenes(url);
+    act(() => {
+      clear.state().clearFilters();
+    });
+    expect(clear.params().has("tagIdsExclude")).toBe(false);
+    expect(clear.params().get("filters")).toBe("none");
+  });
+
+  /** The scene Tags row offering Has none and Has any, as F18 opts it in */
+  const tagsWithPresence = (): PanelField => {
+    const row = PANEL_FIELDS.scene.find((each) => each.key === "tagIds");
+    if (row?.editor !== "ref") throw new Error("no tags row");
+    return { ...row, modifiers: [...row.modifiers, "IS_NULL", "NOT_NULL"] };
+  };
+
+  it("Has none writes `tagIdsModifier=IS_NULL` with no ids and reads back", () => {
+    const row = tagsWithPresence();
+    const codec = codecOf(row);
+    const spec = SCENE_FIELDS.tags;
+    // Picks left from before the choice are neither written nor sent
+    const state = {
+      tagIds: ["1:a"],
+      tagIdsExclude: ["2:b"],
+      tagIdsDepth: -1,
+      tagIdsModifier: "IS_NULL",
+    };
+
+    const params = new URLSearchParams();
+    codec.writeUrl(row, state, params);
+    expect(params.toString()).toBe("tagIdsModifier=IS_NULL");
+    // With no ids at all, the companion is still written
+    const empty = new URLSearchParams();
+    codec.writeUrl(row, { tagIdsModifier: "NOT_NULL" }, empty);
+    expect(empty.toString()).toBe("tagIdsModifier=NOT_NULL");
+
+    const read = codec.readUrl(row, params);
+    expect(read).toEqual({ tagIdsModifier: "IS_NULL" });
+    expect(codec.isActive(row, read)).toBe(true);
+    expect(codec.toCriterion(row, spec, read)).toEqual({ modifier: "IS_NULL" });
+    expect(codec.toCriterion(row, spec, state)).toEqual({
+      modifier: "IS_NULL",
+    });
+    expect(codec.fromCriterion(row, spec, { modifier: "NOT_NULL" })).toEqual({
+      tagIdsModifier: "NOT_NULL",
+    });
+  });
+
+  it("an old URL with only `tagIds` reads as includes", () => {
+    const read = readListParams(
+      new URLSearchParams("tagIds=1:a,2:b&tagIdsModifier=INCLUDES"),
+      "scene",
+      SCENE_FILTER_OPTIONS
+    ).filters;
+
+    expect(read).toEqual({
+      tagIds: ["1:a", "2:b"],
+      tagIdsModifier: "INCLUDES",
+    });
+    expect(buildSceneFilter(read).tags).toEqual({
+      value: ["1:a", "2:b"],
+      modifier: "INCLUDES",
+    });
+  });
+
+  it("a stored `tagIdsModifier: EXCLUDES` keeps Has NONE", () => {
+    const stored = { tagIds: ["466"], tagIdsModifier: "EXCLUDES" };
+
+    const { query, read } = viaUrl("image", stored);
+
+    expect(query).toBe("tagIds=466&tagIdsModifier=EXCLUDES");
+    expect(buildImageFilter(read).tags).toEqual({
+      value: ["466"],
+      modifier: "EXCLUDES",
+    });
+    // Under Has NONE every value excludes: an excluded pick joins the list
+    expect(
+      buildImageFilter({ ...stored, tagIdsExclude: ["5:a"] }).tags
+    ).toEqual({ value: ["466", "5:a"], modifier: "EXCLUDES" });
   });
 });

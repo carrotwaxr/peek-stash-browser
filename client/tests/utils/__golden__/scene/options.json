@@ -47,7 +47,8 @@
       ],
       "modifierKey": "performerIdsModifier",
       "defaultModifier": "INCLUDES",
-      "countFilterContext": "scenes"
+      "countFilterContext": "scenes",
+      "excludeKey": "performerIdsExclude"
     },
     {
       "key": "studioId",
@@ -89,7 +90,8 @@
       "supportsHierarchy": true,
       "hierarchyKey": "tagIdsDepth",
       "hierarchyLabel": "Include sub-tags",
-      "countFilterContext": "scenes"
+      "countFilterContext": "scenes",
+      "excludeKey": "tagIdsExclude"
     },
     {
       "key": "groupIds",

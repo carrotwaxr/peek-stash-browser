@@ -2,8 +2,9 @@
 /**
  * The filter panel's keys: what each list's panel offers, as saved in filter
  * presets and the URL, and the contract field each fills. A key's modifier
- * and depth ride in companion keys (`tagIdsModifier`, `tagIdsDepth`). The
- * server cleans stored presets against this list.
+ * and depth ride in companion keys (`tagIdsModifier`, `tagIdsDepth`), and a
+ * picker's excluded ids in `tagIdsExclude`. The server cleans stored presets
+ * against this list.
  *
  * Projected from the panel table (`panel/`): a new key is a row there.
  */
@@ -29,6 +30,8 @@ export interface UiKey<F extends string = string> {
   readonly modifierKey?: string;
   /** The companion key holding its depth (include sub-tags, sub-studios) */
   readonly hierarchyKey?: string;
+  /** The companion key holding the ids it excludes (`tagIdsExclude`) */
+  readonly excludeKey?: string;
 }
 
 /** A panel's keys and companions, each with its field's literal type */
@@ -45,6 +48,9 @@ function uiKeysOf<const P extends readonly PanelField[]>(
       ...(field.hierarchyKey === undefined
         ? {}
         : { hierarchyKey: field.hierarchyKey }),
+      ...(field.editor !== "ref" || field.excludeKey === undefined
+        ? {}
+        : { excludeKey: field.excludeKey }),
     })
   );
 }

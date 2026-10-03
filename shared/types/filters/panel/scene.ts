@@ -59,6 +59,7 @@ export const SCENE_PANEL = [
     modifierLabels: "has",
     countContext: "scenes",
     pinnedByDefault: true,
+    excludeKey: "performerIdsExclude",
   },
   {
     key: "studioId",
@@ -89,6 +90,7 @@ export const SCENE_PANEL = [
     hierarchyLabel: "Include sub-tags",
     countContext: "scenes",
     pinnedByDefault: true,
+    excludeKey: "tagIdsExclude",
   },
   {
     key: "groupIds",

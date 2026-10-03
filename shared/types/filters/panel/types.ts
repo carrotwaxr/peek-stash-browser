@@ -6,7 +6,11 @@
  * the rows; the panel's options, its URL keys, presets, chips and carousel
  * rules are read from them.
  */
-import type { EnumModifier, RefModifier } from "../criteria.js";
+import type {
+  EnumModifier,
+  RefFieldModifier,
+  RefModifier,
+} from "../criteria.js";
 
 /** The panel's sections, in the order a list draws them */
 export const PANEL_GROUPS = [
@@ -96,14 +100,24 @@ export interface RefField<F extends string = string> extends FieldBase<F> {
   readonly editor: "ref";
   /** Picks several ids (a tag list's `studioId` is single over a multi field) */
   readonly multi: boolean;
-  /** The modifiers offered, a subset of the field's; one means no select */
-  readonly modifiers: readonly RefModifier[];
+  /**
+   * The modifiers offered, a subset of the field's; one means no select.
+   * IS_NULL and NOT_NULL ("Has none", "Has any"), where the field takes
+   * them, are sent with no ids.
+   */
+  readonly modifiers: readonly RefFieldModifier[];
   readonly defaultModifier?: RefModifier;
   /** "Has ANY of these" or "In ANY of these" */
   readonly modifierLabels?: "has" | "in";
   /** The depth checkbox's label ("Include sub-tags") */
   readonly hierarchyLabel?: string;
   readonly countContext?: CountContext;
+  /**
+   * The companion key holding the ids it excludes (`tagIdsExclude`), on a
+   * multi row whose field is `excludable`: each picked value then includes
+   * or excludes (`{ value, excludes }`)
+   */
+  readonly excludeKey?: string;
 }
 
 export interface NumberField<F extends string = string> extends FieldBase<F> {

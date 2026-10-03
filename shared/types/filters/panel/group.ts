@@ -42,6 +42,7 @@ export const GROUP_PANEL = [
     defaultModifier: "INCLUDES",
     modifierLabels: "has",
     countContext: "groups",
+    excludeKey: "performerIdsExclude",
   },
   {
     key: "studioId",
@@ -68,6 +69,7 @@ export const GROUP_PANEL = [
     modifierLabels: "has",
     countContext: "groups",
     pinnedByDefault: true,
+    excludeKey: "tagIdsExclude",
   },
   {
     key: "rating",

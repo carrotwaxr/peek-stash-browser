@@ -17,6 +17,10 @@ import { untrusted } from "@tests/helpers/untrusted";
 import { actAsync, flushPromises, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
+import {
+  FilterControl,
+  type FilterControlProps,
+} from "../../../src/components/ui/FilterControls";
 import Modal from "../../../src/components/ui/Modal";
 import SearchableSelect from "../../../src/components/ui/SearchableSelect";
 
@@ -689,5 +693,171 @@ describe("SearchableSelect as a keyboard control", () => {
       screen.getByPlaceholderText("Type to search...")
     ).toBeInTheDocument();
     expect(trigger()).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("SearchableSelect include or exclude per value (F22a)", () => {
+  /** A picker whose values each include or exclude, as the filter panel holds them */
+  function ExcludeHarness({
+    initial,
+    initialExcluded = [],
+  }: {
+    initial: string[];
+    initialExcluded?: string[];
+  }) {
+    const [value, setValue] = useState<string[]>(initial);
+    const [excluded, setExcluded] = useState<string[]>(initialExcluded);
+    return (
+      <>
+        <SearchableSelect
+          entityType="tags"
+          label="Tags"
+          multi
+          value={value}
+          excluded={excluded}
+          onChange={(next) => setValue(next as string[])}
+          onSelectionChange={(included, nextExcluded) => {
+            setValue(included);
+            setExcluded(nextExcluded);
+          }}
+          placeholder="Select Tags..."
+        />
+        <output data-testid="picked">
+          {JSON.stringify({ value, excluded })}
+        </output>
+      </>
+    );
+  }
+
+  const picked = () =>
+    JSON.parse(screen.getByTestId("picked").textContent ?? "{}") as {
+      value: string[];
+      excluded: string[];
+    };
+
+  beforeEach(() => {
+    mockFindTagsMinimal.mockImplementation((params) =>
+      Promise.resolve(
+        params.ids
+          ? params.ids.map((ref) =>
+              row(ref.split(":")[0] ?? ref, "i", `Tag ${ref.split(":")[0]}`)
+            )
+          : [row("1", "i", "Tag 1"), row("2", "i", "Tag 2")]
+      )
+    );
+  });
+
+  it("each picked value has an include or exclude toggle, a button reachable by keyboard and TV, `aria-pressed` when excluded", async () => {
+    const user = userEvent.setup();
+    render(<ExcludeHarness initial={["1:i"]} initialExcluded={["2:i"]} />);
+
+    const include = await screen.findByRole("button", {
+      name: "Exclude Tag 1",
+    });
+    const exclude = screen.getByRole("button", { name: "Exclude Tag 2" });
+    // Real buttons: Tab reaches them, and so does TV mode's navigator
+    expect(include.tagName).toBe("BUTTON");
+    expect(include).not.toHaveAttribute("tabindex", "-1");
+    expect(include).toHaveAttribute("aria-pressed", "false");
+    expect(exclude).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "Tags: Tag 1, not Tag 2" })
+    ).toBeInTheDocument();
+
+    // From the keyboard: Tag 1 becomes an exclusion
+    include.focus();
+    await user.keyboard("{Enter}");
+    expect(picked()).toEqual({ value: [], excluded: ["2:i", "1:i"] });
+    expect(
+      screen.getByRole("button", { name: "Exclude Tag 1" })
+    ).toHaveAttribute("aria-pressed", "true");
+
+    // And back: Tag 2 becomes an include
+    await user.click(screen.getByRole("button", { name: "Exclude Tag 2" }));
+    expect(picked()).toEqual({ value: ["2:i"], excluded: ["1:i"] });
+
+    // Removing an excluded value drops it from the exclusions
+    await user.click(screen.getByRole("button", { name: "Remove Tag 1" }));
+    expect(picked()).toEqual({ value: ["2:i"], excluded: [] });
+
+    // Clear all empties both
+    await user.click(screen.getByRole("button", { name: "Exclude Tag 2" }));
+    await user.click(
+      screen.getByRole("button", { name: "Clear all selections" })
+    );
+    expect(picked()).toEqual({ value: [], excluded: [] });
+  });
+
+  it("an excluded value is picked in the list, and picking it again removes it", async () => {
+    const user = userEvent.setup();
+    render(<ExcludeHarness initial={[]} initialExcluded={["2:i"]} />);
+
+    await user.click(await screen.findByRole("button", { name: /^Tags/ }));
+    const option = await screen.findByRole("button", {
+      name: /^Tag 2/,
+      pressed: true,
+    });
+    await user.click(option);
+
+    expect(picked()).toEqual({ value: [], excluded: [] });
+  });
+
+  it("no toggle under Has NONE, nor where the field has no `excludeKey`", async () => {
+    const onChange = vi.fn();
+    const onSelectionChange = vi.fn();
+    const control = (props: Partial<FilterControlProps>) => (
+      <FilterControl
+        type="searchable-select"
+        label="Tags"
+        entityType="tags"
+        multi
+        value={["1:i"]}
+        onChange={onChange}
+        modifierOptions={[
+          { value: "INCLUDES", label: "Has ANY of these" },
+          { value: "EXCLUDES", label: "Has NONE of these" },
+        ]}
+        {...props}
+      />
+    );
+
+    const { rerender } = render(
+      control({
+        modifierValue: "INCLUDES",
+        excluded: [],
+        onSelectionChange,
+      })
+    );
+    expect(
+      await screen.findByRole("button", { name: "Exclude Tag 1" })
+    ).toBeInTheDocument();
+
+    // Has NONE: every value already excludes
+    rerender(
+      control({
+        modifierValue: "EXCLUDES",
+        excluded: [],
+        onSelectionChange,
+      })
+    );
+    expect(await screen.findByText("Tag 1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Exclude Tag 1" })).toBeNull();
+
+    // A field with no excludeKey: no handler, no toggle
+    rerender(control({ modifierValue: "INCLUDES" }));
+    expect(await screen.findByText("Tag 1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Exclude Tag 1" })).toBeNull();
+
+    // Nor on a picker used alone without one
+    rerender(
+      <SearchableSelect
+        entityType="tags"
+        multi
+        value={["1:i"]}
+        onChange={onChange}
+      />
+    );
+    expect(await screen.findByText("Tag 1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Exclude Tag 1" })).toBeNull();
   });
 });

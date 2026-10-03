@@ -19,6 +19,7 @@ import {
   type PanelField,
   type PanelGroup,
   type RefField,
+  type RefFieldModifier,
 } from "@peek/shared-types";
 
 /** Shared type for filter configuration objects used across filter UI, URL serialization, and filter chips */
@@ -37,6 +38,11 @@ export interface FilterOption {
   hierarchyKey?: string;
   supportsHierarchy?: boolean;
   hierarchyLabel?: string;
+  /**
+   * A picker's companion holding the ids it excludes (`tagIdsExclude`):
+   * each picked value then has an include or exclude toggle
+   */
+  excludeKey?: string;
   countFilterContext?: string;
   min?: number;
   max?: number;
@@ -84,19 +90,27 @@ const ENTITY_TYPES: Readonly<Record<EntityKind, string>> = {
   image: "images",
 };
 
-/** The condition select's words: "Has ANY of these", or "In ANY of these" for collections */
+/**
+ * The condition select's words: "Has ANY of these", or "In ANY of these" for
+ * collections; "Has none" and "Has any" (sent with no ids) where the row
+ * offers them
+ */
 const REF_MODIFIER_LABELS = {
   has: {
     INCLUDES_ALL: "Has ALL of these",
     INCLUDES: "Has ANY of these",
     EXCLUDES: "Has NONE of these",
+    IS_NULL: "Has none",
+    NOT_NULL: "Has any",
   },
   in: {
     INCLUDES_ALL: "In ALL of these",
     INCLUDES: "In ANY of these",
     EXCLUDES: "NOT in these",
+    IS_NULL: "In none",
+    NOT_NULL: "In any",
   },
-} as const;
+} as const satisfies Record<string, Record<RefFieldModifier, string>>;
 
 /** The condition select's words for a select of values (Resolution) */
 const ENUM_MODIFIER_LABELS: Readonly<Record<string, string>> = {
@@ -184,6 +198,7 @@ function refOption(row: RefField, spec: FieldSpec | undefined): FilterOption {
     ...(row.countContext === undefined
       ? {}
       : { countFilterContext: row.countContext }),
+    ...(row.excludeKey === undefined ? {} : { excludeKey: row.excludeKey }),
   };
 }
 

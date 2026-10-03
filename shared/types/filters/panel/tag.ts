@@ -75,6 +75,7 @@ export const TAG_PANEL = [
     multi: true,
     placeholder: "Select performers...",
     modifiers: INCLUDES_ONLY,
+    excludeKey: "performerIdsExclude",
   },
   {
     key: "studioId",

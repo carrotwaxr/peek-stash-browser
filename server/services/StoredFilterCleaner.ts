@@ -4,7 +4,7 @@
  * custom carousels, which hold a scene filter as a request sends it.
  *
  * - A preset keeps its panel keys (`shared/types/filters/uiKeys.ts`) with
- *   their modifier and depth companions, and its list's contract fields
+ *   their modifier, depth and exclude companions, and its list's contract fields
  *   (a page's permanent criterion saved in the request's shape: the folder
  *   view's tag, the timeline's date). Any other key goes, and so does a
  *   companion whose value its field refuses (the panel then shows the
@@ -17,7 +17,9 @@
  *   default direction, and a lower-case one is upper-cased.
  * - A bare id from before multi-instance support becomes `id:instance` when
  *   exactly one live entity of its type has it on an enabled instance;
- *   otherwise it stays bare and keeps matching that id on every server.
+ *   otherwise it stays bare and keeps matching that id on every server. A
+ *   picker's excluded ids (`tagIdsExclude`, a criterion's `excludes`) are
+ *   tied the same way.
  *
  * Everything else is kept as it is, in its place, so a clean of a clean
  * changes nothing. The cleaners are pure: a bare id's instance comes from a
@@ -202,18 +204,24 @@ function cleanRefs(
   return cleaned.some((item, i) => item !== value[i]) ? cleaned : value;
 }
 
-/** A ref criterion in the request's shape (`{ value, modifier, depth }`) */
+/** The ids a criterion holds: its values and the ones it excludes */
+const REF_LISTS: readonly string[] = ["value", "excludes"];
+
+/**
+ * A ref criterion in the request's shape (`{ value, excludes, modifier,
+ * depth }`): its values and its excludes tied alike
+ */
 function cleanRefCriterion(
   value: unknown,
   target: EntityKind,
   lookup: BareRefLookup,
   tally: Tally
 ): unknown {
-  if (!isPlainObject(value) || !("value" in value)) return value;
-  const refs = cleanRefs(value.value, target, lookup, tally);
-  return refs === value.value
-    ? value
-    : rebuild(value, (key, v) => (key === "value" ? refs : v));
+  if (!isPlainObject(value)) return value;
+  const cleaned = rebuild(value, (key, v) =>
+    REF_LISTS.includes(key) ? cleanRefs(v, target, lookup, tally) : v
+  );
+  return REF_LISTS.some((key) => cleaned[key] !== value[key]) ? cleaned : value;
 }
 
 const ENTITY_TABLES: Readonly<Record<EntityKind, string>> = {
@@ -318,7 +326,7 @@ function cleanSort(
 // =============================================================================
 
 interface PresetKeys {
-  /** Panel keys, with the field each fills */
+  /** Panel keys and exclude companions, with the field each fills */
   readonly panel: ReadonlyMap<string, FieldSpec>;
   /** Modifier companions, with their field */
   readonly modifiers: ReadonlyMap<string, FieldSpec>;
@@ -343,6 +351,8 @@ const PRESET_KEYS = new Map<string, { kind: ListKind; keys: PresetKeys }>(
       const spec = fields[uiKey.field];
       if (!spec) continue;
       panel.set(uiKey.key, spec);
+      // A picker's excluded ids, cleaned like its picks
+      if (uiKey.excludeKey) panel.set(uiKey.excludeKey, spec);
       if (uiKey.modifierKey) modifiers.set(uiKey.modifierKey, spec);
       if (uiKey.hierarchyKey) depths.set(uiKey.hierarchyKey, spec);
     }

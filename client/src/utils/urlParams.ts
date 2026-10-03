@@ -94,6 +94,9 @@ function fieldsOf(
           ...(option.hierarchyKey === undefined
             ? {}
             : { hierarchyKey: option.hierarchyKey }),
+          ...(option.excludeKey === undefined
+            ? {}
+            : { excludeKey: option.excludeKey }),
         } as unknown as PanelField)
     );
   }
@@ -242,8 +245,8 @@ const LIST_STATE_KEYS = [
 const filterKeysCache = new Map<ListEntity, readonly string[]>();
 
 /**
- * The URL keys a list's filters take: each panel row's key and its modifier
- * and depth companions (what its editor's codec holds), the singular form a
+ * The URL keys a list's filters take: each panel row's key and its modifier,
+ * depth and exclude companions (what its editor's codec holds), the singular form a
  * card count links with (`tagId`) and the range and date forms
  * (`rating_min`).
  */

@@ -38,6 +38,7 @@
     "favorite_end",
     "performerIds",
     "performerId",
+    "performerIdsExclude",
     "performerIds_min",
     "performerIds_max",
     "performerIds_start",

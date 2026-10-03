@@ -29,6 +29,7 @@ export const PERFORMER_PANEL = [
     hierarchyLabel: "Include sub-tags",
     countContext: "performers",
     pinnedByDefault: true,
+    excludeKey: "tagIdsExclude",
   },
   {
     key: "gender",

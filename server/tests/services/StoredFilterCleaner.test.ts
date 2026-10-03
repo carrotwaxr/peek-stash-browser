@@ -292,6 +292,44 @@ describe("cleanPresetState", () => {
     expect(report.refsLeftBare).toBe(1);
   });
 
+  it("a preset's `tagIdsExclude` is kept and its bare ids are tied like `tagIds`", () => {
+    const lookup = lookupOf({
+      tag: { "466": "default", "12": "default" },
+      performer: { "7": "default" },
+    });
+    const stored = preset({
+      filters: {
+        tagIds: ["466"],
+        tagIdsExclude: ["12", 13, "5:other"],
+        tagIdsModifier: "INCLUDES",
+        performerIdsExclude: ["7"],
+        // A permanent criterion saved in the request's shape
+        performers: { value: [], excludes: ["7"], modifier: "INCLUDES" },
+      },
+    });
+
+    const { value, report } = cleanPresetState("scene", stored, lookup);
+
+    expect(value).toEqual(
+      preset({
+        filters: {
+          tagIds: ["466:default"],
+          tagIdsExclude: ["12:default", 13, "5:other"],
+          tagIdsModifier: "INCLUDES",
+          performerIdsExclude: ["7:default"],
+          performers: {
+            value: [],
+            excludes: ["7:default"],
+            modifier: "INCLUDES",
+          },
+        },
+      })
+    );
+    expect(report.droppedKeys).toEqual([]);
+    expect(report.refsRewritten).toBe(4);
+    expect(report.refsLeftBare).toBe(1);
+  });
+
   it("each picker's ids resolve as the entity its field names: a clip's scene tags as tags, a scene's studio as a studio", () => {
     const asked: string[] = [];
     const lookup: BareRefLookup = (target, id) => {
@@ -489,6 +527,33 @@ describe("cleanCarouselRules", () => {
     expect(first.report.refsRewritten).toBe(1);
     expect(first.report.refsLeftBare).toBe(1);
     expect(second.changed).toBe(false);
+  });
+  it("a rule's bare `excludes` are tied like its values", () => {
+    const lookup = lookupOf({ tag: { "284": "default", "12": "default" } });
+    const rules = {
+      tags: {
+        value: ["284"],
+        excludes: ["12", "999"],
+        modifier: "INCLUDES",
+        depth: -1,
+      },
+    };
+
+    const first = cleanCarouselRules(rules, "random", "DESC", lookup);
+
+    expect(first.value.rules).toEqual({
+      tags: {
+        value: ["284:default"],
+        excludes: ["12:default", "999"],
+        modifier: "INCLUDES",
+        depth: -1,
+      },
+    });
+    expect(first.report.refsRewritten).toBe(2);
+    expect(first.report.refsLeftBare).toBe(1);
+    expect(
+      cleanCarouselRules(first.value.rules, "random", "DESC", lookup).changed
+    ).toBe(false);
   });
 });
 

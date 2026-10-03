@@ -9,6 +9,7 @@
     "tagId",
     "tagIdsModifier",
     "tagIdsDepth",
+    "tagIdsExclude",
     "tagIds_min",
     "tagIds_max",
     "tagIds_start",

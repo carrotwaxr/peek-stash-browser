@@ -30,7 +30,8 @@
         }
       ],
       "modifierKey": "tagIdsModifier",
-      "defaultModifier": "INCLUDES"
+      "defaultModifier": "INCLUDES",
+      "excludeKey": "tagIdsExclude"
     },
     {
       "key": "sceneTagIds",
@@ -55,7 +56,8 @@
         }
       ],
       "modifierKey": "sceneTagIdsModifier",
-      "defaultModifier": "INCLUDES"
+      "defaultModifier": "INCLUDES",
+      "excludeKey": "sceneTagIdsExclude"
     },
     {
       "key": "performerIds",
@@ -80,7 +82,8 @@
         }
       ],
       "modifierKey": "performerIdsModifier",
-      "defaultModifier": "INCLUDES"
+      "defaultModifier": "INCLUDES",
+      "excludeKey": "performerIdsExclude"
     },
     {
       "key": "studioId",

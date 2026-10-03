@@ -40,6 +40,12 @@ import {
   useWallPlayback,
 } from "../../../src/hooks/useWallPlayback";
 
+// The scene Collections row offers In none and In any, as F18 opts it in
+vi.mock("@peek/shared-types", async (importOriginal) => {
+  const { withRefPresence } = await import("@tests/helpers/refPresence");
+  return withRefPresence(await importOriginal(), [["scene", "groupIds"]]);
+});
+
 vi.mock("../../../src/hooks/useTVMode", () => ({
   useTVMode: () => ({ isTVMode: false }),
 }));
@@ -694,6 +700,63 @@ describe("SearchControls", () => {
       ).toHaveLength(2);
       const filters = must(screen.getByText("Filters").closest("button"));
       expect(within(filters).getByText("2")).toBeInTheDocument();
+    });
+
+    it("excludes with no includes count 1 in the badge and draw one chip", async () => {
+      const list = renderSearchControls(
+        {},
+        { url: "/scenes?tagIdsExclude=2:a" }
+      );
+
+      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+        tags: { value: [], excludes: ["2:a"], modifier: "INCLUDES_ALL" },
+      });
+      expect(
+        screen.getAllByRole("button", { name: /^Remove filter:/ })
+      ).toHaveLength(1);
+      const filters = must(screen.getByText("Filters").closest("button"));
+      expect(within(filters).getByText("1")).toBeInTheDocument();
+    });
+
+    it("Has none hides the picker, counts 1 and draws one chip", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls({}, { url: "/scenes?groupIds=1:a" });
+      await firstQuery(list.onQueryChange);
+
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      const collections = must(
+        screen.getByText("Collections", { selector: "label" }).parentElement,
+        "the Collections control"
+      );
+      expect(
+        within(collections).getByRole("button", { name: /^Collections/ })
+      ).toBeInTheDocument();
+      const condition = within(collections).getByRole("combobox", {
+        name: "Collections condition",
+      });
+      await user.selectOptions(condition, "In none");
+      expect(
+        within(collections).queryByRole("button", { name: /^Collections/ })
+      ).toBeNull();
+      await user.click(
+        must(screen.getByText("Apply Filters").closest("button"))
+      );
+
+      await waitFor(() =>
+        expect(list.lastQuery().scene_filter).toEqual({
+          groups: { modifier: "IS_NULL" },
+        })
+      );
+      expect(list.params().get("groupIdsModifier")).toBe("IS_NULL");
+      expect(list.params().has("groupIds")).toBe(false);
+      const chips = await screen.findAllByRole("button", {
+        name: /^Remove filter:/,
+      });
+      expect(chips.map((chip) => chip.getAttribute("aria-label"))).toEqual([
+        "Remove filter: Collections: in none",
+      ]);
+      const filters = must(screen.getByText("Filters").closest("button"));
+      expect(within(filters).getByText("1")).toBeInTheDocument();
     });
 
     it("activating a chip opens its field and moves focus to the field's first control", async () => {

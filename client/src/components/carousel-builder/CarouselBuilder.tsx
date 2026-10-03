@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { PreviewCarouselResponse } from "@peek/shared-types";
+import type { PanelField, PreviewCarouselResponse } from "@peek/shared-types";
 import {
   AlertCircle,
   ArrowLeft,
@@ -19,7 +19,7 @@ import {
   buildCarouselRules,
   carouselRulesToFilterState,
 } from "../../utils/filterConfig";
-import { type PanelState, codecOf } from "../../utils/filterFields";
+import { type PanelState, codecOf, valuesOf } from "../../utils/filterFields";
 import { Button } from "../ui/index";
 import CarouselPreview from "./CarouselPreview";
 import IconPickerButton from "./IconPickerButton";
@@ -34,6 +34,8 @@ interface CarouselRule {
   id: string;
   filterKey: string;
   value: unknown;
+  /** A picker's excluded ids, where its field takes them */
+  excludes?: string[];
   modifier?: string;
   depth?: number;
 }
@@ -46,16 +48,24 @@ const modifierOf = (value: unknown): string | undefined =>
 const depthOf = (value: unknown): number | undefined =>
   typeof value === "number" ? value : undefined;
 
+/** A picker's excluded ids as a rule holds them: a list, else none */
+const excludesOf = (row: PanelField, state: PanelState) => {
+  if (row.editor !== "ref" || row.excludeKey === undefined) return undefined;
+  const ids = valuesOf(state[row.excludeKey]);
+  return ids.length === 0 ? undefined : ids;
+};
+
 /**
  * The builder's rules from the scene rows' state: one rule per row that
- * filters, with its modifier and depth companions
+ * filters, with its modifier, depth and exclude companions
  */
 function convertFilterStateToRules(state: PanelState): CarouselRule[] {
   return CAROUSEL_FIELDS.filter((row) => codecOf(row).isActive(row, state)).map(
     (row) => ({
       id: generateRuleId(),
       filterKey: row.key,
-      value: state[row.key],
+      value: state[row.key] ?? (row.editor === "ref" && row.multi ? [] : ""),
+      excludes: excludesOf(row, state),
       modifier:
         row.modifierKey === undefined
           ? undefined
@@ -80,6 +90,13 @@ function convertRulesToFilterState(rules: readonly CarouselRule[]): PanelState {
     }
     if (row.hierarchyKey !== undefined && rule.depth !== undefined) {
       state[row.hierarchyKey] = rule.depth;
+    }
+    if (
+      row.editor === "ref" &&
+      row.excludeKey !== undefined &&
+      rule.excludes !== undefined
+    ) {
+      state[row.excludeKey] = rule.excludes;
     }
   }
   return state;

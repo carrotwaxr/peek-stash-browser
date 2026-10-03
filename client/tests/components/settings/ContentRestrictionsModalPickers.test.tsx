@@ -136,4 +136,42 @@ describe("ContentRestrictionsModal pickers", () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+  it("the restriction pickers show no include/exclude toggle", async () => {
+    mockApiGet.mockResolvedValue({
+      restrictions: [
+        {
+          entityType: "tags",
+          mode: "EXCLUDE",
+          entityIds: ["5:server-a", "6:server-a"],
+          restrictEmpty: false,
+          unreadable: false,
+        },
+      ],
+    });
+    finders.findTagsMinimal.mockImplementation((params) =>
+      Promise.resolve(
+        params.ids
+          ? [
+              { id: "5", instanceId: "server-a", name: "Hidden Tag" },
+              { id: "6", instanceId: "server-a", name: "Other Hidden" },
+            ]
+          : []
+      )
+    );
+
+    render(
+      <ContentRestrictionsModal user={restrictedUser} onClose={vi.fn()} />
+    );
+
+    expect(await screen.findByText("Hidden Tag")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove Hidden Tag" })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Exclude / })).toBeNull();
+    expect(
+      screen
+        .getAllByRole("button")
+        .filter((button) => button.hasAttribute("aria-pressed"))
+    ).toEqual([]);
+  });
 });

@@ -34,10 +34,13 @@ const rowOf = <K extends EditorKind>(
 };
 
 describe("codecs", () => {
-  it("a row's keys are its key, then its modifier and depth companions", () => {
+  it("a row's keys are its key, then its modifier, depth and exclude companions", () => {
     expect(
       codecOf(field("scene", "tagIds")).keys(field("scene", "tagIds"))
-    ).toEqual(["tagIds", "tagIdsModifier", "tagIdsDepth"]);
+    ).toEqual(["tagIds", "tagIdsModifier", "tagIdsDepth", "tagIdsExclude"]);
+    expect(
+      codecOf(field("scene", "groupIds")).keys(field("scene", "groupIds"))
+    ).toEqual(["groupIds", "groupIdsModifier"]);
     expect(
       codecOf(field("scene", "resolution")).keys(field("scene", "resolution"))
     ).toEqual(["resolution", "resolutionModifier"]);
