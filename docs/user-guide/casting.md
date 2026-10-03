@@ -48,7 +48,7 @@ A reverse proxy that puts its own login in front of Peek (Authelia, Authentik, `
 
 The scene starts at your **resume point** if you have not played it on this page, and where the page's player was otherwise. Peek picks the file's own stream when the Cast device can play it directly (MP4 with H.264 up to 1080p, or WebM), and an HLS stream from Stash otherwise. This is automatic.
 
-Peek gives the TV the scene's title, its performers, its poster and a personal signed link that works for 12 hours. A long session past that gives "Cast link expired, start casting again": press Cast again. The link follows your access: a scene you hide, or that an admin restricts, stops playing at the TV's next request.
+Peek gives the TV the scene's title, its performers, its poster and a personal signed link that works for 12 hours. A long session past that stops, and the page says "Cast link expired: press play to try again": press play (or Cast), and the scene loads on the TV again with a new link, where it stopped. The link follows your access: a scene you hide, or that an admin restricts, stops playing at the TV's next request, and trying again then says "Couldn't play this scene on <device>".
 
 ### One scene at a time
 

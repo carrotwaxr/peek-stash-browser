@@ -98,10 +98,12 @@ export function useCast(options: UseCastOptions): void {
         framework,
         player,
         page: () => latest.current,
-        fetchLink: (scene) =>
-          queryClient.fetchQuery(
-            sceneMediaLinkQuery(scene.id, scene.instanceId)
-          ),
+        fetchLink: (scene, { fresh = false } = {}) => {
+          const query = sceneMediaLinkQuery(scene.id, scene.instanceId);
+          return queryClient.fetchQuery(
+            fresh ? { ...query, staleTime: 0 } : query
+          );
+        },
         notify: showError,
       });
       session.attach();

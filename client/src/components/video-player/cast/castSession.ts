@@ -14,7 +14,10 @@
  * another scene than the session's does not attach, and its Cast button or
  * play loads its scene into the session. Each load names this tab
  * (`castSenderId`), and only the tab named by the playing media records it.
- * The page's captions menu drives the receiver's text tracks.
+ * The page's captions menu drives the receiver's text tracks. When the TV
+ * fails mid-scene (a link past its expiry, a scene hidden meanwhile) the page
+ * stays on the cast, and play or the Cast button loads the scene again with
+ * a new link where the TV stopped.
  */
 import type { SceneMediaLinkResponse } from "@peek/shared-types";
 import { makeCompositeKey } from "../../../utils/compositeKey";
@@ -258,16 +261,23 @@ export interface CastSessionOptions {
     /** The queue's reducer (`NEXT_SCENE` steps it) */
     dispatch: (action: never) => void;
   };
-  /** The scene's signed media link (C2's query) */
-  fetchLink(scene: CastScene): Promise<SceneMediaLinkResponse>;
+  /**
+   * The scene's signed media link (C2's query); `fresh` mints a new one
+   * rather than reuse the cached link
+   */
+  fetchLink(
+    scene: CastScene,
+    options?: { fresh?: boolean }
+  ): Promise<SceneMediaLinkResponse>;
   /** Tells the user something went wrong (a toast) */
   notify(message: string): void;
 }
 
 export const NO_CAST_SOURCE_MESSAGE =
   "This scene has no format a Cast device can play";
-export const CAST_LINK_EXPIRED_MESSAGE =
-  "Cast link expired, start casting again";
+export const CAST_LINK_EXPIRED_MESSAGE = "Cast link expired";
+/** Added to a receiver error's message: the page's play loads it again */
+const RETRY_HINT = ": press play to try again";
 
 const deviceName = (session: cast.framework.CastSession | null) =>
   session?.getCastDevice().friendlyName ?? null;
@@ -324,6 +334,11 @@ export class CastSessionController {
   private loadedHere = false;
   /** A load from this page is under way: the session still plays the last */
   private loading = false;
+  /**
+   * The receiver failed the media this page follows: play and the Cast
+   * button load it again, with a new link, where the TV stopped
+   */
+  private errored = false;
   /** The page's scene and restart count when last seen */
   private seen = "";
   /** The receiver's text tracks as last set, so a repeat is not sent */
@@ -340,12 +355,19 @@ export class CastSessionController {
     this.context = framework.CastContext.getInstance();
     this.remote = new framework.RemotePlayer();
     this.controller = new framework.RemotePlayerController(this.remote);
-    this.view = remoteView(
+    const view = remoteView(
       this.remote,
       this.controller,
       () => this.attachedTo?.getMediaSession() ?? null,
       media
     );
+    this.view = {
+      ...view,
+      play: () => {
+        if (this.errored) this.retry();
+        else view.play();
+      },
+    };
     this.loader = {
       ...this.view,
       play: () => {
@@ -400,6 +422,7 @@ export class CastSessionController {
     }
     this.loads += 1;
     this.loading = false;
+    this.errored = false;
     const attached = this.attachedTo !== null;
     this.attachedTo = null;
     // The page goes and the TV plays on: what it played since the last save
@@ -476,6 +499,10 @@ export class CastSessionController {
    * Chrome's Cast dialog (pick a device, or stop casting)
    */
   private readonly onPress = () => {
+    if (this.errored) {
+      this.retry();
+      return;
+    }
     if (this.castHere()) return;
     // The dialog rejects when the user closes it: nothing to do
     this.context.requestSession().catch(() => {});
@@ -504,7 +531,8 @@ export class CastSessionController {
   };
 
   private readonly onRemoteTime = () => {
-    if (!this.attachedTo) return;
+    // A failed receiver keeps where it stopped, for the retry
+    if (!this.attachedTo || this.errored) return;
     this.lastRemoteTime = this.remote.currentTime;
     this.options.player.trigger("timeupdate");
   };
@@ -526,7 +554,11 @@ export class CastSessionController {
     // The idle reason is on the media session: the RemotePlayer has none
     const reason = session.getMediaSession()?.idleReason;
     if (reason === media.IdleReason.ERROR) {
-      this.options.notify(this.failureMessage(session));
+      if (this.loading || this.errored) return;
+      // What the TV played is saved; the page stays on the cast
+      this.errored = true;
+      this.stopTracking();
+      this.options.notify(this.failureMessage(session) + RETRY_HINT);
     } else if (reason === media.IdleReason.FINISHED) {
       this.finished(session);
     }
@@ -550,8 +582,20 @@ export class CastSessionController {
     }
   }
 
+  /**
+   * Play or the Cast button after a receiver error: the scene again, with a
+   * new link (the old one may be past its expiry), where the TV stopped
+   */
+  private retry() {
+    const session = this.attachedTo;
+    if (!session || this.loading) return;
+    void this.load(session, this.lastRemoteTime, true, { fresh: true });
+  }
+
   /** Other media on the receiver (perhaps loaded from another tab) */
   private readonly onMediaInfo = () => {
+    // Media loaded since a receiver error (another tab's load) plays again
+    if (this.remote.isMediaLoaded) this.errored = false;
     this.sync();
   };
 
@@ -633,7 +677,8 @@ export class CastSessionController {
   private async load(
     session: cast.framework.CastSession,
     startTime: number,
-    autoplay: boolean
+    autoplay: boolean,
+    { fresh = false }: { fresh?: boolean } = {}
   ) {
     const { player } = this.options;
     const { scene } = this.options.page();
@@ -641,12 +686,13 @@ export class CastSessionController {
     this.stopTracking();
     this.loadedHere = true;
     this.loading = true;
+    this.errored = false;
     this.refresh();
 
     this.loads += 1;
     const load = this.loads;
     try {
-      const link = await this.options.fetchLink(scene);
+      const link = await this.options.fetchLink(scene, { fresh });
       if (load !== this.loads) return;
       this.expiresAt = Date.parse(link.expiresAt);
       const request = buildLoadRequest(this.media, {
@@ -717,6 +763,7 @@ export class CastSessionController {
   private release(seekTo?: number) {
     const { player } = this.options;
     this.loading = false;
+    this.errored = false;
     this.stopTracking();
     this.attachedTo = null;
     this.refresh();

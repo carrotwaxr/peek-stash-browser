@@ -543,7 +543,7 @@ describe("useCast", () => {
     expect(player.peekCastConnected).toBe(false);
   });
 
-  it("a load or media error after the link's expiresAt shows 'Cast link expired, start casting again'", async () => {
+  it("a load or media error after the link's expiresAt says the cast link expired", async () => {
     const { player } = await renderCast();
 
     // A load refused once the link has run out
@@ -556,10 +556,9 @@ describe("useCast", () => {
     const first = new FakeSession();
     first.loadMedia.mockRejectedValue("LOAD_FAILED");
     fake.context.startSession(first);
+    // A failed load leaves the cast: the local player has the scene
     await waitFor(() =>
-      expect(vi.mocked(showError)).toHaveBeenCalledWith(
-        "Cast link expired, start casting again"
-      )
+      expect(vi.mocked(showError)).toHaveBeenCalledWith("Cast link expired")
     );
     fake.context.endSession();
 
@@ -573,8 +572,9 @@ describe("useCast", () => {
     remote.playerState = "IDLE";
     controller.emit(REMOTE_EVENT.PLAYER_STATE_CHANGED);
 
+    // The page stays on the cast: play there loads it again
     expect(vi.mocked(showError)).toHaveBeenCalledWith(
-      "Cast link expired, start casting again"
+      "Cast link expired: press play to try again"
     );
   });
 
@@ -587,8 +587,99 @@ describe("useCast", () => {
     controller.emit(REMOTE_EVENT.PLAYER_STATE_CHANGED);
 
     expect(vi.mocked(showError)).toHaveBeenCalledWith(
-      "Couldn't play this scene on Living Room TV"
+      "Couldn't play this scene on Living Room TV: press play to try again"
     );
+  });
+
+  describe("after a receiver error", () => {
+    /** The TV played to `seconds`, then its media failed (a 404, a link past expiry) */
+    async function receiverFails(seconds: number) {
+      const { player } = await renderCast();
+      const cast = await startCasting(player);
+      cast.remote.currentTime = seconds;
+      cast.controller.emit(REMOTE_EVENT.CURRENT_TIME_CHANGED);
+      cast.session.mediaSession = {
+        ...cast.session.mediaSession,
+        idleReason: "ERROR",
+      };
+      Object.assign(cast.remote, {
+        playerState: "IDLE",
+        isMediaLoaded: false,
+        isPaused: false,
+      });
+      cast.controller.emit(REMOTE_EVENT.PLAYER_STATE_CHANGED);
+      return cast;
+    }
+
+    it("the page stays on the cast, and play loads the scene again with a fresh link where the TV stopped", async () => {
+      const { player, session, controller } = await receiverFails(250);
+      expect(player.peekCastConnected).toBe(true);
+      expect(vi.mocked(apiPost)).toHaveBeenCalledTimes(1);
+
+      void player.play();
+
+      await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+      // A new link, not the cached one the receiver failed on
+      const links = vi
+        .mocked(apiPost)
+        .mock.calls.filter(([endpoint]) => endpoint.endsWith("/media-link"));
+      expect(links).toHaveLength(2);
+      const request = loadRequestOf(session, 1);
+      expect(request.currentTime).toBe(250);
+      expect(request.autoplay).toBe(true);
+      expect(controller.playOrPause).not.toHaveBeenCalled();
+      expect(media.play).not.toHaveBeenCalled();
+      expect(player.peekCastConnected).toBe(true);
+    });
+
+    it("the Cast button loads the scene again rather than opening Chrome's dialog", async () => {
+      const { player, session } = await receiverFails(90);
+
+      untrusted<{ trigger(event: string): void }>(castButton(player)).trigger(
+        "click"
+      );
+
+      await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+      expect(fake.context.requestSession).not.toHaveBeenCalled();
+      expect(loadRequestOf(session, 1).currentTime).toBe(90);
+    });
+
+    it("once loaded again, play and the Cast button act as before", async () => {
+      const { player, session, remote, controller } = await receiverFails(90);
+      void player.play();
+      await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+      await settle();
+      Object.assign(remote, {
+        playerState: "PLAYING",
+        isMediaLoaded: true,
+        isPaused: true,
+      });
+
+      void player.play();
+      untrusted<{ trigger(event: string): void }>(castButton(player)).trigger(
+        "click"
+      );
+
+      expect(controller.playOrPause).toHaveBeenCalledTimes(1);
+      expect(fake.context.requestSession).toHaveBeenCalledTimes(1);
+      expect(session.loadMedia).toHaveBeenCalledTimes(2);
+    });
+
+    it("a scene the user can no longer fetch (hidden mid-cast) leaves the cast for the local player", async () => {
+      const { player, session } = await receiverFails(90);
+      vi.mocked(apiPost).mockRejectedValue(new Error("Not found"));
+      vi.mocked(showError).mockClear();
+
+      void player.play();
+
+      await waitFor(() =>
+        expect(vi.mocked(showError)).toHaveBeenCalledWith(
+          "Couldn't play this scene on Living Room TV"
+        )
+      );
+      expect(session.loadMedia).toHaveBeenCalledTimes(1);
+      expect(player.peekCastConnected).toBe(false);
+    });
   });
 
   it("a resumed session whose customData.scene is another scene does not attach", async () => {
