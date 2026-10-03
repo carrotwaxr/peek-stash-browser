@@ -32,7 +32,7 @@ const HelpModal = ({ onClose }: Props) => {
         items: [
           {
             keys: ["r 1-5"],
-            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+            description: "Set rating (2, 4, 6, 8 or 10 out of 10)",
           },
           { keys: ["r 0"], description: "Clear rating" },
           { keys: ["r f"], description: "Toggle Favorite" },
@@ -45,7 +45,7 @@ const HelpModal = ({ onClose }: Props) => {
         items: [
           {
             keys: ["r 1-5"],
-            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+            description: "Set rating (2, 4, 6, 8 or 10 out of 10)",
           },
           { keys: ["r 0"], description: "Clear rating" },
           { keys: ["r f"], description: "Toggle Favorite" },
@@ -58,7 +58,7 @@ const HelpModal = ({ onClose }: Props) => {
         items: [
           {
             keys: ["r 1-5"],
-            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+            description: "Set rating (2, 4, 6, 8 or 10 out of 10)",
           },
           { keys: ["r 0"], description: "Clear rating" },
           { keys: ["r f"], description: "Toggle Favorite" },
@@ -71,7 +71,7 @@ const HelpModal = ({ onClose }: Props) => {
         items: [
           {
             keys: ["r 1-5"],
-            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+            description: "Set rating (2, 4, 6, 8 or 10 out of 10)",
           },
           { keys: ["r 0"], description: "Clear rating" },
           { keys: ["r f"], description: "Toggle Favorite" },
@@ -86,7 +86,7 @@ const HelpModal = ({ onClose }: Props) => {
           { keys: ["Esc"], description: "Close lightbox" },
           {
             keys: ["r 1-5"],
-            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+            description: "Set rating (2, 4, 6, 8 or 10 out of 10)",
           },
           { keys: ["r 0"], description: "Clear rating" },
           { keys: ["r f"], description: "Toggle Favorite" },
@@ -99,7 +99,7 @@ const HelpModal = ({ onClose }: Props) => {
         items: [
           {
             keys: ["r 1-5"],
-            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+            description: "Set rating (2, 4, 6, 8 or 10 out of 10)",
           },
           { keys: ["r 0"], description: "Clear rating" },
           { keys: ["r f"], description: "Toggle Favorite" },
@@ -112,7 +112,7 @@ const HelpModal = ({ onClose }: Props) => {
         items: [
           {
             keys: ["r 1-5"],
-            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+            description: "Set rating (2, 4, 6, 8 or 10 out of 10)",
           },
           { keys: ["r 0"], description: "Clear rating" },
           { keys: ["r f"], description: "Toggle Favorite" },
