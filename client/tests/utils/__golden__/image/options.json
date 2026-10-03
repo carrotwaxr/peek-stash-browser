@@ -31,7 +31,8 @@
       ],
       "modifierKey": "performerIdsModifier",
       "defaultModifier": "INCLUDES",
-      "countFilterContext": "images"
+      "countFilterContext": "images",
+      "excludeKey": "performerIdsExclude"
     },
     {
       "key": "studioIds",
@@ -56,7 +57,8 @@
       "supportsHierarchy": true,
       "hierarchyKey": "studioIdsDepth",
       "hierarchyLabel": "Include sub-studios",
-      "countFilterContext": "images"
+      "countFilterContext": "images",
+      "excludeKey": "studioIdsExclude"
     },
     {
       "key": "tagIds",
@@ -85,7 +87,8 @@
       "supportsHierarchy": true,
       "hierarchyKey": "tagIdsDepth",
       "hierarchyLabel": "Include sub-tags",
-      "countFilterContext": "images"
+      "countFilterContext": "images",
+      "excludeKey": "tagIdsExclude"
     },
     {
       "key": "galleryIds",

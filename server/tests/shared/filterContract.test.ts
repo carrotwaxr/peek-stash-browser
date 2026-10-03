@@ -364,6 +364,9 @@ describe("filter panel keys", () => {
         field: field.field,
         ...(field.modifierKey ? { modifierKey: field.modifierKey } : {}),
         ...(field.hierarchyKey ? { hierarchyKey: field.hierarchyKey } : {}),
+        ...(field.editor === "ref" && field.excludeKey
+          ? { excludeKey: field.excludeKey }
+          : {}),
       }));
       expect(UI_KEYS[kind]).toEqual(projected);
     }

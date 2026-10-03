@@ -25,6 +25,8 @@ export interface ClientOption {
   readonly defaultModifier?: string;
   readonly hierarchyKey?: string;
   readonly supportsHierarchy?: boolean;
+  /** A picker's companion holding the ids it excludes (`tagIdsExclude`) */
+  readonly excludeKey?: string;
   readonly min?: number;
   readonly max?: number;
 }
@@ -204,8 +206,12 @@ const SUB_ITEMS = ", with sub-items";
  * start only, end only, both; text; each select value but the one the
  * control shows when unset (its `defaultValue`, the unfiltered state);
  * checkbox checked; searchable select one id and (multi) two ids, with and
- * without sub-items. Each under every modifier the option offers. A type
- * with no samples here throws, so a new kind of option cannot go unwalked.
+ * without sub-items. Each under every modifier the option offers. A picker
+ * with an exclude companion adds one include plus one exclude under Has ANY
+ * and Has ALL, and excludes alone under its default modifier; a picker's
+ * Has none and Has any (IS_NULL, NOT_NULL) are one sample each, with no
+ * ids. A type with no samples here throws, so a new kind of option cannot
+ * go unwalked.
  */
 export function optionSamples(
   option: ClientOption,
@@ -214,22 +220,86 @@ export function optionSamples(
   const modifiers: readonly (string | undefined)[] =
     option.modifierOptions?.map((choice) => choice.value) ?? [undefined];
   const values = sampleValues(option, refs);
+  const picker = option.type === "searchable-select";
   return modifiers.flatMap((modifier) =>
-    values.map((value) => ({
-      label:
-        modifier === undefined ? value.variant : `${modifier} ${value.variant}`,
-      state: {
-        ...value.state,
-        ...(modifier !== undefined && option.modifierKey !== undefined
-          ? { [option.modifierKey]: modifier }
-          : {}),
-      },
-      modifier,
-      variant: value.variant,
-      ids: value.ids,
-      withoutSubItems: value.withoutSubItems,
-    }))
+    (picker ? pickerValues(option, refs, modifier, values) : values).map(
+      (value) => ({
+        label:
+          modifier === undefined
+            ? value.variant
+            : `${modifier} ${value.variant}`,
+        state: {
+          ...value.state,
+          ...(modifier !== undefined && option.modifierKey !== undefined
+            ? { [option.modifierKey]: modifier }
+            : {}),
+        },
+        modifier,
+        variant: value.variant,
+        ids: value.ids,
+        withoutSubItems: value.withoutSubItems,
+      })
+    )
   );
+}
+
+const PRESENCE_MODIFIERS: readonly string[] = ["IS_NULL", "NOT_NULL"];
+
+/** The modifiers under which a picker's values may each include or exclude */
+const TOGGLE_MODIFIERS: readonly (string | undefined)[] = [
+  "INCLUDES",
+  "INCLUDES_ALL",
+  undefined,
+];
+
+/**
+ * A picker's samples under one modifier: presence takes no ids; with an
+ * exclude companion, one include plus one exclude (Has ANY, Has ALL) and
+ * excludes alone (the default modifier only, where the modifier means
+ * nothing) join the plain ones
+ */
+function pickerValues(
+  option: ClientOption,
+  refs: RefPool,
+  modifier: string | undefined,
+  values: readonly SampleValue[]
+): SampleValue[] {
+  if (modifier !== undefined && PRESENCE_MODIFIERS.includes(modifier)) {
+    return [
+      { variant: "no ids", state: {}, ids: 0, withoutSubItems: undefined },
+    ];
+  }
+  const { key, excludeKey, entityType } = option;
+  if (
+    excludeKey === undefined ||
+    entityType === undefined ||
+    option.multi !== true ||
+    !TOGGLE_MODIFIERS.includes(modifier)
+  ) {
+    return [...values];
+  }
+  const [first, second] = refs(entityType);
+  const isDefault =
+    modifier === (option.defaultModifier ?? option.modifierOptions?.[0]?.value);
+  return [
+    ...values,
+    {
+      variant: "one include, one exclude",
+      state: { [key]: [first], [excludeKey]: [second] },
+      ids: 1,
+      withoutSubItems: undefined,
+    },
+    ...(isDefault
+      ? [
+          {
+            variant: "excludes alone",
+            state: { [key]: [], [excludeKey]: [first] },
+            ids: 0,
+            withoutSubItems: undefined,
+          },
+        ]
+      : []),
+  ];
 }
 
 interface SampleValue {

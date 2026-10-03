@@ -10,8 +10,10 @@ interface CarouselRule {
   id: string;
   filterKey: string;
   value: unknown;
-  modifier?: string;
-  depth?: number;
+  /** A picker's excluded ids, where its field takes them */
+  excludes?: string[] | undefined;
+  modifier?: string | undefined;
+  depth?: number | undefined;
 }
 
 interface Props {
@@ -36,8 +38,13 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
     (f) => f.key === rule.filterKey || !usedFilterKeys.has(f.key)
   );
 
-  const isRange = filterDef?.type === "range";
-  const presence = rule.modifier === "IS_NULL" || rule.modifier === "NOT_NULL";
+  // "Not set" and "Set" on a range, "Has none" and "Has any" on a picker,
+  // take no value
+  const takesPresence =
+    filterDef?.type === "range" || filterDef?.type === "searchable-select";
+  const presence =
+    takesPresence &&
+    (rule.modifier === "IS_NULL" || rule.modifier === "NOT_NULL");
 
   const handleFilterChange = (newFilterKey: string) => {
     const newDef = CAROUSEL_FILTER_DEFINITIONS.find(
@@ -49,6 +56,7 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
     onChange({
       filterKey: newFilterKey,
       value: newDef.type === "checkbox" ? true : newDef.multi ? [] : "",
+      excludes: undefined,
       modifier: newDef.defaultModifier,
     });
   };
@@ -113,8 +121,8 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
         </div>
       )}
 
-      {/* Value Input; "Not set" and "Set" on a range take no value */}
-      {!(isRange && presence) && (
+      {/* Value Input; a presence choice takes no value */}
+      {!presence && (
         <div className="flex-1 min-w-[200px] space-y-1">
           <label
             className="block text-xs"
@@ -131,7 +139,7 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
       )}
 
       {/* Hierarchy Toggle */}
-      {filterDef?.supportsHierarchy && (
+      {filterDef?.supportsHierarchy && !presence && (
         <div className="space-y-1">
           <label
             className="block text-xs"
@@ -204,6 +212,21 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
           value={rule.value as string | string[]}
           onChange={(val) => onChange({ value: val })}
           multi={filterDef.multi}
+          // A field that takes exclusions: each pick includes or excludes,
+          // but under Has NONE, where every pick excludes
+          excluded={filterDef.excludeKey ? rule.excludes : undefined}
+          onSelectionChange={
+            filterDef.excludeKey
+              ? (included, excluded) =>
+                  onChange({
+                    value: included,
+                    excludes: excluded.length > 0 ? excluded : undefined,
+                  })
+              : undefined
+          }
+          excludeToggle={
+            (rule.modifier ?? filterDef.defaultModifier) !== "EXCLUDES"
+          }
           placeholder={
             filterDef.placeholder ??
             `Select ${(filterDef.label ?? filterDef.key).toLowerCase()}...`

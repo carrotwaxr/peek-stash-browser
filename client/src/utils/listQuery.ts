@@ -370,8 +370,8 @@ export const lockedFieldsOf = (
 
 /**
  * The panel keys of a locked contract field: each row's key and companions
- * (what its codec holds), the singular form a card count links with and the
- * range and date forms
+ * (what its codec holds: the modifier, the depth, a picker's excluded ids),
+ * the singular form a card count links with and the range and date forms
  */
 const lockedPanelKeys = (
   entity: ListEntity,
@@ -388,8 +388,9 @@ const lockedPanelKeys = (
 
 /**
  * The filters without those on a field the page fixes (a performer's Scenes
- * tab has its performer, so the URL's or a preset's `performerIds` and its
- * modifier go). Returns the same object when nothing goes.
+ * tab has its performer, so the URL's or a preset's `performerIds`, its
+ * modifier and its `performerIdsExclude` go). Returns the same object when
+ * nothing goes.
  */
 export const withoutLockedFilters = (
   entity: ListEntity,

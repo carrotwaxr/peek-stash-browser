@@ -30,26 +30,58 @@ interface Props {
 /** Names a chip looks up: the rest show as a count */
 const NAMES_SHOWN = 3;
 
-/** The chip's text, from its parts and the names its ids resolved to */
+/** Names a lookup resolved, and how many it did not return */
+type Resolved = { names: readonly string[]; unavailable: number } | undefined;
+
+/** Resolved names as a list: the first few, then how many more */
+function namesText(ids: readonly string[], resolved: Resolved): string {
+  const listed = [
+    ...(resolved?.names ?? []),
+    ...(resolved !== undefined && resolved.unavailable > 0
+      ? [`${resolved.unavailable} unavailable`]
+      : []),
+  ].join(", ");
+  const more = ids.length - NAMES_SHOWN;
+  return more > 0 ? `${listed} +${more} more` : listed;
+}
+
+/**
+ * The chip's text, from its parts and the names its ids resolved to: the
+ * picks with their condition, then the exclusions ("Tags: any of Blonde;
+ * not Redhead")
+ */
 function chipText(
   parts: ChipParts,
-  resolved: { names: readonly string[]; unavailable: number } | undefined
+  resolved: Resolved,
+  excludedResolved: Resolved
 ): string {
-  const { label, condition, values, ids, suffix = "" } = parts;
+  const {
+    label,
+    condition,
+    values,
+    ids,
+    excludedIds = [],
+    suffix = "",
+  } = parts;
   if (ids !== undefined) {
     // Names not known yet (loading, failed, or no lookup): how many
-    if (resolved === undefined) return `${label}: ${ids.length} selected`;
-    const listed = [
-      ...resolved.names,
-      ...(resolved.unavailable > 0
-        ? [`${resolved.unavailable} unavailable`]
-        : []),
-    ].join(", ");
-    const more = ids.length - NAMES_SHOWN;
-    const body = more > 0 ? `${listed} +${more} more` : listed;
+    if (
+      (ids.length > 0 && resolved === undefined) ||
+      (excludedIds.length > 0 && excludedResolved === undefined)
+    ) {
+      return `${label}: ${ids.length + excludedIds.length} selected`;
+    }
     // A condition on nothing named reads as nonsense
-    const named = resolved.names.length > 0 && condition !== undefined;
-    return `${label}: ${named ? `${condition} ` : ""}${body}${suffix}`;
+    const named = (resolved?.names.length ?? 0) > 0 && condition !== undefined;
+    const body = [
+      ...(ids.length > 0
+        ? [`${named ? `${condition} ` : ""}${namesText(ids, resolved)}`]
+        : []),
+      ...(excludedIds.length > 0
+        ? [`not ${namesText(excludedIds, excludedResolved)}`]
+        : []),
+    ].join("; ");
+    return `${label}: ${body}${suffix}`;
   }
   const body = [condition, ...(values ?? [])].filter(Boolean).join(" ");
   return body === "" ? label : `${label}: ${body}${suffix}`;
@@ -66,8 +98,10 @@ interface ChipProps {
 /** One chip: its body opens the field, its button removes the filter */
 const FilterChip = ({ parts, entityType, onRemove, onOpen }: ChipProps) => {
   const lookedUp = parts.ids?.slice(0, NAMES_SHOWN) ?? [];
+  const excluded = parts.excludedIds?.slice(0, NAMES_SHOWN) ?? [];
   const { data } = useRefNames(entityType, lookedUp);
-  const text = chipText(parts, data);
+  const { data: excludedNames } = useRefNames(entityType, excluded);
+  const text = chipText(parts, data, excludedNames);
 
   return (
     <div

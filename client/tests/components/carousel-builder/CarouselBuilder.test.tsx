@@ -6,7 +6,13 @@
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "@/api/queryClient";
 import { queryKeys } from "@/api/queryKeys";
@@ -196,5 +202,57 @@ describe("CarouselBuilder", () => {
     expect(JSON.parse(put?.[1]?.body as string)).toMatchObject({
       title: "Highly rated",
     });
+  });
+  it("a rule with Tags include A, exclude B saves `{ value: [A], excludes: [B] }` and survives an edit", async () => {
+    const names = {
+      tags: [
+        { id: "5", instanceId: "a", name: "Tag A" },
+        { id: "6", instanceId: "a", name: "Tag B" },
+      ],
+    };
+    const save = async (rules: unknown) => {
+      const stored = { ...CAROUSEL, rules };
+      const fetchMock = stubApi({
+        "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
+        "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+        "/library/tags/minimal": () => jsonResponse(200, names),
+      });
+      renderEditor(createQueryClient());
+      await screen.findByDisplayValue("Highly rated");
+      return fetchMock;
+    };
+    const update = async (fetchMock: ReturnType<typeof stubApi>) => {
+      fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+      const button = await screen.findByRole("button", { name: /Update/ });
+      await waitFor(() => expect(button).toBeEnabled());
+      fireEvent.click(button);
+      await screen.findByText("Settings");
+      const put = fetchMock.mock.calls.find(
+        ([, init]) => init?.method === "PUT"
+      );
+      return (JSON.parse(put?.[1]?.body as string) as { rules: unknown }).rules;
+    };
+
+    // Both tags included: Tag B is turned into an exclusion
+    const first = await save({
+      tags: { value: ["5:a", "6:a"], modifier: "INCLUDES" },
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Exclude Tag B" })
+    );
+    const saved = await update(first);
+    expect(saved).toEqual({
+      tags: { value: ["5:a"], excludes: ["6:a"], modifier: "INCLUDES" },
+    });
+    cleanup();
+    vi.unstubAllGlobals();
+
+    // Read back, the rule is editable as it was saved, and saves the same
+    const second = await save(saved);
+    expect(
+      await screen.findByRole("button", { name: "Exclude Tag B" })
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+    expect(await update(second)).toEqual(saved);
   });
 });

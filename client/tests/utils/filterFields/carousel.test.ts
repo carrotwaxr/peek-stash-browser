@@ -190,6 +190,31 @@ describe("carousel rules", () => {
     expect(buildSceneFilter(state)).toEqual(stored);
   });
 
+  it("a rule with excludes reads back with its exclude companion and builds the same", () => {
+    const stored = {
+      tags: {
+        value: ["1:a"],
+        excludes: ["2:a", "3"],
+        modifier: "INCLUDES_ALL",
+        depth: -1,
+      },
+      performers: { value: [], excludes: ["9:a"], modifier: "INCLUDES" },
+    };
+
+    const { state, kept } = carouselRulesToFilterState(stored);
+
+    expect(state).toEqual({
+      tagIds: ["1:a"],
+      tagIdsExclude: ["2:a", "3"],
+      tagIdsModifier: "INCLUDES_ALL",
+      tagIdsDepth: -1,
+      performerIdsExclude: ["9:a"],
+      performerIdsModifier: "INCLUDES",
+    });
+    expect(kept).toEqual({});
+    expect(buildSceneFilter(state)).toEqual(stored);
+  });
+
   it("the carousel offers the scene panel's fields and choices", () => {
     const offered = SCENE_ROWS.filter((row) => row.carousel !== false);
 

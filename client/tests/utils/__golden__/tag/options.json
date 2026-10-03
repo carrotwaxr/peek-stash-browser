@@ -92,7 +92,8 @@
       "entityType": "performers",
       "multi": true,
       "defaultValue": [],
-      "placeholder": "Select performers..."
+      "placeholder": "Select performers...",
+      "excludeKey": "performerIdsExclude"
     },
     {
       "key": "studioId",

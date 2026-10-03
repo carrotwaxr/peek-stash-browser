@@ -73,7 +73,7 @@ interface RangeValue {
   end?: string;
 }
 
-interface FilterControlProps {
+export interface FilterControlProps {
   type?:
     | "select"
     | "searchable-select"
@@ -112,6 +112,16 @@ interface FilterControlProps {
   isHighlighted?: boolean;
   /** The id of the field's first control, where a chip moves focus */
   controlId?: string;
+  /** A picker's excluded values (its field's exclude companion) */
+  excluded?: readonly string[] | undefined;
+  /**
+   * Given (a picker whose field takes exclusions), each picked value
+   * includes or excludes under Has ANY and Has ALL; under Has NONE every
+   * value already excludes, so no toggle shows
+   */
+  onSelectionChange?:
+    | ((included: string[], excluded: string[]) => void)
+    | undefined;
 }
 
 export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
@@ -139,6 +149,8 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
       onHierarchyChange,
       isHighlighted = false,
       controlId,
+      excluded,
+      onSelectionChange,
     },
     ref
   ) => {
@@ -213,6 +225,13 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
             </div>
           );
         case "searchable-select": {
+          // "Has none" and "Has any" take no picks: the picker and its
+          // sub-items box are not drawn
+          const presence =
+            modifierValue === "IS_NULL" || modifierValue === "NOT_NULL";
+          // Under Has NONE every value excludes: no toggle, the excluded
+          // values shown as picks
+          const toggleable = modifierValue !== "EXCLUDES";
           return (
             <div className="space-y-2">
               {/* Modifier dropdown (if provided) */}
@@ -233,34 +252,39 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                 </select>
               )}
               {/* Main select */}
-              <SearchableSelect
-                id={modifierOptions?.length ? undefined : controlId}
-                label={label}
-                entityType={
-                  entityType as
-                    | "performers"
-                    | "studios"
-                    | "tags"
-                    | "galleries"
-                    | "groups"
-                }
-                value={value as string | string[]}
-                onChange={onChange as (value: string | string[]) => void}
-                multi={multi}
-                placeholder={placeholder || `Select ${label}...`}
-                countFilterContext={
-                  countFilterContext as
-                    | "performers"
-                    | "scenes"
-                    | "galleries"
-                    | "groups"
-                    | "images"
-                    | null
-                    | undefined
-                }
-              />
+              {!presence && (
+                <SearchableSelect
+                  id={modifierOptions?.length ? undefined : controlId}
+                  label={label}
+                  entityType={
+                    entityType as
+                      | "performers"
+                      | "studios"
+                      | "tags"
+                      | "galleries"
+                      | "groups"
+                  }
+                  value={value as string | string[]}
+                  onChange={onChange as (value: string | string[]) => void}
+                  multi={multi}
+                  placeholder={placeholder || `Select ${label}...`}
+                  countFilterContext={
+                    countFilterContext as
+                      | "performers"
+                      | "scenes"
+                      | "galleries"
+                      | "groups"
+                      | "images"
+                      | null
+                      | undefined
+                  }
+                  excluded={excluded}
+                  onSelectionChange={onSelectionChange}
+                  excludeToggle={toggleable}
+                />
+              )}
               {/* Hierarchy checkbox (for tags/studios) */}
-              {supportsHierarchy && onHierarchyChange && (
+              {!presence && supportsHierarchy && onHierarchyChange && (
                 <label className="flex items-center cursor-pointer mt-1">
                   <input
                     type="checkbox"

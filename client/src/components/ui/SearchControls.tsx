@@ -12,7 +12,7 @@ import { useFilterOptions, useLockedFields } from "../../hooks/useListOptions";
 import type { ListUrlState, PresetToLoad } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
-import { activeFieldCount } from "../../utils/filterFields";
+import { activeFieldCount, valuesOf } from "../../utils/filterFields";
 import { sortOptionsFor, withoutLockedOptions } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
 import {
@@ -686,6 +686,7 @@ const SearchControls = ({
             supportsHierarchy,
             hierarchyKey,
             hierarchyLabel,
+            excludeKey,
             ...filterProps
           } = rest;
 
@@ -733,6 +734,19 @@ const SearchControls = ({
               onHierarchyChange={
                 hierarchyKey
                   ? (value: unknown) => handleFilterChange(hierarchyKey, value)
+                  : undefined
+              }
+              // A picker whose field takes exclusions: its excluded values
+              // ride in the exclude companion
+              excluded={
+                excludeKey ? valuesOf(panelFilters[excludeKey]) : undefined
+              }
+              onSelectionChange={
+                excludeKey
+                  ? (included: string[], excluded: string[]) => {
+                      handleFilterChange(key, included);
+                      handleFilterChange(excludeKey, excluded);
+                    }
                   : undefined
               }
               {...filterProps}

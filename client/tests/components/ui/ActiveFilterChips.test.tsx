@@ -24,6 +24,16 @@ vi.mock("@/api/library", () => ({
   },
 }));
 
+// Images' Studios and Scenes' Performers offer Has none and Has any, as F18
+// to F21 opt them in
+vi.mock("@peek/shared-types", async (importOriginal) => {
+  const { withRefPresence } = await import("@tests/helpers/refPresence");
+  return withRefPresence(await importOriginal(), [
+    ["image", "studioIds"],
+    ["scene", "performerIds"],
+  ]);
+});
+
 let unit = "metric";
 vi.mock("@/contexts/UnitPreferenceContext", () => ({
   useUnitPreference: () => ({ unitPreference: unit }),
@@ -55,6 +65,7 @@ const TAGS: Known[] = [
   { id: "3", instanceId: "a", name: "Anal" },
   { id: "4", instanceId: "a", name: "Solo" },
   { id: "5", instanceId: "a", name: "Toys" },
+  { id: "6", instanceId: "a", name: "Redhead" },
 ];
 const STUDIOS: Known[] = [
   { id: "10", instanceId: "a", name: "Brazzers" },
@@ -175,6 +186,43 @@ describe("ActiveFilterChips", () => {
       await edit("Studios: none of Studio A, Studio B")
     ).toBeInTheDocument();
     expect(screen.queryByText(/unavailable/)).not.toBeInTheDocument();
+  });
+
+  it("an include and an exclude read as one chip", async () => {
+    renderChips({
+      tagIds: ["1:a"],
+      tagIdsExclude: ["6:a"],
+      tagIdsModifier: "INCLUDES",
+      tagIdsDepth: -1,
+    });
+
+    expect(
+      await edit("Tags: any of Blonde; not Redhead, with sub-tags")
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /^Edit filter/ })
+    ).toHaveLength(1);
+  });
+
+  it("excludes alone read as not", async () => {
+    renderChips({ tagIdsExclude: ["6:a"] });
+
+    expect(await edit("Tags: not Redhead")).toBeInTheDocument();
+  });
+
+  it("presence reads as has none or has any", async () => {
+    renderChips(
+      { studioIds: ["10:a"], studioIdsModifier: "IS_NULL" },
+      { kind: "image" }
+    );
+    expect(await edit("Studios: has none")).toBeInTheDocument();
+  });
+
+  it("Has any on Performers reads has any", async () => {
+    renderChips({ performerIdsModifier: "NOT_NULL" });
+
+    expect(await edit("Performers: has any")).toBeInTheDocument();
+    expect(libraryApi.findPerformersMinimal).not.toHaveBeenCalled();
   });
 
   it("a single-pick field names its pick without a condition", async () => {

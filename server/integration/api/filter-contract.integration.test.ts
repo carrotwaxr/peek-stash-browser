@@ -675,6 +675,59 @@ describeWithDb(
       }
     });
 
+    it("Tags' include and exclude choices are walked: one include plus one exclude, excludes alone", () => {
+      const tags = must(
+        clientList(client, "scene").options.find(
+          (option) => option.key === "tagIds"
+        ),
+        "the scene Tags option"
+      );
+      const samples = optionSamples(tags, walk.refs);
+
+      expect(tags.excludeKey).toBe("tagIdsExclude");
+      const both = samples.filter(
+        (sample) => sample.variant === "one include, one exclude"
+      );
+      expect(both.map((sample) => sample.modifier).sort()).toEqual([
+        "INCLUDES",
+        "INCLUDES_ALL",
+      ]);
+      const alone = samples.filter(
+        (sample) => sample.variant === "excludes alone"
+      );
+      expect(alone.map((sample) => sample.modifier)).toEqual([
+        tags.defaultModifier,
+      ]);
+      expect(must(alone[0]).state.tagIds).toEqual([]);
+      expect(must(alone[0]).state.tagIdsExclude).toHaveLength(1);
+    });
+
+    it("a picker offering Has none and Has any is walked with one sample each, with no ids", () => {
+      const tags = must(
+        clientList(client, "scene").options.find(
+          (option) => option.key === "tagIds"
+        ),
+        "the scene Tags option"
+      );
+      const withPresence: ClientOption = {
+        ...tags,
+        modifierOptions: [
+          ...(tags.modifierOptions ?? []),
+          { value: "IS_NULL", label: "Has none" },
+          { value: "NOT_NULL", label: "Has any" },
+        ],
+      };
+      const presence = optionSamples(withPresence, walk.refs).filter(
+        (sample) =>
+          sample.modifier === "IS_NULL" || sample.modifier === "NOT_NULL"
+      );
+
+      expect(presence.map((sample) => sample.state)).toEqual([
+        { tagIdsModifier: "IS_NULL" },
+        { tagIdsModifier: "NOT_NULL" },
+      ]);
+    });
+
     /**
      * A gallery's or image's tag count is its junction rows on its own
      * instance (an image's include its galleries' tags): for each count, 0

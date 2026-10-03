@@ -20,6 +20,7 @@ export const CLIP_PANEL = [
     defaultModifier: "INCLUDES",
     modifierLabels: "has",
     pinnedByDefault: true,
+    excludeKey: "tagIdsExclude",
   },
   {
     key: "sceneTagIds",
@@ -33,6 +34,7 @@ export const CLIP_PANEL = [
     modifierKey: "sceneTagIdsModifier",
     defaultModifier: "INCLUDES",
     modifierLabels: "has",
+    excludeKey: "sceneTagIdsExclude",
   },
   {
     key: "performerIds",
@@ -46,6 +48,7 @@ export const CLIP_PANEL = [
     modifierKey: "performerIdsModifier",
     defaultModifier: "INCLUDES",
     modifierLabels: "has",
+    excludeKey: "performerIdsExclude",
   },
   {
     key: "studioId",

@@ -13,6 +13,14 @@
  * everywhere (`valuesOf`): a preset, default preset or carousel rule stored
  * while the field was single keeps its value once the field takes several.
  *
+ * A ref row with an `excludeKey` holds the ids it includes under its key and
+ * those it excludes under the companion (`tagIds`, `tagIdsExclude`), and
+ * sends `{ value, excludes }`. Under Has NONE every pick excludes, so the
+ * excluded ids join `value` and a stored `<key>Modifier: EXCLUDES` keeps
+ * meaning Has NONE; a key without the companion reads as includes. A row
+ * offering Has none or Has any (IS_NULL, NOT_NULL) sends that alone, with no
+ * ids, and writes only its modifier to the URL.
+ *
  * Imports only relative modules and `@peek/shared-types` (see `options.ts`).
  */
 import type {
@@ -22,7 +30,7 @@ import type {
   NumberField,
   PanelField,
   RefField,
-  RefModifier,
+  RefFieldModifier,
   RefSpec,
   TextField,
 } from "@peek/shared-types";
@@ -49,6 +57,8 @@ export interface ChipParts {
   readonly values?: readonly string[];
   /** Entity refs, shown by name once resolved */
   readonly ids?: readonly string[];
+  /** Entity refs excluded beside them ("not Redhead"), shown by name */
+  readonly excludedIds?: readonly string[];
   readonly suffix?: string;
 }
 
@@ -101,16 +111,21 @@ export const valuesOf = (value: unknown): string[] =>
 const isWholeNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value);
 
-/** A ref field's criterion as the request carries it */
+/**
+ * A ref field's criterion as the request carries it: the ids, those
+ * excluded beside them, or a presence check with no ids
+ */
 export interface RefCriterion {
-  value: string[];
-  modifier: RefModifier;
+  value?: string[];
+  excludes?: string[];
+  modifier: RefFieldModifier;
   depth?: number;
 }
 
 /** A page's permanent criterion of a field, in the request's shape */
 interface PermanentRef {
   value?: unknown;
+  excludes?: unknown;
   modifier?: unknown;
   depth?: unknown;
 }
@@ -120,6 +135,34 @@ const permanentOf = (value: unknown): PermanentRef =>
     ? (value as PermanentRef)
     : {};
 
+/** "Has none" and "Has any": a presence check, sent with no ids */
+const PRESENCE_MODIFIERS = ["IS_NULL", "NOT_NULL"] as const;
+type Presence = (typeof PRESENCE_MODIFIERS)[number];
+
+const asPresence = (value: unknown): Presence | undefined =>
+  PRESENCE_MODIFIERS.find((modifier) => modifier === value);
+
+/**
+ * The presence choice a ref row holds, when the row offers it ("Has none",
+ * "Has any"); while one is set the picks are ignored: not sent, not written
+ * to the URL, not on the chip
+ */
+const refPresenceOf = (
+  field: RefField,
+  state: PanelState
+): Presence | undefined => {
+  if (field.modifierKey === undefined) return undefined;
+  const presence = asPresence(state[field.modifierKey]);
+  return presence !== undefined &&
+    field.modifiers.some((modifier) => modifier === presence)
+    ? presence
+    : undefined;
+};
+
+/** The ids a ref row excludes: its exclude companion's, none without one */
+const excludedOf = (field: RefField | undefined, state: PanelState) =>
+  field?.excludeKey === undefined ? [] : valuesOf(state[field.excludeKey]);
+
 /**
  * One ref field's criterion: the row's picks merged with a page's permanent
  * criterion of the same field (a collection page's `groups`). The modifier
@@ -128,6 +171,10 @@ const permanentOf = (value: unknown): PermanentRef =>
  * field takes it (a stale Has ALL on a one-studio field falls back), so
  * every criterion carries the modifier the panel shows. Depth, on a
  * hierarchical field only: the permanent criterion's, else the panel's.
+ * The row's excluded ids go in `excludes` on an excludable field (an id
+ * also picked stays a pick), and join `value` under EXCLUDES, where every
+ * id already excludes. A presence choice the row offers, beside no
+ * permanent ids, is sent alone.
  */
 export function refCriterionOf(
   spec: RefSpec,
@@ -136,16 +183,32 @@ export function refCriterionOf(
   permanent?: unknown
 ): RefCriterion | undefined {
   const fixed = permanentOf(permanent);
-  const value = [
+  const takes = (candidate: unknown): candidate is RefFieldModifier =>
+    spec.modifiers.some((modifier) => modifier === candidate);
+
+  const presence = row === undefined ? undefined : refPresenceOf(row, state);
+  if (
+    presence !== undefined &&
+    takes(presence) &&
+    valuesOf(fixed.value).length === 0 &&
+    valuesOf(fixed.excludes).length === 0
+  ) {
+    return { modifier: presence };
+  }
+
+  const picked = [
     ...new Set([
       ...valuesOf(fixed.value),
       ...valuesOf(row ? state[row.key] : undefined),
     ]),
   ];
-  if (value.length === 0) return undefined;
+  const excluded = spec.excludable
+    ? [
+        ...new Set([...valuesOf(fixed.excludes), ...excludedOf(row, state)]),
+      ].filter((id) => !picked.includes(id))
+    : [];
+  if (picked.length === 0 && excluded.length === 0) return undefined;
 
-  const takes = (candidate: unknown): candidate is RefModifier =>
-    spec.modifiers.some((modifier) => modifier === candidate);
   const chosen =
     row?.modifierKey === undefined ? undefined : state[row.modifierKey];
   // A row with one modifier has no condition select
@@ -160,7 +223,9 @@ export function refCriterionOf(
       row !== undefined && row.modifiers.length > 1
         ? row.defaultModifier
         : undefined,
-    ].find(takes) ?? spec.defaultModifier;
+    ]
+      .filter((candidate) => asPresence(candidate) === undefined)
+      .find(takes) ?? spec.defaultModifier;
 
   const depth = spec.hierarchical
     ? [
@@ -168,14 +233,25 @@ export function refCriterionOf(
         row?.hierarchyKey === undefined ? undefined : state[row.hierarchyKey],
       ].find(isWholeNumber)
     : undefined;
-  return depth === undefined ? { value, modifier } : { value, modifier, depth };
+  const none = modifier === "EXCLUDES";
+  const value = none ? [...picked, ...excluded] : picked;
+  const excludes = none ? [] : excluded;
+  return {
+    value,
+    ...(excludes.length === 0 ? {} : { excludes }),
+    modifier,
+    ...(depth === undefined ? {} : { depth }),
+  };
 }
 
-/** A row's key, then its modifier and depth companions */
+/** A row's key, then its modifier, depth and exclude companions */
 const keysOf = (field: PanelField): readonly string[] =>
-  [field.key, field.modifierKey, field.hierarchyKey].filter(
-    (key): key is string => key !== undefined
-  );
+  [
+    field.key,
+    field.modifierKey,
+    field.hierarchyKey,
+    field.editor === "ref" ? field.excludeKey : undefined,
+  ].filter((key): key is string => key !== undefined);
 
 /** A range or date range with a bound set */
 const hasBound = (value: unknown): boolean =>
@@ -255,13 +331,6 @@ function normalizeMeasure(
 const normalizeNumber = (field: NumberField, value: unknown): unknown =>
   field.measure === undefined ? value : normalizeMeasure(field.measure, value);
 
-/** The presence choices of a number row: "is not set" and "is set" */
-const PRESENCE_MODIFIERS = ["IS_NULL", "NOT_NULL"] as const;
-type Presence = (typeof PRESENCE_MODIFIERS)[number];
-
-const asPresence = (value: unknown): Presence | undefined =>
-  PRESENCE_MODIFIERS.find((modifier) => modifier === value);
-
 /**
  * The presence choice a number row holds, if any. While one is set the
  * bounds are ignored: not sent, not written to the URL, not on the chip.
@@ -323,19 +392,23 @@ const identity = (_field: PanelField, value: unknown): unknown => value;
 const chipLabel = (field: PanelField): string =>
   field.label.replace(/ \([^)]*\)$/, "");
 
-/** The condition select's words on a chip */
+/** The condition select's words on a chip; presence reads as the select's words, lower-case */
 const REF_CONDITIONS = {
   has: {
     INCLUDES_ALL: "all of",
     INCLUDES: "any of",
     EXCLUDES: "none of",
+    IS_NULL: "has none",
+    NOT_NULL: "has any",
   },
   in: {
     INCLUDES_ALL: "in all of",
     INCLUDES: "in any of",
     EXCLUDES: "not in",
+    IS_NULL: "in none",
+    NOT_NULL: "in any",
   },
-} as const;
+} as const satisfies Record<string, Record<RefFieldModifier, string>>;
 
 const ENUM_CONDITIONS: Readonly<Record<string, string>> = {
   EQUALS: "is",
@@ -344,7 +417,11 @@ const ENUM_CONDITIONS: Readonly<Record<string, string>> = {
   LESS_THAN: "lower than",
 };
 
-/** A ref row's chip: its ids to be named, its condition and whether it takes sub-entities */
+/**
+ * A ref row's chip: its ids to be named, its condition and whether it takes
+ * sub-entities ("Tags: any of A; not B, with sub-tags"); excludes alone read
+ * "Tags: not B"; a presence choice "Studios: has none"
+ */
 function refChip(
   field: RefField,
   spec: FieldSpec,
@@ -352,20 +429,28 @@ function refChip(
 ): ChipParts | null {
   if (spec.kind !== "ref") return null;
   const criterion = refCriterionOf(spec, field, state);
-  if (criterion === undefined || valuesOf(state[field.key]).length === 0) {
-    return null;
-  }
+  if (criterion === undefined) return null;
   const words: Readonly<Record<string, string>> =
     REF_CONDITIONS[field.modifierLabels ?? "has"];
+  const label = chipLabel(field);
+  const presence = asPresence(criterion.modifier);
+  if (presence !== undefined) {
+    return { label, values: [words[presence] ?? presence.toLowerCase()] };
+  }
+  const ids = criterion.value ?? [];
+  const excludedIds = criterion.excludes ?? [];
   // One modifier offered: no condition select, so no condition to name
   const condition =
-    field.modifiers.length > 1 ? words[criterion.modifier] : undefined;
+    field.modifiers.length > 1 && ids.length > 0
+      ? words[criterion.modifier]
+      : undefined;
   const withDescendants =
     criterion.depth !== undefined && criterion.depth !== 0;
   return {
-    label: chipLabel(field),
+    label,
     ...(condition === undefined ? {} : { condition }),
-    ids: criterion.value,
+    ids,
+    ...(excludedIds.length === 0 ? {} : { excludedIds }),
     ...(withDescendants
       ? {
           suffix: `, with ${(field.hierarchyLabel ?? "sub-items").replace(/^Include /i, "")}`,
@@ -633,27 +718,37 @@ function dateRangeFromCriterion(
 
 /**
  * A stored ref criterion as the row edits it: its ids as stored (a bare id
- * stays bare, a lone id is a one-element list), the modifier when the row
- * offers it and the depth when the row takes one. Nothing when the row
- * cannot edit it: no ids, a modifier it does not offer, several ids on a
- * one-pick row, a depth it does not take.
+ * stays bare, a lone id is a one-element list), its `excludes` under the
+ * exclude companion, the modifier when the row offers it and the depth when
+ * the row takes one; a presence check the row offers as its choice alone.
+ * Nothing when the row cannot edit it: no ids, a modifier it does not
+ * offer, several ids on a one-pick row, a depth it does not take, excludes
+ * on a row without the companion.
  */
 function refFromCriterion(
   field: RefField,
   spec: FieldSpec,
   criterion: unknown
 ): PanelState {
-  const parts = partsOf(criterion, ["value", "modifier", "depth"]);
+  const parts = partsOf(criterion, ["value", "excludes", "modifier", "depth"]);
   if (parts === undefined || spec.kind !== "ref") return {};
-  const ids = valuesOf(parts.value);
   const modifier = parts.modifier ?? spec.defaultModifier;
   const offered = field.modifiers.some((each) => each === modifier);
+  const presence = asPresence(modifier);
+  if (presence !== undefined) {
+    return offered && field.modifierKey !== undefined
+      ? { [field.modifierKey]: presence }
+      : {};
+  }
+  const ids = valuesOf(parts.value);
+  const excluded = valuesOf(parts.excludes);
   const { depth } = parts;
   const takesDepth =
     depth === undefined ||
     (field.hierarchyKey !== undefined && isWholeNumber(depth));
   if (
-    ids.length === 0 ||
+    (ids.length === 0 && excluded.length === 0) ||
+    (excluded.length > 0 && field.excludeKey === undefined) ||
     !offered ||
     !takesDepth ||
     (!field.multi && ids.length > 1)
@@ -661,7 +756,10 @@ function refFromCriterion(
     return {};
   }
   return {
-    [field.key]: field.multi ? ids : ids[0],
+    ...(ids.length === 0 ? {} : { [field.key]: field.multi ? ids : ids[0] }),
+    ...(field.excludeKey === undefined || excluded.length === 0
+      ? {}
+      : { [field.excludeKey]: excluded }),
     ...(field.modifierKey === undefined
       ? {}
       : { [field.modifierKey]: modifier }),
@@ -867,33 +965,58 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
   ref: {
     keys: keysOf,
     normalize: identity,
-    isActive: (field, state) => valuesOf(state[field.key]).length > 0,
+    // Its picks, its exclusions, or a presence choice it offers
+    isActive: (field, state) =>
+      refPresenceOf(field, state) !== undefined ||
+      valuesOf(state[field.key]).length > 0 ||
+      excludedOf(field, state).length > 0,
     toCriterion: (field, spec, state) =>
       spec.kind === "ref" ? refCriterionOf(spec, field, state) : undefined,
-    // A list of ids joined with commas (a lone string is a one-element
-    // list), or one id
-    writeUrl: urlWriter((field, value, params) => {
+    // A presence choice writes its modifier alone. Else a list of ids
+    // joined with commas (a lone string is a one-element list), or one id;
+    // the excluded ids the same way under the exclude companion; then the
+    // modifier and depth when either list has an id or the key is set
+    writeUrl: (field, state, params) => {
+      const presence = refPresenceOf(field, state);
+      if (presence !== undefined && field.modifierKey !== undefined) {
+        params.set(field.modifierKey, presence);
+        return;
+      }
+      const value = state[field.key];
+      const excluded = excludedOf(field, state);
+      if (isUnset(value) && excluded.length === 0) return;
       if (field.multi) {
         const ids = valuesOf(value);
         if (ids.length > 0) params.set(field.key, ids.join(","));
       } else if (value) {
         setParam(params, field.key, value);
       }
-    }),
+      if (field.excludeKey !== undefined && excluded.length > 0) {
+        params.set(field.excludeKey, excluded.join(","));
+      }
+      writeCompanions(field, state, params);
+    },
     // A card's count links with one entity and its instance
     // (/scenes?performerId=82&instance=abc-123 reads performerIds:
     // ["82:abc-123"]); it wins over the row's own list. A list's refs each
-    // name their own instance
+    // name their own instance, the excluded ones too
     readUrl: urlReader((field, params) => {
       const one = params.get(entityParamFor(field.key));
       const value = params.get(field.key);
+      const excluded =
+        field.excludeKey === undefined ? null : params.get(field.excludeKey);
+      const excludes =
+        field.excludeKey === undefined || excluded === null
+          ? {}
+          : { [field.excludeKey]: excluded.split(",").filter(Boolean) };
       if (one) {
         const ref = entityRefFromParam(one, params.get("instance"));
-        return { [field.key]: field.multi ? [ref] : ref };
+        return { [field.key]: field.multi ? [ref] : ref, ...excludes };
       }
-      if (value === null) return {};
+      if (value === null) return excludes;
       return {
         [field.key]: field.multi ? value.split(",").filter(Boolean) : value,
+        ...excludes,
       };
     }),
     fromCriterion: refFromCriterion,

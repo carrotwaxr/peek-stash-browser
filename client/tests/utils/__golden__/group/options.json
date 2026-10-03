@@ -55,7 +55,8 @@
       ],
       "modifierKey": "performerIdsModifier",
       "defaultModifier": "INCLUDES",
-      "countFilterContext": "groups"
+      "countFilterContext": "groups",
+      "excludeKey": "performerIdsExclude"
     },
     {
       "key": "studioId",
@@ -91,7 +92,8 @@
       ],
       "modifierKey": "tagIdsModifier",
       "defaultModifier": "INCLUDES_ALL",
-      "countFilterContext": "groups"
+      "countFilterContext": "groups",
+      "excludeKey": "tagIdsExclude"
     },
     {
       "key": "rating",

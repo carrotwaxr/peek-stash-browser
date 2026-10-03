@@ -37,6 +37,7 @@ export const STUDIO_PANEL = [
     hierarchyLabel: "Include sub-tags",
     countContext: "studios",
     pinnedByDefault: true,
+    excludeKey: "tagIdsExclude",
   },
   {
     key: "rating",

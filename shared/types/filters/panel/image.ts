@@ -18,6 +18,7 @@ export const IMAGE_PANEL = [
     defaultModifier: "INCLUDES",
     modifierLabels: "has",
     countContext: "images",
+    excludeKey: "performerIdsExclude",
   },
   {
     key: "studioIds",
@@ -34,6 +35,7 @@ export const IMAGE_PANEL = [
     hierarchyKey: "studioIdsDepth",
     hierarchyLabel: "Include sub-studios",
     countContext: "images",
+    excludeKey: "studioIdsExclude",
   },
   {
     key: "tagIds",
@@ -51,6 +53,7 @@ export const IMAGE_PANEL = [
     hierarchyLabel: "Include sub-tags",
     countContext: "images",
     pinnedByDefault: true,
+    excludeKey: "tagIdsExclude",
   },
   {
     key: "galleryIds",

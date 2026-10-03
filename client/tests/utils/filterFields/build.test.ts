@@ -204,6 +204,103 @@ describe("buildPanelFilter", () => {
     });
   });
 
+  it("include A, exclude B sends `{ value: [A], excludes: [B] }`", () => {
+    expect(
+      buildPanelFilter("scene", {
+        tagIds: ["1:a"],
+        tagIdsExclude: ["2:a"],
+        tagIdsModifier: "INCLUDES",
+        tagIdsDepth: -1,
+      })
+    ).toEqual({
+      tags: {
+        value: ["1:a"],
+        excludes: ["2:a"],
+        modifier: "INCLUDES",
+        depth: -1,
+      },
+    });
+    // A value both picked and excluded is sent once, as an include
+    expect(
+      buildPanelFilter("image", {
+        performerIds: ["1:a"],
+        performerIdsExclude: ["1:a", "3:a"],
+      })
+    ).toEqual({
+      performers: {
+        value: ["1:a"],
+        excludes: ["3:a"],
+        modifier: "INCLUDES",
+      },
+    });
+  });
+
+  it("excludes alone send `value: []`", () => {
+    expect(buildPanelFilter("scene", { performerIdsExclude: ["4:b"] })).toEqual(
+      {
+        performers: { value: [], excludes: ["4:b"], modifier: "INCLUDES" },
+      }
+    );
+  });
+
+  it('Has any sends `{ modifier: "NOT_NULL" }` with no value', () => {
+    const rows = (PANEL_FIELDS.scene as readonly PanelField[]).map(
+      (row): PanelField =>
+        row.key === "performerIds" && row.editor === "ref"
+          ? { ...row, modifiers: [...row.modifiers, "IS_NULL", "NOT_NULL"] }
+          : row
+    );
+    const table = { rows, specs: SCENE_FIELDS };
+
+    expect(
+      buildPanelFilter(
+        "scene",
+        {
+          performerIds: ["1:a"],
+          performerIdsExclude: ["2:a"],
+          performerIdsModifier: "NOT_NULL",
+        },
+        table
+      )
+    ).toEqual({ performers: { modifier: "NOT_NULL" } });
+    expect(
+      buildPanelFilter("scene", { performerIdsModifier: "IS_NULL" }, table)
+    ).toEqual({ performers: { modifier: "IS_NULL" } });
+    // A row that does not offer presence ignores a stale choice
+    expect(
+      buildPanelFilter("scene", {
+        performerIds: ["1:a"],
+        performerIdsModifier: "NOT_NULL",
+      })
+    ).toEqual({ performers: { value: ["1:a"], modifier: "INCLUDES" } });
+  });
+
+  it("the To Review preset sends what it sent in beta.7", () => {
+    const golden = JSON.parse(
+      readFileSync(
+        resolve(__dirname, "../__golden__/image/builders.json"),
+        "utf8"
+      )
+    ) as {
+      prodPresets: {
+        name: string;
+        stored: { filters: Record<string, unknown> };
+        buildListQueryFromItsFilters: { image_filter: unknown };
+      }[];
+    };
+    const toReview = golden.prodPresets.find(
+      (preset) => preset.name === "To Review"
+    );
+
+    expect(toReview?.buildListQueryFromItsFilters.image_filter).toEqual({
+      studios: { value: ["772", "971"], modifier: "EXCLUDES" },
+      tags: { value: ["466"], modifier: "EXCLUDES" },
+    });
+    expect(
+      text(buildPanelFilter("image", toReview?.stored.filters ?? {}))
+    ).toBe(text(toReview?.buildListQueryFromItsFilters.image_filter));
+  });
+
   it("a new field needs only its table row", () => {
     const row: PanelField = {
       key: "markerCount",
