@@ -3,7 +3,7 @@
  * carousel list and every carousel's scenes stale, so Home asks for them
  * again (an edited rule set shows its new scenes at once).
  */
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -34,6 +34,12 @@ const CAROUSEL = {
 };
 
 /** The builder editing carousel c1 */
+/** The settings page as the builder leaves to it: names the tab it lands on */
+function SettingsProbe() {
+  const { search } = useLocation();
+  return <div>Settings {new URLSearchParams(search).get("tab")}</div>;
+}
+
 function renderEditor(client: QueryClient) {
   render(
     <QueryClientProvider client={client}>
@@ -43,7 +49,7 @@ function renderEditor(client: QueryClient) {
             path="/settings/carousels/:id/edit"
             element={<CarouselBuilder />}
           />
-          <Route path="/settings" element={<div>Settings</div>} />
+          <Route path="/settings" element={<SettingsProbe />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -57,7 +63,7 @@ function renderNew() {
       <MemoryRouter initialEntries={["/settings/carousels/new"]}>
         <Routes>
           <Route path="/settings/carousels/new" element={<CarouselBuilder />} />
-          <Route path="/settings" element={<div>Settings</div>} />
+          <Route path="/settings" element={<SettingsProbe />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -143,7 +149,7 @@ describe("CarouselBuilder", () => {
     const update = await screen.findByRole("button", { name: /Update/ });
     await waitFor(() => expect(update).toBeEnabled());
     fireEvent.click(update);
-    await screen.findByText("Settings");
+    await screen.findByText(/^Settings/);
 
     const sent = (match: (url: string, method?: string) => boolean) =>
       JSON.parse(
@@ -184,7 +190,7 @@ describe("CarouselBuilder", () => {
 
     fireEvent.click(update);
 
-    await screen.findByText("Settings");
+    await screen.findByText(/^Settings/);
     expect(
       client.getQueryState(queryKeys.carousels.execute("c1"))?.isInvalidated
     ).toBe(true);
@@ -219,7 +225,7 @@ describe("CarouselBuilder", () => {
       const button = await screen.findByRole("button", { name: /Update/ });
       await waitFor(() => expect(button).toBeEnabled());
       fireEvent.click(button);
-      await screen.findByText("Settings");
+      await screen.findByText(/^Settings/);
       const put = fetchMock.mock.calls.find(
         ([, init]) => init?.method === "PUT"
       );
@@ -273,7 +279,7 @@ describe("CarouselBuilder", () => {
     const button = await screen.findByRole("button", { name: /Update/ });
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
-    await screen.findByText("Settings");
+    await screen.findByText(/^Settings/);
     const rulesOf = (
       find: (url: string, method: string | undefined) => boolean
     ) =>
@@ -375,7 +381,7 @@ describe("CarouselBuilder", () => {
     const save = await screen.findByRole("button", { name: /^Save/ });
     await waitFor(() => expect(save).toBeEnabled());
     fireEvent.click(save);
-    await screen.findByText("Settings");
+    await screen.findByText(/^Settings/);
     const post = must(
       fetchMock.mock.calls.find(
         ([url, init]) =>
@@ -598,10 +604,10 @@ describe("CarouselBuilder", () => {
     it("Back with unsaved changes asks first", async () => {
       await openWith(CAROUSEL.rules);
 
-      // Nothing changed: Back leaves at once
+      // Nothing changed: Back leaves at once, to the tab listing carousels
       fireEvent.click(back());
       expect(prompt()).toBeNull();
-      await screen.findByText("Settings");
+      await screen.findByText("Settings navigation");
       cleanup();
       vi.unstubAllGlobals();
 
@@ -616,7 +622,7 @@ describe("CarouselBuilder", () => {
         within(dialog).getByRole("button", { name: "Keep editing" })
       );
       await waitFor(() => expect(prompt()).toBeNull());
-      expect(screen.queryByText("Settings")).toBeNull();
+      expect(screen.queryByText(/^Settings/)).toBeNull();
       expect(fieldsIn(document.body)).toEqual(["rating", "watched"]);
 
       fireEvent.click(back());
@@ -625,7 +631,7 @@ describe("CarouselBuilder", () => {
           await screen.findByRole("dialog", { name: "Discard changes?" })
         ).getByRole("button", { name: "Discard" })
       );
-      await screen.findByText("Settings");
+      await screen.findByText(/^Settings/);
     });
 
     it("Back after Save does not", async () => {
@@ -637,7 +643,7 @@ describe("CarouselBuilder", () => {
       await previewAndUpdate(fetchMock);
 
       expect(prompt()).toBeNull();
-      expect(screen.getByText("Settings")).toBeVisible();
+      expect(screen.getByText(/^Settings/)).toBeVisible();
     });
 
     it("a change put back as it was is not unsaved", async () => {
@@ -649,7 +655,7 @@ describe("CarouselBuilder", () => {
       fireEvent.click(back());
 
       expect(prompt()).toBeNull();
-      await screen.findByText("Settings");
+      await screen.findByText(/^Settings/);
     });
   });
 
@@ -702,7 +708,7 @@ describe("CarouselBuilder", () => {
       const save = await screen.findByRole("button", { name: /^Save/ });
       await waitFor(() => expect(save).toBeEnabled());
       fireEvent.click(save);
-      await screen.findByText("Settings");
+      await screen.findByText(/^Settings/);
 
       const post = must(
         fetchMock.mock.calls.find(
