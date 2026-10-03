@@ -67,7 +67,7 @@ const attached: VrMode[] = [];
 
 function attach(
   player: TestPlayer,
-  inputs: VrModeInputs = { detected: "180_LR", storageKey: KEY }
+  inputs: VrModeInputs = { detected: "180_LR", storageKey: KEY, decodes: null }
 ) {
   const mode = attachVrMode(player, inputs, hud);
   attached.push(mode);
@@ -127,7 +127,7 @@ afterEach(() => {
 describe("attachVrMode: no stored pick", () => {
   it("with no user key the pick lasts for the page only: nothing is stored", async () => {
     const { player, vr } = makePlayer();
-    attach(player, { detected: "180_LR", storageKey: null });
+    attach(player, { detected: "180_LR", storageKey: null, decodes: null });
     const setItem = vi.spyOn(Storage.prototype, "setItem");
 
     await press(radio(player, "360"));
@@ -140,7 +140,7 @@ describe("attachVrMode: no stored pick", () => {
   it("with no user key a stored pick under another key is not read", async () => {
     localStorage.setItem(KEY, "360");
     const { player, vr } = makePlayer();
-    attach(player, { detected: "180_LR", storageKey: null });
+    attach(player, { detected: "180_LR", storageKey: null, decodes: null });
 
     await press(toggle(player));
 
@@ -251,7 +251,7 @@ describe("attachVrMode: update", () => {
     const mode = attach(player);
     await press(toggle(player));
 
-    mode.update({ detected: "180_LR", storageKey: KEY });
+    mode.update({ detected: "180_LR", storageKey: KEY, decodes: null });
 
     expect(vr.setProjection).not.toHaveBeenCalled();
     expect(isOn(player)).toBe(true);
@@ -263,7 +263,7 @@ describe("attachVrMode: update", () => {
     const mode = attach(player);
     await press(toggle(player));
 
-    mode.update({ detected: "180_LR", storageKey: OTHER_KEY });
+    mode.update({ detected: "180_LR", storageKey: OTHER_KEY, decodes: null });
 
     expect(vr.setProjection).toHaveBeenCalledWith("FISHEYE_200_LR");
   });
@@ -273,7 +273,7 @@ describe("attachVrMode: update", () => {
     const mode = attach(player);
     await press(toggle(player));
 
-    mode.update({ detected: "180_LR", storageKey: OTHER_KEY });
+    mode.update({ detected: "180_LR", storageKey: OTHER_KEY, decodes: null });
 
     expect(vr.setProjection).toHaveBeenCalledWith("180_LR");
   });
@@ -283,7 +283,7 @@ describe("attachVrMode: update", () => {
     const mode = attach(player);
     await press(toggle(player));
 
-    mode.update({ detected: "360", storageKey: KEY });
+    mode.update({ detected: "360", storageKey: KEY, decodes: null });
 
     expect(vr.setProjection).toHaveBeenCalledWith("360");
   });
@@ -292,7 +292,7 @@ describe("attachVrMode: update", () => {
     const { player, vr } = makePlayer();
     const mode = attach(player);
 
-    mode.update({ detected: "360", storageKey: OTHER_KEY });
+    mode.update({ detected: "360", storageKey: OTHER_KEY, decodes: null });
     await press(toggle(player));
 
     expect(vr.setProjection).not.toHaveBeenCalled();
