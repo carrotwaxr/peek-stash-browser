@@ -373,7 +373,7 @@ describe("GroupQueryBuilder", () => {
         "NOT EXISTS (SELECT 1 FROM GroupRelation gsr JOIN StashGroup gsc ON gsc.id = gsr.subId"
       );
       expect(sql).toContain(
-        "((gsc.id = ? AND gsc.stashInstanceId = ?) OR (gsc.id = ? AND gsc.stashInstanceId = ?)))"
+        "((gsc.stashInstanceId = ? AND gsc.id IN (?, ?))))"
       );
       expect(must(vi.mocked(expandRefs).mock.calls[0])[4]).toBe("up");
     });
@@ -426,10 +426,11 @@ describe("GroupQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "((g.studioId = ? AND g.stashInstanceId = ?) OR (g.studioId = ? AND g.stashInstanceId = ?))"
+        "((g.stashInstanceId = ? AND g.studioId IN (?, ?)))"
       );
-      expect(sql).not.toContain("g.studioId IN (");
-      expect(params).toEqual(arrayContaining(["41", "inst-a", "99", "inst-a"]));
+      // The ids never match without their instance
+      expect(sql).not.toContain("(g.studioId IN (");
+      expect(params).toEqual(arrayContaining(["inst-a", "41", "99"]));
       expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
@@ -442,11 +443,9 @@ describe("GroupQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toMatch(
-        /NOT EXISTS \(SELECT 1 FROM GroupTag (\w+) WHERE \1\.groupId = g\.id AND \1\.groupInstanceId = g\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \? AND \1\.tagInstanceId = \?\)\)\)/
+        /NOT EXISTS \(SELECT 1 FROM GroupTag (\w+) WHERE \1\.groupId = g\.id AND \1\.groupInstanceId = g\.stashInstanceId AND \(\(\1\.tagInstanceId = \? AND \1\.tagId IN \(\?, \?\)\)\)\)/
       );
-      expect(params).toEqual(
-        arrayContaining(["284", "inst-a", "99", "inst-a"])
-      );
+      expect(params).toEqual(arrayContaining(["inst-a", "284", "99"]));
       expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
@@ -670,7 +669,7 @@ const GROUP_CLAUSES: Record<
   aliases: "g.aliases LIKE ?",
   url: "json_valid(g.urls)",
   tags: "FROM GroupTag gt WHERE gt.groupId = g.id",
-  studios: "(g.studioId = ? AND g.stashInstanceId = ?)",
+  studios: "(g.stashInstanceId = ? AND g.studioId IN (?, ?))",
   scenes: "FROM SceneGroup sg JOIN StashScene lsc",
   performers: "FROM ScenePerformer sp JOIN SceneGroup sg",
   containing_groups: "FROM GroupRelation gcr JOIN StashGroup gcp",

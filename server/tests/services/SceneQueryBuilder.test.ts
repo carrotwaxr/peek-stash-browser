@@ -610,7 +610,7 @@ describe("SceneQueryBuilder", () => {
       expect(params).toContain("3");
     });
 
-    it("tags match the junction and the inherited list, each as pairs", async () => {
+    it("tags match the junction and the inherited list, one id list per instance", async () => {
       await run({
         filter: {
           tags: {
@@ -623,10 +623,10 @@ describe("SceneQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ? AND st.tagInstanceId = ?)))"
+        "EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND ((st.tagInstanceId = ? AND st.tagId IN (?, ?))))"
       );
       expect(sql).toContain(
-        "EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = s.id AND sit.sceneInstanceId = s.stashInstanceId AND ((sit.tagId = ? AND sit.tagInstanceId = ?) OR (sit.tagId = ? AND sit.tagInstanceId = ?)))"
+        "EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = s.id AND sit.sceneInstanceId = s.stashInstanceId AND ((sit.tagInstanceId = ? AND sit.tagId IN (?, ?))))"
       );
       expect(params.filter((p) => p === "284")).toHaveLength(2);
       expect(params).not.toContain("284:inst-a");
@@ -759,7 +759,7 @@ describe("SceneQueryBuilder", () => {
       expect(sql).toContain("FROM ScenePerformer");
       expect(sql).toContain("FROM SceneTag");
       expect(sql).toContain("FROM SceneInheritedTag");
-      expect(sql).toContain("s.studioId = ?");
+      expect(sql).toContain("s.studioId IN (?, ?)");
       expect(sql).toContain("strftime('%Y.%m%d', ");
       expect(sql).not.toContain("julianday");
       expect(sql).toContain("s.date IS NOT NULL AND EXISTS");
@@ -1139,7 +1139,7 @@ describe("getByRefs", () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
   });
 
-  it("binds one (id, instance) pair per ref, so B's same id stays out", async () => {
+  it("binds each ref's id beside its instance, so B's same id stays out", async () => {
     await sceneQueryBuilder.getByRefs({
       userId: 1,
       refs: [
@@ -1150,13 +1150,12 @@ describe("getByRefs", () => {
     });
 
     const { sql, params } = pageStatement();
-    expect(sql).toContain(
-      "((s.id = ? AND s.stashInstanceId = ?) OR (s.id = ? AND s.stashInstanceId = ?))"
-    );
-    expect(sql).not.toContain("s.id IN (");
-    // The pairs appear in order, each id beside its instance
+    expect(sql).toContain("((s.stashInstanceId = ? AND s.id IN (?, ?)))");
+    // The ids never match without their instance
+    expect(sql).not.toContain("(s.id IN (");
+    // The instance is bound once, ahead of its ids
     const at = params.indexOf("7");
-    expect(params.slice(at, at + 4)).toEqual(["7", "inst-a", "8", "inst-a"]);
+    expect(params.slice(at - 1, at + 2)).toEqual(["inst-a", "7", "8"]);
   });
 
   it("applies the user's exclusions by default and runs no count", async () => {
@@ -1648,7 +1647,7 @@ const SCENE_CLAUSES: Record<
   duplicated: "s.phash IS NOT NULL AND s.phash != ''",
   performers: "FROM ScenePerformer sp WHERE sp.sceneId = s.id",
   tags: "FROM SceneInheritedTag sit",
-  studios: "(s.studioId = ? AND s.stashInstanceId = ?)",
+  studios: "(s.stashInstanceId = ? AND s.studioId IN (?, ?))",
   groups: "FROM SceneGroup sg WHERE sg.sceneId = s.id",
   galleries: "FROM SceneGallery sg WHERE sg.sceneId = s.id",
   performer_tags: "FROM ScenePerformer sp CROSS JOIN PerformerTag pt",
@@ -1678,7 +1677,7 @@ const SCENE_CLAUSES: Record<
   last_played_at: "w.lastPlayedAt >= ?",
   favorite: "r.favorite = 1",
   performer_favorite: "FROM ScenePerformer sp WHERE sp.sceneId = s.id",
-  studio_favorite: "(s.studioId = ? AND s.stashInstanceId = ?)",
+  studio_favorite: "(s.stashInstanceId = ? AND s.studioId IN (?, ?))",
   tag_favorite: "FROM SceneInheritedTag sit",
   organized: "s.organized = ?",
 };
@@ -1700,8 +1699,8 @@ describe("every scene field clause", () => {
 
   const BOUND = {
     performer_favorite: ["8", "inst-a"],
-    studio_favorite: ["8", "inst-a"],
-    tag_favorite: ["8", "inst-a"],
+    studio_favorite: ["inst-a", "8"],
+    tag_favorite: ["inst-a", "8"],
     resolution: [],
     orientation: [],
   };

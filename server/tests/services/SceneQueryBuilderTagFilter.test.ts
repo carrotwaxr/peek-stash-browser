@@ -104,20 +104,18 @@ describe("SceneQueryBuilder tag clause", () => {
       });
 
       expect(result.sql).toContain(
-        "(st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ? AND st.tagInstanceId = ?)"
+        "(st.tagInstanceId = ? AND st.tagId IN (?, ?))"
       );
       expect(result.sql).not.toContain(BARE_TERM);
       // The direct arm, then the inherited arm, each the tag and its child
       // on the tag's own instance
       expect(result.params).toEqual([
-        "284",
         "instance-1",
+        "284",
         "284-child",
         "instance-1",
         "284",
-        "instance-1",
         "284-child",
-        "instance-1",
       ]);
     });
 
@@ -150,15 +148,13 @@ describe("SceneQueryBuilder tag clause", () => {
       });
 
       expect(result.sql).not.toContain(BARE_TERM);
-      expect(result.params.slice(0, 8)).toEqual([
-        "284",
+      expect(result.params.slice(0, 6)).toEqual([
         "instance-1",
+        "284",
         "284-child",
-        "instance-1",
+        "instance-2",
         "284",
-        "instance-2",
         "284-child-2",
-        "instance-2",
       ]);
     });
 
@@ -172,14 +168,12 @@ describe("SceneQueryBuilder tag clause", () => {
       expect(result.sql).toMatch(/^NOT \(EXISTS \(SELECT 1 FROM SceneTag st/);
       expect(result.sql).not.toContain(BARE_TERM);
       expect(result.params).toEqual([
-        "284",
         "instance-1",
+        "284",
         "284-child",
         "instance-1",
         "284",
-        "instance-1",
         "284-child",
-        "instance-1",
       ]);
     });
   });
@@ -368,22 +362,18 @@ describe("SceneQueryBuilder tag clause", () => {
       ).toHaveLength(2);
       expect(result.count?.params).toEqual(result.params);
       expect(result.params).toEqual([
-        "284",
         "instance-1",
+        "284",
         "284-child",
         "instance-1",
         "284",
-        "instance-1",
         "284-child",
         "instance-1",
         "313",
-        "instance-1",
         "313-child",
         "instance-1",
         "313",
-        "instance-1",
         "313-child",
-        "instance-1",
       ]);
     });
   });

@@ -27,6 +27,17 @@ export const SAMPLE_NUMBER = 7;
 export const SAMPLE_TEXT = "needle";
 export const SAMPLE_DAY = "2026-01-02";
 
+/**
+ * What a ref sample's clause binds: a hierarchical field expands the ref to
+ * more than one on its instance, which bind as the instance once and then
+ * the ids; a lone ref binds as the pair (id, instance)
+ */
+function refBound(hierarchical: boolean): readonly Bound[] {
+  return hierarchical
+    ? [SAMPLE_REF.instanceId, SAMPLE_REF.id]
+    : [SAMPLE_REF.id, SAMPLE_REF.instanceId];
+}
+
 /** The first of the spec's modifiers that is one of `preferred`, else its default */
 function pick<M extends string>(
   modifiers: readonly M[],
@@ -51,7 +62,7 @@ export function sampleFor(field: string, spec: FieldSpec): FieldSample | null {
           modifier: spec.defaultModifier,
           depth: spec.hierarchical ? -1 : 0,
         },
-        bound: [SAMPLE_REF.id, SAMPLE_REF.instanceId],
+        bound: refBound(spec.hierarchical),
       };
     case "playlist":
       return {
@@ -137,10 +148,11 @@ export function alternatesFor(
         ? "INCLUDES_ALL"
         : "EXCLUDES";
       return [
-        make(other, { refs, modifier: other, depth }, [
-          SAMPLE_REF.id,
-          SAMPLE_REF.instanceId,
-        ]),
+        make(
+          other,
+          { refs, modifier: other, depth },
+          refBound(spec.hierarchical)
+        ),
         ...PRESENCE.filter((m) => spec.modifiers.includes(m)).map((m) =>
           make(m, { refs: [], modifier: m, depth })
         ),

@@ -319,11 +319,9 @@ describe("PerformerQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toMatch(
-        /EXISTS \(SELECT 1 FROM PerformerTag (\w+) WHERE \1\.performerId = p\.id AND \1\.performerInstanceId = p\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \? AND \1\.tagInstanceId = \?\)\)\)/
+        /EXISTS \(SELECT 1 FROM PerformerTag (\w+) WHERE \1\.performerId = p\.id AND \1\.performerInstanceId = p\.stashInstanceId AND \(\(\1\.tagInstanceId = \? AND \1\.tagId IN \(\?, \?\)\)\)\)/
       );
-      expect(params).toEqual(
-        arrayContaining(["284", "inst-a", "99", "inst-a"])
-      );
+      expect(params).toEqual(arrayContaining(["inst-a", "284", "99"]));
       expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
       expect(params).not.toContain("284:inst-a");
     });
@@ -743,7 +741,7 @@ describe("every performer field clause", () => {
   }
 
   const BOUND = {
-    tag_favorite: ["8", "inst-a"],
+    tag_favorite: ["inst-a", "8"],
   };
 
   const SAMPLES = new Map(samplesOf(PERFORMER_FIELDS, BOUND));

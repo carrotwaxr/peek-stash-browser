@@ -62,7 +62,7 @@ const IMAGE_CLAUSES: Record<
   resolution: "MIN(i.width, i.height) BETWEEN 144 AND 239",
   orientation: "i.width > i.height",
   tags: "FROM ImageTag it WHERE it.imageId = i.id",
-  studios: "(i.studioId = ? AND i.stashInstanceId = ?)",
+  studios: "(i.stashInstanceId = ? AND i.studioId IN (?, ?))",
   performers: "FROM ImagePerformer ip WHERE ip.imageId = i.id",
   galleries:
     "FROM ImageGallery ig WHERE ((ig.galleryId = ? AND ig.galleryInstanceId = ?))",
@@ -74,7 +74,7 @@ const IMAGE_CLAUSES: Record<
   updated_at: "i.stashUpdatedAt >= ?",
   favorite: "r.favorite = 1",
   performer_favorite: "FROM ImagePerformer ip WHERE ip.imageId = i.id",
-  studio_favorite: "(i.studioId = ? AND i.stashInstanceId = ?)",
+  studio_favorite: "(i.stashInstanceId = ? AND i.studioId IN (?, ?))",
   tag_favorite: "FROM ImageTag it WHERE it.imageId = i.id",
   performer_tags: "FROM ImagePerformer ip CROSS JOIN PerformerTag pt",
   performer_count: "(SELECT COUNT(*) FROM ImagePerformer",
@@ -98,8 +98,8 @@ describe("every image field clause", () => {
 
   const BOUND = {
     performer_favorite: ["8", "inst-a"],
-    studio_favorite: ["8", "inst-a"],
-    tag_favorite: ["8", "inst-a"],
+    studio_favorite: ["inst-a", "8"],
+    tag_favorite: ["inst-a", "8"],
     resolution: [],
     orientation: [],
   };

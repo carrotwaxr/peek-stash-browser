@@ -312,9 +312,9 @@ describe("GalleryQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "(g.studioId IS NULL OR NOT ((g.studioId = ? AND g.stashInstanceId = ?) OR (g.studioId = ? AND g.stashInstanceId = ?)))"
+        "(g.studioId IS NULL OR NOT ((g.stashInstanceId = ? AND g.studioId IN (?, ?))))"
       );
-      expect(params).toEqual(arrayContaining(["41", "inst-a", "99", "inst-a"]));
+      expect(params).toEqual(arrayContaining(["inst-a", "41", "99"]));
       expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
@@ -327,11 +327,9 @@ describe("GalleryQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toMatch(
-        /EXISTS \(SELECT 1 FROM GalleryTag (\w+) WHERE \1\.galleryId = g\.id AND \1\.galleryInstanceId = g\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \? AND \1\.tagInstanceId = \?\)\)\)/
+        /EXISTS \(SELECT 1 FROM GalleryTag (\w+) WHERE \1\.galleryId = g\.id AND \1\.galleryInstanceId = g\.stashInstanceId AND \(\(\1\.tagInstanceId = \? AND \1\.tagId IN \(\?, \?\)\)\)\)/
       );
-      expect(params).toEqual(
-        arrayContaining(["284", "inst-a", "99", "inst-a"])
-      );
+      expect(params).toEqual(arrayContaining(["inst-a", "284", "99"]));
       expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
@@ -714,7 +712,7 @@ const GALLERY_CLAUSES: Record<
   organized: "g.organized = ?",
   is_zip: "NULLIF(g.filePath, '') IS NOT NULL",
   tags: "FROM GalleryTag gt WHERE gt.galleryId = g.id",
-  studios: "(g.studioId = ? AND g.stashInstanceId = ?)",
+  studios: "(g.stashInstanceId = ? AND g.studioId IN (?, ?))",
   performers: "FROM GalleryPerformer gp WHERE gp.galleryId = g.id",
   scenes: "FROM SceneGallery sg JOIN StashScene lsc",
   rating100: "r.rating > ?",
@@ -726,7 +724,7 @@ const GALLERY_CLAUSES: Record<
   favorite: "r.favorite = 1",
   hasFavoriteImage: "FROM ImageGallery ig",
   performer_favorite: "FROM GalleryPerformer gp WHERE gp.galleryId = g.id",
-  studio_favorite: "(g.studioId = ? AND g.stashInstanceId = ?)",
+  studio_favorite: "(g.stashInstanceId = ? AND g.studioId IN (?, ?))",
   tag_favorite: "FROM GalleryTag gt WHERE gt.galleryId = g.id",
   performer_tags: "FROM PerformerTag pt",
   performer_count: "(SELECT COUNT(*) FROM GalleryPerformer pc",
@@ -751,8 +749,8 @@ describe("every gallery field clause", () => {
 
   const BOUND = {
     performer_favorite: ["8", "inst-a"],
-    studio_favorite: ["8", "inst-a"],
-    tag_favorite: ["8", "inst-a"],
+    studio_favorite: ["inst-a", "8"],
+    tag_favorite: ["inst-a", "8"],
   };
 
   const SAMPLES = new Map(samplesOf(GALLERY_FIELDS, BOUND));

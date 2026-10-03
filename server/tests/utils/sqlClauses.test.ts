@@ -161,6 +161,43 @@ describe("pairs", () => {
     });
   });
 
+  it("groups the refs of one instance into one IN list, so a junction searches its index once for the instance", () => {
+    expect(
+      pairs("st.tagId", "st.tagInstanceId", [
+        ref("1"),
+        ref("2"),
+        ref("3", B),
+        ref("4"),
+        ref("5", B),
+        ref("6", B),
+      ])
+    ).toEqual({
+      sql: "(st.tagInstanceId = ? AND st.tagId IN (?, ?, ?)) OR (st.tagInstanceId = ? AND st.tagId IN (?, ?, ?))",
+      params: ["inst-a", "1", "2", "4", "inst-b", "3", "5", "6"],
+    });
+  });
+
+  it("groups bare refs into one IN list on the id alone, after the instance groups", () => {
+    expect(
+      pairs("st.tagId", "st.tagInstanceId", [
+        bare("1"),
+        ref("2"),
+        bare("3"),
+        ref("4"),
+      ])
+    ).toEqual({
+      sql: "(st.tagInstanceId = ? AND st.tagId IN (?, ?)) OR (st.tagId IN (?, ?))",
+      params: ["inst-a", "2", "4", "1", "3"],
+    });
+  });
+
+  it("keeps a lone ref as a single pair", () => {
+    expect(pairs("st.tagId", "st.tagInstanceId", [ref("1")])).toEqual({
+      sql: "(st.tagId = ? AND st.tagInstanceId = ?)",
+      params: ["1", "inst-a"],
+    });
+  });
+
   it("treats an empty instance as a bare ref", () => {
     expect(
       pairs("sg.sceneId", "sg.sceneInstanceId", [{ id: "1", instanceId: "" }])
@@ -169,7 +206,7 @@ describe("pairs", () => {
 });
 
 describe("viaSceneClause", () => {
-  it("INCLUDES for groups by scene emits an EXISTS on SceneGroup keyed by the group's (id, stashInstanceId), joined to the live scene, with one (sceneId, sceneInstanceId) pair per composite ref and a bare `sceneId = ?` per bare ref", () => {
+  it("INCLUDES for groups by scene emits an EXISTS on SceneGroup keyed by the group's (id, stashInstanceId), joined to the live scene, with one (sceneId, sceneInstanceId) group per instance and a bare `sceneId = ?` for the bare refs", () => {
     const clause = viaSceneClause(
       GROUPS_BY_SCENE,
       [ref("5"), bare("7"), ref("9", B)],
@@ -178,8 +215,8 @@ describe("viaSceneClause", () => {
     );
 
     expect(clause).toEqual({
-      sql: `${GROUP_BY_SCENE_EXISTS}(sg.sceneId = ? AND sg.sceneInstanceId = ?) OR (sg.sceneId = ?) OR (sg.sceneId = ? AND sg.sceneInstanceId = ?)))`,
-      params: ["5", "inst-a", "7", "9", "inst-b"],
+      sql: `${GROUP_BY_SCENE_EXISTS}(sg.sceneId = ? AND sg.sceneInstanceId = ?) OR (sg.sceneId = ? AND sg.sceneInstanceId = ?) OR (sg.sceneId = ?)))`,
+      params: ["5", "inst-a", "9", "inst-b", "7"],
     });
   });
 
@@ -766,8 +803,8 @@ describe("refClause", () => {
     };
 
     expect(refClause(target, [ref("1"), ref("2")], "INCLUDES", OPTS)).toEqual({
-      sql: "((s.studioId = ? AND s.stashInstanceId = ?) OR (s.studioId = ? AND s.stashInstanceId = ?))",
-      params: ["1", "inst-a", "2", "inst-a"],
+      sql: "((s.stashInstanceId = ? AND s.studioId IN (?, ?)))",
+      params: ["inst-a", "1", "2"],
     });
     expect(refClause(target, [ref("1")], "EXCLUDES", OPTS)).toEqual({
       sql: "(s.studioId IS NULL OR NOT ((s.studioId = ? AND s.stashInstanceId = ?)))",
@@ -781,8 +818,8 @@ describe("refClause", () => {
       inheritedJunction: SCENE_INHERITED_TAGS,
     });
     expect(inline.ctes).toBeUndefined();
-    // Each ref binds its id and instance in the direct arm and the inherited arm
-    expect(inline.params).toHaveLength(PAIR_INLINE_LIMIT * 4);
+    // Each ref binds its id in the direct arm and the inherited arm, the instance once per arm
+    expect(inline.params).toHaveLength(PAIR_INLINE_LIMIT * 2 + 2);
 
     const refs = many(PAIR_INLINE_LIMIT + 1);
     const large = refClause(SCENE_TAGS, refs, "INCLUDES", {
@@ -857,7 +894,7 @@ describe("refClause", () => {
     });
 
     expect(clause.ctes).toBeUndefined();
-    expect(clause.params).toHaveLength(400);
+    expect(clause.params).toHaveLength(201);
   });
 
   describe("a junction whose parent key is another row's columns (parentKey)", () => {
