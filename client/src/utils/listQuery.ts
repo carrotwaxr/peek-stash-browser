@@ -30,17 +30,6 @@ import type { ListEntity } from "./urlParams";
 type Filters = Readonly<Record<string, unknown>>;
 
 /**
- * Whether a collection filter names at least one collection and includes it:
- * a list of ids, or `{ value, modifier }` with any modifier but EXCLUDES.
- */
-export function hasIncludingCollection(filter: unknown): boolean {
-  if (Array.isArray(filter)) return filter.length > 0;
-  if (typeof filter !== "object" || filter === null) return false;
-  const { value, modifier } = filter as { value?: unknown; modifier?: unknown };
-  return Array.isArray(value) && value.length > 0 && modifier !== "EXCLUDES";
-}
-
-/**
  * The values a filter state names with an including modifier: the page's
  * permanent criterion in the request's shape (`{ value, modifier }` under the
  * contract field), or the panel's key with its modifier companion. An
@@ -94,11 +83,7 @@ const playlistRow = () =>
 /** Whether a filter state, the page's permanent criteria merged in, offers the Scene Number sort */
 export function offersSceneIndex(filters: Filters): boolean {
   return (
-    hasIncludingCollection(filters.groups) ||
-    hasIncludingCollection({
-      value: filters.groupIds,
-      modifier: filters.groupIdsModifier,
-    })
+    includedValues(filters, "groups", "groupIds", "groupIdsModifier").length > 0
   );
 }
 

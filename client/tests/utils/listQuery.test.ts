@@ -124,6 +124,49 @@ describe("sortOptionsFor: sorts that read a filter", () => {
     expect(valuesOf("group", include([1]))).not.toContain("playlist_position");
   });
 
+  it.each(["IS_NULL", "NOT_NULL"])(
+    "the presence choice %s never offers a sort that reads picks",
+    (modifier) => {
+      // A preset or hand-made link can hold picks beside a presence choice:
+      // the request carries only the presence, so the server has no
+      // collection or playlist to order by
+      expect(
+        valuesOf("scene", { groupIds: ["3:abc"], groupIdsModifier: modifier })
+      ).not.toContain("scene_index");
+      expect(
+        valuesOf("scene", { groups: { value: ["3:abc"], modifier } })
+      ).not.toContain("scene_index");
+      expect(
+        valuesOf("scene", { playlists: { value: [1], modifier } })
+      ).not.toContain("playlist_position");
+      expect(
+        valuesOf("group", { groupIds: ["3:abc"], groupIdsModifier: modifier })
+      ).not.toContain("sub_group_order");
+      const query = buildListQuery(
+        "scene",
+        state({
+          sort: { field: "scene_index", direction: "ASC", seed: null },
+          filters: { groupIds: ["3:abc"], groupIdsModifier: modifier },
+        }),
+        {}
+      );
+      expect(query?.filter.sort).toBe(DEFAULT_SORT.scene.field);
+    }
+  );
+
+  it("Scene Number appears with an included collection", () => {
+    expect(
+      valuesOf("scene", { groupIds: ["3:abc"], groupIdsModifier: "INCLUDES" })
+    ).toContain("scene_index");
+    expect(valuesOf("scene", { groupIds: ["3:abc"] })).toContain("scene_index");
+    expect(
+      valuesOf("scene", { groups: { value: ["3:abc"], modifier: "INCLUDES" } })
+    ).toContain("scene_index");
+    expect(
+      valuesOf("scene", { groupIds: ["3:abc"], groupIdsModifier: "EXCLUDES" })
+    ).not.toContain("scene_index");
+  });
+
   it("Playlist order is not sent without one playlist", () => {
     const sort = {
       field: "playlist_position",
