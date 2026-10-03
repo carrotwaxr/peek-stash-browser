@@ -10,7 +10,9 @@
  * every other modifier's on the same value (INCLUDES and INCLUDES_ALL may
  * agree on one id); a sample with sub-items from the same sample without
  * them. Every sort option must parse, and its ORDER BY must differ from the
- * builder's fallback sort, which a key with no expression gets. Clips go
+ * builder's fallback sort, which a key with no expression gets. Every sample
+ * sent with its rows in `where` (as the list pages send it since W10) lists
+ * the same rows and total as through the filter object. Clips go
  * through `buildClipFilter` into the body `ClipSearch` posts
  * (`clip_filter`), the same parser and the clip builder.
  *
@@ -47,8 +49,8 @@ import { parseListRequest } from "../../utils/listRequest.js";
 import { parseJsonArray } from "../../utils/sqlHelpers.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
-  type ClientFilterConfig,
   type ClientList,
+  type ClientModules,
   type ClientOption,
   type OptionSample,
   type PanelState,
@@ -151,13 +153,37 @@ function describeError(error: unknown): string {
   return `the request failed: ${error instanceof Error ? error.message : String(error)}`;
 }
 
-/** Parses the client's request as the route does, and runs the list's builder */
+/** A page's rows (`id:instanceId`, in order) and its total */
+interface Listed {
+  readonly keys: readonly string[];
+  readonly total: number | null;
+}
+
+/** A builder's answer as the rows' keys and the total */
+function listedOf(result: {
+  readonly items: readonly object[];
+  readonly total: number | null;
+}): Listed {
+  return {
+    keys: result.items.map(
+      (item) =>
+        `${String(Reflect.get(item, "id"))}:${String(Reflect.get(item, "instanceId"))}`
+    ),
+    total: result.total,
+  };
+}
+
+/**
+ * Parses the client's request as the route does, and runs the list's
+ * builder: `filters` holds the body's filter parts (`<entity>_filter`, and
+ * `where` when the rows go there)
+ */
 async function runList(
   kind: ListKind,
-  filter: Record<string, unknown>,
+  filters: Record<string, unknown>,
   sort: string | undefined,
   walk: Walk
-): Promise<void> {
+): Promise<Listed> {
   const parse = { userId: walk.userId } as const;
   const scope = {
     userId: walk.userId,
@@ -172,57 +198,65 @@ async function runList(
       q: "",
       ...(sort === undefined ? {} : { sort }),
     },
-    [FILTER_BODY_KEYS[kind]]: filter,
+    ...filters,
   };
   switch (kind) {
     case "scene":
-      await sceneQueryBuilder.execute({
-        ...scope,
-        request: parseListRequest("scene", body, parse),
-      });
-      return;
+      return listedOf(
+        await sceneQueryBuilder.execute({
+          ...scope,
+          request: parseListRequest("scene", body, parse),
+        })
+      );
     case "performer":
-      await performerQueryBuilder.execute({
-        ...scope,
-        request: parseListRequest("performer", body, parse),
-      });
-      return;
+      return listedOf(
+        await performerQueryBuilder.execute({
+          ...scope,
+          request: parseListRequest("performer", body, parse),
+        })
+      );
     case "studio":
-      await studioQueryBuilder.execute({
-        ...scope,
-        request: parseListRequest("studio", body, parse),
-      });
-      return;
+      return listedOf(
+        await studioQueryBuilder.execute({
+          ...scope,
+          request: parseListRequest("studio", body, parse),
+        })
+      );
     case "tag":
-      await tagQueryBuilder.execute({
-        ...scope,
-        request: parseListRequest("tag", body, parse),
-      });
-      return;
+      return listedOf(
+        await tagQueryBuilder.execute({
+          ...scope,
+          request: parseListRequest("tag", body, parse),
+        })
+      );
     case "group":
-      await groupQueryBuilder.execute({
-        ...scope,
-        request: parseListRequest("group", body, parse),
-      });
-      return;
+      return listedOf(
+        await groupQueryBuilder.execute({
+          ...scope,
+          request: parseListRequest("group", body, parse),
+        })
+      );
     case "gallery":
-      await galleryQueryBuilder.execute({
-        ...scope,
-        request: parseListRequest("gallery", body, parse),
-      });
-      return;
+      return listedOf(
+        await galleryQueryBuilder.execute({
+          ...scope,
+          request: parseListRequest("gallery", body, parse),
+        })
+      );
     case "image":
-      await imageQueryBuilder.execute({
-        ...scope,
-        request: parseListRequest("image", body, parse),
-      });
-      return;
+      return listedOf(
+        await imageQueryBuilder.execute({
+          ...scope,
+          request: parseListRequest("image", body, parse),
+        })
+      );
     case "clip":
-      await clipQueryBuilder.execute({
-        ...scope,
-        request: parseListRequest("clip", body, parse),
-      });
-      return;
+      return listedOf(
+        await clipQueryBuilder.execute({
+          ...scope,
+          request: parseListRequest("clip", body, parse),
+        })
+      );
   }
 }
 
@@ -237,7 +271,7 @@ async function pageStatement(
   const filter = list.build(state);
   const recorder = recordStatements();
   try {
-    await runList(kind, filter, sort, walk);
+    await runList(kind, { [FILTER_BODY_KEYS[kind]]: filter }, sort, walk);
   } catch (error) {
     return { error: describeError(error) };
   } finally {
@@ -510,6 +544,85 @@ async function walkFilters(kind: ListKind, walk: Walk, list: ClientList) {
   return [...problems, ...staleEntries(`${kind} filter `, ran)];
 }
 
+/** A list's rows for these filter parts, or why there are none */
+async function listedFor(
+  kind: ListKind,
+  filters: Record<string, unknown>,
+  walk: Walk
+): Promise<Listed | { readonly error: string }> {
+  try {
+    return await runList(kind, filters, undefined, walk);
+  } catch (error) {
+    return { error: describeError(error) };
+  }
+}
+
+/**
+ * Every sample of one list sent twice: its rows in the filter object
+ * (`build`), and as the list pages send them (W10), the rows in `where`
+ * beside the filter object `filterObjectOf` leaves. The two must list the
+ * same rows and total; the statements differ in their CTE names, so the
+ * rows are compared, not the SQL. The problems found.
+ */
+async function walkWhere(kind: ListKind, walk: Walk, list: ClientList) {
+  const problems: string[] = [];
+  let sentInWhere = 0;
+  const filterKey = FILTER_BODY_KEYS[kind];
+  for (const option of list.options) {
+    if (option.type === "section-header") continue;
+    let samples: OptionSample[];
+    try {
+      samples = optionSamples(option, walk.refs);
+    } catch (error) {
+      problems.push(
+        `${kind} where ${option.key}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      continue;
+    }
+    for (const sample of samples) {
+      const id = `${kind} where ${option.key}: ${sample.label}`;
+      const built = list.build(sample.state);
+      const { filter, where } = list.split(sample.state);
+      if (
+        where === undefined &&
+        JSON.stringify(built) !== JSON.stringify(filter)
+      ) {
+        problems.push(
+          `${id}: the rows build ${JSON.stringify(built)} but send no where`
+        );
+        continue;
+      }
+      const viaFilter = await listedFor(kind, { [filterKey]: built }, walk);
+      const viaWhere = await listedFor(
+        kind,
+        { [filterKey]: filter, ...(where === undefined ? {} : { where }) },
+        walk
+      );
+      if (where !== undefined) sentInWhere += 1;
+      if ("error" in viaFilter || "error" in viaWhere) {
+        problems.push(
+          `${id}: through the filter object ${"error" in viaFilter ? viaFilter.error : "listed"}; through where ${"error" in viaWhere ? viaWhere.error : "listed"} (${JSON.stringify(where)})`
+        );
+        continue;
+      }
+      if (
+        viaFilter.total !== viaWhere.total ||
+        viaFilter.keys.join(",") !== viaWhere.keys.join(",")
+      ) {
+        problems.push(
+          [
+            `${id}: where lists other rows than the filter object`,
+            `  filter object ${JSON.stringify(built)}: total ${viaFilter.total}, ${viaFilter.keys.join(", ")}`,
+            `  where ${JSON.stringify(where)} beside ${JSON.stringify(filter)}: total ${viaWhere.total}, ${viaWhere.keys.join(", ")}`,
+          ].join("\n")
+        );
+      }
+    }
+  }
+  if (sentInWhere === 0) problems.push(`${kind}: no sample sent a where`);
+  return problems;
+}
+
 /** Every sort option of one list, walked; the problems found */
 async function walkSorts(kind: ListKind, walk: Walk, list: ClientList) {
   const problems: string[] = [];
@@ -692,7 +805,7 @@ describeWithDb(
   "filter contract: every client filter and sort reaches SQL",
   () => {
     let walk: Walk;
-    let client: ClientFilterConfig;
+    let client: ClientModules;
 
     beforeAll(async () => {
       client = await loadClientFilterConfig();
@@ -738,6 +851,15 @@ describeWithDb(
           walk,
           clientList(client, kind)
         );
+        expect(problems.join("\n\n")).toBe("");
+      },
+      WALK_TIMEOUT_MS
+    );
+
+    it.each(LIST_KINDS)(
+      "every %s sample sends the same rows through where as through the filter object",
+      async (kind) => {
+        const problems = await walkWhere(kind, walk, clientList(client, kind));
         expect(problems.join("\n\n")).toBe("");
       },
       WALK_TIMEOUT_MS

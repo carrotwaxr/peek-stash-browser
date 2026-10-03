@@ -8,7 +8,7 @@ import React, {
 import deepEqual from "fast-deep-equal";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
 import { type ColumnConfig, presetColumnsOf } from "../../config/tableColumns";
-import { useFilterOptions, useLockedFields } from "../../hooks/useListOptions";
+import { useFilterOptions } from "../../hooks/useListOptions";
 import type { ListUrlState, PresetToLoad } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
@@ -117,17 +117,19 @@ const SearchControls = ({
   const filterRefs = useRef<Record<string, HTMLElement | null>>({}); // Refs for filter controls (for scroll-to-highlight)
 
   const { isTVMode } = useTVMode();
-  const lockedFields = useLockedFields(artifactType, permanentFilters);
-  // The panel and the chips offer only what the page leaves free
+  // The panel and the chips offer every field the view leaves free: a field
+  // the page fixes is offered, its rows AND-ed with the page's criterion
+  // (FILTERS-12), but not the timeline's date or the open folder's tags
+  const { viewLockedFields } = listState;
   const allFilterOptions = useFilterOptions(artifactType);
   const filterOptions = useMemo(
     () =>
       withoutLockedOptions(
         artifactType as ListEntity,
         allFilterOptions,
-        lockedFields
+        viewLockedFields
       ),
-    [artifactType, allFilterOptions, lockedFields]
+    [artifactType, allFilterOptions, viewLockedFields]
   );
 
   const {

@@ -33,17 +33,147 @@ const state = (overrides: Partial<ListQueryState> = {}): ListQueryState => ({
 const TIMELINE = { date: { start: "2024-03-01", end: "2024-03-31" } };
 
 describe("buildListQuery", () => {
-  it("a permanent filter wins over a preset naming the same field", () => {
+  it("the page's permanent filter goes in the filter object, the panel's rows in where", () => {
     const query = buildListQuery(
       "scene",
-      state({ filters: { date: { start: "2001-01-01" }, favorite: true } }),
+      state({ filters: { favorite: true } }),
       TIMELINE
     );
-    const expected = buildSceneFilter({ ...TIMELINE, favorite: true });
     expect(query).toEqual({
       filter: { page: 1, per_page: 24, q: "", sort: "date", direction: "DESC" },
-      scene_filter: expected,
+      scene_filter: buildSceneFilter(TIMELINE),
+      where: {
+        match: "all",
+        rules: [{ field: "favorite", criterion: true }],
+      },
     });
+  });
+
+  it("panel rows go to where, the page's lock to the filter object", () => {
+    const performers = { value: ["1:a"], modifier: "INCLUDES" };
+    const query = buildListQuery(
+      "scene",
+      state({ filters: { tagIds: ["5:a"], tagIdsModifier: "INCLUDES" } }),
+      { performers }
+    );
+    expect(query && "scene_filter" in query && query.scene_filter).toEqual({
+      performers,
+    });
+    expect(query?.where?.match).toBe("all");
+    expect(query?.where?.rules).toHaveLength(1);
+    expect(must(query?.where?.rules[0], "the Tags row")).toMatchObject({
+      field: "tags",
+      criterion: { value: ["5:a"], modifier: "INCLUDES" },
+    });
+  });
+
+  it("a tag page's own tag and the user's Tags row both apply (FILTERS-12)", () => {
+    const tags = { value: ["7:a"], modifier: "INCLUDES", depth: 0 };
+    const query = buildListQuery(
+      "scene",
+      state({ filters: { tagIds: ["5:a"], tagIdsModifier: "EXCLUDES" } }),
+      { tags }
+    );
+    // Not merged into one criterion: the page's tag AND the user's row
+    expect(query && "scene_filter" in query && query.scene_filter).toEqual({
+      tags,
+    });
+    expect(must(query?.where?.rules[0], "the Tags row")).toMatchObject({
+      field: "tags",
+      criterion: { value: ["5:a"], modifier: "EXCLUDES" },
+    });
+  });
+
+  it("no rows, no where key", () => {
+    const bare = buildListQuery("scene", state(), {});
+    const locked = buildListQuery("scene", state(), TIMELINE);
+    expect(bare).not.toHaveProperty("where");
+    expect(locked).not.toHaveProperty("where");
+    expect(bare && "scene_filter" in bare && bare.scene_filter).toEqual({});
+  });
+
+  it("a group goes to where as a group", () => {
+    const query = buildListQuery(
+      "scene",
+      state({
+        filters: {
+          favorite: true,
+          g1: "any",
+          "g1.tagIds": ["1:a"],
+          "g1.performerIds": ["2:a"],
+        },
+      }),
+      {}
+    );
+    expect(query && "scene_filter" in query && query.scene_filter).toEqual({});
+    const where = must(query?.where, "where");
+    expect(where.match).toBe("all");
+    expect(where.rules).toHaveLength(2);
+    expect(where.rules[0]).toEqual({ field: "favorite", criterion: true });
+    const group = must(where.rules[1], "the group");
+    expect(group).toMatchObject({ match: "any" });
+    expect(
+      "rules" in group &&
+        group.rules.map((rule) => "field" in rule && rule.field)
+    ).toEqual(["performers", "tags"]);
+  });
+
+  it("a saved contract-field key stays in the filter object", () => {
+    // A preset that saved a page's criterion (`performers`) beside a row
+    const performers = { value: ["1:a"], modifier: "INCLUDES" };
+    const query = buildListQuery(
+      "scene",
+      state({ filters: { performers, favorite: true } }),
+      {}
+    );
+    expect(query && "scene_filter" in query && query.scene_filter).toEqual({
+      performers,
+    });
+    expect(query?.where?.rules).toEqual([
+      { field: "favorite", criterion: true },
+    ]);
+  });
+
+  it.each([
+    ["no Has Preview row", {}, { is_generated: true }, undefined],
+    ["With preview only", { isGenerated: "true" }, {}, true],
+    ["Without preview only", { isGenerated: "false" }, {}, false],
+    ["All clips", { isGenerated: "all" }, {}, undefined],
+  ])(
+    "clips with %s: the default preview filter is sent only when no row decides it",
+    (_label, filters, clipFilter, sentInWhere) => {
+      const query = buildListQuery(
+        "clip",
+        state({
+          filters,
+          sort: { field: "title", direction: "ASC", seed: null },
+        }),
+        {}
+      );
+      expect(query && "clip_filter" in query && query.clip_filter).toEqual(
+        clipFilter
+      );
+      expect(query?.where).toEqual(
+        sentInWhere === undefined
+          ? undefined
+          : {
+              match: "all",
+              rules: [{ field: "is_generated", criterion: sentInWhere }],
+            }
+      );
+    }
+  );
+
+  it("a Has Preview row in a group also replaces the default", () => {
+    const query = buildListQuery(
+      "clip",
+      state({
+        filters: { g1: "any", "g1.isGenerated": "false", "g1.tagIds": ["1:a"] },
+        sort: { field: "title", direction: "ASC", seed: null },
+      }),
+      {}
+    );
+    expect(query && "clip_filter" in query && query.clip_filter).toEqual({});
   });
 
   it("a timeline period's date survives a sort change", () => {
@@ -125,7 +255,7 @@ describe("sortOptionsFor: sorts that read a filter", () => {
   });
 
   it.each(["IS_NULL", "NOT_NULL"])(
-    "the presence choice %s never offers a sort that reads picks",
+    "the presence choice %s offers no sort that reads picks where the request carries only the presence",
     (modifier) => {
       // A preset or hand-made link can hold picks beside a presence choice:
       // the request carries only the presence, so the server has no
@@ -139,9 +269,21 @@ describe("sortOptionsFor: sorts that read a filter", () => {
       expect(
         valuesOf("scene", { playlists: { value: [1], modifier } })
       ).not.toContain("playlist_position");
+      // The parent collection picker offers no presence choice: its picks
+      // are sent as INCLUDES, which Collection order reads (the server's
+      // rule, read on what is sent)
+      const parents = buildListQuery(
+        "group",
+        state({ filters: { groupIds: ["3:abc"], groupIdsModifier: modifier } }),
+        {}
+      );
+      expect(must(parents?.where?.rules[0], "the parent row")).toMatchObject({
+        field: "containing_groups",
+        criterion: { value: ["3:abc"], modifier: "INCLUDES" },
+      });
       expect(
         valuesOf("group", { groupIds: ["3:abc"], groupIdsModifier: modifier })
-      ).not.toContain("sub_group_order");
+      ).toContain("sub_group_order");
       const query = buildListQuery(
         "scene",
         state({
@@ -275,6 +417,65 @@ describe("sortOptionsFor: sorts that read a filter", () => {
   });
 });
 
+describe("sorts that read a filter read root rows only (the server's topLevelCriteria)", () => {
+  it("Scene Number is offered for a root collection row but not under match any", () => {
+    expect(valuesOf("scene", { groupIds: ["3:a"] })).toContain("scene_index");
+    expect(
+      valuesOf("scene", { groupIds: ["3:a"], match: "any", favorite: true })
+    ).not.toContain("scene_index");
+    // A row inside a group never decides a sort
+    expect(
+      valuesOf("scene", { g1: "all", "g1.groupIds": ["3:a"] })
+    ).not.toContain("scene_index");
+    // The page's own collection is the filter object's, under any root too
+    expect(
+      valuesOf("scene", {
+        match: "any",
+        groups: { value: ["3:a"], modifier: "INCLUDES" },
+      })
+    ).toContain("scene_index");
+  });
+
+  it("a second playlist row with one id does not enable Playlist order when the first has two", () => {
+    expect(
+      valuesOf("scene", { playlistIds: ["1", "2"], "2.playlistIds": ["3"] })
+    ).not.toContain("playlist_position");
+    // The first row that names something decides: an excluding one does not
+    expect(
+      valuesOf("scene", {
+        playlistIds: ["1", "2"],
+        playlistIdsModifier: "EXCLUDES",
+        "2.playlistIds": ["3"],
+      })
+    ).toContain("playlist_position");
+  });
+
+  it("the page's playlist wins over a panel row of the field", () => {
+    expect(
+      valuesOf("scene", {
+        playlists: { value: [1], modifier: "INCLUDES" },
+        playlistIds: ["2", "3"],
+      })
+    ).toContain("playlist_position");
+  });
+
+  it("Collection order reads the first root parent collection row", () => {
+    expect(
+      valuesOf("group", { groupIds: ["3:a"], groupIdsModifier: "EXCLUDES" })
+    ).not.toContain("sub_group_order");
+    expect(
+      valuesOf("group", {
+        groupIds: ["3:a"],
+        groupIdsModifier: "EXCLUDES",
+        "2.groupIds": ["4:a"],
+      })
+    ).toContain("sub_group_order");
+    expect(
+      valuesOf("group", { groupIds: ["3:a"], match: "any" })
+    ).not.toContain("sub_group_order");
+  });
+});
+
 describe("locked fields", () => {
   it("lockedFieldsOf reads the top level keys and the entity's own filter", () => {
     expect(
@@ -317,6 +518,26 @@ describe("locked fields", () => {
     expect(
       withoutLockedFilters("scene", { tagIdsExclude: ["2:a"] }, ["tags"])
     ).toEqual({});
+  });
+
+  it("a View's `2.performerIds` and `g1.performerIds` are stripped on a performer page, and `g1` with them", () => {
+    const filters = {
+      performerIds: ["1:a"],
+      "2.performerIds": ["2:a"],
+      "2.performerIdsModifier": "EXCLUDES",
+      g1: "any",
+      "g1.performerIds": ["3:a"],
+      "g1.performerIdsModifier": "INCLUDES",
+      g2: "all",
+      "g2.tagIds": ["4:a"],
+      "g2.performerIds": ["5:a"],
+      favorite: true,
+    };
+    expect(withoutLockedFilters("scene", filters, ["performers"])).toEqual({
+      g2: "all",
+      "g2.tagIds": ["4:a"],
+      favorite: true,
+    });
   });
 
   it("withoutLockedOptions drops the option, and a section left empty", () => {

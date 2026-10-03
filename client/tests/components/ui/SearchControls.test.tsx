@@ -27,6 +27,7 @@ import {
   type ListControlsProps,
 } from "@tests/helpers/ListControls";
 import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
+import { sentFilter } from "@tests/helpers/sentFilter";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,6 +36,7 @@ import {
   defaultPresetsQueryOptions,
   presetsQueryOptions,
 } from "../../../src/api/hooks/usePresets";
+import type { ListView } from "../../../src/hooks/useListUrlState";
 import {
   WALL_VIEW_SETTINGS,
   useWallPlayback,
@@ -409,7 +411,9 @@ describe("SearchControls", () => {
         { url: "/scenes?performerIds=7:server-a" }
       );
 
-      expect((await firstQuery(onQueryChange)).scene_filter).toEqual({
+      expect(
+        sentFilter(await firstQuery(onQueryChange), "scene_filter")
+      ).toEqual({
         performers: { value: ["7:server-a"], modifier: "INCLUDES" },
       });
 
@@ -459,7 +463,7 @@ describe("SearchControls", () => {
         must(screen.getByText("Apply Filters").closest("button"))
       );
       await waitFor(() =>
-        expect(list.lastQuery().scene_filter).toEqual({
+        expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
           tags: { value: ["1:a"], modifier: "EXCLUDES", depth: -1 },
         })
       );
@@ -473,7 +477,9 @@ describe("SearchControls", () => {
           url: "/scenes?tagIds=1:a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
         }
       );
-      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+      expect(
+        sentFilter(await firstQuery(list.onQueryChange), "scene_filter")
+      ).toEqual({
         tags: { value: ["1:a"], modifier: "INCLUDES_ALL", depth: -1 },
       });
 
@@ -496,13 +502,27 @@ describe("SearchControls", () => {
     const offers = (label: string) =>
       screen.queryByText(label, { selector: "label" }) !== null;
 
-    it("on a performer's Scenes tab the panel offers no Performers picker", async () => {
+    const PERFORMER = { value: ["1:abc"], modifier: "INCLUDES" };
+    const TAG = { value: ["5:abc"], modifier: "INCLUDES", depth: 0 };
+    const PERIOD = { start: "2024-01-01", end: "2024-01-31" };
+    /** The timeline's period as `date`, the open folder as `tags`: the view's own */
+    const viewFilters = ({ viewMode, folderPath }: ListView) =>
+      viewMode === "timeline"
+        ? { date: PERIOD }
+        : viewMode === "folder" && folderPath.length > 0
+          ? { tags: { ...TAG, value: folderPath.slice(-1) } }
+          : {};
+    const VIEWS = [
+      { id: "grid", label: "Grid view" },
+      { id: "timeline", label: "Timeline view" },
+      { id: "folder", label: "Folder view" },
+    ];
+
+    it("on a performer's Scenes tab the panel offers Performers too (FILTERS-12)", async () => {
       const list = renderSearchControls(
         {
           context: "scene_performer",
-          permanentFilters: {
-            performers: { value: ["1:abc"], modifier: "INCLUDES" },
-          },
+          permanentFilters: { performers: PERFORMER },
         },
         { url: "/performer/1" }
       );
@@ -510,29 +530,35 @@ describe("SearchControls", () => {
 
       await openPanel();
 
-      expect(offers("Performers")).toBe(false);
+      expect(offers("Performers")).toBe(true);
       expect(offers("Tags")).toBe(true);
     });
 
-    it("a performerIds param in that URL does not reach the request", async () => {
+    it("a performerIds param in that URL goes in where, the page's performer in the filter object", async () => {
       const list = renderSearchControls(
         {
           context: "scene_performer",
-          permanentFilters: {
-            performers: { value: ["1:abc"], modifier: "INCLUDES" },
-          },
+          permanentFilters: { performers: PERFORMER },
         },
         {
           url: "/performer/1?performerIds=9:abc&performerIdsModifier=EXCLUDES",
         }
       );
 
-      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
-        performers: { value: ["1:abc"], modifier: "INCLUDES" },
+      const query = await firstQuery(list.onQueryChange);
+      expect(query.scene_filter).toEqual({ performers: PERFORMER });
+      expect(query.where).toEqual({
+        match: "all",
+        rules: [
+          {
+            field: "performers",
+            criterion: { value: ["9:abc"], modifier: "EXCLUDES" },
+          },
+        ],
       });
     });
 
-    it("on a tag's Performers tab the panel offers no Tags picker", async () => {
+    it("on a tag's Performers tab the panel offers Tags too", async () => {
       // SearchableGrid hands its locked filters over as they are: the
       // entity's own filter holds the fixed fields
       const list = renderSearchControls(
@@ -551,39 +577,39 @@ describe("SearchControls", () => {
 
       await openPanel();
 
-      expect(offers("Tags")).toBe(false);
+      expect(offers("Tags")).toBe(true);
       expect(offers("Gender")).toBe(true);
     });
 
-    it("in the timeline view the panel offers no Date filter", async () => {
+    it("a tag page's Scenes tab offers Tags; the timeline view does not offer Date", async () => {
       const list = renderSearchControls(
         {
-          permanentFilters: {
-            date: { start: "2024-01-01", end: "2024-01-31" },
-          },
+          context: "scene_tag",
+          permanentFilters: { tags: TAG },
+          viewFilters,
+          viewModes: VIEWS,
         },
-        { url: "/scenes?view=timeline" }
+        { url: "/tag/5?view=timeline" }
       );
-      await firstQuery(list.onQueryChange);
+      const query = await firstQuery(list.onQueryChange);
+      expect(query.scene_filter).toMatchObject({ tags: TAG });
 
       await openPanel();
+      expect(offers("Tags")).toBe(true);
       // The date filters sit in a collapsed section
       await userEvent.click(screen.getByText("Date Ranges"));
-
       expect(offers("Created Date")).toBe(true);
       expect(offers("Scene Date")).toBe(false);
     });
 
     it("inside a folder the panel offers no Tags picker", async () => {
       const list = renderSearchControls(
-        {
-          permanentFilters: {
-            tags: { value: ["5:abc"], modifier: "INCLUDES", depth: 0 },
-          },
-        },
-        { url: "/scenes?view=folder" }
+        { viewFilters, viewModes: VIEWS },
+        { url: "/scenes?view=folder&folderPath=5:abc" }
       );
-      await firstQuery(list.onQueryChange);
+      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+        tags: TAG,
+      });
 
       await openPanel();
 
@@ -627,7 +653,9 @@ describe("SearchControls", () => {
       );
 
       await waitFor(() =>
-        expect(list.lastQuery().scene_filter).toEqual({ favorite: true })
+        expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
+          favorite: true,
+        })
       );
       expect(list.params().get("favorite")).toBe("true");
       expect(list.actions).toEqual(["PUSH"]);
@@ -647,7 +675,9 @@ describe("SearchControls", () => {
         must(screen.getByText("Apply Filters").closest("button"))
       );
       await waitFor(() =>
-        expect(list.lastQuery().scene_filter).toEqual({ favorite: false })
+        expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
+          favorite: false,
+        })
       );
       expect(list.params().get("favorite")).toBe("false");
 
@@ -659,7 +689,9 @@ describe("SearchControls", () => {
       await user.click(
         must(screen.getByText("Apply Filters").closest("button"))
       );
-      await waitFor(() => expect(list.lastQuery().scene_filter).toEqual({}));
+      await waitFor(() =>
+        expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({})
+      );
       expect(list.params().has("favorite")).toBe(false);
     });
 
@@ -686,7 +718,7 @@ describe("SearchControls", () => {
       );
 
       await waitFor(() =>
-        expect(list.lastQuery().scene_filter).toEqual({
+        expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
           orientation: { value: ["LANDSCAPE", "SQUARE"] },
         })
       );
@@ -707,7 +739,9 @@ describe("SearchControls", () => {
           },
         }
       );
-      expect((await firstQuery(list.onQueryChange)).performer_filter).toEqual({
+      expect(
+        sentFilter(await firstQuery(list.onQueryChange), "performer_filter")
+      ).toEqual({
         gender: { value: ["FEMALE"], modifier: "INCLUDES" },
       });
 
@@ -729,7 +763,7 @@ describe("SearchControls", () => {
       );
 
       await waitFor(() =>
-        expect(list.lastQuery().performer_filter).toEqual({
+        expect(sentFilter(list.lastQuery(), "performer_filter")).toEqual({
           gender: { value: ["MALE", "FEMALE"], modifier: "EXCLUDES" },
         })
       );
@@ -738,7 +772,9 @@ describe("SearchControls", () => {
     it("choosing Not rated hides the bounds and sends IS_NULL", async () => {
       const user = userEvent.setup();
       const list = renderSearchControls({}, { url: "/scenes?rating_min=40" });
-      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+      expect(
+        sentFilter(await firstQuery(list.onQueryChange), "scene_filter")
+      ).toEqual({
         rating100: { modifier: "BETWEEN", value: 40 },
       });
 
@@ -763,7 +799,7 @@ describe("SearchControls", () => {
       );
 
       await waitFor(() =>
-        expect(list.lastQuery().scene_filter).toEqual({
+        expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
           rating100: { modifier: "IS_NULL" },
         })
       );
@@ -780,7 +816,9 @@ describe("SearchControls", () => {
         screen.getByRole("button", { name: /^Remove filter: Favorite/ })
       );
 
-      await waitFor(() => expect(list.lastQuery().scene_filter).toEqual({}));
+      await waitFor(() =>
+        expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({})
+      );
       expect(list.params().has("favorite")).toBe(false);
     });
 
@@ -837,7 +875,9 @@ describe("SearchControls", () => {
         { url: "/scenes?tagIdsExclude=2:a" }
       );
 
-      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+      expect(
+        sentFilter(await firstQuery(list.onQueryChange), "scene_filter")
+      ).toEqual({
         tags: { value: [], excludes: ["2:a"], modifier: "INCLUDES_ALL" },
       });
       expect(
@@ -872,7 +912,7 @@ describe("SearchControls", () => {
       );
 
       await waitFor(() =>
-        expect(list.lastQuery().scene_filter).toEqual({
+        expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
           groups: { modifier: "IS_NULL" },
         })
       );
@@ -944,7 +984,9 @@ describe("SearchControls", () => {
       );
 
       await waitFor(() => expect(list.lastQuery().filter.page).toBe(1));
-      expect(list.lastQuery().scene_filter).toEqual({ tags: FOLDER_TAG });
+      expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
+        tags: FOLDER_TAG,
+      });
     });
   });
 
@@ -975,7 +1017,7 @@ describe("SearchControls", () => {
         }
       );
       const first = await firstQuery(list.onQueryChange);
-      expect(first.scene_filter).toEqual({
+      expect(sentFilter(first, "scene_filter")).toEqual({
         performers: { value: ["1:abc"], modifier: "INCLUDES" },
       });
 
@@ -984,7 +1026,7 @@ describe("SearchControls", () => {
       );
 
       await waitFor(() => expect(list.lastQuery().filter.page).toBe(2));
-      expect(list.lastQuery().scene_filter).toEqual({
+      expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
         performers: { value: ["1:abc"], modifier: "INCLUDES" },
       });
     });
@@ -1285,7 +1327,9 @@ describe("SearchControls", () => {
     it("Clear All asks for the unfiltered list", async () => {
       const user = userEvent.setup();
       const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
-      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+      expect(
+        sentFilter(await firstQuery(list.onQueryChange), "scene_filter")
+      ).toEqual({
         favorite: true,
       });
 
@@ -1294,7 +1338,9 @@ describe("SearchControls", () => {
         must((await screen.findByText("Clear All")).closest("button"))
       );
 
-      await waitFor(() => expect(list.lastQuery().scene_filter).toEqual({}));
+      await waitFor(() =>
+        expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({})
+      );
       expect(list.params().has("favorite")).toBe(false);
     });
 
@@ -1397,7 +1443,9 @@ describe("SearchControls text condition (F22b)", () => {
   it("the text condition select is named `<label> condition` and reaches the request", async () => {
     const user = userEvent.setup();
     const list = renderSearchControls({}, { url: "/scenes?path=/media" });
-    expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+    expect(
+      sentFilter(await firstQuery(list.onQueryChange), "scene_filter")
+    ).toEqual({
       path: { value: "/media", modifier: "INCLUDES" },
     });
 
@@ -1418,7 +1466,7 @@ describe("SearchControls text condition (F22b)", () => {
     await user.click(must(screen.getByText("Apply Filters").closest("button")));
 
     await waitFor(() =>
-      expect(list.lastQuery().scene_filter).toEqual({
+      expect(sentFilter(list.lastQuery(), "scene_filter")).toEqual({
         path: { value: "/media", modifier: "STARTS_WITH" },
       })
     );

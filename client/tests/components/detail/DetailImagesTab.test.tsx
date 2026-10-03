@@ -270,7 +270,7 @@ describe("DetailImagesTab", () => {
     });
   });
 
-  it("the tab's lock is not offered in the filter panel and shows no chip", async () => {
+  it("the tab's locked field is offered in the filter panel (FILTERS-12) and the lock shows no chip", async () => {
     tagTab();
     await waitFor(() => expect(cards()).toHaveLength(PER_PAGE));
 
@@ -285,9 +285,8 @@ describe("DetailImagesTab", () => {
     expect(
       await screen.findByText("Performers", { selector: "label" })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText("Tags", { selector: "label" })
-    ).not.toBeInTheDocument();
+    // A Tags row narrows the page's tag: both apply
+    expect(screen.getByText("Tags", { selector: "label" })).toBeInTheDocument();
   });
 
   it("a default Images-page preset does not apply on a detail Images tab", async () => {

@@ -8,7 +8,9 @@
  * the URL names no filter (a key of the entity's `UI_KEYS`, a companion,
  * singular, range or date form, `q`, or `filters=none`, which a filter
  * change that leaves no filter writes); `instance`, `tab`, `sort`, `view`
- * and every other key leave them on.
+ * and every other key leave them on. A View's filters lose the fields the
+ * page fixes; the URL's keep them (they go in `where`, FILTERS-12), but not
+ * those the view fixes (the timeline's date, the open folder's tags).
  *
  * Setters rewrite only the list's own keys (`listOwnedKeys`). History: push
  * for filters, sort, page, folder and presets; replace for search text, per
@@ -86,16 +88,19 @@ export interface UseListUrlStateOptions {
   /** The page's fixed filters: never in the URL, merged last into the request */
   permanentFilters?: Record<string, unknown>;
   /**
-   * The contract fields the page fixes (`performers`, `tags`, `date`): the
-   * URL's and the default preset's filters on them are dropped, companions
-   * included, so the panel cannot turn the page's own criterion inside out
+   * The contract fields the page fixes (`performers`, `tags`, `date`): a
+   * View's and the default View's filters on them are dropped when they
+   * load, companions and every row of the field included (a "Fave
+   * performers" View would list nothing on a performer page). The URL's
+   * rows on them stay: they go in `where`, AND-ed with the page's own
+   * criterion (FILTERS-12).
    */
   lockedFields?: readonly string[];
   /**
    * Permanent filters a view adds from its own state (the timeline's period
    * as `date`, the open folder as `tags`), given the page's own
-   * (`permanentFilters`): merged over them, and their fields locked like
-   * `lockedFields`
+   * (`permanentFilters`): merged over them, and their fields locked
+   * (`viewLockedFields`): the URL's filters on them are dropped too
    */
   viewFilters?: (
     view: ListView,
@@ -130,6 +135,11 @@ export interface ListUrlState {
   folderPath: string[];
   /** The page's permanent filters with its view's (`viewFilters`) merged in */
   permanentFilters: Record<string, unknown>;
+  /**
+   * The fields the view fixes (the timeline period's `date`, the open
+   * folder's `tags`), not the page's: the panel offers every other field
+   */
+  viewLockedFields: readonly string[];
   /** The default preset for this context, whichever of its fields applied */
   activePreset: SavedPreset | null;
   /** Presets resolved (cached after the first visit) and a random order seeded */
@@ -255,29 +265,27 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   );
 
   // Equal sets are one dependency, whichever array carries them
-  const lockedKey = [
-    ...new Set([...pageLockedFields, ...lockedFieldsOf(entityType, viewOwn)]),
-  ]
-    .sort()
-    .join(",");
-  const lockedFields = useMemo(
-    () => (lockedKey === "" ? NO_LOCKS : lockedKey.split(",")),
-    [lockedKey]
+  const viewLockedKey = lockedFieldsOf(entityType, viewOwn).join(",");
+  const viewLockedFields = useMemo(
+    () => (viewLockedKey === "" ? NO_LOCKS : viewLockedKey.split(",")),
+    [viewLockedKey]
   );
 
   const derived = useMemo(() => {
-    const filtersBeforeView = withoutLockedFilters(
-      entityType,
-      url.hasFilters
-        ? url.filters
-        : // A default preset becomes state without the URL's reader
+    // The URL's rows on a field the page fixes stay (FILTERS-12); a default
+    // View's go, as a loaded View's do (`loadPreset`)
+    const filtersBeforeView = url.hasFilters
+      ? url.filters
+      : withoutLockedFilters(
+          entityType,
+          // A default preset becomes state without the URL's reader
           normalizePanelState(entityType, activePreset?.filters ?? NO_FILTERS),
-      pageLockedFields
-    );
+          pageLockedFields
+        );
     const filters = withoutLockedFilters(
       entityType,
       filtersBeforeView,
-      lockedFields
+      viewLockedFields
     );
 
     const offered =
@@ -319,7 +327,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     defaults,
     entityType,
     pageLockedFields,
-    lockedFields,
+    viewLockedFields,
     view,
     shown,
   ]);
@@ -460,7 +468,13 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
       const field = parseSortValue(preset.sort || defaults.sort).field;
       write(
         {
-          filters: preset.filters,
+          // A View's rows on a field the page fixes would narrow it to
+          // nothing it was saved for: they go as the default View's do
+          filters: withoutLockedFilters(
+            entityType,
+            preset.filters,
+            pageLockedFields
+          ),
           sort: sortValue(field, field === "random" ? freshSeed() : null),
           direction: isDirection(preset.direction)
             ? preset.direction
@@ -476,7 +490,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
         "push"
       );
     },
-    [write, defaults, derived.perPage]
+    [write, defaults, derived.perPage, entityType, pageLockedFields]
   );
 
   const query = useMemo(
@@ -487,6 +501,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   return {
     ...derived,
     permanentFilters,
+    viewLockedFields,
     activePreset,
     ready,
     listKey: listKeyOf(query),

@@ -12,7 +12,10 @@ import {
   useListDefaults,
   useLockedFields,
 } from "@/hooks/useListOptions";
-import { useListUrlState } from "@/hooks/useListUrlState";
+import {
+  type UseListUrlStateOptions,
+  useListUrlState,
+} from "@/hooks/useListUrlState";
 import {
   type ListQuery,
   buildListQuery,
@@ -30,27 +33,31 @@ export type ListControlsProps = Omit<
   initialSort?: string;
   /** Each new request the list's state builds, as a page would send it */
   onQueryChange?: (query: ListQuery) => void;
+  /** The view's own filters (the timeline's date, the open folder's tags) */
+  viewFilters?: UseListUrlStateOptions["viewFilters"];
 };
 
 /**
  * `SearchControls` as a list page holds it: the list's state from the URL
- * (`useListUrlState`) with the page's permanent filters locked, and the
- * request built from it (`buildListQuery`), reported once per change
+ * (`useListUrlState`) with the page's permanent filters locked and the
+ * view's own (`viewFilters`) merged in, and the request built from it
+ * (`buildListQuery`), reported once per change
  */
 export function ListControls({
   initialSort = "o_counter",
   onQueryChange,
+  viewFilters,
   ...props
 }: ListControlsProps) {
   const {
     artifactType = "scene",
     context,
-    permanentFilters = NO_FILTERS,
+    permanentFilters: pageFilters = NO_FILTERS,
     viewModes,
   } = props;
   const entity = artifactType as ListEntity;
   const filterOptions = useFilterOptions(artifactType);
-  const lockedFields = useLockedFields(artifactType, permanentFilters);
+  const lockedFields = useLockedFields(artifactType, pageFilters);
   const defaults = useListDefaults(artifactType, initialSort);
   const viewModeIds = useMemo(
     () => (viewModes ? viewModes.map((mode) => mode.id) : ["grid"]),
@@ -68,11 +75,13 @@ export function ListControls({
     sortOptions,
     viewModes: viewModeIds,
     defaults,
-    permanentFilters,
+    permanentFilters: pageFilters,
     lockedFields,
+    ...(viewFilters ? { viewFilters } : {}),
   });
 
-  const { ready, filters, sort, page, perPage, q } = listState;
+  const { ready, filters, sort, page, perPage, q, permanentFilters } =
+    listState;
   const query = useMemo(
     () =>
       buildListQuery(
@@ -91,5 +100,11 @@ export function ListControls({
     onQueryChange(query);
   }, [query, onQueryChange]);
 
-  return <SearchControls {...props} listState={listState} />;
+  return (
+    <SearchControls
+      {...props}
+      permanentFilters={permanentFilters}
+      listState={listState}
+    />
+  );
 }

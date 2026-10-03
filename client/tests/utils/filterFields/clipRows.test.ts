@@ -310,7 +310,16 @@ describe("clip presets saved before 9a", () => {
           {}
         )
       ).toMatchObject({
-        clip_filter: { studios: { value: ["3"], modifier: "INCLUDES" } },
+        clip_filter: { is_generated: true },
+        where: {
+          match: "all",
+          rules: [
+            {
+              field: "studios",
+              criterion: { value: ["3"], modifier: "INCLUDES" },
+            },
+          ],
+        },
       });
       expect(chipsOf("clip", filters)).toHaveLength(1);
     }

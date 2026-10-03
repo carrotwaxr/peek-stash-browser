@@ -31,6 +31,7 @@ export {
   type PanelRow,
   type PanelRowGroup,
   type PanelTree,
+  filterObjectOf,
   filtersEqual,
   isFilterUrlKey,
   mergeAnyRows,

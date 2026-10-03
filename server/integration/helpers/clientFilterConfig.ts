@@ -1,8 +1,11 @@
 /**
  * The client's filter panel and sort options (`client/src/utils/filterConfig.ts`)
- * for the filter contract test (item 38), and the panel states it walks.
+ * for the filter contract test (item 38), and the panel states it walks. The
+ * request's two filter parts come from `client/src/utils/filterFields/`
+ * (`filterObjectOf` and `whereOf`, W10), so the walk can send a state's rows
+ * through `where` as the list pages do.
  *
- * The client file is loaded at run time through a non-literal `import()` of a
+ * The client files are loaded at run time through a non-literal `import()` of a
  * `new URL(...)` specifier and typed by `ClientFilterConfig` below, so it
  * stays out of the server's type program (`tsconfig.tests.json`): the client
  * checks it with its own flags, and the server's stricter ones (B23's
@@ -72,11 +75,33 @@ export interface ClientFilterConfig {
   readonly buildClipFilter: BuildFilter;
 }
 
+/** A `where` tree as the client sends it (`WhereGroup`), opaque to the walk */
+export type ClientWhere = Readonly<Record<string, unknown>>;
+
+/** The exports of `client/src/utils/filterFields/index.ts` the walk reads */
+export interface ClientFilterFields {
+  /** The state's rows as the request's `where`; undefined with none */
+  readonly whereOf: (
+    kind: ListKind,
+    state: PanelState
+  ) => ClientWhere | undefined;
+  /** The request's filter object beside that `where`: no row, a list's default criteria */
+  readonly filterObjectOf: (
+    kind: ListKind,
+    state: PanelState
+  ) => Record<string, unknown>;
+}
+
 /** One list's panel: its options, its sorts and its filter builder */
 export interface ClientList {
   readonly options: readonly ClientOption[];
   readonly sorts: readonly ClientChoice[];
   readonly build: BuildFilter;
+  /** The request's filter parts as the list pages send a state: the filter object and `where` */
+  readonly split: (state: PanelState) => {
+    readonly filter: Record<string, unknown>;
+    readonly where: ClientWhere | undefined;
+  };
 }
 
 /** Each list's exports in the client module */
@@ -141,8 +166,24 @@ function isClientFilterConfig(module: unknown): module is ClientFilterConfig {
   );
 }
 
-/** Loads `client/src/utils/filterConfig.ts`, outside the server's type program */
-export async function loadClientFilterConfig(): Promise<ClientFilterConfig> {
+/** The filter-fields module's exports the walk needs, checked by name and kind */
+function isClientFilterFields(module: unknown): module is ClientFilterFields {
+  return (
+    typeof module === "object" &&
+    module !== null &&
+    typeof Reflect.get(module, "whereOf") === "function" &&
+    typeof Reflect.get(module, "filterObjectOf") === "function"
+  );
+}
+
+/** The client modules the walk reads: the panel's config and its filter fields */
+export type ClientModules = ClientFilterConfig & ClientFilterFields;
+
+/**
+ * Loads `client/src/utils/filterConfig.ts` and
+ * `client/src/utils/filterFields/index.ts`, outside the server's type program
+ */
+export async function loadClientFilterConfig(): Promise<ClientModules> {
   const specifier = new URL(
     "../../../client/src/utils/filterConfig.ts",
     import.meta.url
@@ -153,20 +194,35 @@ export async function loadClientFilterConfig(): Promise<ClientFilterConfig> {
       `${specifier} lacks a *_FILTER_OPTIONS, *_SORT_OPTIONS or build*Filter export the contract test reads`
     );
   }
-  return module;
+  const fieldsSpecifier = new URL(
+    "../../../client/src/utils/filterFields/index.ts",
+    import.meta.url
+  ).href;
+  const fields: unknown = await import(fieldsSpecifier);
+  if (!isClientFilterFields(fields)) {
+    throw new Error(
+      `${fieldsSpecifier} lacks the whereOf or filterObjectOf export the contract test reads`
+    );
+  }
+  return {
+    ...module,
+    whereOf: (kind, state) => fields.whereOf(kind, state),
+    filterObjectOf: (kind, state) => fields.filterObjectOf(kind, state),
+  };
 }
 
-/** One list's panel, read from the client module */
-export function clientList(
-  config: ClientFilterConfig,
-  kind: ListKind
-): ClientList {
+/** One list's panel, read from the client modules */
+export function clientList(config: ClientModules, kind: ListKind): ClientList {
   const names = EXPORTS[kind];
   const build = config[names.build];
   return {
     options: config[names.options],
     sorts: config[names.sorts],
     build: (state) => build(state),
+    split: (state) => ({
+      filter: config.filterObjectOf(kind, state),
+      where: config.whereOf(kind, state),
+    }),
   };
 }
 

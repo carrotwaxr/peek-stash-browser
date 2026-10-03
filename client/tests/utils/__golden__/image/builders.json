@@ -3140,6 +3140,14 @@
           "modifier": "EQUALS",
           "value": 0
         }
+      },
+      "listRequest": {
+        "image_filter": {
+          "tag_count": {
+            "modifier": "EQUALS",
+            "value": 0
+          }
+        }
       }
     },
     {
@@ -3157,6 +3165,26 @@
         "tag_count": {
           "modifier": "EQUALS",
           "value": 0
+        }
+      },
+      "listRequest": {
+        "image_filter": {
+          "tag_count": {
+            "modifier": "EQUALS",
+            "value": 0
+          }
+        },
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "tag_count",
+              "criterion": {
+                "modifier": "BETWEEN",
+                "value": 2
+              }
+            }
+          ]
         }
       }
     },
@@ -3176,6 +3204,16 @@
             "10:inst-a"
           ],
           "modifier": "INCLUDES"
+        }
+      },
+      "listRequest": {
+        "image_filter": {
+          "performers": {
+            "value": [
+              "10:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
         }
       }
     },
@@ -3198,6 +3236,17 @@
           "modifier": "INCLUDES",
           "depth": -1
         }
+      },
+      "listRequest": {
+        "image_filter": {
+          "studios": {
+            "value": [
+              "11:inst-a"
+            ],
+            "modifier": "INCLUDES",
+            "depth": -1
+          }
+        }
       }
     },
     {
@@ -3219,6 +3268,17 @@
           "modifier": "INCLUDES",
           "depth": -1
         }
+      },
+      "listRequest": {
+        "image_filter": {
+          "tags": {
+            "value": [
+              "12:inst-a"
+            ],
+            "modifier": "INCLUDES",
+            "depth": -1
+          }
+        }
       }
     },
     {
@@ -3237,6 +3297,16 @@
             "14:inst-a"
           ],
           "modifier": "INCLUDES"
+        }
+      },
+      "listRequest": {
+        "image_filter": {
+          "galleries": {
+            "value": [
+              "14:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
         }
       }
     },
@@ -3261,6 +3331,30 @@
           ],
           "modifier": "INCLUDES"
         }
+      },
+      "listRequest": {
+        "image_filter": {
+          "galleries": {
+            "value": [
+              "14:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
+        },
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "galleries",
+              "criterion": {
+                "value": [
+                  "5:inst-a"
+                ],
+                "modifier": "INCLUDES"
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -3277,6 +3371,15 @@
           "value": "2020-01-01",
           "value2": "2024-12-31"
         }
+      },
+      "listRequest": {
+        "image_filter": {
+          "date": {
+            "modifier": "BETWEEN",
+            "value": "2020-01-01",
+            "value2": "2024-12-31"
+          }
+        }
       }
     },
     {
@@ -3291,6 +3394,14 @@
           "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
+      },
+      "listRequest": {
+        "image_filter": {
+          "date": {
+            "modifier": "BETWEEN",
+            "value": "2020-01-01"
+          }
+        }
       }
     },
     {
@@ -3304,6 +3415,14 @@
         "date": {
           "modifier": "BETWEEN",
           "value2": "2024-12-31"
+        }
+      },
+      "listRequest": {
+        "image_filter": {
+          "date": {
+            "modifier": "BETWEEN",
+            "value2": "2024-12-31"
+          }
         }
       }
     }
@@ -3359,20 +3478,30 @@
             "sort": "created_at",
             "direction": "ASC"
           },
-          "image_filter": {
-            "studios": {
-              "value": [
-                "772",
-                "971"
-              ],
-              "modifier": "EXCLUDES"
-            },
-            "tags": {
-              "value": [
-                "466"
-              ],
-              "modifier": "EXCLUDES"
-            }
+          "image_filter": {},
+          "where": {
+            "match": "all",
+            "rules": [
+              {
+                "field": "studios",
+                "criterion": {
+                  "value": [
+                    "772",
+                    "971"
+                  ],
+                  "modifier": "EXCLUDES"
+                }
+              },
+              {
+                "field": "tags",
+                "criterion": {
+                  "value": [
+                    "466"
+                  ],
+                  "modifier": "EXCLUDES"
+                }
+              }
+            ]
           }
         }
       },
@@ -3397,20 +3526,30 @@
             "sort": "created_at",
             "direction": "ASC"
           },
-          "image_filter": {
-            "studios": {
-              "value": [
-                "772",
-                "971"
-              ],
-              "modifier": "EXCLUDES"
-            },
-            "tags": {
-              "value": [
-                "466"
-              ],
-              "modifier": "EXCLUDES"
-            }
+          "image_filter": {},
+          "where": {
+            "match": "all",
+            "rules": [
+              {
+                "field": "studios",
+                "criterion": {
+                  "value": [
+                    "772",
+                    "971"
+                  ],
+                  "modifier": "EXCLUDES"
+                }
+              },
+              {
+                "field": "tags",
+                "criterion": {
+                  "value": [
+                    "466"
+                  ],
+                  "modifier": "EXCLUDES"
+                }
+              }
+            ]
           }
         }
       },
@@ -3422,20 +3561,30 @@
           "sort": "created_at",
           "direction": "DESC"
         },
-        "image_filter": {
-          "studios": {
-            "value": [
-              "772",
-              "971"
-            ],
-            "modifier": "EXCLUDES"
-          },
-          "tags": {
-            "value": [
-              "466"
-            ],
-            "modifier": "EXCLUDES"
-          }
+        "image_filter": {},
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "studios",
+              "criterion": {
+                "value": [
+                  "772",
+                  "971"
+                ],
+                "modifier": "EXCLUDES"
+              }
+            },
+            {
+              "field": "tags",
+              "criterion": {
+                "value": [
+                  "466"
+                ],
+                "modifier": "EXCLUDES"
+              }
+            }
+          ]
         }
       }
     }

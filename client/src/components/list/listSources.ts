@@ -67,20 +67,22 @@ export interface ListSource {
 
 /**
  * The clip list's request (`POST /api/library/clips`) from the list's
- * query: its page, sort and search in `filter` and the panel's
- * `clip_filter` (a scene's own clips carry the page's permanent `scenes`
- * there), as every list sends them; a sort not yet chosen ("") is left to
- * the server's default, newest first
+ * query: its page, sort and search in `filter`, `clip_filter` (a scene's
+ * own clips carry the page's permanent `scenes` there, and the default "With
+ * preview only") and the user's rows in `where`, as every list sends them;
+ * a sort not yet chosen ("") is left to the server's default, newest first
  */
 export function clipRequestOf(query: ListQuery): FindClipsRequest {
   const { sort, ...page } = query.filter;
   const clipFilter = "clip_filter" in query ? query.clip_filter : undefined;
+  const where = query.where as FindClipsRequest["where"];
   return {
     filter: {
       ...page,
       ...(sort === "" ? {} : { sort: sort as ListPageInput<"clip">["sort"] }),
     },
     ...(clipFilter === undefined ? {} : { clip_filter: clipFilter }),
+    ...(where === undefined ? {} : { where }),
   };
 }
 

@@ -2,6 +2,7 @@ import { type Page, type Response, expect, test } from "@playwright/test";
 import { ListPage } from "./pages/ListPage";
 import { requireData } from "./support/data";
 import { runPrefix } from "./support/names";
+import { sentCriterion } from "./support/sentFilter";
 
 /**
  * Card to Back on the library lists (LG-34): opening a card and pressing Back
@@ -443,13 +444,12 @@ test.describe("List navigation", () => {
       new RegExp(`/images\\?studioId=${studio.id}(&|$)`)
     );
     const response = await images;
-    const sent = response.request().postDataJSON() as {
-      image_filter?: { studios?: { value?: string[] } };
-    };
-    expect(sent.image_filter?.studios?.value).toHaveLength(1);
-    expect(sent.image_filter?.studios?.value?.[0]).toMatch(
-      new RegExp(`^${studio.id}(:|$)`)
+    const sentStudios = sentCriterion<{ value?: string[] }>(
+      response.request().postDataJSON(),
+      "studios"
     );
+    expect(sentStudios?.value).toHaveLength(1);
+    expect(sentStudios?.value?.[0]).toMatch(new RegExp(`^${studio.id}(:|$)`));
     const body = (await response.json()) as { findImages: { count: number } };
     expect(body.findImages.count).toBe(count);
   });

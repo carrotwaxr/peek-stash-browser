@@ -531,31 +531,136 @@ describe("useListUrlState", () => {
       expect(list.state.filters).toEqual({ favorite: true });
     });
 
-    it("the URL's filter on a locked field is ignored, companions included", () => {
+    it("the URL's filter on a field the page fixes stays, companions included (FILTERS-12)", () => {
       const list = renderList(
         "/performer/1?performerIds=9:abc&performerIdsModifier=EXCLUDES&favorite=true",
         { ...SCENE_OPTIONS, lockedFields: ["performers"] }
       );
-      expect(list.state.filters).toEqual({ favorite: "true" });
+      expect(list.state.filters).toEqual({
+        performerIds: ["9:abc"],
+        performerIdsModifier: "EXCLUDES",
+        favorite: "true",
+      });
     });
 
-    it("locks nothing that is not named", () => {
-      const list = renderList("/scenes?performerIds=9:abc&tagIds=4:abc", {
-        ...SCENE_OPTIONS,
-        lockedFields: ["tags"],
-      });
+    it("a default View loses only the fields the page fixes", () => {
+      const list = renderList(
+        "/scenes",
+        { ...SCENE_OPTIONS, lockedFields: ["tags"] },
+        {
+          context: "scene",
+          preset: preset({
+            filters: { performerIds: ["9:abc"], tagIds: ["4:abc"] },
+          }),
+        }
+      );
       expect(Object.keys(list.state.filters)).toEqual(["performerIds"]);
     });
 
-    it("a write drops the locked field's stale keys from the URL", async () => {
+    it("a tag page's URL keeps a Tags row the user added, and the request ANDs it with the page's tag (`scene_filter.tags` and `where`)", () => {
+      const tags = { value: ["5:abc"], modifier: "INCLUDES", depth: 0 };
+      const list = renderList("/tag/5?tagIds=9:abc&tagIdsModifier=INCLUDES", {
+        ...SCENE_OPTIONS,
+        permanentFilters: { tags },
+        lockedFields: ["tags"],
+      });
+      expect(list.state.filters).toEqual({
+        tagIds: ["9:abc"],
+        tagIdsModifier: "INCLUDES",
+      });
+      const request = JSON.parse(list.state.listKey) as {
+        scene_filter?: unknown;
+        where?: { match: string; rules: unknown[] };
+      };
+      expect(request.scene_filter).toEqual({ tags });
+      expect(request.where?.match).toBe("all");
+      expect(must(request.where?.rules[0], "the Tags row")).toMatchObject({
+        field: "tags",
+        criterion: { value: ["9:abc"], modifier: "INCLUDES" },
+      });
+    });
+
+    it("a default View's Tags is still stripped on a tag page", () => {
+      const list = renderList(
+        "/tag/5",
+        {
+          ...SCENE_OPTIONS,
+          permanentFilters: {
+            tags: { value: ["5:abc"], modifier: "INCLUDES" },
+          },
+          lockedFields: ["tags"],
+        },
+        {
+          context: "scene",
+          preset: preset({
+            filters: {
+              tagIds: ["9:abc"],
+              "2.tagIds": ["8:abc"],
+              favorite: true,
+            },
+          }),
+        }
+      );
+      expect(list.state.filters).toEqual({ favorite: "true" });
+      expect(
+        (JSON.parse(list.state.listKey) as { where?: unknown }).where
+      ).toEqual({
+        match: "all",
+        rules: [{ field: "favorite", criterion: true }],
+      });
+    });
+
+    it("loading a View drops its rows on a field the page fixes", async () => {
+      const list = renderList("/performer/1", {
+        ...SCENE_OPTIONS,
+        lockedFields: ["performers"],
+      });
+      await actAsync(() =>
+        list.state.loadPreset(
+          preset({
+            filters: {
+              performerIds: ["9:abc"],
+              "g1.performerIds": ["8:abc"],
+              g1: "any",
+              favorite: true,
+            },
+          })
+        )
+      );
+      expect(list.params().has("performerIds")).toBe(false);
+      expect(list.params().has("g1.performerIds")).toBe(false);
+      expect(list.params().has("g1")).toBe(false);
+      expect(list.params().get("favorite")).toBe("true");
+    });
+
+    it("a write keeps the URL's rows on a field the page fixes", async () => {
       const list = renderList(
         "/scenes?performerIds=9:abc&performerIdsModifier=EXCLUDES&favorite=true",
         { ...SCENE_OPTIONS, lockedFields: ["performers"] }
       );
       await actAsync(() => list.state.removeFilter("favorite"));
-      expect(list.params().has("performerIds")).toBe(false);
-      expect(list.params().has("performerIdsModifier")).toBe(false);
+      expect(list.params().get("performerIds")).toBe("9:abc");
+      expect(list.params().get("performerIdsModifier")).toBe("EXCLUDES");
       expect(list.params().has("favorite")).toBe(false);
+    });
+
+    it("`viewLockedFields` holds the timeline's `date`, not the page's locked performer", () => {
+      const list = renderList("/performer/1?view=timeline", {
+        ...SCENE_OPTIONS,
+        permanentFilters: {
+          performers: { value: ["1:abc"], modifier: "INCLUDES" },
+        },
+        lockedFields: ["performers"],
+        viewFilters: ({ viewMode }) =>
+          viewMode === "timeline"
+            ? { date: { start: "2024-03-01", end: "2024-03-31" } }
+            : {},
+      });
+      expect(list.state.viewLockedFields).toEqual(["date"]);
+      expect(Object.keys(list.state.permanentFilters).sort()).toEqual([
+        "date",
+        "performers",
+      ]);
     });
   });
 

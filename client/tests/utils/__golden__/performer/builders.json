@@ -4591,13 +4591,20 @@
             "sort": "rating",
             "direction": "DESC"
           },
-          "performer_filter": {
-            "gender": {
-              "value": [
-                "FEMALE"
-              ],
-              "modifier": "INCLUDES"
-            }
+          "performer_filter": {},
+          "where": {
+            "match": "all",
+            "rules": [
+              {
+                "field": "gender",
+                "criterion": {
+                  "value": [
+                    "FEMALE"
+                  ],
+                  "modifier": "INCLUDES"
+                }
+              }
+            ]
           }
         }
       },
@@ -4616,13 +4623,20 @@
             "sort": "rating",
             "direction": "DESC"
           },
-          "performer_filter": {
-            "gender": {
-              "value": [
-                "FEMALE"
-              ],
-              "modifier": "INCLUDES"
-            }
+          "performer_filter": {},
+          "where": {
+            "match": "all",
+            "rules": [
+              {
+                "field": "gender",
+                "criterion": {
+                  "value": [
+                    "FEMALE"
+                  ],
+                  "modifier": "INCLUDES"
+                }
+              }
+            ]
           }
         }
       },
@@ -4634,13 +4648,20 @@
           "sort": "rating",
           "direction": "DESC"
         },
-        "performer_filter": {
-          "gender": {
-            "value": [
-              "FEMALE"
-            ],
-            "modifier": "INCLUDES"
-          }
+        "performer_filter": {},
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "gender",
+              "criterion": {
+                "value": [
+                  "FEMALE"
+                ],
+                "modifier": "INCLUDES"
+              }
+            }
+          ]
         }
       }
     }

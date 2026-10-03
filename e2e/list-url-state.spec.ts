@@ -3,6 +3,7 @@ import { ListPage } from "./pages/ListPage";
 import { mustOk } from "./support/api";
 import { requireData } from "./support/data";
 import { uniqueName } from "./support/names";
+import { sentCriterion } from "./support/sentFilter";
 import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
 /**
@@ -90,11 +91,8 @@ test.describe("List state in the URL", () => {
           request.method() === "POST"
       );
     const modifierOf = (request: Awaited<ReturnType<typeof sceneRequest>>) =>
-      (
-        request.postDataJSON() as {
-          scene_filter?: { resolution?: { modifier?: string } };
-        }
-      ).scene_filter?.resolution?.modifier;
+      sentCriterion<{ modifier?: string }>(request.postDataJSON(), "resolution")
+        ?.modifier;
 
     await list.openFilters();
     await page.getByRole("heading", { name: "Video Properties" }).click();
@@ -220,10 +218,9 @@ test.describe("List state in the URL", () => {
       await page.goto(`/performers?instance=${encodeURIComponent(instanceId)}`);
 
       const body = (await listResponse).request().postDataJSON() as {
-        performer_filter?: { gender?: unknown };
         filter?: { sort?: string };
       };
-      expect(body.performer_filter?.gender).toBeTruthy();
+      expect(sentCriterion(body, "gender")).toBeTruthy();
       expect(body.filter?.sort).toBe("name");
       await expect(
         page.getByRole("button", { name: /^Remove filter: Gender/ })

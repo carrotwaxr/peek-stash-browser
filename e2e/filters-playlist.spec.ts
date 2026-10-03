@@ -4,6 +4,7 @@ import { mustOk } from "./support/api";
 import { deleteGroups } from "./support/cleanup";
 import { requireData } from "./support/data";
 import { runPrefix, uniqueName } from "./support/names";
+import { sentCriterion } from "./support/sentFilter";
 import {
   type TestUser,
   completeSetup,
@@ -138,12 +139,11 @@ test.describe("Scenes filtered by a playlist", () => {
       );
       await page.goto(`/scenes?playlistIds=${playlist.playlist.id}`);
       const response = await answered;
-      const sent = response.request().postDataJSON() as {
-        scene_filter?: { playlists?: { value?: number[] } };
-      };
-      expect(sent.scene_filter?.playlists?.value).toEqual([
-        playlist.playlist.id,
-      ]);
+      const playlists = sentCriterion<{ value?: number[] }>(
+        response.request().postDataJSON(),
+        "playlists"
+      );
+      expect(playlists?.value).toEqual([playlist.playlist.id]);
       const body = (await response.json()) as {
         findScenes: { count: number; scenes: SceneRow[] };
       };
