@@ -115,6 +115,11 @@ function makePlayer() {
     isDisposed(): boolean;
     dispose(): void;
     peekVr: () => FakeVr;
+    peekCastState?: string;
+    trigger(event: string): void;
+    tech(options: { IWillNotUseThisInPlugins: boolean }): {
+      el(): HTMLVideoElement;
+    };
   };
   const vr = fakeVr();
   player.peekVr = () => vr;
@@ -187,9 +192,17 @@ async function setup(
     strict = false,
     queueLength = 3,
     reducer = false,
-  }: { strict?: boolean; queueLength?: number; reducer?: boolean } = {}
+    castState,
+  }: {
+    strict?: boolean;
+    queueLength?: number;
+    reducer?: boolean;
+    /** The cast code's state already on the player (a session joined first) */
+    castState?: string;
+  } = {}
 ) {
   const player = makePlayer();
+  if (castState) player.peekCastState = castState;
   players.push(player);
   const playerRef = { current: player };
   let props: HookProps = {
@@ -297,6 +310,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Reflect.deleteProperty(
+    HTMLMediaElement.prototype,
+    "webkitCurrentPlaybackTargetIsWireless"
+  );
   players.splice(0).forEach((p) => p.isDisposed() || p.dispose());
   document.body.innerHTML = "";
   vi.unstubAllGlobals();
@@ -520,6 +537,123 @@ describe("useVrMode: the projection menu", () => {
     expect(player.vr.enable).not.toHaveBeenCalled();
     await click(toggleOf(player));
     expect(player.vr.enable).toHaveBeenCalledWith("360_LR");
+  });
+});
+
+/** Safari's wireless target flag on media elements, off until a test sets it */
+interface WirelessVideo extends HTMLVideoElement {
+  wireless?: boolean;
+}
+function stubWirelessTarget(initial = false) {
+  Object.defineProperty(
+    HTMLMediaElement.prototype,
+    "webkitCurrentPlaybackTargetIsWireless",
+    {
+      configurable: true,
+      get(this: WirelessVideo) {
+        return this.wireless ?? initial;
+      },
+    }
+  );
+}
+const techOf = (player: Player) =>
+  player.tech({ IWillNotUseThisInPlugins: true }).el() as WirelessVideo;
+const castStateChanges = (player: Player, state: string) =>
+  act(async () => {
+    player.peekCastState = state;
+    player.trigger("peek:caststate");
+    await Promise.resolve();
+  });
+const wirelessChanges = (player: Player, wireless: boolean) =>
+  act(async () => {
+    techOf(player).wireless = wireless;
+    techOf(player).dispatchEvent(
+      new Event("webkitcurrentplaybacktargetiswirelesschanged")
+    );
+    await Promise.resolve();
+  });
+const isHidden = (player: Player) =>
+  buttonEl(player).classList.contains("vjs-hidden");
+
+describe("useVrMode: casting and wireless playback", () => {
+  it("the VR button is hidden while the cast state is CONNECTED and returns after", async () => {
+    const { player } = await setup(vrScene());
+    expect(isHidden(player)).toBe(false);
+
+    await click(toggleOf(player));
+    expect(player.vr.enabled).toBe(true);
+
+    await castStateChanges(player, "CONNECTED");
+    expect(isHidden(player)).toBe(true);
+    // VR is off too, and the menu shows it
+    expect(player.vr.disable).toHaveBeenCalledTimes(1);
+    expect(toggleOf(player).el.getAttribute("aria-checked")).toBe("false");
+
+    await castStateChanges(player, "NOT_CONNECTED");
+    expect(isHidden(player)).toBe(false);
+    // Back to flat: nothing turns VR on again
+    expect(player.vr.enable).toHaveBeenCalledTimes(1);
+    expect(toggleOf(player).el.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("a session connected before a VR scene loads keeps the VR button hidden", async () => {
+    const { player } = await setup(vrScene(), { castState: "CONNECTED" });
+    expect(isHidden(player)).toBe(true);
+
+    await castStateChanges(player, "NOT_CONNECTED");
+    expect(isHidden(player)).toBe(false);
+  });
+
+  it("a VR click that finishes loading after a session connects does not turn VR on", async () => {
+    let release = () => {};
+    vi.mocked(loadVr).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (release = resolve))
+    );
+    const { player } = await setup(vrScene());
+
+    await click(toggleOf(player));
+    await castStateChanges(player, "CONNECTED");
+    await act(async () => {
+      release();
+      await Promise.resolve();
+    });
+
+    expect(player.vr.enable).not.toHaveBeenCalled();
+  });
+
+  it("Safari switching to a wireless target disables VR, and the button stays hidden while the target is wireless", async () => {
+    stubWirelessTarget();
+    const { player } = await setup(vrScene());
+    await click(toggleOf(player));
+    expect(player.vr.enabled).toBe(true);
+
+    await wirelessChanges(player, true);
+    expect(player.vr.disable).toHaveBeenCalledTimes(1);
+    expect(isHidden(player)).toBe(true);
+
+    // Another cast event does not bring it back while the target is wireless
+    await castStateChanges(player, "NOT_CONNECTED");
+    expect(isHidden(player)).toBe(true);
+
+    await wirelessChanges(player, false);
+    expect(isHidden(player)).toBe(false);
+  });
+
+  it("a player already on a wireless target loads with the VR button hidden", async () => {
+    stubWirelessTarget(true);
+    const { player } = await setup(vrScene());
+    expect(isHidden(player)).toBe(true);
+  });
+
+  it("with no cast SDK, VR is unaffected", async () => {
+    // No `peekCastState` and no `peek:caststate`: a tab that cannot cast
+    const { player } = await setup(vrScene());
+    expect(isHidden(player)).toBe(false);
+
+    await click(toggleOf(player));
+    expect(player.vr.enable).toHaveBeenCalledTimes(1);
+    expect(isHidden(player)).toBe(false);
+    expect(player.vr.disable).not.toHaveBeenCalled();
   });
 });
 

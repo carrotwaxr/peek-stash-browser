@@ -21,6 +21,8 @@ interface ComponentLike {
   el(): HTMLElement;
   dispose(): void;
   trigger(event: string): void;
+  hide(): void;
+  show(): void;
   name(): string;
   player(): unknown;
   options_: unknown;

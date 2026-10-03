@@ -17,6 +17,12 @@
  *
  * In Safari, turning VR on while native HLS plays moves to the Direct source
  * (`preferDirect`).
+ *
+ * VR and casting take turns on the one player: while a Cast session is
+ * connected, or Safari plays to a wireless (AirPlay) target, VR is off and
+ * its button hidden. The two features share only the player: the cast code
+ * keeps `player.peekCastState` and fires `peek:caststate`, which are read
+ * here (also at attach, for a session joined before the button existed).
  */
 import { VR_PROJECTIONS, type VrProjection } from "@peek/shared-types";
 import videojs from "video.js";
@@ -47,6 +53,12 @@ export interface VrModePlayer {
   };
   isDisposed(): boolean;
   currentSrc(): string;
+  /** The Cast state while a cast session exists (`castSession`) */
+  peekCastState?: string;
+  on(event: string, handler: () => void): void;
+  off(event: string, handler: () => void): void;
+  ready(callback: () => void): void;
+  tech(options: { IWillNotUseThisInPlugins: boolean }): { el(): HTMLElement };
   /** The `sourceSelector` plugin, absent on a player without it */
   sourceSelector?: () => SourceSelector;
   /** Registered by `vrPlugin`, so present only after `loadVr()`. */
@@ -74,6 +86,14 @@ export interface VrMode {
   setFavorite(favorite: boolean): void;
   /** Turns VR off and removes the button (nothing to do on a disposed player). */
   detach(): void;
+}
+
+/** Cast's `CastState` while a session is connected (`castPlugin`) */
+const CAST_CONNECTED = "CONNECTED";
+
+/** Safari's media element, with the wireless target it plays to */
+interface WirelessElement extends HTMLElement {
+  webkitCurrentPlaybackTargetIsWireless?: boolean;
 }
 
 interface XrNavigator {
@@ -167,6 +187,47 @@ export function attachVrMode(
   let button: VrMenuButton | null = null;
   const refresh = () => button?.refresh();
 
+  // Casting or a wireless target takes the player: VR is off and hidden
+  // until both end
+  let casting = player.peekCastState === CAST_CONNECTED;
+  let wireless = false;
+  const takeTurns = () => {
+    if (!alive || player.isDisposed()) return;
+    if (casting || wireless) {
+      if (view.enabled) {
+        player.peekVr?.().disable();
+        view.enabled = false;
+      }
+      button?.hide();
+    } else {
+      button?.show();
+    }
+    refresh();
+  };
+  const onCastState = () => {
+    casting = player.peekCastState === CAST_CONNECTED;
+    takeTurns();
+  };
+  player.on("peek:caststate", onCastState);
+
+  // Safari: the tech's element says when it plays to a wireless target. The
+  // element exists once the player is ready.
+  let video: WirelessElement | null = null;
+  const onWireless = () => {
+    wireless = video?.webkitCurrentPlaybackTargetIsWireless === true;
+    takeTurns();
+  };
+  player.ready(() => {
+    if (!alive || player.isDisposed()) return;
+    video = player.tech({ IWillNotUseThisInPlugins: true }).el();
+    if (!("webkitCurrentPlaybackTargetIsWireless" in video)) return;
+    video.addEventListener(
+      "webkitcurrentplaybacktargetiswirelesschanged",
+      onWireless
+    );
+    onWireless();
+  });
+
   const toggle = async () => {
     if (view.enabled) {
       player.peekVr?.().disable();
@@ -178,7 +239,7 @@ export function attachVrMode(
     loading = true;
     try {
       await loadVr();
-      if (!alive || player.isDisposed()) return;
+      if (!alive || player.isDisposed() || casting || wireless) return;
       const vr = player.peekVr?.();
       if (!vr) return;
       vr.setHud(hud);
@@ -212,6 +273,8 @@ export function attachVrMode(
     VR_BUTTON_NAME,
     button as unknown as BarControl
   );
+  // A session joined before this button existed
+  takeTurns();
 
   return {
     update(next) {
@@ -231,10 +294,15 @@ export function attachVrMode(
     detach() {
       alive = false;
       run.cancelled = true;
+      video?.removeEventListener(
+        "webkitcurrentplaybacktargetiswirelesschanged",
+        onWireless
+      );
       const shown = button;
       button = null;
       // A disposed player took the button, the fork and the view with it
       if (!shown || player.isDisposed()) return;
+      player.off("peek:caststate", onCastState);
       if (view.enabled) player.peekVr?.().disable();
       view.enabled = false;
       player.controlBar.removeChild(shown);

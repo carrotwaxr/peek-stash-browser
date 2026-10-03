@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
+import videojs from "video.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, apiPost } from "@/api";
 import type * as apiModule from "@/api";
@@ -360,6 +361,63 @@ function lastTrackEdit(session: FakeSession) {
   );
   return must(edit.mock.lastCall, "an editTracksInfo call")[0];
 }
+
+/**
+ * VR's plugin as `vrPlugin` registers it: a plugin that exists on a player
+ * once something has called `player.peekVr()` (the VR button's first click)
+ */
+function registerFakeVr() {
+  const vr = { disable: vi.fn() };
+  videojs.registerPlugin("peekVr", () => vr);
+  return vr;
+}
+
+describe("useCast and VR", () => {
+  afterEach(() => {
+    untrusted<{ deregisterPlugin(name: string): void }>(
+      videojs
+    ).deregisterPlugin("peekVr");
+  });
+
+  it("a cast session start while VR is on disables VR before the load request", async () => {
+    const vr = registerFakeVr();
+    const { player } = await renderCast();
+    // The VR button's first click creates the plugin
+    (player as unknown as { peekVr(): unknown }).peekVr();
+
+    const { session } = await startCasting(player);
+
+    expect(vr.disable).toHaveBeenCalledTimes(1);
+    expect(must(vr.disable.mock.invocationCallOrder[0])).toBeLessThan(
+      must(session.loadMedia.mock.invocationCallOrder[0])
+    );
+  });
+
+  it("with VR's plugin never created, a cast start does not create it", async () => {
+    const vr = registerFakeVr();
+    const { player } = await renderCast();
+
+    await startCasting(player);
+
+    expect(vr.disable).not.toHaveBeenCalled();
+    expect(
+      (player as unknown as { usingPlugin(name: string): boolean }).usingPlugin(
+        "peekVr"
+      )
+    ).toBe(false);
+  });
+
+  it("with no cast SDK, VR is unaffected", async () => {
+    vi.mocked(loadCastSdk).mockResolvedValue(null);
+    const vr = registerFakeVr();
+    const { player } = await renderCast({ waitForAttach: false });
+    (player as unknown as { peekVr(): unknown }).peekVr();
+    await settle();
+
+    expect(vr.disable).not.toHaveBeenCalled();
+    expect(player.peekCastState).toBeUndefined();
+  });
+});
 
 describe("useCast", () => {
   it("session start pauses the local player and loads the media at its start time", async () => {

@@ -216,6 +216,10 @@ export interface CastPlayer extends CastControlsPlayer, CastAwarePlayer {
   currentTime(seconds: number): void;
   hasStarted(): boolean;
   trigger(event: string): void;
+  /** Whether a plugin has been created on this player (video.js) */
+  usingPlugin(name: string): boolean;
+  /** VR's plugin: calling it creates it, so check `usingPlugin` first */
+  peekVr?: () => { disable(): void };
   tech(options: { IWillNotUseThisInPlugins: boolean }): {
     trigger(event: string): void;
   } | null;
@@ -612,6 +616,9 @@ export class CastSessionController {
       resumeTime,
     });
     player.pause();
+    // VR and the TV take turns on the player: VR goes first. Calling
+    // `peekVr` creates the plugin, so only where it already exists.
+    if (player.usingPlugin("peekVr")) player.peekVr?.().disable();
     this.expiresAt = Number.POSITIVE_INFINITY;
     this.loadedHere = true;
     this.follow(session);
