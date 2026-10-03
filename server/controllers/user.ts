@@ -1100,7 +1100,10 @@ async function checkedViewState(
 ): Promise<ViewState> {
   const issues: ApiErrorIssue[] = [];
 
-  // One query per entity type the filters name, for their bare ids
+  // One query per entity type the filters name, for their bare ids. It reads
+  // every enabled instance, not the viewer's selection or exclusions: the
+  // selection is a preference, not access control (invariant 11), and a tie
+  // only names the instance of an id the user sent, matching nothing more
   const lookup = await bareRefLookupFor((recording) =>
     validateViewFilters(kind, body.filters, { lookup: recording })
   );
