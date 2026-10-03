@@ -25,6 +25,15 @@ export {
   readPanelFilter,
 } from "./build";
 export { type FilterChip, activeFieldCount, chipsOf } from "./chips";
+export {
+  clearFilters,
+  isRowActive,
+  removeGroup,
+  removeRow,
+  rowState,
+  sameRowState,
+  setRow,
+} from "./filterState";
 export { type FilterOption, filterOptionsOf, rowKeysOf } from "./options";
 export {
   type KeptLeaf,

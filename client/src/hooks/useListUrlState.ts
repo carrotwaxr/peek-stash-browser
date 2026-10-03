@@ -14,8 +14,9 @@
  *
  * Setters rewrite only the list's own keys (`listOwnedKeys`). History: push
  * for filters, sort, page, folder and presets; replace for search text, per
- * page, view, zoom, density, timeline period and `setPage(n, { history:
- * "replace" })`.
+ * page, view, zoom, density, timeline period, `setPage(n, { history:
+ * "replace" })` and `applyFilters(next, { history: "replace" })` (a chip's
+ * popover, whose later edits replace its first).
  */
 import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -148,7 +149,10 @@ export interface ListUrlState {
   listKey: string;
   /** The serialised list query without its page; "" until ready */
   listKeyWithoutPage: string;
-  applyFilters: (filters: Record<string, unknown>) => void;
+  applyFilters: (
+    filters: Record<string, unknown>,
+    opts?: { history?: "push" | "replace" }
+  ) => void;
   removeFilter: (key: string) => void;
   clearFilters: () => void;
   setSort: (field: string, direction?: Direction) => void;
@@ -364,8 +368,8 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   const { filters, sort } = derived;
 
   const applyFilters = useCallback(
-    (next: Record<string, unknown>) =>
-      write({ filters: next, page: 1 }, "push"),
+    (next: Record<string, unknown>, opts?: { history?: "push" | "replace" }) =>
+      write({ filters: next, page: 1 }, opts?.history ?? "push"),
     [write]
   );
 
