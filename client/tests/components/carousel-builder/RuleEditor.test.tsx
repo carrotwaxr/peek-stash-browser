@@ -35,6 +35,7 @@ const {
   PRESENCE_RULE,
   PLAYLIST_RULE,
   PATH_RULE,
+  TOGGLE_RULE,
 } = vi.hoisted(() => ({
   mockFindTagsMinimal: vi.fn<FindMinimalMock>(),
   mockGetPlaylists: vi.fn<() => Promise<GetUserPlaylistsResponse>>(),
@@ -71,6 +72,14 @@ const {
     ],
     defaultModifier: "INCLUDES",
   },
+  // A test-local toggle: the scene rows have none
+  TOGGLE_RULE: {
+    key: "testToggle",
+    type: "checkbox",
+    label: "Test Favorites",
+    defaultValue: false,
+    placeholder: "Favorites Only",
+  },
   // A test-local ref rule offering presence; the scene rows opt in at F18
   PRESENCE_RULE: {
     key: "testTagIds",
@@ -98,6 +107,7 @@ vi.mock("../../../src/utils/filterConfig", async (importOriginal) => {
       PRESENCE_RULE,
       PLAYLIST_RULE,
       PATH_RULE,
+      TOGGLE_RULE,
     ],
   };
 });
@@ -402,6 +412,26 @@ describe("RuleEditor", () => {
     );
   });
 
+  it("a toggle rule reads its label", () => {
+    const onChange = vi.fn();
+    render(
+      <RuleEditor
+        rule={{ id: "rule-1", filterKey: "testToggle", value: true }}
+        usedFilterKeys={new Set(["testToggle"])}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Favorites Only")).toBeInTheDocument();
+    expect(screen.queryByText("Enabled")).toBeNull();
+    const toggle = screen.getByRole("checkbox");
+    expect(toggle).toBeChecked();
+
+    fireEvent.click(toggle);
+    expect(must(onChange.mock.calls[0])[0]).toEqual({ value: false });
+  });
+
   it("a text rule offering Has none hides its value", () => {
     render(
       <RuleEditor
@@ -428,6 +458,7 @@ describe("every rule control has a name", () => {
     { filterKey: "testPath", value: "", modifier: "INCLUDES" },
     { filterKey: "resolution", value: "" },
     { filterKey: "favorite", value: "" },
+    { filterKey: "testToggle", value: true },
   ])("$filterKey", (rule) => {
     const { container } = render(
       <RuleEditor

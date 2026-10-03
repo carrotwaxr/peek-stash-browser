@@ -68,8 +68,8 @@ export const SortControl = ({
  * Reusable Filter Control Component
  */
 interface RangeValue {
-  min?: string;
-  max?: string;
+  min?: string | number;
+  max?: string | number;
   start?: string;
   end?: string;
 }
@@ -116,6 +116,8 @@ export interface FilterControlProps {
   isHighlighted?: boolean;
   /** The id of the field's first control, where a chip moves focus */
   controlId?: string;
+  /** The label stays for assistive technology only (a surface that names the field elsewhere) */
+  hideLabel?: boolean;
   /** A picker's excluded values (its field's exclude companion) */
   excluded?: readonly string[] | undefined;
   /**
@@ -154,6 +156,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
       onHierarchyChange,
       isHighlighted = false,
       controlId,
+      hideLabel = false,
       excluded,
       onSelectionChange,
     },
@@ -453,7 +456,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                   id={boundsId}
                   type="number"
                   aria-label={`Minimum ${label}`}
-                  value={rangeVal.min || ""}
+                  value={rangeVal.min ?? ""}
                   onChange={(e) =>
                     onChange({ ...rangeVal, min: e.target.value })
                   }
@@ -466,7 +469,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                 <input
                   type="number"
                   aria-label={`Maximum ${label}`}
-                  value={rangeVal.max || ""}
+                  value={rangeVal.max ?? ""}
                   onChange={(e) =>
                     onChange({ ...rangeVal, max: e.target.value })
                   }
@@ -585,7 +588,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
       >
         <label
           htmlFor={controlId}
-          className="text-sm font-medium mb-2"
+          className={hideLabel ? "sr-only" : "text-sm font-medium mb-2"}
           style={{ color: "var(--text-primary)" }}
         >
           {label}

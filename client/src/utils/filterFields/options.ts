@@ -66,6 +66,25 @@ export interface FilterOption {
   defaultOpen?: boolean;
 }
 
+/**
+ * The state keys a row owns: its value, and its condition, sub-items and
+ * exclude companions where it has them. A row's editor reads and writes
+ * these and no others.
+ */
+export function rowKeysOf(
+  option: Pick<
+    FilterOption,
+    "key" | "modifierKey" | "hierarchyKey" | "excludeKey"
+  >
+): string[] {
+  return [
+    option.key,
+    option.modifierKey,
+    option.hierarchyKey,
+    option.excludeKey,
+  ].filter((each): each is string => each !== undefined);
+}
+
 /** Each list's contract fields */
 export const SPECS: Readonly<
   Record<ListKind, Readonly<Record<string, FieldSpec>>>

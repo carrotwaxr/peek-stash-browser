@@ -24,4 +24,4 @@ export {
   readPanelFilter,
 } from "./build";
 export { type FilterChip, activeFieldCount, chipsOf } from "./chips";
-export { type FilterOption, filterOptionsOf } from "./options";
+export { type FilterOption, filterOptionsOf, rowKeysOf } from "./options";

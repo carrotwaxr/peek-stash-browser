@@ -12,14 +12,19 @@ import { useFilterOptions, useLockedFields } from "../../hooks/useListOptions";
 import type { ListUrlState, PresetToLoad } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
-import { activeFieldCount, valuesOf } from "../../utils/filterFields";
+import {
+  type FilterOption,
+  type PanelState,
+  activeFieldCount,
+  rowKeysOf,
+} from "../../utils/filterFields";
 import { sortOptionsFor, withoutLockedOptions } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
 import {
   ActiveFilterChips,
   Button,
   ContextSettings,
-  FilterControl,
+  FieldEditor,
   FilterPanel,
   FilterPresets,
   Pagination,
@@ -187,14 +192,20 @@ const SearchControls = ({
     return ids;
   }, [filterOptions]);
 
-  // Handle filter change in panel (editing before submit)
-  const handleFilterChange = useCallback(
-    (filterKey: string, value: unknown) => {
+  // A row edited in the panel (before submit): the row's keys are replaced
+  // by its next state, the rest of the draft stays
+  const handleRowChange = useCallback(
+    (option: FilterOption, next: PanelState) => {
+      const owned = new Set(rowKeysOf(option));
       setDraft((prev) => ({
         base: filters,
         values: {
-          ...(prev && deepEqual(prev.base, filters) ? prev.values : filters),
-          [filterKey]: value === "" ? undefined : value,
+          ...Object.fromEntries(
+            Object.entries(
+              prev && deepEqual(prev.base, filters) ? prev.values : filters
+            ).filter(([key]) => !owned.has(key))
+          ),
+          ...next,
         },
       }));
     },
@@ -594,7 +605,7 @@ const SearchControls = ({
         filterRefs={filterRefs}
       >
         {filterOptions.map((opt, index) => {
-          const { defaultValue, key, type, ...rest } = opt;
+          const { key, type } = opt;
 
           // Render section header
           if (type === "section-header") {
@@ -681,77 +692,16 @@ const SearchControls = ({
           }
 
           // Render regular filter control
-          const {
-            modifierOptions,
-            modifierKey,
-            defaultModifier,
-            supportsHierarchy,
-            hierarchyKey,
-            hierarchyLabel,
-            excludeKey,
-            ...filterProps
-          } = rest;
-
           return (
-            <FilterControl
+            <FieldEditor
               key={`FilterControl-${key}`}
               ref={(el: HTMLDivElement | null) => {
                 if (el) filterRefs.current[key] = el;
               }}
               isHighlighted={highlightedFilterKey === key}
-              controlId={`filter-${key}`}
-              onChange={(value: unknown) => handleFilterChange(key, value)}
-              value={panelFilters[key] || defaultValue}
-              type={
-                type as
-                  | "select"
-                  | "searchable-select"
-                  | "checkbox"
-                  | "number"
-                  | "text"
-                  | "date"
-                  | "range"
-                  | "imperial-height-range"
-                  | "date-range"
-                  | "time-range"
-              }
-              label={filterProps.label!}
-              modifierOptions={modifierOptions}
-              // Untouched, the option's default: the modifier the request carries
-              modifierValue={
-                (modifierKey
-                  ? (panelFilters[modifierKey] as string | undefined)
-                  : undefined) ?? defaultModifier
-              }
-              onModifierChange={(value: unknown) =>
-                modifierKey && handleFilterChange(modifierKey, value)
-              }
-              supportsHierarchy={supportsHierarchy}
-              hierarchyLabel={hierarchyLabel}
-              hierarchyValue={
-                hierarchyKey
-                  ? (panelFilters[hierarchyKey] as number | undefined)
-                  : undefined
-              }
-              onHierarchyChange={
-                hierarchyKey
-                  ? (value: unknown) => handleFilterChange(hierarchyKey, value)
-                  : undefined
-              }
-              // A picker whose field takes exclusions: its excluded values
-              // ride in the exclude companion
-              excluded={
-                excludeKey ? valuesOf(panelFilters[excludeKey]) : undefined
-              }
-              onSelectionChange={
-                excludeKey
-                  ? (included: string[], excluded: string[]) => {
-                      handleFilterChange(key, included);
-                      handleFilterChange(excludeKey, excluded);
-                    }
-                  : undefined
-              }
-              {...filterProps}
+              option={opt}
+              state={panelFilters}
+              onChange={(next) => handleRowChange(opt, next)}
             />
           );
         })}

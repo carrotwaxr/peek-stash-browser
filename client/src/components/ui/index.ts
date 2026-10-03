@@ -33,6 +33,7 @@ export {
 } from "./ErrorBoundary";
 export { default as ExternalPlayerButton } from "./ExternalPlayerButton";
 export { default as FavoriteButton } from "./FavoriteButton";
+export { default as FieldEditor } from "./FieldEditor";
 export { default as HideConfirmationDialog } from "./HideConfirmationDialog";
 export { FilterControl, FilterPanel, SortControl } from "./FilterControls";
 export { default as FilterPresets } from "./FilterPresets";
