@@ -6,9 +6,9 @@
  *   a panel key or companion with or without a row prefix, or a contract
  *   field of the list at the root (a page's permanent criterion, kept as
  *   today). Anything else is refused with its path.
- * - Rows are the distinct (group, occurrence, row key); a companion
- *   (`tagIdsModifier`, `tagIdsDepth`, `tagIdsExclude`) belongs to its row and
- *   is not one of its own. At most 20 rows and 5 groups (`WHERE_LIMITS`), and
+ * - Rows are the distinct (group, occurrence, panel key) of the panel keys;
+ *   a companion (`tagIdsModifier`, `tagIdsDepth`, `tagIdsExclude`) belongs
+ *   to its row and is not one of its own, even with no panel key beside it. At most 20 rows and 5 groups (`WHERE_LIMITS`), and
  *   64 KB of filters.
  * - What is saved is the filters cleaned as a stored preset is
  *   (`cleanViewFilters`): a bare id is tied to its one enabled instance
@@ -86,7 +86,11 @@ export function validateViewFilters(
         break;
       case "row":
         if (role.group > 0) groups.add(role.group);
-        rows.add(JSON.stringify([role.group, role.occurrence, role.row]));
+        // A row is counted from its panel key: a companion alone (no panel
+        // key beside it) is no row, and the client drops it on read
+        if (role.key === role.row) {
+          rows.add(JSON.stringify([role.group, role.occurrence, role.row]));
+        }
         break;
       case "permanent":
         break;

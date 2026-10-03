@@ -235,7 +235,24 @@ describe("validateViewFilters", () => {
     expect(refusedPaths("scene", filters)).toEqual([]);
   });
 
+  it("a companion with no panel key of its row adds no row", () => {
+    const filters: Record<string, unknown> = { "g1.rating": { min: "3" } };
+    for (let n = 1; n <= 19; n++) {
+      filters[n === 1 ? "tagIds" : `${n}.tagIds`] = [`${n}:a`];
+    }
+    // The client drops it on read: no g1.2.tagIds holds it
+    filters["g1.2.tagIdsModifier"] = "INCLUDES";
+
+    expect(refusedPaths("scene", filters)).toEqual([]);
+  });
+
   describe("refuses with a path", () => {
+    it("a group key with a leading zero: g01 is not g1", () => {
+      expect(
+        refusedPaths("scene", { g01: "any", "g1.rating": { min: "1" } })
+      ).toEqual(["filters.g01"]);
+    });
+
     it("an unknown base key, at the root and under a prefix", () => {
       expect(
         refusedPaths("scene", { notAFilter: 1, "g1.nope": 2, "2.nope": 3 })

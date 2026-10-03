@@ -445,8 +445,11 @@ function takesDepth(spec: FieldSpec, value: unknown): boolean {
   return typeof value === "number" && Number.isInteger(value) && value >= -1;
 }
 
-/** A group's match key, `g1` to `g99` (only `g1` to `g5` are groups) */
-const GROUP_KEY = /^g(\d+)$/;
+/**
+ * A group's match key, `g1` on, with no leading zero as Contract 3 writes it
+ * (only `g1` to `g5` are groups; `g01` is no group key)
+ */
+const GROUP_KEY = /^g([1-9]\d*)$/;
 
 /** A filter key's place in the state, read with the key grammar */
 export type FilterKeyRole =
