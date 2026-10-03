@@ -10,6 +10,7 @@ import { LucideSlidersHorizontal } from "lucide-react";
 import { useListCount } from "../../api/hooks/useListCount";
 import { useFlushableDebounce } from "../../hooks/useDebounce";
 import type { ListFilters } from "../../hooks/useListFilters";
+import { useTVMode } from "../../hooks/useTVMode";
 import {
   type FilterChip,
   type FilterOption,
@@ -84,10 +85,12 @@ const NO_CHIPS: readonly FilterChip[] = [];
  * Advanced and Clear all, one editor per root row in one column (each a
  * `FieldEditor` under its `ChipEditorHeader`, whose pin buttons save at
  * once), the groups as chips (opening the Advanced view), and the list's
- * fields ("+ Filter" drawn inline). Nothing reaches the list until the
- * footer's "Show N results": each edit asks only the count (typing 300 ms
- * after the last key) through the page's `countRequestOf`, and the footer
- * reads "Show results" while counting or after a failed count. Show N
+ * fields ("+ Filter" drawn inline; in TV mode its button over its menu, so
+ * the D-pad goes from the last row past it to "Show N results", and opening
+ * at "add" focuses that button). Nothing reaches the list until the footer's
+ * "Show N results": each edit asks only the count (typing 300 ms after the
+ * last key) through the page's `countRequestOf`, and the footer reads "Show
+ * results" while counting or after a failed count. Show N
  * applies the draft once (one history entry) and closes; Escape, the close
  * button or the backdrop discard it.
  *
@@ -246,7 +249,9 @@ const OpenSheet = ({
   permanentChips = NO_CHIPS,
 }: FilterSheetProps) => {
   const { kind, options } = filters;
+  const { isTVMode } = useTVMode();
   const pinning = useListPinning(kind, options);
+  const addRef = useRef<HTMLButtonElement>(null);
   const nextId = useRef(0);
   const newId = () => {
     nextId.current += 1;
@@ -328,12 +333,14 @@ const OpenSheet = ({
     const { target } = focus;
     if (target === undefined) return;
     const element =
-      target === "add"
-        ? bodyRef.current?.querySelector<HTMLElement>('[role="combobox"]')
-        : document.getElementById(target.id);
+      target !== "add"
+        ? document.getElementById(target.id)
+        : isTVMode
+          ? addRef.current
+          : bodyRef.current?.querySelector<HTMLElement>('[role="combobox"]');
     element?.scrollIntoView({ block: "nearest" });
     element?.focus();
-  }, [focus]);
+  }, [focus, isTVMode]);
 
   /** Moves focus to a row's control once drawn */
   const focusRow = (nextRows: readonly SheetRow[], id: string) => {
@@ -549,18 +556,29 @@ const OpenSheet = ({
             );
           })}
           <section aria-label="Add a filter">
-            <h4
-              className="mb-2 text-sm font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Add a filter
-            </h4>
-            <AddFilterMenu
-              filters={draftFilters}
-              pinnedFields={pinning.shownPins.fields}
-              onPick={pickField}
-              inline
-            />
+            {isTVMode ? (
+              <AddFilterMenu
+                filters={draftFilters}
+                pinnedFields={pinning.shownPins.fields}
+                onPick={pickField}
+                triggerRef={addRef}
+              />
+            ) : (
+              <>
+                <h4
+                  className="mb-2 text-sm font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Add a filter
+                </h4>
+                <AddFilterMenu
+                  filters={draftFilters}
+                  pinnedFields={pinning.shownPins.fields}
+                  onPick={pickField}
+                  inline
+                />
+              </>
+            )}
           </section>
         </div>
       </Modal>

@@ -29,7 +29,8 @@ const FOCUSABLE =
 /**
  * A small panel under the control that opens it (a menu, a settings list).
  * Not modal: it adds no overlay scope, so page keys keep running, and the
- * page behind stays usable.
+ * page behind stays usable. In TV mode the arrows move focus only inside it
+ * while it holds focus (`focusRoot`, by its `role="dialog"`).
  *
  * Render it next to the anchor, inside the anchor's positioned wrapper (it is
  * placed with the anchor's offsets) and never through a portal: inside a

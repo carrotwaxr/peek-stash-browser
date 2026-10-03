@@ -38,6 +38,7 @@ import {
   filterOptionsOf,
   treeOf,
 } from "@/utils/filterFields";
+import { moveFocus } from "@/utils/spatialFocus";
 
 interface Known {
   id: string;
@@ -95,8 +96,9 @@ vi.mock("@/contexts/UnitPreferenceContext", () => ({
   useUnitPreference: () => ({ unitPreference: unit }),
 }));
 
+let tv = false;
 vi.mock("@/hooks/useTVMode", () => ({
-  useTVMode: () => ({ isTVMode: false }),
+  useTVMode: () => ({ isTVMode: tv }),
 }));
 
 vi.mock("@/contexts/CardDisplaySettingsContext", () => ({
@@ -206,6 +208,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  tv = false;
 });
 
 describe("chip text", () => {
@@ -1113,5 +1116,87 @@ describe("on the sheet surface (a phone or a TV)", () => {
 
     const bar = screen.getByRole("group", { name: "Filters" });
     expect(bar).toHaveClass("flex-nowrap", "overflow-x-auto");
+  });
+});
+
+describe("in TV mode", () => {
+  const UNWATCHED: PinnedFilter = {
+    id: "default-unwatched",
+    key: "watched",
+    state: { watched: "false" },
+    label: "Unwatched",
+  };
+
+  /** A control's name: its label, else its text */
+  const nameOf = (el: Element) =>
+    (el.getAttribute("aria-label") ?? el.textContent ?? "").trim();
+
+  /**
+   * happy-dom has no layout: each child of the controls' card is a row,
+   * 50 px under the one before, and its controls sit left to right in
+   * document order, 100 px wide
+   */
+  function layOut(card: Element) {
+    [...card.children].forEach((row, index) => {
+      [
+        ...row.querySelectorAll<HTMLElement>(
+          'button, input:not([type="hidden"]), select'
+        ),
+      ].forEach((el, column) => {
+        const r = {
+          left: column * 110,
+          top: index * 50,
+          right: column * 110 + 100,
+          bottom: index * 50 + 34,
+        };
+        el.getBoundingClientRect = () =>
+          ({ ...r, x: r.left, y: r.top, width: 100, height: 34 }) as DOMRect;
+      });
+    });
+  }
+
+  it("in TV mode the row's order is pinned filters, pinned fields, chips, groups, Filters, Views; Down from the search box lands on the first pin", async () => {
+    tv = true;
+    const list = renderListControls(
+      {},
+      {
+        url: "/scenes?organized=true&g1=any&g1.tagFavorite=true&g1.performerFavorite=true",
+        pins: { scene: { fields: ["studioId"], filters: [UNWATCHED] } },
+      }
+    );
+    await list.firstQuery();
+    await screen.findByRole("button", { name: "Unwatched" });
+
+    const bar = screen.getByRole("group", { name: "Filters" });
+    const names = [...bar.querySelectorAll("button")].map(nameOf);
+    const at = (pattern: RegExp) => {
+      const index = names.findIndex((name) => pattern.test(name));
+      expect(index, String(pattern)).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    const order = [
+      at(/^Unwatched$/),
+      at(/^Edit filter: Studios$/),
+      at(/^Edit filter: Organized: Yes$/),
+      at(/^Edit filter group: Any of/),
+      at(/^Filters \(2\)$/),
+      at(/^Views/),
+    ];
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    // Row 1 keeps search and sort, not Filters or Views
+    const search = screen.getByPlaceholderText("Search...");
+    expect(bar.contains(search)).toBe(false);
+
+    // Down from the search box: the bar is the next row, its first pin first
+    let card = search.parentElement;
+    while (card !== null && !card.contains(bar)) card = card.parentElement;
+    layOut(must(card, "the controls' card"));
+    act(() => search.focus());
+    act(() => {
+      moveFocus("down", document.body);
+    });
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Unwatched" })
+    );
   });
 });

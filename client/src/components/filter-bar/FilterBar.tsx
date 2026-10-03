@@ -1,4 +1,12 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   PANEL_FIELDS,
   type PinnedFilter,
@@ -45,6 +53,13 @@ interface FilterBarProps {
    * instead of a popover, and the row scrolls sideways
    */
   onOpenSheet?: ((focus: SheetFocus) => void) | undefined;
+  /**
+   * Drawn after the group chips, before "+ Filter" (TV mode: the list's
+   * "Filters" button and Views menu, so the D-pad meets the pins first)
+   */
+  trailing?: ReactNode;
+  /** "+ Filter" itself, for the list's `f` key */
+  addFilterRef?: RefObject<HTMLButtonElement | null>;
 }
 
 /**
@@ -87,8 +102,8 @@ const sameAt = (a: RowKey, b: RowKey): boolean =>
  * in the panel's order, then one chip per group (its match and its rows'
  * field names; its body opens the Advanced view at the group, its button
  * removes the group), led by "Match any" when the root matches any, then
- * "+ Filter", "Advanced" (the row view) and, while a filter is set,
- * "Clear all". A chip's body opens its editor in a popover under it
+ * `trailing` (TV mode's "Filters" and Views), "+ Filter", "Advanced" (the
+ * row view) and, while a filter is set, "Clear all". A chip's body opens its editor in a popover under it
  * (`ChipEditor`), whose changes apply as they are made, and whose header
  * pins the field or its value; its button removes the row. A field picked
  * in "+ Filter" opens its chip's editor, or, when it is not in use, a
@@ -109,12 +124,15 @@ const FilterBar = ({
   permanentFilters = NONE,
   permanentFiltersMetadata = NONE,
   onOpenSheet,
+  trailing = null,
+  addFilterRef,
 }: FilterBarProps) => {
   const { kind, tree, options } = filters;
   const { unitPreference } = useUnitPreference();
   const barRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
-  const addRef = useRef<HTMLButtonElement>(null);
+  const ownAddRef = useRef<HTMLButtonElement>(null);
+  const addRef = addFilterRef ?? ownAddRef;
   const closeRef = useRef<(() => void) | null>(null);
   const [editor, setEditor] = useState<OpenEditor | null>(null);
   const [advanced, setAdvanced] = useState<AdvancedOpen | null>(null);
@@ -272,7 +290,7 @@ const FilterBar = ({
       if (button) button.focus();
       else addRef.current?.focus();
     },
-    [items, shownPins]
+    [items, shownPins, addRef]
   );
 
   // One chip per group, numbered as the URL numbers them (`g1`...), its
@@ -341,7 +359,7 @@ const FilterBar = ({
       }
       setEditor(null);
     },
-    [editor, drawn, focusNeighbour]
+    [editor, drawn, focusNeighbour, addRef]
   );
 
   const toggle = (at: RowKey) => {
@@ -504,6 +522,7 @@ const FilterBar = ({
           onRemove={() => removeGroupChip(number)}
         />
       ))}
+      {trailing}
       <AddFilterMenu
         filters={filters}
         pinnedFields={shownPins.fields}

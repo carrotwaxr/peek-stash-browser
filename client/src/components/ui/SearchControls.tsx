@@ -89,10 +89,17 @@ const NO_SETTINGS: SettingConfig[] = [];
  * control writes the URL through the list state; nothing here holds a copy
  * of it.
  *
- * On a phone or a TV (`useFilterSurface`), row 1 is search and "Filters
- * (n)", row 2 the sort, Views and view controls (wrapping), and row 3 the
- * chips, scrolling sideways; "Filters", a chip and "+ Filter" open the
- * filter sheet (`FilterSheet`), which applies with "Show N results".
+ * On a phone (`useFilterSurface`), row 1 is search and "Filters (n)", row 2
+ * the sort, Views and view controls (wrapping), and row 3 the chips,
+ * scrolling sideways; "Filters", a chip and "+ Filter" open the filter sheet
+ * (`FilterSheet`), which applies with "Show N results". In TV mode row 1 is
+ * search, sort and the view controls, and row 2 the chip row, which leads
+ * with the pins (so Down from the search box lands on the first) and ends
+ * with "Filters (n)" and Views (a dialog there) before "+ Filter".
+ *
+ * Page keys: `/` focuses the search box and `f` opens "+ Filter" (the sheet
+ * at its "+ Filter" on a phone or a TV), neither from inside a popover, a
+ * dialog or the player; in TV mode PageUp and PageDown change the page.
  */
 const SearchControls = ({
   artifactType = "scene",
@@ -115,6 +122,8 @@ const SearchControls = ({
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
   const topPaginationRef = useRef<HTMLDivElement>(null); // Ref for top pagination element
+  const searchRef = useRef<HTMLDivElement>(null);
+  const addFilterRef = useRef<HTMLButtonElement>(null);
 
   const { isTVMode } = useTVMode();
   // The chip bar offers every field the view leaves free: a field the page
@@ -268,15 +277,58 @@ const SearchControls = ({
     listFilters.tree.rows.filter((row) => freeKeys.has(row.field.key)).length +
     groupCount;
   const usesSheet = surface === "sheet" && filterable;
+  // TV mode: the pins lead the chip row, under search, and "Filters" and
+  // Views follow the chips
+  const tvRow = usesSheet && isTVMode;
   // A phone turned wide, or a view without filters, closes the sheet for
   // good (its draft discarded), so it does not come back on its own
   if (!usesSheet && sheet !== null) setSheet(null);
 
+  // The list's own keys, enabled in every mode. Not from inside a popover
+  // or a dialog (a Modal's overlay scope stops them anyway) or the player
+  const listKey =
+    (run: (event: KeyboardEvent) => boolean) =>
+    (event: KeyboardEvent): boolean => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest('[role="dialog"], .video-js') !== null
+      ) {
+        return false;
+      }
+      return run(event);
+    };
+
+  useShortcutScope({
+    layer: "page",
+    keys: {
+      "/": listKey(() => {
+        const input = searchRef.current?.querySelector("input");
+        if (!input) return false;
+        input.focus();
+        return true;
+      }),
+      // Shift+F is left free
+      f: listKey((event) => {
+        if (event.shiftKey || !filterable) return false;
+        if (usesSheet) {
+          openSheet("add");
+          return true;
+        }
+        const add = addFilterRef.current;
+        if (!add || add.getAttribute("aria-expanded") === "true") return false;
+        add.click();
+        return true;
+      }),
+    },
+  });
+
   const searchBox = (
     <div
+      ref={searchRef}
       data-tv-search-item="search-input"
       className={
-        usesSheet
+        usesSheet && !tvRow
           ? "min-w-0 flex-1"
           : "w-full sm:w-auto sm:flex-1 sm:min-w-[180px] sm:max-w-sm"
       }
@@ -290,6 +342,36 @@ const SearchControls = ({
     </div>
   );
 
+  const filtersButton = (
+    <div data-tv-search-item="filters">
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => openSheet()}
+        aria-haspopup="dialog"
+        aria-expanded={sheet !== null}
+        className="whitespace-nowrap"
+        icon={
+          <LucideSlidersHorizontal className="w-4 h-4" aria-hidden="true" />
+        }
+      >
+        {filterCount > 0 ? `Filters (${filterCount})` : "Filters"}
+      </Button>
+    </div>
+  );
+
+  // Views: only loading one from the menu shows its table columns; a default
+  // View applied on a visit leaves the user's saved columns alone
+  const viewsMenu = (
+    <ViewsMenu
+      listState={listState}
+      context={effectiveContext}
+      permanentFilters={permanentFilters}
+      currentTableColumns={currentTableColumns}
+      {...(onPresetColumns ? { onViewColumns: onPresetColumns } : {})}
+    />
+  );
+
   return (
     <div>
       <div
@@ -300,32 +382,16 @@ const SearchControls = ({
         }}
       >
         {/* Row 1: search, sort, Views, then how to show the list; on a
-            phone or a TV, search and "Filters (n)", the rest in row 2 */}
-        {usesSheet && (
+            phone, search and "Filters (n)", the rest in row 2; in TV mode
+            Views and "Filters (n)" go to the chip row */}
+        {usesSheet && !tvRow && (
           <div className="flex items-center gap-2 mb-2">
             {searchBox}
-            <div data-tv-search-item="filters">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => openSheet()}
-                aria-haspopup="dialog"
-                aria-expanded={sheet !== null}
-                className="whitespace-nowrap"
-                icon={
-                  <LucideSlidersHorizontal
-                    className="w-4 h-4"
-                    aria-hidden="true"
-                  />
-                }
-              >
-                {filterCount > 0 ? `Filters (${filterCount})` : "Filters"}
-              </Button>
-            </div>
+            {filtersButton}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {!usesSheet && searchBox}
+          {(!usesSheet || tvRow) && searchBox}
 
           {/* Sort: the field, then its direction */}
           <div className="flex items-center gap-1">
@@ -354,16 +420,7 @@ const SearchControls = ({
             </div>
           </div>
 
-          {/* Views: only loading one from the menu shows its table columns;
-              a default View applied on a visit leaves the user's saved
-              columns alone */}
-          <ViewsMenu
-            listState={listState}
-            context={effectiveContext}
-            permanentFilters={permanentFilters}
-            currentTableColumns={currentTableColumns}
-            {...(onPresetColumns ? { onViewColumns: onPresetColumns } : {})}
-          />
+          {!tvRow && viewsMenu}
 
           {/* View Mode Toggle - Show if the page has views */}
           {viewModes && (
@@ -406,14 +463,26 @@ const SearchControls = ({
           </div>
         </div>
 
-        {/* Row 2: the filter chips (groups too), + Filter, Advanced and Clear all */}
+        {/* Row 2: the filter chips (groups too), + Filter, Advanced and Clear
+            all; in TV mode "Filters (n)" and Views after the groups */}
         {filterable ? (
           <div className="mt-3">
             <FilterBar
               filters={listFilters}
               permanentFilters={permanentFilters}
               permanentFiltersMetadata={permanentFiltersMetadata}
+              addFilterRef={addFilterRef}
               {...(usesSheet ? { onOpenSheet: openSheet } : {})}
+              {...(tvRow
+                ? {
+                    trailing: (
+                      <>
+                        {filtersButton}
+                        {viewsMenu}
+                      </>
+                    ),
+                  }
+                : {})}
             />
             <FilterSheet
               filters={listFilters}

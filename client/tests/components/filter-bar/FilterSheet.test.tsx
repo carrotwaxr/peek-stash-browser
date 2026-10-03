@@ -316,6 +316,35 @@ describe("FilterSheet", () => {
     );
   });
 
+  it("in TV mode the sheet's + Filter is a button over its menu, so Down from the last row meets it before Show N; a pick adds a focused row", async () => {
+    tv = true;
+    const user = userEvent.setup();
+    const list = renderListControls({}, { url: "/scenes" });
+    await list.firstQuery();
+
+    await user.click(screen.getByRole("button", { name: "Add filter" }));
+    const add = within(sheet()).getByRole("button", { name: "Add filter" });
+    await waitFor(() => expect(add).toHaveFocus());
+    // The field list is not drawn in place
+    expect(
+      within(sheet()).queryByRole("combobox", { name: "Find a filter" })
+    ).not.toBeInTheDocument();
+
+    await user.keyboard("{Enter}");
+    const find = within(sheet()).getByRole("combobox", {
+      name: "Find a filter",
+    });
+    await waitFor(() => expect(find).toHaveFocus());
+    await user.click(
+      within(sheet()).getByRole("option", { name: "Favorite Scenes" })
+    );
+    expect(
+      within(sheet()).queryByRole("combobox", { name: "Find a filter" })
+    ).not.toBeInTheDocument();
+    await waitFor(() => expect(field("Favorite Scenes")).toHaveFocus());
+    expect(list.actions).toEqual([]);
+  });
+
   it("pinned filter toggles in the sheet change the draft only; in the page's chip row they apply at once", async () => {
     const user = userEvent.setup();
     const list = renderListControls(

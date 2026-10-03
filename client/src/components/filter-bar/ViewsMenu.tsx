@@ -35,6 +35,8 @@ import { type ColumnConfig, presetColumnsOf } from "../../config/tableColumns";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import type { ListUrlState } from "../../hooks/useListUrlState";
 import { useRovingFocus } from "../../hooks/useRovingFocus";
+import { useTVMode } from "../../hooks/useTVMode";
+import Modal from "../ui/Modal";
 import Popover from "../ui/Popover";
 import StatusMessage from "../ui/StatusMessage";
 import ViewNameDialog from "./ViewNameDialog";
@@ -92,6 +94,10 @@ interface Toast {
  * active View; to rename another, load it first. A View holds the filters,
  * sort and presentation, never the page's own filters, the search text or
  * pins.
+ *
+ * In TV mode the menu is a dialog (`Modal`): the Views as buttons (the
+ * active one pressed, and focused on open, else the first), then the
+ * actions, all reached by the D-pad; OK loads a View.
  */
 const ViewsMenu = ({
   listState,
@@ -127,7 +133,9 @@ const ViewsMenu = ({
   const [toast, setToast] = useState<Toast | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const firstViewRef = useRef<HTMLButtonElement>(null);
   const onMenuKeyDown = useRovingFocus(menuRef, { itemSelector: ITEMS });
+  const { isTVMode } = useTVMode();
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -136,6 +144,7 @@ const ViewsMenu = ({
   }, [toast]);
 
   const isDefault = activeView !== null && activeView.id === defaultId;
+  const isActive = (view: SavedPreset) => activeView?.id === view.id;
   const name = activeView ? `Views: ${activeView.name}` : "Views";
   const modified = activeView !== null && activeViewModified;
 
@@ -377,88 +386,146 @@ const ViewsMenu = ({
         />
       </button>
 
-      <Popover
-        anchorRef={buttonRef}
-        open={isOpen}
-        onClose={closeMenu}
-        label="Views"
-      >
-        <div
-          ref={menuRef}
-          role="menu"
-          aria-label="Views"
-          onKeyDown={onMenuKeyDown}
-          className="p-1 flex flex-col gap-0.5 min-w-[14rem] max-w-[20rem] max-h-[70vh] overflow-y-auto"
+      {isTVMode ? (
+        <Modal
+          isOpen={isOpen}
+          onClose={closeMenu}
+          title="Views"
+          size="sm"
+          initialFocusRef={firstViewRef}
         >
-          {views.length === 0 ? (
+          <div className="flex flex-col gap-1">
+            {views.length === 0 ? (
+              <p
+                className="px-2 py-1.5 text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                No saved views
+              </p>
+            ) : (
+              views.map((view, index) => {
+                const checked = isActive(view);
+                const focusHere =
+                  checked || (index === 0 && !views.some(isActive));
+                return (
+                  <button
+                    key={view.id}
+                    ref={focusHere ? firstViewRef : undefined}
+                    type="button"
+                    aria-pressed={checked}
+                    onClick={() => handleLoad(view)}
+                    className={itemClass}
+                    style={{
+                      color: checked
+                        ? "var(--accent-primary)"
+                        : "var(--text-primary)",
+                    }}
+                  >
+                    <LucideCheck
+                      size={14}
+                      aria-hidden="true"
+                      style={{ visibility: checked ? "visible" : "hidden" }}
+                    />
+                    <span className="flex-1 truncate">{view.name}</span>
+                    {view.id === defaultId && <DefaultBadge />}
+                  </button>
+                );
+              })
+            )}
             <div
-              className="px-2 py-1.5 text-sm"
-              style={{ color: "var(--text-muted)" }}
-            >
-              No saved views
-            </div>
-          ) : (
-            views.map((view) => {
-              const checked = activeView?.id === view.id;
-              return (
-                <button
-                  key={view.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={checked}
-                  data-popover-focus={checked ? "" : undefined}
-                  onClick={() => handleLoad(view)}
-                  className={itemClass}
-                  style={{
-                    color: checked
-                      ? "var(--accent-primary)"
-                      : "var(--text-primary)",
-                  }}
-                >
-                  <LucideCheck
-                    size={14}
-                    aria-hidden="true"
-                    style={{ visibility: checked ? "visible" : "hidden" }}
-                  />
-                  <span className="flex-1 truncate">{view.name}</span>
-                  {view.id === defaultId && (
-                    <span
-                      className="text-xs px-1.5 py-0.5 rounded"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      Default
-                    </span>
-                  )}
-                </button>
-              );
-            })
-          )}
-
+              role="separator"
+              className="my-1 border-t"
+              style={{ borderColor: "var(--border-color)" }}
+            />
+            {actions.map(({ key, text, icon: Icon, disabled, onSelect }) => (
+              <button
+                key={key}
+                type="button"
+                disabled={disabled}
+                onClick={onSelect}
+                className={itemClass}
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <Icon size={14} aria-hidden="true" />
+                <span>{text}</span>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      ) : (
+        <Popover
+          anchorRef={buttonRef}
+          open={isOpen}
+          onClose={closeMenu}
+          label="Views"
+        >
           <div
-            role="separator"
-            className="my-1 border-t"
-            style={{ borderColor: "var(--border-color)" }}
-          />
+            ref={menuRef}
+            role="menu"
+            aria-label="Views"
+            onKeyDown={onMenuKeyDown}
+            className="p-1 flex flex-col gap-0.5 min-w-[14rem] max-w-[20rem] max-h-[70vh] overflow-y-auto"
+          >
+            {views.length === 0 ? (
+              <div
+                className="px-2 py-1.5 text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                No saved views
+              </div>
+            ) : (
+              views.map((view) => {
+                const checked = isActive(view);
+                return (
+                  <button
+                    key={view.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={checked}
+                    data-popover-focus={checked ? "" : undefined}
+                    onClick={() => handleLoad(view)}
+                    className={itemClass}
+                    style={{
+                      color: checked
+                        ? "var(--accent-primary)"
+                        : "var(--text-primary)",
+                    }}
+                  >
+                    <LucideCheck
+                      size={14}
+                      aria-hidden="true"
+                      style={{ visibility: checked ? "visible" : "hidden" }}
+                    />
+                    <span className="flex-1 truncate">{view.name}</span>
+                    {view.id === defaultId && <DefaultBadge />}
+                  </button>
+                );
+              })
+            )}
 
-          {actions.map(({ key, text, icon: Icon, disabled, onSelect }) => (
-            <button
-              key={key}
-              type="button"
-              role="menuitem"
-              disabled={disabled}
-              onClick={onSelect}
-              className={itemClass}
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <Icon size={14} aria-hidden="true" />
-              <span>{text}</span>
-            </button>
-          ))}
-        </div>
-      </Popover>
+            <div
+              role="separator"
+              className="my-1 border-t"
+              style={{ borderColor: "var(--border-color)" }}
+            />
+
+            {actions.map(({ key, text, icon: Icon, disabled, onSelect }) => (
+              <button
+                key={key}
+                type="button"
+                role="menuitem"
+                disabled={disabled}
+                onClick={onSelect}
+                className={itemClass}
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <Icon size={14} aria-hidden="true" />
+                <span>{text}</span>
+              </button>
+            ))}
+          </div>
+        </Popover>
+      )}
 
       {dialog === "save" && (
         <ViewNameDialog
@@ -489,5 +556,18 @@ const ViewsMenu = ({
     </div>
   );
 };
+
+/** The default View's mark */
+const DefaultBadge = () => (
+  <span
+    className="text-xs px-1.5 py-0.5 rounded"
+    style={{
+      backgroundColor: "var(--bg-tertiary)",
+      color: "var(--text-secondary)",
+    }}
+  >
+    Default
+  </span>
+);
 
 export default ViewsMenu;
