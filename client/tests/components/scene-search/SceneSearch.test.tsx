@@ -288,6 +288,47 @@ describe("SceneSearch", () => {
       // The queue belongs to the signed-in user (renderListPage signs in user 1)
       expect(playlist.userId).toBe(1);
     });
+
+    it("a card on a detail page's Scenes tab carries the page's title to the player and names the queue after it", async () => {
+      api.findScenes.mockResolvedValue(scenes(rowsOf("s", 2)));
+      const { router } = renderListPage(
+        <SceneSearch title="Ada's scenes" fromPageTitle="Ada" />,
+        { initialEntries: ["/performers/1"] }
+      );
+
+      fireEvent.click(await screen.findByRole("button", { name: "s-1" }));
+
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe("/scene/s-1")
+      );
+      const state = router.state.location.state as {
+        fromPageTitle?: string;
+        playlist: { name: string; currentIndex: number };
+      };
+      expect(state.fromPageTitle).toBe("Ada");
+      expect(state.playlist).toMatchObject({
+        name: "Ada's scenes",
+        currentIndex: 1,
+      });
+    });
+
+    it("a list with no title names its queue `Scene Grid` and sends no page title", async () => {
+      api.findScenes.mockResolvedValue(scenes(rowsOf("s", 2)));
+      const { router } = renderListPage(<SceneSearch />, {
+        initialEntries: ["/scenes"],
+      });
+
+      fireEvent.click(await screen.findByRole("button", { name: "s-0" }));
+
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe("/scene/s-0")
+      );
+      const state = router.state.location.state as {
+        playlist: { name: string };
+      };
+      expect(state.playlist.name).toBe("Scene Grid");
+      expect(state).not.toHaveProperty("fromPageTitle");
+    });
   });
 
   describe("Stale results", () => {
