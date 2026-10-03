@@ -53,6 +53,7 @@ import {
   noClause,
   orientationClause,
   performerAgeExists,
+  performerAgeSort,
   performerTagsFieldClause,
   refClause,
   resolutionClause,
@@ -322,6 +323,14 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * last_o_at is the viewer's latest O time (the newest string of
    * WatchHistory.oHistory, stored as ISO text), scenes with none last in
    * either direction; it scans the viewer's history rows, like o_counter.
+   * resolution is the shorter side of the file; studio the studio's name,
+   * case-insensitive, scenes with none (or whose studio is deleted or hidden
+   * from the viewer) last in both directions; performer_age Stash's: the
+   * youngest performer's age ascending, the oldest's descending, at the
+   * scene's date, a scene with no date or no performer the viewer can see
+   * (with a birthdate) last in both directions (`performerAgeSort`). None
+   * reads an index: each reads the filtered scenes and sorts them, as
+   * rating does.
    * scene_index is the scene's number in the collection the request filters
    * by, and has an expression only with one (INCLUDES or INCLUDES_ALL):
    * without it the key falls back to the default sort. playlist_position is
@@ -329,7 +338,8 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    */
   protected sortMap(
     dir: SortDirection,
-    filter: ParsedFilter<"scene">
+    filter: ParsedFilter<"scene">,
+    ctx: QueryContext
   ): Record<string, SortExpr> {
     const column = (sql: string): SortExpr => ({
       sql: `${sql} ${dir}`,
@@ -348,6 +358,11 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       path: column("s.filePath"),
       performer_count: column("s.performerCount"),
       tag_count: column("s.tagCount"),
+      resolution: column("MIN(s.fileWidth, s.fileHeight)"),
+      code: column("s.code"),
+      organized: column("s.organized"),
+      studio: this.studioNameSort(dir, ctx),
+      performer_age: this.performerAgeOrder(dir, ctx),
 
       // The viewer's rating (SceneRating)
       rating: column("COALESCE(r.rating, 0)"),
@@ -366,6 +381,34 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       ...this.sceneIndexSort(dir, filter),
       ...this.playlistPositionSort(dir, filter),
     };
+  }
+
+  /**
+   * The studio's name, case-insensitive: a scalar subquery on the studio's
+   * key (the scene's own instance), so no join reaches the count. A studio
+   * that is deleted, or that the viewer cannot see (`UserExcludedEntity`,
+   * the every-instance arm too), counts as none, as the row's studio ref
+   * does, so a hidden name never orders the list. Scenes with none list
+   * last in both directions.
+   */
+  private studioNameSort(dir: SortDirection, ctx: QueryContext): SortExpr {
+    const hidden = ctx.applyExclusions
+      ? " AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity ssx WHERE ssx.userId = ? AND ssx.entityType = 'studio' AND ssx.entityId = sso.id AND (ssx.instanceId = '' OR ssx.instanceId = sso.stashInstanceId))"
+      : "";
+    return {
+      sql: `(SELECT sso.name FROM StashStudio sso WHERE sso.id = s.studioId AND sso.stashInstanceId = s.stashInstanceId AND sso.deletedAt IS NULL${hidden}) COLLATE NOCASE ${dir} NULLS LAST`,
+      params: ctx.applyExclusions ? [ctx.userId] : [],
+    };
+  }
+
+  /** The performer age the sort reads, the viewer's hidden performers left out */
+  private performerAgeOrder(dir: SortDirection, ctx: QueryContext): SortExpr {
+    const age = performerAgeSort(
+      SCENE_PERFORMER_AGE,
+      ctx.applyExclusions ? ctx.userId : null,
+      dir
+    );
+    return { sql: `${age.sql} ${dir} NULLS LAST`, params: age.params };
   }
 
   /**

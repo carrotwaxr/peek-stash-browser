@@ -327,7 +327,11 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     defaultSort: "stashCreatedAt",
   };
 
-  protected sortMap(direction: SortDirection): Record<string, SortExpr> {
+  protected sortMap(
+    direction: SortDirection,
+    _filter: ClipListRequest["filter"],
+    ctx: QueryContext
+  ): Record<string, SortExpr> {
     const by = (sql: string): SortExpr => ({
       sql: `${sql} ${direction}`,
       params: [],
@@ -335,10 +339,28 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     return {
       stashCreatedAt: by("c.stashCreatedAt"),
       stashUpdatedAt: by("c.stashUpdatedAt"),
-      title: by("c.title"),
+      title: this.titleSort(direction, ctx),
       seconds: by("c.seconds"),
       sceneTitle: by("s.title"),
       duration: by("(c.endSeconds - c.seconds)"),
+    };
+  }
+
+  /**
+   * The title as the clip shows it: its own, else its primary tag's name,
+   * case-insensitive; a clip with neither lists first ascending (last
+   * descending), as a NULL does. The tag is a scalar subquery on its key, so
+   * no join reaches the count; a tag that is deleted or that the viewer
+   * cannot see (`UserExcludedEntity`, the every-instance arm too) lends no
+   * name, as the clip's tag chips do not show it.
+   */
+  private titleSort(direction: SortDirection, ctx: QueryContext): SortExpr {
+    const hidden = ctx.applyExclusions
+      ? " AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity ptx WHERE ptx.userId = ? AND ptx.entityType = 'tag' AND ptx.entityId = ptg.id AND (ptx.instanceId = '' OR ptx.instanceId = ptg.stashInstanceId))"
+      : "";
+    return {
+      sql: `COALESCE(NULLIF(c.title, ''), (SELECT ptg.name FROM StashTag ptg WHERE ptg.id = c.primaryTagId AND ptg.stashInstanceId = c.primaryTagInstanceId AND ptg.deletedAt IS NULL${hidden})) COLLATE NOCASE ${direction}`,
+      params: ctx.applyExclusions ? [ctx.userId] : [],
     };
   }
 

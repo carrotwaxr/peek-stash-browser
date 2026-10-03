@@ -326,6 +326,11 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       gallery_count: column(visibleCount(ctx, "p.galleryCount", "galleries")),
       group_count: column(visibleCount(ctx, "p.groupCount", "groups")),
 
+      // The performer's live tags and clips the viewer can see, as the
+      // filters count them
+      tag_count: this.countSort(visibleTagCount(ctx), dir),
+      marker_count: this.countSort(visibleMarkerCount(ctx), dir),
+
       // The viewer's rating (PerformerRating)
       rating: column("COALESCE(r.rating, 0)"),
       rating100: column("COALESCE(r.rating, 0)"),

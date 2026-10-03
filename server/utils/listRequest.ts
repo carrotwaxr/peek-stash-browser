@@ -382,6 +382,31 @@ function requirePlaylistForPosition(
   return undefined;
 }
 
+/**
+ * Sub-collection order is a collection's index in one parent collection, so
+ * the sort needs an including `containing_groups` criterion to name it.
+ * Without one the sort is a problem at the sort's path (a 400 in reject
+ * mode) and the list keeps its default.
+ */
+function requireParentForSubGroupOrder(
+  field: SortField<"group"> | undefined,
+  criteria: ParsedFieldsResult["criteria"],
+  path: string,
+  problems: Problems
+): SortField<"group"> | undefined {
+  if (field?.field !== "sub_group_order") return field;
+  const parents = criteria.containing_groups as RefFieldCriterion | undefined;
+  if (
+    (parents?.modifier === "INCLUDES" ||
+      parents?.modifier === "INCLUDES_ALL") &&
+    parents.refs.length > 0
+  ) {
+    return field;
+  }
+  problems.add(path, "Sub-collection order needs a parent collection filter");
+  return undefined;
+}
+
 /** A scene sort that reads a criterion (Scene Number, Playlist order), checked against it */
 function requireSortContext(
   field: SortField<"scene"> | undefined,
@@ -985,6 +1010,15 @@ export function parseListRequest<E extends ListKind>(
   if (entity === "scene") {
     sortField = requireSortContext(
       sortField as SortField<"scene"> | undefined,
+      fields.criteria,
+      "filter.sort",
+      problems
+    ) as typeof sortField;
+  }
+
+  if (entity === "group") {
+    sortField = requireParentForSubGroupOrder(
+      sortField as SortField<"group"> | undefined,
       fields.criteria,
       "filter.sort",
       problems

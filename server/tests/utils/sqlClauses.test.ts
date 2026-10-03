@@ -27,6 +27,7 @@ import {
   buildTextFilter,
   combine,
   countForms,
+  dayNumberSql,
   exclusionJoin,
   fullDateSql,
   galleryNameSql,
@@ -37,7 +38,9 @@ import {
   orientationClause,
   pairs,
   performerAgeExists,
+  performerAgeSort,
   performerCountClause,
+  performerCountSql,
   performerTagsClause,
   performerTagsFieldClause,
   randomOrder,
@@ -1947,6 +1950,14 @@ describe("ageYearsSql", () => {
   });
 });
 
+describe("dayNumberSql", () => {
+  it("reads a date as YYYY.MMDD through fullDateSql, so a partial date counts from its first day", () => {
+    expect(dayNumberSql("p.birthdate")).toBe(
+      `strftime('%Y.%m%d', ${fullDateSql("p.birthdate")})`
+    );
+  });
+});
+
 describe("performerAgeExists", () => {
   const source = {
     junction: {
@@ -2001,6 +2012,89 @@ describe("performerAgeExists", () => {
         1
       ).sql
     ).toBe("");
+  });
+});
+
+describe("performerAgeSort", () => {
+  const source = {
+    junction: {
+      table: "ScenePerformer",
+      itemId: "sceneId",
+      itemInstance: "sceneInstanceId",
+      performerId: "performerId",
+      performerInstance: "performerInstanceId",
+    },
+    item: { id: "s.id", instance: "s.stashInstanceId", date: "s.date" },
+  };
+
+  it("is the item's day number less the latest birthdate's for the youngest performer and the earliest's for the oldest, from one CTE of the viewer's visible performers", () => {
+    const asc = performerAgeSort(source, 7, "ASC");
+    const desc = performerAgeSort(source, 7, "DESC");
+    expect(asc.sql).toContain(
+      `SELECT CAST(${dayNumberSql("s.date")} - MAX(pa.day) AS INTEGER) FROM ScenePerformer sp JOIN pa ON pa.id = sp.performerId AND pa.inst = sp.performerInstanceId`
+    );
+    expect(desc.sql).toContain(
+      `SELECT CAST(${dayNumberSql("s.date")} - MIN(pa.day) AS INTEGER) FROM ScenePerformer sp JOIN pa`
+    );
+    for (const sort of [asc, desc]) {
+      // A partial birthdate counts from its first day, through fullDateSql
+      expect(sort.sql).toContain(
+        `${dayNumberSql("p.birthdate")} AS day FROM StashPerformer p`
+      );
+      expect(sort.sql).toContain(fullDateSql("p.birthdate"));
+      expect(sort.sql).toContain(
+        "WITH pa AS MATERIALIZED (SELECT p.id AS id, p.stashInstanceId AS inst,"
+      );
+      expect(sort.sql).toContain(
+        "sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId"
+      );
+      expect(sort.sql).toContain("p.deletedAt IS NULL");
+      expect(sort.sql).toContain("p.birthdate IS NOT NULL");
+      expect(sort.sql).toContain(
+        exclusionJoin("pax", "performer", "p.id", "p.stashInstanceId")
+      );
+      expect(sort.sql).toContain("pax.id IS NULL");
+      expect(sort.params).toEqual([7]);
+    }
+  });
+
+  it("without a viewer reads every performer", () => {
+    const sort = performerAgeSort(source, null, "ASC");
+    expect(sort.sql).not.toContain("UserExcludedEntity");
+    expect(sort.params).toEqual([]);
+  });
+});
+
+describe("performerCountSql", () => {
+  const IMAGE_PERFORMERS: JunctionTarget = {
+    kind: "junction",
+    table: "ImagePerformer",
+    alias: "ip",
+    parentAlias: "i",
+    parentIdCol: "imageId",
+    parentInstanceCol: "imageInstanceId",
+    refIdCol: "performerId",
+    refInstanceCol: "performerInstanceId",
+  };
+
+  it("is the count the filter compares: the viewer's visible performers, with the viewer bound", () => {
+    const count = performerCountSql(IMAGE_PERFORMERS, 7);
+    expect(count.sql).toMatch(/^\(SELECT COUNT\(\*\) FROM ImagePerformer pc /);
+    expect(count.sql).toContain("pcp.deletedAt IS NULL AND pce.id IS NULL)");
+    expect(count.params).toEqual([7]);
+    expect(
+      performerCountClause(
+        { modifier: "EQUALS", value: 2 },
+        IMAGE_PERFORMERS,
+        7
+      ).sql
+    ).toBe(`${count.sql} = ?`);
+  });
+
+  it("without a viewer counts every live performer, binding nothing", () => {
+    const count = performerCountSql(IMAGE_PERFORMERS, null);
+    expect(count.sql).not.toContain("UserExcludedEntity");
+    expect(count.params).toEqual([]);
   });
 });
 

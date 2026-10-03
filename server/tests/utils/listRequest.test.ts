@@ -249,6 +249,25 @@ describe("parseListRequest: sort", () => {
     }
   });
 
+  it("sub_group_order needs an including containing_groups criterion: a 400", () => {
+    const body = (modifier?: string) => ({
+      filter: { sort: "sub_group_order" },
+      group_filter:
+        modifier === undefined
+          ? {}
+          : { containing_groups: { value: ["7:inst"], modifier } },
+    });
+    for (const modifier of [undefined, "EXCLUDES"]) {
+      expect(
+        paths(issuesOf(() => parseListRequest("group", body(modifier), opts())))
+      ).toEqual(["filter.sort"]);
+    }
+    for (const modifier of ["INCLUDES", "INCLUDES_ALL"]) {
+      const parsed = parseListRequest("group", body(modifier), opts());
+      expect(parsed.sort.field).toBe("sub_group_order");
+    }
+  });
+
   it("direction asc is ASC; sideways is invalid", () => {
     expect(
       parseListRequest("scene", { filter: { direction: "asc" } }, opts()).sort

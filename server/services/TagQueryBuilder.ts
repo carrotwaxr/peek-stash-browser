@@ -206,11 +206,7 @@ function parentCount(ctx: QueryContext): FilterClause {
  * tag's list for every tag.
  */
 function childCount(ctx: LeafContext): FilterClause {
-  const links = visibleChildLinks(ctx);
-  const instances = instanceColumnClause(
-    "tcc.stashInstanceId",
-    ctx.allowedInstanceIds
-  );
+  const pass = childCountPass(ctx);
   const name = `${ctx.name}_children`;
   return {
     sql: `COALESCE((SELECT k.n FROM ${name} k WHERE k.pid = t.id AND k.inst = t.stashInstanceId), 0)`,
@@ -218,10 +214,27 @@ function childCount(ctx: LeafContext): FilterClause {
     ctes: [
       {
         name,
-        sql: `${name}(pid, inst, n) AS MATERIALIZED (SELECT tcj.value, tcc.stashInstanceId, COUNT(DISTINCT tcc.id) ${links.sql} AND ${instances.sql} GROUP BY tcj.value, tcc.stashInstanceId)`,
-        params: [...links.params, ...instances.params],
+        sql: `${name}(pid, inst, n) AS MATERIALIZED (${pass.sql})`,
+        params: pass.params,
       },
     ],
+  };
+}
+
+/**
+ * The grouped pass over the live tags the viewer can see that counts, for
+ * each (parent id, instance), its visible children: `pid`, `inst`, `n`.
+ * The filter reads it as a CTE (`childCount`), the sort as a derived table.
+ */
+function childCountPass(ctx: QueryContext): FilterClause {
+  const links = visibleChildLinks(ctx);
+  const instances = instanceColumnClause(
+    "tcc.stashInstanceId",
+    ctx.allowedInstanceIds
+  );
+  return {
+    sql: `SELECT tcj.value AS pid, tcc.stashInstanceId AS inst, COUNT(DISTINCT tcc.id) AS n ${links.sql} AND ${instances.sql} GROUP BY tcj.value, tcc.stashInstanceId`,
+    params: [...links.params, ...instances.params],
   };
 }
 
@@ -286,6 +299,11 @@ class TagQueryBuilder extends EntityQueryBuilder<
       // page's Markers statistic is the viewer's own, `countRelations`)
       scene_marker_count: column("t.sceneMarkerCount"),
 
+      // The tag's live parents and children the viewer can see, as the
+      // filters count them
+      parent_count: this.countSort(parentCount(ctx), dir),
+      child_count: this.childCountSort(dir, ctx),
+
       // The viewer's rating (TagRating)
       rating: column("COALESCE(r.rating, 0)"),
       rating100: column("COALESCE(r.rating, 0)"),
@@ -293,6 +311,22 @@ class TagQueryBuilder extends EntityQueryBuilder<
       // The viewer's stats (UserTagStats)
       o_counter: column("COALESCE(us.oCounter, 0)"),
       play_count: column("COALESCE(us.playCount, 0)"),
+    };
+  }
+
+  /**
+   * The tag's visible children, from the same one grouped pass over the
+   * live tags' parent lists the filter reads (`childCountPass`), here as a
+   * materialized CTE inside the scalar subquery: computed once per
+   * statement, looked up by the tag's key, and no join reaches the count.
+   * `parentIds` has no index, so a per-row count would read every tag's
+   * list for every tag.
+   */
+  private childCountSort(dir: SortDirection, ctx: QueryContext): SortExpr {
+    const pass = childCountPass(ctx);
+    return {
+      sql: `COALESCE((WITH tcs AS MATERIALIZED (${pass.sql}) SELECT tcs.n FROM tcs WHERE tcs.pid = t.id AND tcs.inst = t.stashInstanceId), 0) ${dir}`,
+      params: pass.params,
     };
   }
 

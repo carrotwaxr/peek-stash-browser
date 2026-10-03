@@ -198,6 +198,10 @@ class StudioQueryBuilder extends EntityQueryBuilder<
       ),
       group_count: column(visibleCount(ctx, "s.groupCount", "groups")),
 
+      // The live children and tags the viewer can see, as the filters count
+      child_count: this.countSort(childCount(ctx), dir),
+      tag_count: this.countSort(tagCount(ctx), dir),
+
       // The viewer's rating (StudioRating)
       rating: column("COALESCE(r.rating, 0)"),
       rating100: column("COALESCE(r.rating, 0)"),
