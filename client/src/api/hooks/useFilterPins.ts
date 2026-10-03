@@ -69,16 +69,27 @@ interface SetPinsContext {
   hadAnswer: boolean;
 }
 
+/** Every pin save: one scope, so saves reach the server in the order made */
+const PIN_SAVES = ["filterPins", "save"] as const;
+
 /**
  * Saves a list's pins (`PUT /user/filter-pins/:list`). The new pins show
- * before the server answers; a failed save puts that list's previous pins
- * back (other lists' entries are left as they are, so overlapping saves of
- * different lists do not undo each other).
+ * before the server answers. Saves run one after another (each sends the
+ * whole list, so two must not land out of order). A failed save, when no
+ * later save waits, puts that list's previous pins back and reads the pins
+ * again; while a later save waits (made over this one's pins, and sending
+ * them), the cache stays as the last change drew it. Other lists' entries
+ * are left as they are.
  */
 export function useSetPins() {
   const queryClient = useQueryClient();
   const key = queryKeys.user.filterPins();
+  // This save is pending until its callbacks end, so another is one more
+  const laterWaits = () =>
+    queryClient.isMutating({ mutationKey: PIN_SAVES }) > 1;
   return useMutation<unknown, Error, SetPinsVariables, SetPinsContext>({
+    mutationKey: PIN_SAVES,
+    scope: { id: "filter-pins" },
     mutationFn: ({ kind, pins }) => apiPut(`/user/filter-pins/${kind}`, pins),
     onMutate: async ({ kind, pins }) => {
       // A read still on its way would land over the new pins
@@ -96,6 +107,7 @@ export function useSetPins() {
       return { previous: cached?.pins[kind], hadAnswer: cached !== undefined };
     },
     onError: (_error, { kind }, context) => {
+      if (laterWaits()) return;
       if (context?.hadAnswer) {
         writeListPins(
           queryClient,
@@ -106,8 +118,8 @@ export function useSetPins() {
         void queryClient.resetQueries({ queryKey: key });
       }
     },
-    onSettled: (_data, _error, _variables, context) =>
-      context?.hadAnswer === false
+    onSettled: (_data, error, _variables, context) =>
+      !laterWaits() && (error !== null || context?.hadAnswer === false)
         ? queryClient.invalidateQueries({ queryKey: key })
         : undefined,
   });
