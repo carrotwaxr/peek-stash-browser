@@ -72,12 +72,10 @@ test("loads nothing off origin on Home and Scenes, and only Google's Cast sender
   const scene = await pickScene(page);
   if (scene) {
     await page.goto(scenePath(scene), { waitUntil: "networkidle" });
-    // The sender script is the one off-origin request a scene page may make
-    // (a secure Chromium tab; the config's host rule keeps it from resolving).
-    // The page's Cast hook loads it, so the check becomes "exactly this one"
-    // when that hook lands.
-    expect(offOrigin.filter((url) => url !== CAST_SENDER_URL)).toEqual([]);
-    expect(offOrigin.length).toBeLessThanOrEqual(1);
+    // The page's Cast hook (useCast) loads the sender script in a secure
+    // Chromium tab: the one off-origin request, which the config's host rule
+    // keeps from resolving
+    await expect.poll(() => offOrigin).toEqual([CAST_SENDER_URL]);
   }
 
   const interFaces = await page.evaluate(

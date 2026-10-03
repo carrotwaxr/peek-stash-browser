@@ -9,6 +9,8 @@ import { newClientToken } from "../../utils/clientToken";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getSceneTitle } from "../../utils/format";
 import { mayTakeFocus } from "../../utils/pageFocus";
+import type { CastScene } from "./cast/castSession";
+import { useCast } from "./cast/useCast";
 import { buildPlayerSources } from "./playerSources";
 import { type AirPlayPlayer, setupAirPlay } from "./plugins/airplay";
 import {
@@ -284,6 +286,27 @@ export function useVideoPlayer({
     queueLength:
       (playlist as { scenes?: unknown[] } | null)?.scenes?.length ?? 0,
     dispatch,
+  });
+
+  // ============================================================================
+  // CASTING (after the player exists: its effect reads the player)
+  // ============================================================================
+
+  useCast({
+    playerRef,
+    scene: scene as CastScene | null,
+    sceneKey,
+    dispatch,
+    autoplayNext,
+    repeat,
+    restartCount,
+    playlist,
+    // The user's resume point for the scene, where a cast starts when the
+    // local player has not played (not the Continue Watching resume)
+    resumeTime:
+      (watchHistory as { resumeTime?: number | null } | null)?.resumeTime ??
+      null,
+    minimumPlayPercent,
   });
 
   // ============================================================================

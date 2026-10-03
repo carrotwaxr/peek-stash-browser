@@ -14,6 +14,7 @@ import { must } from "@tests/testUtils";
 import videojs from "video.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, apiGet, apiPost, redirectToLogin } from "@/api";
+import { useCast } from "@/components/video-player/cast/useCast";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
 import { setupAirPlay } from "@/components/video-player/plugins/airplay";
 import { isSessionExpired } from "@/components/video-player/sessionCheck";
@@ -58,6 +59,12 @@ vi.mock("@/components/video-player/plugins/media-session", () => ({}));
 // bare-function video.js mock below
 vi.mock("@/components/video-player/plugins/airplay", () => ({
   setupAirPlay: vi.fn(() => () => {}),
+}));
+// The same for the Cast button; useCast needs providers and Google's SDK
+vi.mock("@/components/video-player/cast/castPlugin", () => ({}));
+vi.mock("@/components/video-player/cast/castMiddleware", () => ({}));
+vi.mock("@/components/video-player/cast/useCast", () => ({
+  useCast: vi.fn(),
 }));
 
 interface SendOptions {
@@ -151,6 +158,8 @@ interface Controls {
   repeat?: "none" | "all" | "one";
   /** The player is ready and the scene should start by itself */
   autoplay?: boolean;
+  /** The user's resume point in the scene's watch history */
+  resumeTime?: number;
 }
 
 function renderPlayer(
@@ -195,7 +204,10 @@ function renderPlayer(
         location: { state: null, pathname, search: "" },
         hasResumedRef,
         initialResumeTimeRef,
-        watchHistory: null,
+        watchHistory:
+          controls.resumeTime === undefined
+            ? null
+            : { resumeTime: controls.resumeTime },
         loadingWatchHistory: false,
       }),
     { initialProps: { current: scene } }
@@ -614,6 +626,29 @@ describe("useVideoPlayer", () => {
 
     unmount();
     expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands useCast the player, the scene with its key, the queue and the user's resume point", () => {
+    const player = fakePlayer();
+    const playlist = rowQueue();
+    renderPlayer(player, onA, null, {
+      playlist,
+      autoplayNext: false,
+      repeat: "all",
+      resumeTime: 300,
+    });
+
+    const options = must(vi.mocked(useCast).mock.lastCall, "useCast call")[0];
+    expect(options.playerRef.current).toBe(player);
+    expect(options.scene).toBe(onA);
+    expect(options.sceneKey).toBe("123:inst-a");
+    expect(options.playlist).toBe(playlist);
+    expect(options.autoplayNext).toBe(false);
+    expect(options.repeat).toBe("all");
+    expect(options.restartCount).toBe(0);
+    // The watch history's resume point, not the Continue Watching one
+    expect(options.resumeTime).toBe(300);
+    expect(options.minimumPlayPercent).toBe(20);
   });
 
   it("a blocked autoplay retries muted", async () => {

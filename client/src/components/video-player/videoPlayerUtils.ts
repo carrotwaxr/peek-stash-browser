@@ -1,4 +1,7 @@
 import videojs from "video.js";
+// The cast middleware registers first: while a cast is attached it ends a
+// seek before the duration middleware could reload a transcode for it
+import "./cast/castMiddleware.js";
 // Import duration middleware (registers via videojs.use)
 import "./durationMiddleware.js";
 

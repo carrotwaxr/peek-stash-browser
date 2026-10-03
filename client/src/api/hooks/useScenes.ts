@@ -88,6 +88,21 @@ export function useExternalPlayerLink(sceneId: string, instanceId: string) {
 }
 
 /**
+ * The query for a scene's signed media link, shared by `useSceneMediaLink` and
+ * a cast start's `fetchQuery`: one key, and a link is reused for at most an
+ * hour.
+ */
+export const sceneMediaLinkQuery = (sceneId: string, instanceId: string) => ({
+  queryKey: queryKeys.scenes.mediaLink(instanceId, sceneId),
+  queryFn: () =>
+    apiPost<SceneMediaLinkResponse>(`/scene/${sceneId}/media-link`, {
+      instanceId,
+    }),
+  staleTime: 60 * 60 * 1000,
+  retry: false,
+});
+
+/**
  * The scene's signed media link: every playable source, the one a Cast
  * receiver is given, captions and poster, all on the user's personal link.
  * `enabled` is the caller's flag, so only a tab that needs it (Safari, or a
@@ -100,15 +115,9 @@ export function useSceneMediaLink(
   { enabled = true }: { enabled?: boolean } = {}
 ) {
   return useQuery({
-    queryKey: queryKeys.scenes.mediaLink(instanceId, sceneId),
-    queryFn: () =>
-      apiPost<SceneMediaLinkResponse>(`/scene/${sceneId}/media-link`, {
-        instanceId,
-      }),
+    ...sceneMediaLinkQuery(sceneId, instanceId),
     enabled: enabled && !!sceneId && !!instanceId,
-    staleTime: 60 * 60 * 1000,
     refetchInterval: 60 * 60 * 1000,
-    retry: false,
   });
 }
 
