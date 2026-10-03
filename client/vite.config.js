@@ -50,6 +50,13 @@ export default defineConfig(({ mode }) => ({
           external || !/\/client\/src\/.*\/index\.ts$/.test(id),
       },
       output: {
+        // A dynamic chunk is named after its entry module: the VR code
+        // (vr/vrPlugin.ts with the fork and three.js) is the `vr` chunk, the
+        // name its line in scripts/bundleBudget.mjs uses
+        chunkFileNames: (chunk) =>
+          chunk.facadeModuleId?.endsWith("/video-player/vr/vrPlugin.ts")
+            ? "assets/vr-[hash].js"
+            : "assets/[name]-[hash].js",
         manualChunks: {
           // Separate vendor chunks for better caching
           "react-vendor": [
@@ -67,8 +74,9 @@ export default defineConfig(({ mode }) => ({
       },
     },
     // video-vendor is video.js with VHS (about 620 kB, no smaller build plays
-    // HLS and DASH); any other chunk this large still warns. The gate is
-    // scripts/bundleBudget.mjs (npm run check:bundle), which fails the build.
+    // HLS and DASH); any other chunk this large still warns, the lazy `vr`
+    // chunk (about 750 kB) on purpose. The gate is scripts/bundleBudget.mjs
+    // (npm run check:bundle), which fails the build.
     chunkSizeWarningLimit: 650,
   },
   server: {
@@ -97,6 +105,11 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
       },
     },
+  },
+  // The VR fork is first met through loadVr's import(): pre-bundle it at
+  // start, or Vite dev re-optimises and reloads the page at the VR click
+  optimizeDeps: {
+    include: ["@blaineam/videojs-vr"],
   },
   resolve: {
     alias: {

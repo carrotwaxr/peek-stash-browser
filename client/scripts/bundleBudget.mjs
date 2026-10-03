@@ -23,6 +23,11 @@ export const budgets = {
     // 11.9 kB measured: react-hot-toast only. lucide-react is in no manual
     // chunk, so each chunk carries the icons it draws.
     "ui-vendor": 13,
+    // 749.4 kB measured on 2026-10-03 (193.3 gzip): the lazy VR code,
+    // vr/vrPlugin.ts with @blaineam/videojs-vr 3.3.0, which bundles three.js
+    // and webvr-polyfill. Loaded only on VR scenes (vr/loadVr.ts); named in
+    // vite.config.js's chunkFileNames.
+    vr: 787,
   },
   // The entry chunk (the script index.html loads): the app shell, login and the
   // layout; every page, the setup wizard and the help dialog load on demand.

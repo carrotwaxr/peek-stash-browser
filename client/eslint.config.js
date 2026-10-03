@@ -5,6 +5,34 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+const RESTRICTED_IMPORTS = "@typescript-eslint/no-restricted-imports";
+const VR_PLUGIN = "src/components/video-player/vr/vrPlugin.ts";
+const VR_LOADER = "src/components/video-player/vr/loadVr.ts";
+
+/** The VR import rules: the fork, vrPlugin, or both. */
+const restrictVr = (fork, plugin) => ({
+  paths: fork
+    ? [
+        {
+          name: "@blaineam/videojs-vr",
+          message:
+            "Only vr/vrPlugin.ts imports the VR fork; elsewhere load it with loadVr() (vr/loadVr.ts).",
+          allowTypeImports: true,
+        },
+      ]
+    : [],
+  patterns: plugin
+    ? [
+        {
+          regex: "(^|/)vrPlugin(\\.[jt]s)?$",
+          message:
+            "vrPlugin loads only through loadVr() (vr/loadVr.ts): a static import puts the VR chunk in this one.",
+          allowTypeImports: true,
+        },
+      ]
+    : [],
+});
+
 export default defineConfig([
   globalIgnores(["dist", "coverage"]),
   {
@@ -107,6 +135,23 @@ export default defineConfig([
         ),
       ],
     },
+  },
+  // The VR code (the fork and three.js, about 750 kB) is the lazy `vr` chunk:
+  // only vr/loadVr.ts reaches vr/vrPlugin.ts, by import(), and only
+  // vrPlugin.ts imports the fork. A static import anywhere else pulls it into
+  // that file's chunk (the Scene page). Type imports are free.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [VR_PLUGIN, VR_LOADER],
+    rules: { [RESTRICTED_IMPORTS]: ["error", restrictVr(true, true)] },
+  },
+  {
+    files: [VR_LOADER],
+    rules: { [RESTRICTED_IMPORTS]: ["error", restrictVr(true, false)] },
+  },
+  {
+    files: [VR_PLUGIN],
+    rules: { [RESTRICTED_IMPORTS]: ["error", restrictVr(false, true)] },
   },
   // Build scripts run in Node
   {
