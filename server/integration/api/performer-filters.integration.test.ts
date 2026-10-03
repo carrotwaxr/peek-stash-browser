@@ -843,8 +843,10 @@ describeWithDb(
       ["", null],
       [null, null],
     ])("careerYearsSql(%j) is %j", async (text, years) => {
+      const career = careerYearsSql("c.v", Y);
       const rows = await prisma.$queryRawUnsafe<{ years: bigint | null }[]>(
-        `SELECT ${careerYearsSql("c.v")} AS years FROM (SELECT ? AS v) c`,
+        `SELECT ${career.sql} AS years FROM (SELECT ? AS v) c`,
+        ...career.params,
         text
       );
       const value = must(rows[0], "the expression's row").years;

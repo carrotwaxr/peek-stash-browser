@@ -1774,7 +1774,8 @@ export function stashIdsClause(
  * "- YYYY" and any other text give NULL. These are the legacy
  * `parseCareerLength`'s dated forms (item 38), in SQL so the Career Length
  * filter and sort run in the list statement; PR 9 revisits the meaning
- * against Stash's. The current year is SQLite's (`now`, UTC).
+ * against Stash's. The current year is the caller's `year` (the viewer's,
+ * from `zonedToday`), bound as the expression's one parameter.
  *
  * It evaluates per row, as a scalar subquery whose nested FROM computes the
  * normalised text, its hyphen and its two parts once: written as one inline
@@ -1782,22 +1783,23 @@ export function stashIdsClause(
  * (once over 55k performers through Prisma: 64 ms against 202; a page sorted
  * by it 110 ms against 257, and 44 ms by name).
  */
-export function careerYearsSql(column: string): string {
+export function careerYearsSql(column: string, year: number): FilterClause {
   const space = "char(32, 9, 10, 13)";
   const fourDigits = "'[0-9][0-9][0-9][0-9]'";
   const start = "CAST(career_start AS INTEGER)";
   const end = "CAST(career_end AS INTEGER)";
-  return [
+  const sql = [
     "(SELECT CASE",
     `WHEN career_start NOT GLOB ${fourDigits} OR ${start} <= 1900 THEN NULL`,
     `WHEN career_end IN ('', 'present', 'current', 'now') THEN CASE WHEN ${start} <= career_year THEN career_year - ${start} END`,
     `WHEN career_end GLOB ${fourDigits} AND ${end} >= ${start} AND ${end} <= career_year + 1 THEN ${end} - ${start}`,
     "END",
     // No hyphen: substr(x, 1, -1) is '', which no year matches
-    `FROM (SELECT trim(substr(career_text, 1, career_dash - 1), ${space}) AS career_start, trim(substr(career_text, career_dash + 1), ${space}) AS career_end, CAST(strftime('%Y', 'now') AS INTEGER) AS career_year`,
+    `FROM (SELECT trim(substr(career_text, 1, career_dash - 1), ${space}) AS career_start, trim(substr(career_text, career_dash + 1), ${space}) AS career_end, CAST(? AS INTEGER) AS career_year`,
     `FROM (SELECT career_text, instr(career_text, '-') AS career_dash`,
     `FROM (SELECT lower(trim(replace(replace(${column}, char(8211), '-'), char(8212), '-'), ${space})) AS career_text))))`,
   ].join(" ");
+  return { sql, params: [year] };
 }
 
 /**
