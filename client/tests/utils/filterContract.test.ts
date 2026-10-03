@@ -5,7 +5,7 @@
  * offered, and every sort is one the server accepts.
  */
 import {
-  CLIP_PARAMS,
+  CLIP_FIELDS,
   FIELDS,
   type FieldSpec,
   LIST_KINDS,
@@ -82,7 +82,7 @@ describe("client filter options and the shared contract", () => {
     "every %s option offers only modifiers its field takes, and defaults to one of them",
     (kind) => {
       const fields: Readonly<Record<string, FieldSpec>> =
-        kind === "clip" ? CLIP_PARAMS : FIELDS[kind];
+        kind === "clip" ? CLIP_FIELDS : FIELDS[kind];
       const refused = FILTER_OPTIONS[kind].flatMap((option) => {
         const uiKey = UI_KEYS[kind].find((key) => key.key === option.key);
         const spec = uiKey ? fields[uiKey.field] : undefined;
@@ -116,7 +116,7 @@ describe("client filter options and the shared contract", () => {
     "every %s text option carries its contract field's maxLength",
     (kind) => {
       const fields: Readonly<Record<string, FieldSpec>> =
-        kind === "clip" ? CLIP_PARAMS : FIELDS[kind];
+        kind === "clip" ? CLIP_FIELDS : FIELDS[kind];
       const texts = FILTER_OPTIONS[kind].filter(
         (option) => option.type === "text"
       );

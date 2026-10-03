@@ -6,7 +6,7 @@
  */
 import {
   BREAST_TYPES,
-  CLIP_PARAMS,
+  CLIP_FIELDS,
   ETHNICITIES,
   EYE_COLORS,
   type EditorKind,
@@ -26,7 +26,7 @@ import { describe, expect, it } from "vitest";
 
 const TABLES: Record<ListKind, Readonly<Record<string, FieldSpec>>> = {
   ...FIELDS,
-  clip: CLIP_PARAMS,
+  clip: CLIP_FIELDS,
 };
 
 const panelOf = (kind: ListKind): readonly PanelField[] => PANEL_FIELDS[kind];

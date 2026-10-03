@@ -6,8 +6,8 @@
  */
 import {
   type EntityKind,
-  FIELDS,
   type FieldSpec,
+  LIST_FIELDS,
   LIST_KINDS,
   type ListKind,
   UI_KEYS,
@@ -1044,13 +1044,13 @@ describe("filter requests follow the contract", () => {
     (kind): kind is EntityKind => kind !== "clip"
   );
 
-  /** Where an entity list's request carries the field a panel key fills */
-  const pathOf = (kind: EntityKind, key: string): readonly string[] => {
+  /** Where a list's request carries the field a panel key fills */
+  const pathOf = (kind: ListKind, key: string): readonly string[] => {
     const uiKey = must(
       UI_KEYS[kind].find((candidate) => candidate.key === key),
       `${kind} UI key ${key}`
     );
-    const fields: Readonly<Record<string, FieldSpec>> = FIELDS[kind];
+    const fields: Readonly<Record<string, FieldSpec>> = LIST_FIELDS[kind];
     const spec = must(fields[uiKey.field], `${kind} field ${uiKey.field}`);
     return spec.kind === "ref" && spec.path ? spec.path : [uiKey.field];
   };
@@ -1115,12 +1115,6 @@ describe("filter requests follow the contract", () => {
     state: Record<string, unknown>
   ) => {
     const sent = LISTS[kind].build(state);
-    if (kind === "clip") {
-      return {
-        value: readPath(sent, [option.key]),
-        modifier: readPath(sent, [`${option.key}Modifier`]),
-      };
-    }
     const criterion = readPath(sent, pathOf(kind, option.key));
     return {
       value: readPath(criterion, ["value"]),
@@ -1159,17 +1153,17 @@ describe("filter requests follow the contract", () => {
         performerIdsModifier: "EXCLUDES",
       })
     ).toEqual({
-      tagIds: ["1:server-a"],
-      tagIdsModifier: "EXCLUDES",
-      sceneTagIds: ["2:server-a", "3:server-a"],
-      sceneTagIdsModifier: "INCLUDES_ALL",
-      performerIds: ["4:server-a"],
-      performerIdsModifier: "EXCLUDES",
-      isGenerated: true,
+      tags: { value: ["1:server-a"], modifier: "EXCLUDES" },
+      scene_tags: {
+        value: ["2:server-a", "3:server-a"],
+        modifier: "INCLUDES_ALL",
+      },
+      performers: { value: ["4:server-a"], modifier: "EXCLUDES" },
+      is_generated: true,
     });
   });
 
-  it("clips list with a preview until the panel picks otherwise, and All clips sends no isGenerated", () => {
+  it("clips list with a preview until the panel picks otherwise, and All clips sends no is_generated", () => {
     const isGenerated = must(
       CLIP_FILTER_OPTIONS.find((option) => option.key === "isGenerated"),
       "the clip isGenerated option"
@@ -1179,12 +1173,12 @@ describe("filter requests follow the contract", () => {
       "the All clips choice"
     );
 
-    expect(buildClipFilter({})).toEqual({ isGenerated: true });
+    expect(buildClipFilter({})).toEqual({ is_generated: true });
     expect(buildClipFilter({ isGenerated: "true" })).toEqual({
-      isGenerated: true,
+      is_generated: true,
     });
     expect(buildClipFilter({ isGenerated: "false" })).toEqual({
-      isGenerated: false,
+      is_generated: false,
     });
     // The panel stores "" as no choice, so All clips needs a value of its own
     expect(allClips.value).not.toBe("");

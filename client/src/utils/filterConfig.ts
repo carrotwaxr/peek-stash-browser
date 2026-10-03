@@ -2,6 +2,7 @@
  * Sorting and filtering configuration for all entity types
  */
 import {
+  type ClipFilterInput,
   type GalleryFilterInput,
   type GroupFilterInput,
   type ImageFilterInput,
@@ -12,7 +13,6 @@ import {
   type StudioFilterInput,
   type TagFilterInput,
 } from "@peek/shared-types";
-import type { ClipFilterParams } from "../api/clips";
 import {
   type FilterOption,
   type PanelTable,
@@ -198,12 +198,11 @@ export const buildImageFilter = (filters: FilterState): ImageFilterInput =>
   buildPanelFilter("image", filters);
 
 /**
- * The Clips page's filter parameters for `GET /api/clips` (`getClips` joins
- * the lists with commas). Each list with a choice of modifier sends it in
- * `<param>Modifier`. Clips list with a preview unless the panel picks
- * "Without preview only" (false) or "All clips" (no `isGenerated`).
+ * The Clips page's `clip_filter` for `POST /api/library/clips`. Clips list
+ * with a preview unless the panel picks "Without preview only" (false) or
+ * "All clips" (no `is_generated`).
  */
-export const buildClipFilter = (filters: FilterState): ClipFilterParams =>
+export const buildClipFilter = (filters: FilterState): ClipFilterInput =>
   buildPanelFilter("clip", filters);
 
 // ============================================================================

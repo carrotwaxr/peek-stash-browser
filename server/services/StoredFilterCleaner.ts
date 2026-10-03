@@ -24,11 +24,10 @@
  * lookup, which `bareRefLookupFor` builds from one query per entity type.
  */
 import {
-  CLIP_PARAMS,
   DEFAULT_SORT,
   type EntityKind,
-  FIELDS,
   type FieldSpec,
+  LIST_FIELDS,
   LIST_KINDS,
   type ListKind,
   PER_PAGE_MAX,
@@ -330,7 +329,7 @@ interface PresetKeys {
 }
 
 const fieldsOf = (kind: ListKind): Readonly<Record<string, FieldSpec>> =>
-  kind === "clip" ? CLIP_PARAMS : FIELDS[kind];
+  LIST_FIELDS[kind];
 
 /** By the key presets are saved under; a Map, so `__proto__` is no member */
 const PRESET_KEYS = new Map<string, { kind: ListKind; keys: PresetKeys }>(

@@ -71,8 +71,7 @@ export {
 } from "./admin";
 
 // Clips
-export { getClips, getClipsForScene, getClipPreviewUrl } from "./clips";
-export type { ClipFilterParams, GetClipsOptions } from "./clips";
+export { findClips, getClipsForScene, getClipPreviewUrl } from "./clips";
 
 // Image view history
 export { imageViewHistoryApi } from "./image-view-history";

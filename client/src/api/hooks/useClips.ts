@@ -1,5 +1,6 @@
+import type { FindClipsRequest } from "@peek/shared-types";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
-import { type GetClipsOptions, getClips } from "..";
+import { findClips } from "..";
 import { clipListTotal, fetchListPage } from "../../utils/listQuery";
 import { queryKeys } from "../queryKeys";
 
@@ -9,7 +10,7 @@ import { queryKeys } from "../queryKeys";
  * current page stays on screen while the next one loads, and a page change
  * reuses the list's count (`fetchListPage`).
  */
-export function useClipList(params: GetClipsOptions | null) {
+export function useClipList(params: FindClipsRequest | null) {
   return useQuery({
     queryKey: queryKeys.clips.list((params ?? {}) as Record<string, unknown>),
     queryFn:
@@ -20,7 +21,7 @@ export function useClipList(params: GetClipsOptions | null) {
               context,
               params as Record<string, unknown>,
               clipListTotal,
-              (request) => getClips(request as GetClipsOptions)
+              (request) => findClips(request as FindClipsRequest)
             ),
     placeholderData: keepPreviousData,
   });

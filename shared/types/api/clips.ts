@@ -1,4 +1,5 @@
 // shared/types/api/clips.ts
+import type { ClipListRequestInput } from "../filters/index.js";
 import type { ListCount } from "./library.js";
 
 /**
@@ -47,10 +48,24 @@ export interface ClipWithRelations {
 }
 
 // =============================================================================
+// FIND CLIPS
+// =============================================================================
+
+/** POST /api/library/clips: the clip list's filter body */
+export type FindClipsRequest = ClipListRequestInput;
+
+/** POST /api/library/clips answers as GET /api/clips does */
+export type FindClipsResponse<Count extends ListCount = number> =
+  GetClipsResponse<Count>;
+
+// =============================================================================
 // GET CLIPS
 // =============================================================================
 
-/** GET /api/clips */
+/**
+ * GET /api/clips: the old query parameters, kept for callers that still send
+ * them; each maps onto a `clip_filter` field (`POST /api/library/clips`)
+ */
 export interface GetClipsQuery extends Record<
   string,
   string | string[] | undefined

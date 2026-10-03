@@ -11,8 +11,8 @@
  * agree on one id); a sample with sub-items from the same sample without
  * them. Every sort option must parse, and its ORDER BY must differ from the
  * builder's fallback sort, which a key with no expression gets. Clips go
- * through `buildClipFilter`, the query string `ClipSearch` sends,
- * `parseClipQuery` and the clip builder.
+ * through `buildClipFilter` into the body `ClipSearch` posts
+ * (`clip_filter`), the same parser and the clip builder.
  *
  * A new option or sort is walked by construction. KNOWN_GAPS names the cases
  * that fail at this commit, each with why; each must still fail, so closing
@@ -38,7 +38,7 @@ import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { must } from "../../tests/helpers/must.js";
-import { parseClipQuery, parseListRequest } from "../../utils/listRequest.js";
+import { parseListRequest } from "../../utils/listRequest.js";
 import { parseJsonArray } from "../../utils/sqlHelpers.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
@@ -50,7 +50,6 @@ import {
   type RefPair,
   type RefPool,
   clientList,
-  clipQueryParams,
   loadClientFilterConfig,
   optionSamples,
 } from "../helpers/clientFilterConfig.js";
@@ -150,21 +149,6 @@ async function runList(
     userId: walk.userId,
     allowedInstanceIds: walk.allowedInstanceIds,
   };
-  if (kind === "clip") {
-    // As `ClipSearch` sends it
-    const query = {
-      page: "1",
-      perPage: String(PER_PAGE),
-      sortBy: sort ?? DEFAULT_SORT.clip.field,
-      sortDir: DEFAULT_SORT.clip.direction.toLowerCase(),
-      ...clipQueryParams(filter),
-    };
-    await clipQueryBuilder.execute({
-      ...scope,
-      request: parseClipQuery(query, parse),
-    });
-    return;
-  }
   // As `SearchControls` sends it
   const body = {
     filter: {
@@ -217,6 +201,12 @@ async function runList(
       await imageQueryBuilder.execute({
         ...scope,
         request: parseListRequest("image", body, parse),
+      });
+      return;
+    case "clip":
+      await clipQueryBuilder.execute({
+        ...scope,
+        request: parseListRequest("clip", body, parse),
       });
       return;
   }

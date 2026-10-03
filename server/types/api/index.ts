@@ -236,6 +236,8 @@ export type {
 
 // Clips endpoint types
 export type {
+  FindClipsRequest,
+  FindClipsResponse,
   GetClipsQuery,
   GetClipsResponse,
   GetClipByIdParams,
@@ -291,6 +293,8 @@ export type {
   // Scenes
   FindScenesRequest,
   FindScenesResponse,
+  FindScenesMinimalRequest,
+  FindScenesMinimalResponse,
   FindSimilarScenesParams,
   FindSimilarScenesQuery,
   FindSimilarScenesResponse,

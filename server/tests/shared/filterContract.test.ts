@@ -8,10 +8,9 @@
  * read it, so these checks keep the tables consistent with themselves.
  */
 import {
-  CLIP_PARAMS,
   DEFAULT_SORT,
-  FIELDS,
   type FieldSpec,
+  LIST_FIELDS,
   LIST_KINDS,
   type ListKind,
   PANEL_FIELDS,
@@ -23,10 +22,10 @@ import {
 } from "@peek/shared-types/filters/index.js";
 import { describe, expect, it } from "vitest";
 
-const TABLES: Record<ListKind, Readonly<Record<string, FieldSpec>>> = {
-  ...FIELDS,
-  clip: CLIP_PARAMS,
-};
+const TABLES: Record<
+  ListKind,
+  Readonly<Record<string, FieldSpec>>
+> = LIST_FIELDS;
 
 /** Every field of every table, named `<list>.<field>` */
 const allFields = (): [string, FieldSpec][] =>
@@ -60,7 +59,7 @@ describe("filter contract", () => {
     expect(wrong).toEqual([]);
   });
 
-  it("excludable fields are refs: the tags, performers and studios of the seven lists, and the scenes' performer tags", () => {
+  it("excludable fields are refs: the tags, performers and studios of every list, the clips' scene tags, and the performer tags", () => {
     const excludable = allFields().flatMap(([name, spec]) =>
       spec.kind === "ref" && spec.excludable ? [name] : []
     );
@@ -70,10 +69,16 @@ describe("filter contract", () => {
         ? [name]
         : []
     );
-    const expected = Object.entries(FIELDS).flatMap(([kind, fields]) =>
+    const expected = Object.entries(LIST_FIELDS).flatMap(([kind, fields]) =>
       Object.entries(fields).flatMap(([field, spec]: [string, FieldSpec]) =>
         spec.kind === "ref" &&
-        ["tags", "performers", "studios", "performer_tags"].includes(field)
+        [
+          "tags",
+          "performers",
+          "studios",
+          "performer_tags",
+          "scene_tags",
+        ].includes(field)
           ? [`${kind}.${field}`]
           : []
       )
@@ -83,6 +88,7 @@ describe("filter contract", () => {
     expect(excludable).toEqual(expected);
     expect(excludable).toContain("tag.performers");
     expect(excludable).toContain("scene.performer_tags");
+    expect(excludable).toContain("clip.scene_tags");
   });
 
   it("ref presence (has none, has any) is on the relations a row can lack", () => {

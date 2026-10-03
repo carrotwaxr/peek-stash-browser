@@ -7,7 +7,7 @@
  * the fields the server opened are exactly the ones offered.
  */
 import {
-  CLIP_PARAMS,
+  CLIP_FIELDS,
   FIELDS,
   type FieldSpec,
   LIST_KINDS,
@@ -35,7 +35,7 @@ import {
 import { buildSearchParams, parseSearchParams } from "@/utils/urlParams";
 
 const specsOf = (kind: ListKind): Readonly<Record<string, FieldSpec>> =>
-  kind === "clip" ? CLIP_PARAMS : FIELDS[kind];
+  kind === "clip" ? CLIP_FIELDS : FIELDS[kind];
 
 const rowsOf = (kind: ListKind): readonly PanelField[] => PANEL_FIELDS[kind];
 

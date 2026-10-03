@@ -22,7 +22,7 @@ import {
 } from "@peek/shared-types/filters/index.js";
 import { makeEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import type { ParsedListRequest } from "../types/parsedFilters.js";
-import { parseClipQuery, parseListRequest } from "../utils/listRequest.js";
+import { parseListRequest } from "../utils/listRequest.js";
 import { clipQueryBuilder } from "./ClipQueryBuilder.js";
 import { galleryQueryBuilder } from "./GalleryQueryBuilder.js";
 import { groupQueryBuilder } from "./GroupQueryBuilder.js";
@@ -145,18 +145,28 @@ async function countTab<E extends EntityKind>(
 }
 
 /**
- * A tag's clips: the Clips page's own count over the request its link sends
- * (`GET /api/clips?tagIds=<ref>&isGenerated=true`, the page's default), so
- * the statistic equals the list it opens. The clip's scene's exclusions and
- * the viewer's instances apply as on that list (invariant 3). Clip tag
- * filters take no depth.
+ * A tag's clips: the Clips page's own count over the request its link opens
+ * (`/clips?tagId=<ref>`, with the page's default "With preview only"),
+ * whose body is `clip_filter: { tags, is_generated: true }`, so the
+ * statistic equals the list it opens. The clip's scene's exclusions and the
+ * viewer's instances apply as on that list (invariant 3). The link sends no
+ * depth.
  */
 async function countClips(
   ref: { id: string; instanceId: string },
   options: RelationCountOptions
 ): Promise<number> {
-  const request = parseClipQuery(
-    { tagIds: makeEntityRef(ref.id, ref.instanceId), isGenerated: "true" },
+  const request = parseListRequest(
+    "clip",
+    {
+      clip_filter: {
+        tags: {
+          value: [makeEntityRef(ref.id, ref.instanceId)],
+          modifier: "INCLUDES",
+        },
+        is_generated: true,
+      },
+    },
     { userId: options.userId }
   );
   return clipQueryBuilder.count({

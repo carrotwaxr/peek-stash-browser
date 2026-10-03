@@ -1,21 +1,23 @@
 /**
  * Clip preview URLs carry the instance (sweep item 2), so the server checks
- * the row it will serve on a multi-instance setup. The clips list sends
- * every filter parameter the Clips page builds, modifiers included, as
- * `GET /api/clips` takes them (item 38).
+ * the row it will serve on a multi-instance setup. The clips list posts the
+ * request the Clips page builds, as `POST /api/library/clips` takes it
+ * (item 38, F16).
  */
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { apiGet } from "@/api/client";
-import { getClipPreviewUrl, getClips, getClipsForScene } from "@/api/clips";
+import { apiGet, apiPost } from "@/api/client";
+import { findClips, getClipPreviewUrl, getClipsForScene } from "@/api/clips";
 
 vi.mock("@/api/client", () => ({
   apiGet: vi.fn(),
+  apiPost: vi.fn(),
   // The query client registers its library-stamp listener here
   setLibraryStampListener: vi.fn(),
 }));
 
 const mockApiGet = vi.mocked(apiGet);
+const mockApiPost = vi.mocked(apiPost);
 
 describe("getClipPreviewUrl", () => {
   it("getClipPreviewUrl always names the instance", () => {
@@ -29,64 +31,32 @@ describe("getClipPreviewUrl", () => {
   });
 });
 
-describe("getClips", () => {
+describe("findClips", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockApiGet.mockResolvedValue({});
+    mockApiPost.mockResolvedValue({});
   });
 
-  it("sends each filter with its modifier, lists comma-joined", async () => {
-    await getClips({
-      page: 2,
-      perPage: 48,
-      sortBy: "title",
-      sortDir: "asc",
-      q: "kiss",
-      sceneId: "9:server-a",
-      tagIds: ["1:server-a", "2:server-a"],
-      tagIdsModifier: "INCLUDES_ALL",
-      sceneTagIds: ["3:server-a"],
-      sceneTagIdsModifier: "EXCLUDES",
-      performerIds: ["4:server-a"],
-      performerIdsModifier: "EXCLUDES",
-      studioId: "5:server-a",
-      isGenerated: false,
-    });
+  it("posts the request, its clip_filter and paging as they are", async () => {
+    const request = {
+      filter: {
+        page: 2,
+        per_page: 48,
+        sort: "title" as const,
+        direction: "ASC" as const,
+        q: "kiss",
+        count: false as const,
+      },
+      clip_filter: {
+        scenes: { value: ["9:server-a"] },
+        tags: { value: ["1:server-a"], modifier: "INCLUDES_ALL" as const },
+        is_generated: false,
+      },
+    };
 
-    const url = must(mockApiGet.mock.calls[0])[0];
-    expect(url.startsWith("/clips?")).toBe(true);
-    expect(
-      Object.fromEntries(new URLSearchParams(url.slice("/clips?".length)))
-    ).toEqual({
-      page: "2",
-      perPage: "48",
-      sortBy: "title",
-      sortDir: "asc",
-      q: "kiss",
-      sceneId: "9:server-a",
-      tagIds: "1:server-a,2:server-a",
-      tagIdsModifier: "INCLUDES_ALL",
-      sceneTagIds: "3:server-a",
-      sceneTagIdsModifier: "EXCLUDES",
-      performerIds: "4:server-a",
-      performerIdsModifier: "EXCLUDES",
-      studioId: "5:server-a",
-      isGenerated: "false",
-    });
-  });
+    await findClips(request);
 
-  it("sends count=false for a page alone, and nothing for a counted page", async () => {
-    await getClips({ page: 2, count: false });
-    await getClips({ page: 1 });
-
-    expect(mockApiGet).toHaveBeenNthCalledWith(1, "/clips?page=2&count=false");
-    expect(mockApiGet).toHaveBeenNthCalledWith(2, "/clips?page=1");
-  });
-
-  it("sends no isGenerated for every clip", async () => {
-    await getClips({ page: 1 });
-
-    expect(mockApiGet).toHaveBeenCalledWith("/clips?page=1");
+    expect(mockApiPost).toHaveBeenCalledWith("/library/clips", request);
   });
 });
 

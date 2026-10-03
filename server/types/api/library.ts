@@ -16,6 +16,8 @@ export type {
   // Scenes
   FindScenesRequest,
   FindScenesResponse,
+  FindScenesMinimalRequest,
+  FindScenesMinimalResponse,
   FindSimilarScenesParams,
   FindSimilarScenesQuery,
   FindSimilarScenesResponse,

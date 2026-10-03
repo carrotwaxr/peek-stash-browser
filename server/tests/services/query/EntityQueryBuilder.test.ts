@@ -213,11 +213,11 @@ class NestedBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "clip"> {
 
   /** One field of the clip's table; the rest build no clause */
   protected override readonly fieldClauses = {
-    isGenerated: (isGenerated: boolean): FilterClause => ({
+    is_generated: (isGenerated: boolean): FilterClause => ({
       sql: "c.isGenerated = ?",
       params: [isGenerated ? 1 : 0],
     }),
-  } as Pick<FieldClauses<"clip">, "isGenerated"> as FieldClauses<"clip">;
+  } as Pick<FieldClauses<"clip">, "is_generated"> as FieldClauses<"clip">;
 
   protected override searchClause(q: string): FilterClause {
     return { sql: "c.title LIKE ?", params: [q] };
@@ -674,7 +674,7 @@ describe("EntityQueryBuilder", () => {
       await nested.execute({
         userId: 5,
         allowedInstanceIds: ["inst-a"],
-        request: clipRequest({ filter: { isGenerated: true } }),
+        request: clipRequest({ filter: { is_generated: true } }),
       });
 
       const [page, count] = statements();
@@ -1034,12 +1034,16 @@ class TableBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "clip"> {
     };
 
   protected override readonly fieldClauses: FieldClauses<"clip"> = {
-    sceneId: this.recorder("sceneId"),
-    tagIds: this.recorder("tagIds"),
-    sceneTagIds: this.recorder("sceneTagIds"),
-    performerIds: this.recorder("performerIds"),
-    studioId: this.recorder("studioId"),
-    isGenerated: this.recorder("isGenerated"),
+    scenes: this.recorder("scenes"),
+    tags: this.recorder("tags"),
+    scene_tags: this.recorder("scene_tags"),
+    performers: this.recorder("performers"),
+    studios: this.recorder("studios"),
+    is_generated: this.recorder("is_generated"),
+    duration: this.recorder("duration"),
+    created_at: this.recorder("created_at"),
+    updated_at: this.recorder("updated_at"),
+    title: this.recorder("title"),
   };
 
   protected override searchClause(q: string): FilterClause {
@@ -1078,26 +1082,22 @@ describe("the field clause table", () => {
       request: clipRequest({
         q: "kiss",
         filter: {
-          sceneTagIds: { ...refs, modifier: "INCLUDES" },
-          sceneId: { ...refs, modifier: "INCLUDES" },
+          scene_tags: { ...refs, modifier: "INCLUDES" },
+          scenes: { ...refs, modifier: "INCLUDES" },
         },
       }),
     });
 
     expect(table.calls).toEqual([
-      "sceneId:sceneId:false",
-      "sceneTagIds:sceneTagIds:false",
+      "scenes:scenes:false",
+      "scene_tags:scene_tags:false",
       "search",
     ]);
     const page = must(statements()[0]);
-    positions(page.sql, [
-      "c.sceneId = ?",
-      "c.sceneTagIds = ?",
-      "c.title LIKE ?",
-    ]);
+    positions(page.sql, ["c.scenes = ?", "c.scene_tags = ?", "c.title LIKE ?"]);
     expect(page.params.slice(-5)).toEqual([
-      "sceneId",
-      "sceneTagIds",
+      "scenes",
+      "scene_tags",
       "kiss",
       10,
       10,

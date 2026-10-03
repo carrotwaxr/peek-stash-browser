@@ -12,15 +12,13 @@
  * returned as `ignored` for the caller to log.
  */
 import {
-  CLIP_PARAMS,
   DEFAULT_PLAYLIST_ITEM_SORT,
   DEFAULT_SORT,
   type DateSpec,
-  type EntityKind,
   type EnumSpec,
-  FIELDS,
   FILTER_BODY_KEYS,
   type FieldSpec,
+  LIST_FIELDS,
   type ListKind,
   MAX_REF_VALUES,
   MINIMAL_IDS_MAX,
@@ -34,7 +32,9 @@ import {
   type PresenceModifier,
   Q_MAX_LENGTH,
   RANGE_MODIFIERS,
+  REF_MODIFIERS,
   type RangeModifier,
+  type RefModifier,
   type RefSpec,
   SCENE_FIELDS,
   SORTS,
@@ -52,13 +52,12 @@ import type {
   MinimalScope,
 } from "../types/api/index.js";
 import type {
+  ClipListRequest,
   EnumCriterion,
   FilterRef,
   MinimalKind,
   MultiEnumFieldCriterion,
   ParsedClipFilter,
-  ParsedClipQuery,
-  ParsedFields,
   ParsedFilter,
   ParsedListRequest,
   ParsedMinimalRequest,
@@ -898,8 +897,11 @@ function parseCountFlag(
   return undefined;
 }
 
-/** `POST /api/library/<entities>`: paging, sort, search, top-level ids and the entity's filter */
-export function parseListRequest<E extends EntityKind>(
+/**
+ * `POST /api/library/<entities>` and `POST /api/library/clips`: paging,
+ * sort, search, top-level ids (not for clips) and the list's filter
+ */
+export function parseListRequest<E extends ListKind>(
   entity: E,
   body: unknown,
   options: ParseOptions
@@ -955,7 +957,16 @@ export function parseListRequest<E extends EntityKind>(
         walk(raw, path, pageHandlers, problems, "Unknown request field");
       },
     ],
-    ["ids", (raw, path) => (ids = parseIdList(raw, path, problems))],
+    // Clips take no top-level ids: their filter has no `ids` field
+    ...(entity === "clip"
+      ? []
+      : [
+          [
+            "ids",
+            (raw: unknown, path: string) =>
+              (ids = parseIdList(raw, path, problems)),
+          ] as const,
+        ]),
     [
       filterKey,
       (raw, path) => {
@@ -964,7 +975,7 @@ export function parseListRequest<E extends EntityKind>(
           problems.add(path, "Expected an object");
           return;
         }
-        fields = parseFields(FIELDS[entity], raw, path, problems);
+        fields = parseFields(LIST_FIELDS[entity], raw, path, problems);
       },
     ],
   ]);
@@ -984,7 +995,10 @@ export function parseListRequest<E extends EntityKind>(
 
   return {
     page: clampPage(state.page),
-    perPage: clampPerPage(state.perPage, PER_PAGE_DEFAULT),
+    perPage: clampPerPage(
+      state.perPage,
+      entity === "clip" ? CLIP_PER_PAGE_DEFAULT : PER_PAGE_DEFAULT
+    ),
     q: state.q,
     sort: resolveSort(entity, sortField, state.direction, options.userId),
     // The one boundary cast: each criterion was validated by its field's schema
@@ -1108,12 +1122,27 @@ export function parseCarouselRequest(
 // CLIPS
 // =============================================================================
 
+/**
+ * `GET /api/clips`'s ref parameters, kept for old links and callers: each
+ * fills its `clip_filter` field (lead decision 5) with the modifiers the
+ * GET always took. A list is one comma-separated value; one with a choice
+ * of modifier takes it from `<param>Modifier`. No depth: the body's.
+ */
+const CLIP_QUERY_REFS = new Map<
+  string,
+  { readonly field: string; readonly modifiers: readonly RefModifier[] }
+>([
+  ["sceneId", { field: "scenes", modifiers: ["INCLUDES"] }],
+  ["tagIds", { field: "tags", modifiers: REF_MODIFIERS }],
+  ["sceneTagIds", { field: "scene_tags", modifiers: REF_MODIFIERS }],
+  ["performerIds", { field: "performers", modifiers: REF_MODIFIERS }],
+  ["studioId", { field: "studios", modifiers: ["INCLUDES"] }],
+]);
+
 /** The `<param>Modifier` companions of the ref parameters with a choice of modifier */
-const CLIP_MODIFIER_KEYS = new Map<string, RefSpec>(
-  Object.entries(CLIP_PARAMS).flatMap(([key, spec]) =>
-    spec.kind === "ref" && spec.modifiers.length > 1
-      ? [[`${key}Modifier`, spec]]
-      : []
+const CLIP_MODIFIER_KEYS = new Set(
+  [...CLIP_QUERY_REFS].flatMap(([key, { modifiers }]) =>
+    modifiers.length > 1 ? [`${key}Modifier`] : []
   )
 );
 
@@ -1145,7 +1174,7 @@ function parseBooleanText(
 /** A comma-separated ref list with its modifier from `<key>Modifier`; absent when empty or invalid */
 function parseClipRefs(
   key: string,
-  spec: RefSpec,
+  modifiers: readonly RefModifier[],
   raw: unknown,
   query: Record<string, unknown>,
   problems: Problems
@@ -1158,14 +1187,13 @@ function parseClipRefs(
     .filter((v) => v !== "");
   if (values.length === 0) return undefined;
 
-  let modifier = spec.defaultModifier;
-  if (spec.modifiers.length > 1) {
+  let modifier: RefModifier = "INCLUDES";
+  if (modifiers.length > 1) {
     const modifierKey = `${key}Modifier`;
     const rawModifier = query[modifierKey];
     if (rawModifier !== undefined && rawModifier !== null) {
-      const chosen = spec.modifiers.find((m) => m === rawModifier);
-      // No clip parameter offers presence
-      if (chosen === undefined || isPresence(chosen)) {
+      const chosen = modifiers.find((m) => m === rawModifier);
+      if (chosen === undefined) {
         // An invalid modifier drops the whole criterion
         problems.add(modifierKey, "Invalid modifier");
         return undefined;
@@ -1182,11 +1210,16 @@ function parseClipRefs(
   return { refs: result.data, modifier, depth: 0 };
 }
 
-/** `GET /api/clips`: query strings coerced, refs as comma lists, every clip when `isGenerated` is absent */
+/**
+ * `GET /api/clips`, the lenient reader of today's query parameters: query
+ * strings coerced, refs as comma lists, each parameter read onto its
+ * `clip_filter` field, so the GET lists what the same body would. Every
+ * clip when `isGenerated` is absent.
+ */
 export function parseClipQuery(
   query: unknown,
   options: ParseOptions
-): ParsedClipQuery {
+): ClipListRequest {
   const input = requireObject(query, "query");
   const problems = new Problems();
 
@@ -1221,28 +1254,26 @@ export function parseClipQuery(
       "count",
       (raw, path) => (state.count = parseBooleanText(raw, path, problems)),
     ],
+    [
+      "instanceId",
+      (raw, path) => {
+        specificInstanceId = parseInstanceId(raw, path, problems);
+      },
+    ],
+    [
+      "isGenerated",
+      (raw, path) => {
+        isGenerated = parseBooleanText(raw, path, problems) ?? isGenerated;
+      },
+    ],
   ]);
-  for (const [key, spec] of Object.entries(CLIP_PARAMS)) {
-    switch (spec.kind) {
-      case "instance":
-        handlers.set(key, (raw, path) => {
-          specificInstanceId = parseInstanceId(raw, path, problems);
-        });
-        break;
-      case "boolean":
-        handlers.set(key, (raw, path) => {
-          isGenerated = parseBooleanText(raw, path, problems) ?? isGenerated;
-        });
-        break;
-      case "ref":
-        handlers.set(key, (raw) => {
-          const criterion = parseClipRefs(key, spec, raw, input, problems);
-          if (criterion) criteria[key] = criterion;
-        });
-        break;
-    }
+  for (const [key, { field, modifiers }] of CLIP_QUERY_REFS) {
+    handlers.set(key, (raw) => {
+      const criterion = parseClipRefs(key, modifiers, raw, input, problems);
+      if (criterion) criteria[field] = criterion;
+    });
   }
-  for (const modifierKey of CLIP_MODIFIER_KEYS.keys()) {
+  for (const modifierKey of CLIP_MODIFIER_KEYS) {
     // Read with its parameter
     handlers.set(modifierKey, () => undefined);
   }
@@ -1250,9 +1281,9 @@ export function parseClipQuery(
   walk(input, "", handlers, problems, "Unknown query parameter");
 
   const filter: ParsedClipFilter = {
-    // The boundary cast: each criterion was validated by its parameter's spec
-    ...(criteria as ParsedFields<typeof CLIP_PARAMS>),
-    ...(isGenerated === undefined ? {} : { isGenerated }),
+    // The boundary cast: each criterion was validated against its field
+    ...(criteria as ParsedClipFilter),
+    ...(isGenerated === undefined ? {} : { is_generated: isGenerated }),
   };
   problems.finish();
 
@@ -1605,7 +1636,8 @@ const minimalIdList = z
 
 /**
  * `POST /api/library/<entities>/minimal` (the entity pickers): search text,
- * a page size, ids, count minimums and a scope; always name order, one page.
+ * a page size, ids, count minimums and a scope (never for scenes, which no
+ * restriction names); always name order, one page.
  * `ids` names what the request looks up and `scope` the instances it looks
  * in, so a bad one is a 400. Whether the user may send the
  * scope is the query's check (findMinimalEntities: admins only).
@@ -1682,7 +1714,10 @@ export function parseMinimalRequest<E extends MinimalKind>(
       "scope",
       (raw, path) => {
         if (raw === undefined || raw === null) return;
-        if (raw === "allEnabled") {
+        if (raw === "allEnabled" && entity === "scene") {
+          // The Content Restrictions editor restricts no scenes
+          problems.add(path, "Scenes are listed for the user only");
+        } else if (raw === "allEnabled") {
           scope = raw;
         } else {
           problems.add(path, 'Expected "allEnabled"');

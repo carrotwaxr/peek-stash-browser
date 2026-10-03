@@ -168,22 +168,39 @@ describe("buildPanelFilter", () => {
     });
   });
 
-  it("clips flatten", () => {
+  it("clips build a clip_filter", () => {
     expect(
       buildPanelFilter("clip", {
         tagIds: ["1:a", "2:a"],
         tagIdsModifier: "EXCLUDES",
+        performerIds: ["3:a"],
         studioId: "5:a",
         isGenerated: "all",
       })
     ).toEqual({
-      tagIds: ["1:a", "2:a"],
-      tagIdsModifier: "EXCLUDES",
-      studioId: "5:a",
+      tags: { value: ["1:a", "2:a"], modifier: "EXCLUDES" },
+      performers: { value: ["3:a"], modifier: "INCLUDES" },
+      studios: { value: ["5:a"], modifier: "INCLUDES" },
     });
-    expect(buildPanelFilter("clip", {})).toEqual({ isGenerated: true });
+    expect(buildPanelFilter("clip", {})).toEqual({ is_generated: true });
     expect(buildPanelFilter("clip", { isGenerated: "false" })).toEqual({
-      isGenerated: false,
+      is_generated: false,
+    });
+    // A scene's own clips: the page's permanent scene
+    expect(
+      buildPanelFilter("clip", {
+        scenes: { value: ["9:a"], modifier: "INCLUDES" },
+      })
+    ).toEqual({
+      is_generated: true,
+      scenes: { value: ["9:a"], modifier: "INCLUDES" },
+    });
+  });
+
+  it('the prod clip preset { sceneTagIds: ["280"] } builds a clip_filter.scene_tags the parser accepts', () => {
+    expect(buildPanelFilter("clip", { sceneTagIds: ["280"] })).toEqual({
+      scene_tags: { value: ["280"], modifier: "INCLUDES" },
+      is_generated: true,
     });
   });
 

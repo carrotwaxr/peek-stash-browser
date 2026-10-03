@@ -273,9 +273,15 @@ export const libraryListTotal = (
   },
 });
 
-/** The clip list (`GET /api/clips`): `total` and `totalPages`, asked off by `count=false` */
+/** The clip list (`POST /api/library/clips`): `total` and `totalPages`, asked off by `filter.count: false` */
 export const clipListTotal: ListTotalShape<Record<string, unknown>> = {
-  uncounted: (request) => ({ ...request, count: false }),
+  uncounted: (request) => ({
+    ...request,
+    filter: {
+      ...(request.filter as Record<string, unknown> | undefined),
+      count: false,
+    },
+  }),
   total: (data) => {
     const total = (data as ListData | undefined)?.total;
     return typeof total === "number" ? total : null;

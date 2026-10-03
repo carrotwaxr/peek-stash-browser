@@ -533,10 +533,12 @@ export interface MinimalEntityQueryRow {
   instanceId: string;
   /** The name expression; a gallery with no title, file or folder has none */
   name: string | null;
-  /** Galleries only: what the shown name is built from */
+  /** Galleries and scenes only: what the shown name is built from */
   title?: string | null;
   fileBasename?: string | null;
   folderPath?: string | null;
+  /** Scenes only: the primary file's path, named from when there is no title */
+  filePath?: string | null;
 }
 
 // ---------------------------------------------------------------------------

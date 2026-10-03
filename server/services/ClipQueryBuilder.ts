@@ -32,6 +32,7 @@ import type {
   RefCriterion,
 } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
+import { expandRefs, expandRefsEach } from "../utils/hierarchyUtils.js";
 import {
   type ColumnTarget,
   type FilterClause,
@@ -39,6 +40,9 @@ import {
   type RefClauseOptions,
   allOf,
   anyOf,
+  buildInstantFilter,
+  buildNumericFilter,
+  buildTextFilter,
   exclusionJoin,
   refClause,
   searchAll,
@@ -51,6 +55,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 import {
   type NestedEntity,
@@ -216,34 +221,70 @@ function refOptions(ctx: LeafContext, name: string): RefClauseOptions {
 }
 
 /**
- * A tag on the clip itself: its primary tag or one of its tag list. Has ANY
- * is either holding any of the refs; Has ALL each ref held by one or the
+ * A clip leaf's CTE name: the one the statement always had for the field's
+ * own values (`studio`, `scene`), the leaf's for its excludes
+ * (`studios_not`), so the two leaves of one field never share a name
+ */
+function cteName(ctx: LeafContext, field: string, own: string): string {
+  return ctx.name === field ? own : ctx.name;
+}
+
+/**
+ * A tag on the clip itself: its primary tag or one of its tag list, each
+ * ref with its sub-tags to the criterion's depth. Has ANY is either holding
+ * any of the refs; Has ALL each ref (with its sub-tags) held by one or the
  * other (one OR per ref, AND-ed), so a clip with T1 as its primary tag and
  * T2 in its list has both; Has NONE neither holding any (the primary tag's
- * EXCLUDES keeps a clip without one). An OR of the two EXCLUDES would keep a
- * clip holding a ref in only one of them.
+ * EXCLUDES keeps a clip without one). An OR of the two EXCLUDES would keep
+ * a clip holding a ref in only one of them. The CTEs are the statement's
+ * own (`primary_tag`, `clip_tags`), the excludes' leaf's prefixed with its
+ * name.
  */
-function clipTagClause(
+async function clipTagClause(
   criterion: RefCriterion,
-  opts: (name: string) => RefClauseOptions
-): FilterClause {
-  const { refs } = criterion;
-  const either = (matched: readonly FilterRef[], prefix: string) =>
+  ctx: LeafContext
+): Promise<FilterClause> {
+  const prefix = ctx.name === "tags" ? "" : `${ctx.name}_`;
+  const opts = (name: string) => refOptions(ctx, `${prefix}${name}`);
+  const { depth } = criterion;
+  const allowed = ctx.allowedInstanceIds;
+  const either = (matched: readonly FilterRef[], tag: string) =>
     anyOf([
-      refClause(PRIMARY_TAG, matched, "INCLUDES", opts(`${prefix}primary_tag`)),
-      refClause(CLIP_TAGS, matched, "INCLUDES", opts(`${prefix}clip_tags`)),
+      refClause(PRIMARY_TAG, matched, "INCLUDES", opts(`${tag}primary_tag`)),
+      refClause(CLIP_TAGS, matched, "INCLUDES", opts(`${tag}clip_tags`)),
     ]);
   switch (criterion.modifier) {
     case "INCLUDES":
-      return either(refs, "");
-    case "INCLUDES_ALL":
-      return allOf(refs.map((ref, i) => either([ref], `all${i}_`)));
-    case "EXCLUDES":
+      return either(
+        await expandRefs("tag", criterion.refs, depth, allowed),
+        ""
+      );
+    case "INCLUDES_ALL": {
+      const groups = await expandRefsEach(
+        "tag",
+        criterion.refs,
+        depth,
+        allowed
+      );
+      return allOf(groups.map((group, i) => either(group, `all${i}_`)));
+    }
+    case "EXCLUDES": {
+      const refs = await expandRefs("tag", criterion.refs, depth, allowed);
       return allOf([
         refClause(PRIMARY_TAG, refs, "EXCLUDES", opts("primary_tag")),
         refClause(CLIP_TAGS, refs, "EXCLUDES", opts("clip_tags")),
       ]);
+    }
   }
+}
+
+/** A ref criterion that names the clips the statement drives from: a studio's or scenes' INCLUDES */
+function drives(criterion: RefCriterion | undefined): boolean {
+  return (
+    criterion !== undefined &&
+    criterion.modifier !== "EXCLUDES" &&
+    criterion.refs.length > 0
+  );
 }
 
 class ClipQueryBuilder extends EntityQueryBuilder<
@@ -302,12 +343,15 @@ class ClipQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The filter parameters, one clause per field in the order the statement
-   * ANDs them, and the search. The clip's tags, its scene's tags
-   * and its scene's performers take Has ANY, Has ALL and Has NONE; the scene
-   * and the studio are single-valued (INCLUDES only). A scene tag is one the
-   * scene holds (SceneTag) or inherits (SceneInheritedTag), in every
-   * modifier, as on the scene list.
+   * The clip filter's clauses, one per field in the order the statement
+   * ANDs them, and the search. The clip's tags, its scene's tags and its
+   * scene's performers take Has ANY, Has ALL and Has NONE; the studio is
+   * single-valued (INCLUDES or EXCLUDES, which keeps a scene without one).
+   * The tags, scene tags and studio take a depth (their sub-tags and
+   * sub-studios). A scene tag is one the scene holds (SceneTag) or inherits
+   * (SceneInheritedTag), in every modifier, as on the scene list. The
+   * duration is the end less the start (a clip without an end matches no
+   * comparison), the dates the clip's epoch columns in the viewer's day.
    *
    * Has ANY and Has ALL on a junction (the clip's tag list, its scene's tags
    * and performers) match the list of parents the junction's ref index
@@ -315,47 +359,62 @@ class ClipQueryBuilder extends EntityQueryBuilder<
    * short (the primary tag's index beside it: MULTI-INDEX OR) and builds
    * once and probes when it is long, where a correlated EXISTS probed the
    * junction for every clip (a clip tag: 50 ms to 0.7 at 207k clips). A
-   * studio or a scene names few clips and drives the statement itself;
-   * beside one each other filter probes those clips (EXISTS), which is
-   * cheaper than reading a common tag's whole list first (a studio and a
-   * clip tag: 10 ms, against 13 with the list). Has NONE keeps its NOT
-   * EXISTS per clip. Whether a studio or a scene is present is a fact of
-   * the whole filter, which `leafContextFor` hands each clause as `lists`.
-   * The CTE names stay the ones the statement always had (a clip filter has
-   * one leaf per field, so they are unique).
+   * studio or scenes it includes name few clips and drive the statement
+   * themselves; beside one each other filter probes those clips (EXISTS),
+   * which is cheaper than reading a common tag's whole list first (a studio
+   * and a clip tag: 10 ms, against 13 with the list). Has NONE keeps its NOT
+   * EXISTS per clip. Whether a studio or scenes drive is a fact of the whole
+   * filter, which `leafContextFor` hands each clause as `lists`. The CTE
+   * names stay the ones the statement always had; a field's excludes take
+   * their leaf's (`cteName`).
    */
   protected override readonly fieldClauses: FieldClauses<"clip"> = {
-    isGenerated: (isGenerated) => ({
+    is_generated: (isGenerated) => ({
       sql: "c.isGenerated = ?",
       params: [isGenerated ? 1 : 0],
     }),
-    sceneId: (c, ctx) =>
-      refClause(CLIP_SCENE, c.refs, "INCLUDES", refOptions(ctx, "scene")),
-    tagIds: (c, ctx) => clipTagClause(c, (name) => refOptions(ctx, name)),
-    sceneTagIds: (c, ctx) =>
-      refClause(SCENE_TAGS, c.refs, c.modifier, {
-        ...refOptions(ctx, "scene_tags"),
+    scenes: (c, ctx) =>
+      refClause(
+        CLIP_SCENE,
+        c.refs,
+        c.modifier,
+        refOptions(ctx, cteName(ctx, "scenes", "scene"))
+      ),
+    tags: (c, ctx) => clipTagClause(c, ctx),
+    scene_tags: (c, ctx) =>
+      hierarchicalRefClause("tag", SCENE_TAGS, c, ctx, {
+        name: cteName(ctx, "scene_tags", "scene_tags"),
         inheritedJunction: SCENE_INHERITED_TAGS,
+        ...(ctx.lists === true ? { sortedByIndex: false } : {}),
       }),
-    performerIds: (c, ctx) =>
+    performers: (c, ctx) =>
       refClause(
         SCENE_PERFORMERS,
         c.refs,
         c.modifier,
-        refOptions(ctx, "performers")
+        refOptions(ctx, cteName(ctx, "performers", "performers"))
       ),
-    studioId: (c, ctx) =>
-      refClause(SCENE_STUDIO, c.refs, "INCLUDES", refOptions(ctx, "studio")),
+    studios: (c, ctx) =>
+      hierarchicalRefClause("studio", SCENE_STUDIO, c, ctx, {
+        name: cteName(ctx, "studios", "studio"),
+        ...(ctx.lists === true ? { sortedByIndex: false } : {}),
+      }),
+    duration: (c) => buildNumericFilter(c, "(c.endSeconds - c.seconds)"),
+    created_at: (c, ctx) =>
+      buildInstantFilter(c, "c.stashCreatedAt", ctx.timeZone),
+    updated_at: (c, ctx) =>
+      buildInstantFilter(c, "c.stashUpdatedAt", ctx.timeZone),
+    title: (c) => buildTextFilter(c, "c.title"),
   };
 
-  /** No studio and no scene criterion: the filter's clauses list by their junctions' indexes */
+  /** No studio and no scenes include: the filter's clauses list by their junctions' indexes */
   protected override leafContextFor(
     filter: ClipListRequest["filter"],
     ctx: LeafContext
   ): LeafContext {
     return {
       ...ctx,
-      lists: filter.studioId === undefined && filter.sceneId === undefined,
+      lists: !drives(filter.studios) && !drives(filter.scenes),
     };
   }
 
@@ -429,8 +488,8 @@ class ClipQueryBuilder extends EntityQueryBuilder<
         q: undefined,
         sort: { field: "seconds", direction: "ASC", seed: undefined },
         filter: {
-          sceneId: { refs: [options.scene], modifier: "INCLUDES", depth: 0 },
-          ...(options.includeUngenerated ? {} : { isGenerated: true }),
+          scenes: { refs: [options.scene], modifier: "INCLUDES", depth: 0 },
+          ...(options.includeUngenerated ? {} : { is_generated: true }),
         },
         specificInstanceId: undefined,
       },

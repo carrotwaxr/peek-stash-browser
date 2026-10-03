@@ -116,13 +116,13 @@
   "imperialOptions": "same as the metric options",
   "locks": [
     {
-      "field": "tagIds",
+      "field": "tags",
       "lockedFieldsTop": [
-        "tagIds"
+        "tags"
       ],
       "lockedFieldsInner": [
         "clip_filter",
-        "tagIds"
+        "tags"
       ],
       "removedStateKeys": [
         "tagIds",
@@ -134,13 +134,13 @@
       "optionCountAfter": 5
     },
     {
-      "field": "sceneTagIds",
+      "field": "scene_tags",
       "lockedFieldsTop": [
-        "sceneTagIds"
+        "scene_tags"
       ],
       "lockedFieldsInner": [
         "clip_filter",
-        "sceneTagIds"
+        "scene_tags"
       ],
       "removedStateKeys": [
         "sceneTagIds",
@@ -152,13 +152,13 @@
       "optionCountAfter": 5
     },
     {
-      "field": "performerIds",
+      "field": "performers",
       "lockedFieldsTop": [
-        "performerIds"
+        "performers"
       ],
       "lockedFieldsInner": [
         "clip_filter",
-        "performerIds"
+        "performers"
       ],
       "removedStateKeys": [
         "performerIds",
@@ -170,13 +170,13 @@
       "optionCountAfter": 5
     },
     {
-      "field": "studioId",
+      "field": "studios",
       "lockedFieldsTop": [
-        "studioId"
+        "studios"
       ],
       "lockedFieldsInner": [
         "clip_filter",
-        "studioId"
+        "studios"
       ],
       "removedStateKeys": [
         "studioId"
@@ -187,13 +187,13 @@
       "optionCountAfter": 5
     },
     {
-      "field": "isGenerated",
+      "field": "is_generated",
       "lockedFieldsTop": [
-        "isGenerated"
+        "is_generated"
       ],
       "lockedFieldsInner": [
         "clip_filter",
-        "isGenerated"
+        "is_generated"
       ],
       "removedStateKeys": [
         "isGenerated"

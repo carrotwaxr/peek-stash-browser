@@ -8,6 +8,7 @@
  * Imports only relative modules and `@peek/shared-types` (see `options.ts`).
  */
 import {
+  type ClipFilterInput,
   type FieldSpec,
   type GalleryFilterInput,
   type GroupFilterInput,
@@ -21,17 +22,10 @@ import {
   type StudioFilterInput,
   type TagFilterInput,
 } from "@peek/shared-types";
-import type { ClipFilterParams } from "../../api/clips";
-import {
-  CODECS,
-  type PanelState,
-  type RefCriterion,
-  codecOf,
-  refCriterionOf,
-} from "./codecs";
+import { CODECS, type PanelState, codecOf, refCriterionOf } from "./codecs";
 import { SPECS } from "./options";
 
-/** Each list's request filter (clips: the GET parameters) */
+/** Each list's request filter */
 export interface PanelFilters {
   scene: SceneFilterInput;
   performer: PerformerFilterInput;
@@ -40,7 +34,7 @@ export interface PanelFilters {
   group: GroupFilterInput;
   gallery: GalleryFilterInput;
   image: ImageFilterInput;
-  clip: ClipFilterParams;
+  clip: ClipFilterInput;
 }
 
 /** A list's rows and the contract fields they fill */
@@ -94,8 +88,7 @@ function permanentCriterion(
  * A list's request filter from the panel's state: each row's criterion,
  * then the state's contract fields that are no panel key (a page's
  * permanent criteria). A field with a `path` nests there
- * (`scenes_filter.groups`); clips flatten into their GET parameters (a
- * list and its `<param>Modifier`, a single ref's one id).
+ * (`scenes_filter.groups`).
  */
 export function buildPanelFilter<K extends ListKind>(
   kind: K,
@@ -107,12 +100,6 @@ export function buildPanelFilter<K extends ListKind>(
 
   const place = (name: string, spec: FieldSpec, criterion: unknown) => {
     if (criterion === undefined) return;
-    if (spec.kind === "ref" && kind === "clip") {
-      const { value, modifier } = criterion as RefCriterion;
-      filter[name] = spec.single ? value[0] : value;
-      if (spec.modifiers.length > 1) filter[`${name}Modifier`] = modifier;
-      return;
-    }
     if (spec.kind === "ref" && spec.path !== undefined) {
       const [outer, inner] = spec.path;
       const nested = filter[outer];
@@ -161,7 +148,7 @@ export interface ReadPanelFilter {
  * nests). Every criterion no row reads, or a row cannot edit (a modifier
  * it does not offer, a key it does not know), is kept as stored, so
  * building the state again and merging `kept` under it loses nothing.
- * Clips' flat GET parameters are not read.
+ * Clips have no stored rules to read.
  */
 export function readPanelFilter(
   kind: Exclude<ListKind, "clip">,

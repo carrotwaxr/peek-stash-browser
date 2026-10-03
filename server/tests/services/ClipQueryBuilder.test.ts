@@ -9,7 +9,7 @@
  * the page (only those the viewer may see), and the scene's clips and the
  * clip by id.
  */
-import { CLIP_PARAMS } from "@peek/shared-types/filters/index.js";
+import { CLIP_FIELDS } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
@@ -197,7 +197,7 @@ describe("ClipQueryBuilder", () => {
     });
 
     it("counts with the same joins and WHERE", async () => {
-      await run({ filter: { isGenerated: true } });
+      await run({ filter: { is_generated: true } });
 
       const page = statement(0);
       const count = statement(1);
@@ -248,7 +248,7 @@ describe("ClipQueryBuilder", () => {
       [true, 1],
       [false, 0],
     ])("isGenerated %s matches c.isGenerated = %s", async (value, bound) => {
-      await run({ filter: { isGenerated: value } });
+      await run({ filter: { is_generated: value } });
 
       const { sql, params } = statement(0);
       expect(sql).toContain("AND c.isGenerated = ?");
@@ -279,7 +279,7 @@ describe("ClipQueryBuilder", () => {
     });
 
     it("the search clause sits after the field clauses", async () => {
-      await run({ q: "sea", filter: { isGenerated: true } });
+      await run({ q: "sea", filter: { is_generated: true } });
 
       const { sql, params } = statement(0);
       positions(sql, ["c.isGenerated = ?", "c.title LIKE ? ESCAPE"]);
@@ -287,19 +287,19 @@ describe("ClipQueryBuilder", () => {
     });
 
     it("the scene matches its (id, instance) pair, and a bare id every instance", async () => {
-      await run({ filter: { sceneId: criterion([ref("42")]) } });
+      await run({ filter: { scenes: criterion([ref("42")]) } });
       expect(statement(0).sql).toContain(
         "((c.sceneId = ? AND c.sceneInstanceId = ?))"
       );
       expect(statement(0).params).toEqual(arrayContaining(["42", "inst-a"]));
 
       vi.clearAllMocks();
-      await run({ filter: { sceneId: criterion([bare("42")]) } });
+      await run({ filter: { scenes: criterion([bare("42")]) } });
       expect(statement(0).sql).toContain("((c.sceneId = ?))");
     });
 
     it("the tag filter matches the primary tag or a junction tag by (id, instance), the junction's clips read as one list by its tag index", async () => {
-      await run({ filter: { tagIds: criterion([ref("5"), bare("6")]) } });
+      await run({ filter: { tags: criterion([ref("5"), bare("6")]) } });
 
       const { sql, params } = statement(0);
       expect(sql).toContain(
@@ -317,16 +317,16 @@ describe("ClipQueryBuilder", () => {
 
     it("beside a studio or a scene, which drive, the tag, scene tag and performer filters probe each clip", async () => {
       for (const driver of [
-        { studioId: criterion([ref("8")]) },
-        { sceneId: criterion([ref("42")]) },
+        { studios: criterion([ref("8")]) },
+        { scenes: criterion([ref("42")]) },
       ]) {
         vi.clearAllMocks();
         await run({
           filter: {
             ...driver,
-            tagIds: criterion([ref("5")]),
-            sceneTagIds: criterion([ref("20")]),
-            performerIds: criterion([ref("10")]),
+            tags: criterion([ref("5")]),
+            scene_tags: criterion([ref("20")]),
+            performers: criterion([ref("10")]),
           },
         });
 
@@ -346,7 +346,7 @@ describe("ClipQueryBuilder", () => {
 
     it("tags Has ALL is one OR of the primary tag and the tag list per ref, AND-ed", async () => {
       await run({
-        filter: { tagIds: criterion([ref("5"), ref("6")], "INCLUDES_ALL") },
+        filter: { tags: criterion([ref("5"), ref("6")], "INCLUDES_ALL") },
       });
 
       const { sql, params } = statement(0);
@@ -367,7 +367,7 @@ describe("ClipQueryBuilder", () => {
 
     it("tags Has NONE holds neither in the primary tag nor the list, keeping a clip with no primary tag", async () => {
       await run({
-        filter: { tagIds: criterion([ref("5"), bare("6")], "EXCLUDES") },
+        filter: { tags: criterion([ref("5"), bare("6")], "EXCLUDES") },
       });
 
       const { sql, params } = statement(0);
@@ -386,7 +386,7 @@ describe("ClipQueryBuilder", () => {
 
     it("tags Has NONE above the negative inline limit probes the refs: the primary tag's key, then the clip's tag rows", async () => {
       const many = Array.from({ length: 65 }, (_, i) => ref(String(i + 1)));
-      await run({ filter: { tagIds: criterion(many, "EXCLUDES") } });
+      await run({ filter: { tags: criterion(many, "EXCLUDES") } });
 
       const { sql, params } = statement(0);
       const refsJson = pairsJson(
@@ -405,8 +405,8 @@ describe("ClipQueryBuilder", () => {
     it("scene tags and performers take Has ALL and Has NONE on the clip's scene; Has NONE holds the tag neither directly nor inherited", async () => {
       await run({
         filter: {
-          sceneTagIds: criterion([ref("20")], "EXCLUDES"),
-          performerIds: criterion([ref("10"), ref("11")], "INCLUDES_ALL"),
+          scene_tags: criterion([ref("20")], "EXCLUDES"),
+          performers: criterion([ref("10"), ref("11")], "INCLUDES_ALL"),
         },
       });
 
@@ -420,7 +420,7 @@ describe("ClipQueryBuilder", () => {
     });
 
     it("scene tags match the clip's scene's own and inherited tags by (id, instance), read as one list by each junction's tag index and matched on the clip's own scene columns", async () => {
-      await run({ filter: { sceneTagIds: criterion([ref("20", "inst-b")]) } });
+      await run({ filter: { scene_tags: criterion([ref("20", "inst-b")]) } });
 
       const { sql, params } = statement(0);
       expect(sql).toContain(
@@ -433,7 +433,7 @@ describe("ClipQueryBuilder", () => {
     it("scene tags Has ALL is one list per tag, each with its inherited arm, AND-ed", async () => {
       await run({
         filter: {
-          sceneTagIds: criterion([ref("20"), ref("21")], "INCLUDES_ALL"),
+          scene_tags: criterion([ref("20"), ref("21")], "INCLUDES_ALL"),
         },
       });
 
@@ -444,7 +444,7 @@ describe("ClipQueryBuilder", () => {
 
     it("above the inline limit the scene tags' matched set holds the inherited junction's scenes too", async () => {
       const many = Array.from({ length: 65 }, (_, i) => ref(String(i + 1)));
-      await run({ filter: { sceneTagIds: criterion(many) } });
+      await run({ filter: { scene_tags: criterion(many) } });
 
       const { sql, params } = statement(0);
       // One JSON parameter for both junctions' arms
@@ -460,7 +460,7 @@ describe("ClipQueryBuilder", () => {
     });
 
     it("the studio matches the clip's scene's studio by (id, instance)", async () => {
-      await run({ filter: { studioId: criterion([ref("8")]) } });
+      await run({ filter: { studios: criterion([ref("8")]) } });
 
       expect(statement(0).sql).toContain(
         "((s.studioId = ? AND s.stashInstanceId = ?))"
@@ -469,7 +469,7 @@ describe("ClipQueryBuilder", () => {
 
     it("above the inline limit the tags travel as one JSON parameter into matched sets", async () => {
       const many = Array.from({ length: 65 }, (_, i) => ref(String(i + 1)));
-      await run({ filter: { tagIds: criterion(many) } });
+      await run({ filter: { tags: criterion(many) } });
 
       const { sql, params } = statement(0);
       positions(sql, [
@@ -486,9 +486,86 @@ describe("ClipQueryBuilder", () => {
       ]);
     });
 
+    it("the duration is the end less the start: a clip without an end matches no comparison", async () => {
+      await run({
+        filter: {
+          duration: { modifier: "NOT_BETWEEN", value: 10, value2: 20 },
+        },
+      });
+
+      const { sql, params } = statement(0);
+      expect(sql).toContain("(c.endSeconds - c.seconds) NOT BETWEEN ? AND ?");
+      expect(params).toEqual(arrayContaining([10, 20]));
+    });
+
+    it("created and updated dates read the clip's epoch columns in the viewer's day", async () => {
+      await clipQueryBuilder.execute({
+        userId: 7,
+        allowedInstanceIds: ALLOWED,
+        timeZone: "America/Chicago",
+        request: parsedClipRequest({
+          filter: {
+            created_at: { modifier: "EQUALS", value: "2021-10-12" },
+            updated_at: { modifier: "IS_NULL" },
+          },
+        }),
+      });
+
+      const { sql, params } = statement(0);
+      expect(sql).toContain("(c.stashCreatedAt >= ? AND c.stashCreatedAt < ?)");
+      expect(sql).toContain("c.stashUpdatedAt IS NULL");
+      // Midnight to midnight in Chicago (UTC-5 in October)
+      expect(params).toEqual(
+        arrayContaining([Date.UTC(2021, 9, 12, 5), Date.UTC(2021, 9, 13, 5)])
+      );
+    });
+
+    it("the title filter reads the clip's own title", async () => {
+      await run({ filter: { title: { modifier: "EQUALS", value: "Intro" } } });
+
+      expect(statement(0).sql).toContain("c.title");
+      expect(statement(0).params).toContain("Intro");
+    });
+
+    it("the studio's EXCLUDES keeps a clip whose scene has no studio", async () => {
+      await run({ filter: { studios: criterion([ref("8")], "EXCLUDES") } });
+
+      expect(statement(0).sql).toContain(
+        "(s.studioId IS NULL OR NOT ((s.studioId = ? AND s.stashInstanceId = ?)))"
+      );
+    });
+
+    it("a criterion's excludes become a clause of their own beside its values, named apart", async () => {
+      const many = Array.from({ length: 9 }, (_, i) => ref(String(i + 100)));
+      await run({
+        filter: {
+          tags: { ...criterion([ref("5")]), excludes: many },
+          performers: { ...criterion([ref("10")]), excludes: many },
+        },
+      });
+
+      const { sql } = statement(0);
+      expect(sql).toContain("tags_not_primary_tag_refs(id, inst)");
+      expect(sql).toContain("tags_not_clip_tags_refs(id, inst)");
+      expect(sql).toContain("performers_not_refs(id, inst)");
+      expect(sql).toContain(
+        "(((c.primaryTagId = ? AND c.primaryTagInstanceId = ?)) OR (c.id, c.stashInstanceId) IN"
+      );
+    });
+
+    it("several scenes match any of their (id, instance) pairs", async () => {
+      await run({
+        filter: { scenes: criterion([ref("42"), ref("43", "inst-b")]) },
+      });
+
+      expect(statement(0).sql).toContain(
+        "((c.sceneId = ? AND c.sceneInstanceId = ?) OR (c.sceneId = ? AND c.sceneInstanceId = ?))"
+      );
+    });
+
     it("above the inline limit a scene filter matches the clip's scene by its key", async () => {
       const many = Array.from({ length: 65 }, (_, i) => ref(String(i + 1)));
-      await run({ filter: { performerIds: criterion(many) } });
+      await run({ filter: { performers: criterion(many) } });
 
       expect(statement(0).sql).toContain(
         "(s.id, s.stashInstanceId) IN (SELECT id, inst FROM performers_matched)"
@@ -719,8 +796,8 @@ describe("ClipQueryBuilder", () => {
 
 describe("the clip field table", () => {
   it("has a clause for every field but the base's", () => {
-    const fields = Object.keys(CLIP_PARAMS).filter(
-      (field) => field !== "instanceId"
+    const fields = Object.keys(CLIP_FIELDS).filter(
+      (field) => field !== "instance_id"
     );
 
     expect(Object.keys(clipQueryBuilder["fieldClauses"]).sort()).toEqual(

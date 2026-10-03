@@ -38,7 +38,7 @@ export interface ClientChoice {
 /** The filter panel's state: option keys and their modifier and hierarchy companions */
 export type PanelState = Readonly<Record<string, unknown>>;
 
-/** A `build*Filter`: the panel state to the request's filter (a clip's query parameters) */
+/** A `build*Filter`: the panel state to the request's filter (`<entity>_filter`, `clip_filter`) */
 export type BuildFilter = (state: PanelState) => Record<string, unknown>;
 
 /** The exports of `client/src/utils/filterConfig.ts` the walk reads */
@@ -317,32 +317,4 @@ function refSamples(option: ClientOption, refs: RefPool): SampleValue[] {
       withoutSubItems: on ? pick.variant : undefined,
     }))
   );
-}
-
-/**
- * A clip panel's filter as `GET /api/clips` receives it: `ClipSearch` and
- * `api/clips.ts` send each parameter as a string, lists joined with commas.
- * They forward only the parameters they name, so a parameter
- * `buildClipFilter` gains must be added there too.
- */
-export function clipQueryParams(
-  params: Readonly<Record<string, unknown>>
-): Record<string, string> {
-  const query: Record<string, string> = {};
-  for (const [name, value] of Object.entries(params)) {
-    if (Array.isArray(value)) {
-      if (value.length > 0) query[name] = value.map(String).join(",");
-    } else if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean"
-    ) {
-      query[name] = String(value);
-    } else if (value !== undefined && value !== null) {
-      throw new Error(
-        `Clip parameter ${name} is not a string, number, boolean or list`
-      );
-    }
-  }
-  return query;
 }

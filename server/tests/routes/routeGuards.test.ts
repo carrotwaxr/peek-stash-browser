@@ -70,6 +70,7 @@ const PUBLIC_ROUTES = [
 /** The routes whose handler reads `req.allowedInstanceIds` (`libraryHandler`). */
 const LIBRARY_ROUTES = [
   "POST /api/library/scenes",
+  "POST /api/library/scenes/minimal",
   "GET /api/library/scenes/:id/similar",
   "GET /api/library/scenes/recommended",
   "POST /api/library/performers",
@@ -89,6 +90,7 @@ const LIBRARY_ROUTES = [
   "POST /api/library/galleries/minimal",
   "GET /api/library/galleries/:id/counts",
   "POST /api/library/images",
+  "POST /api/library/clips",
   "GET /api/clips",
   "GET /api/clips/:id",
   "GET /api/scenes/:id/clips",
@@ -122,6 +124,7 @@ const MOUNTS: Record<string, string> = {
   "exclusions.ts": "/api/exclusions",
   "groups.ts": "/api/groups",
   "imageViewHistory.ts": "/api/image-view-history",
+  "library/clips.ts": "/api/library",
   "library/galleries.ts": "/api/library",
   "library/groups.ts": "/api/library",
   "library/images.ts": "/api/library",
