@@ -7,6 +7,17 @@ import {
 } from "../../../src/components/wall/wallConfig";
 
 describe("wallConfig", () => {
+  describe("clip config", () => {
+    it("the wall tile of an untitled clip reads its primary tag's name", () => {
+      const config = wallConfig.clip;
+      expect(
+        config.getTitle({ title: "", primaryTag: { name: "Action" } })
+      ).toBe("Action");
+      expect(config.getTitle({ title: "Intro" })).toBe("Intro");
+      expect(config.getTitle({})).toBe("Untitled");
+    });
+  });
+
   describe("scene config", () => {
     const config = wallConfig.scene;
 

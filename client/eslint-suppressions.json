@@ -4,14 +4,9 @@
       "count": 1
     }
   },
-  "src/components/cards/ClipCard.tsx": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "src/components/cards/ClipCardPreview.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/cards/GroupCard.tsx": {
@@ -294,7 +289,7 @@
       "count": 17
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 112
+      "count": 110
     },
     "@typescript-eslint/no-unsafe-call": {
       "count": 12
@@ -303,7 +298,7 @@
       "count": 42
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 35
+      "count": 34
     }
   },
   "src/components/tags/TagTreeNode.tsx": {
@@ -599,9 +594,6 @@
     },
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
     }
   },
   "src/components/video-player/plugins/media-session.ts": {
@@ -817,7 +809,7 @@
       "count": 8
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 7
+      "count": 6
     }
   },
   "src/config/entityDisplayConfig.ts": {

@@ -4,6 +4,7 @@
  */
 import { formatDistanceToNow } from "date-fns";
 import { getClipPreviewUrl } from "../../api";
+import { clipTitle } from "../../utils/clipTitle";
 import type { Clip } from "../cards/ClipCard";
 
 const formatDate = (dateStr: any) => {
@@ -104,7 +105,7 @@ export const wallConfig = {
       }
       return 16 / 9; // Default for video clips
     },
-    getTitle: (row: Record<string, unknown>) => asClip(row).title || "Untitled",
+    getTitle: (row: Record<string, unknown>) => clipTitle(asClip(row)),
     getSubtitle: (row: Record<string, unknown>) => {
       const item = asClip(row);
       const parts: string[] = [];

@@ -9,7 +9,7 @@ Browse and play scene markers (clips) from your Stash library. Clips are short s
 The Clips page shows all clips synced from your Stash library. Each clip card displays:
 
 - Animated preview thumbnail (if generated in Stash)
-- Clip title
+- Clip title, or its tag's name when it has none
 - Duration badge
 - Tag indicators
 - "No preview" badge for ungenerated clips

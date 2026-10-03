@@ -109,6 +109,20 @@ describe("MarkersPlugin", () => {
     expect(pending?.classList.contains("vjs-marker-ungenerated")).toBe(true);
   });
 
+  it("the player marker of an untitled clip reads its primary tag's name", () => {
+    const { player, duration } = makePlayer();
+    current = player;
+    const plugin = player.markers();
+    duration.mockReturnValue(100);
+
+    plugin.addClipMarkers([
+      { seconds: 10, title: null, primaryTag: { name: "Action" } },
+      { seconds: 20, title: "Named", primaryTag: { name: "Other" } },
+    ]);
+
+    expect(plugin.markers.map((m) => m.title)).toEqual(["Action", "Named"]);
+  });
+
   // Hard-coded from the crypto-js implementation this replaced: a tag keeps
   // the colour it has always had
   it.each([

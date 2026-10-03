@@ -1,4 +1,5 @@
 import videojs from "video.js";
+import { clipTitle } from "../../../utils/clipTitle";
 import { sha256Hex } from "../../../utils/sha256";
 
 interface MarkerSet {
@@ -168,7 +169,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     // Convert clips to marker format and add them
     const markers: Marker[] = clips.map((clip) => ({
       seconds: clip.seconds,
-      title: clip.title || "Untitled",
+      title: clipTitle(clip),
       primaryTag: clip.primaryTag ?? null,
       ungenerated: clip.isGenerated === false,
     }));

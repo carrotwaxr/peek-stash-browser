@@ -3,6 +3,7 @@ import { getClipPreviewUrl } from "../../api";
 import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { useInView } from "../../hooks/useInView";
 import { usePreviewVideoRef } from "../../hooks/usePreviewVideoRef";
+import { clipTitle } from "../../utils/clipTitle";
 import type { Clip } from "./ClipCard";
 
 interface Props {
@@ -64,7 +65,7 @@ const ClipCardPreview = ({
       {screenshotUrl ? (
         <img
           src={shouldLoadScreenshot ? screenshotUrl : undefined}
-          alt={clip.title || "Clip"}
+          alt={clipTitle(clip)}
           className={`w-full h-full pointer-events-none ${objectFitClass}`}
           style={{ backgroundColor: "var(--bg-secondary)" }}
         />
