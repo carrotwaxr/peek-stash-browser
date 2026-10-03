@@ -15,6 +15,7 @@ import type {
   FieldSpecOf,
   InstanceSpec,
   ListKind,
+  Match,
   NumberSpec,
   PlaylistItemSort,
   PlaylistSpec,
@@ -199,6 +200,30 @@ export type ParsedFields<F extends Readonly<Record<string, FieldSpec>>> = {
 /** The parsed `<entity>_filter`; top-level ids are merged into `ids` (INCLUDES) */
 export type ParsedFilter<E extends ListKind> = ParsedFields<FieldSpecOf<E>>;
 
+/** The fields a `where` row may name: every parsed field but `ids` (the instance field is already lifted out) */
+type WhereFieldOf<E extends ListKind> = Exclude<
+  keyof ParsedFilter<E> & string,
+  "ids"
+>;
+
+/** One parsed row: a field and its criterion as `filter` would carry it */
+export type ParsedWhereLeaf<E extends ListKind> = {
+  [F in WhereFieldOf<E>]: {
+    readonly field: F;
+    readonly criterion: NonNullable<ParsedFilter<E>[F]>;
+  };
+}[WhereFieldOf<E>];
+
+/**
+ * A parsed `where`: the root's rules are rows and groups, a group's only
+ * rows. Never empty: empty rows and groups drop, and an empty root is no
+ * where. At most WHERE_LIMITS' rows, groups and refs.
+ */
+export interface ParsedWhereGroup<E extends ListKind> {
+  readonly match: Match;
+  readonly rules: readonly (ParsedWhereLeaf<E> | ParsedWhereGroup<E>)[];
+}
+
 export interface ParsedSort<K extends ListKind> {
   /** Whitelisted; "random_<n>" arrives as field "random", seed n % 1e8 */
   readonly field: SortOf<K>;
@@ -216,6 +241,8 @@ export interface ParsedListRequest<E extends ListKind> {
   readonly q: string | undefined;
   readonly sort: ParsedSort<E>;
   readonly filter: ParsedFilter<E>;
+  /** The user's rows (`where`), AND-ed after `filter`; absent when none */
+  readonly where?: ParsedWhereGroup<E>;
   /** `<entity>_filter.instance_id`, INSTANCE_ID_PATTERN */
   readonly specificInstanceId: string | undefined;
   /**
