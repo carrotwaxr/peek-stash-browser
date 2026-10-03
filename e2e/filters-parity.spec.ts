@@ -10,7 +10,7 @@ import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
  * E2E tests for the filters PR 9a brings level with Stash's: a gallery card's
  * Scenes count opens the Scenes list filtered by that gallery, and a Tags
  * filter that includes one tag and excludes another survives the URL and a
- * saved preset.
+ * saved View.
  */
 
 interface GalleryRow {
@@ -81,12 +81,12 @@ test.describe("Filters in step with Stash", () => {
     ).toBeVisible();
   });
 
-  test("Tags include X, exclude Y round-trips through the URL and a saved preset", async ({
+  test("Tags include X, exclude Y round-trips through the URL and a saved View", async ({
     browser,
     baseURL,
     request,
   }) => {
-    // The preset is per-user state: a throwaway user of its own
+    // The View is per-user state: a throwaway user of its own
     const user = await createUser(request, "filter-tags");
     const context = await signIn(browser, baseURL, user);
     try {
@@ -181,12 +181,13 @@ test.describe("Filters in step with Stash", () => {
         page.getByRole("button", { name: /^Edit filter: Tags/ })
       ).toContainText(excluded.name);
 
-      // 4. Saved as the default preset, it applies on a bare /scenes
-      await page.getByRole("button", { name: "Save Preset" }).click();
-      const dialog = page.getByRole("dialog", { name: "Save Filter Preset" });
-      await dialog
-        .getByPlaceholder("Enter preset name...")
-        .fill(uniqueName("tags-preset"));
+      // 4. Saved as a new default View from the Views menu, it applies on
+      // a bare /scenes
+      const viewName = uniqueName("tags-view");
+      await page.getByRole("button", { name: /^Views/ }).click();
+      await page.getByRole("menuitem", { name: "Save as new view" }).click();
+      const dialog = page.getByRole("dialog", { name: "Save view" });
+      await dialog.getByRole("textbox", { name: "Name" }).fill(viewName);
       await dialog
         .getByRole("checkbox", { name: /Set as default for All Scenes page/ })
         .check();
@@ -198,6 +199,10 @@ test.describe("Filters in step with Stash", () => {
       );
       await dialog.getByRole("button", { name: "Save" }).click();
       await saved;
+      await expect(page).toHaveURL(/[?&]savedView=/);
+      await expect(
+        page.getByRole("button", { name: `Views: ${viewName}` })
+      ).toBeVisible();
 
       const fromPreset = page.waitForResponse(
         (r) =>
@@ -217,6 +222,28 @@ test.describe("Filters in step with Stash", () => {
       await expect(
         page.getByRole("button", { name: /^Edit filter: Tags/ })
       ).toContainText(excluded.name);
+      await expect(
+        page.getByRole("button", { name: `Views: ${viewName}` })
+      ).toBeVisible();
+
+      // 5. With the filters cleared, loading it from the Views menu sends
+      // them again and names it in the URL
+      await page.goto("/scenes?filters=none");
+      await expect(
+        page.getByRole("button", { name: "Views", exact: true })
+      ).toBeVisible();
+      const fromMenu = page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === "/api/library/scenes" &&
+          r.request().method() === "POST" &&
+          (r.request().postData() ?? "").includes('"excludes"')
+      );
+      await page.getByRole("button", { name: /^Views/ }).click();
+      await page.getByRole("menuitemradio", { name: viewName }).click();
+      expect(
+        sentCriterion((await fromMenu).request().postDataJSON(), "tags")
+      ).toMatchObject({ value: [includedRef], excludes: [excludedRef] });
+      await expect(page).toHaveURL(/[?&]savedView=/);
     } finally {
       await context.close();
       await deleteUser(request, user.id);

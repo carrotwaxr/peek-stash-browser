@@ -67,13 +67,15 @@ describe("presets share one query", () => {
     });
   });
 
-  it("SearchControls and FilterPresets on one page send one GET to each preset endpoint", async () => {
+  it("SearchControls and its Views menu on one page send one GET to each preset endpoint", async () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
     renderPage(client);
     await waitFor(() => {
-      expect(screen.getByText("Load Preset")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^Views/ })
+      ).toBeInTheDocument();
       expect(count("/user/filter-presets")).toBeGreaterThan(0);
     });
     // Let every consumer settle
@@ -95,7 +97,9 @@ describe("presets share one query", () => {
 
     renderPage(client);
     await waitFor(() => {
-      expect(screen.getByText("Load Preset")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^Views/ })
+      ).toBeInTheDocument();
     });
     await new Promise((r) => setTimeout(r, 50));
     expect(count("/user/filter-presets")).toBe(1);

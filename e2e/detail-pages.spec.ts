@@ -241,12 +241,12 @@ test.describe("Detail Pages", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("a tag's Images tab lists the tag's images, opens the viewer, and keeps a default preset saved there to itself", async ({
+  test("a tag's Images tab lists the tag's images, opens the viewer, and keeps a default View saved there to itself", async ({
     browser,
     baseURL,
     request,
   }) => {
-    // The preset is per-user state: a throwaway user of its own
+    // The View is per-user state: a throwaway user of its own
     const user = await createUser(request, "tag-images");
     const context = await signIn(browser, baseURL, user);
     try {
@@ -287,11 +287,14 @@ test.describe("Detail Pages", () => {
       // 3. A sort by file size saved there as the default
       await page.goto(`${tabPath}&sort=filesize&dir=DESC`);
       await list.waitForResults("Image");
-      await page.getByRole("button", { name: "Save Preset" }).click();
-      const dialog = page.getByRole("dialog", { name: "Save Filter Preset" });
-      await dialog.getByPlaceholder("Enter preset name...").fill("By size");
+      await page.getByRole("button", { name: /^Views/ }).click();
+      await page.getByRole("menuitem", { name: "Save as new view" }).click();
+      const dialog = page.getByRole("dialog", { name: "Save view" });
+      await dialog.getByRole("textbox", { name: "Name" }).fill("By size");
       await dialog
-        .getByRole("checkbox", { name: /Set as default for Tag pages/ })
+        .getByRole("checkbox", {
+          name: "Set as default for Tag pages (Images tab)",
+        })
         .check();
       const saved = page.waitForResponse(
         (r) =>

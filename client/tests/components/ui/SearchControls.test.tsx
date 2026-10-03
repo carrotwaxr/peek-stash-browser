@@ -950,7 +950,7 @@ describe("SearchControls", () => {
       expect(onPresetColumns).not.toHaveBeenCalled();
     });
 
-    it("loading that preset from the menu shows its columns", async () => {
+    it("loading that preset from the Views menu shows its columns", async () => {
       const user = userEvent.setup();
       const onPresetColumns = vi.fn();
       const list = renderSearchControls(
@@ -959,8 +959,10 @@ describe("SearchControls", () => {
       );
       await firstQuery(list.onQueryChange);
 
-      await user.click(screen.getByTitle("Load Preset"));
-      await user.click(await screen.findByText("Default"));
+      await user.click(screen.getByRole("button", { name: /^Views/ }));
+      await user.click(
+        await screen.findByRole("menuitemradio", { name: /^Default/ })
+      );
 
       expect(onPresetColumns).toHaveBeenCalledTimes(1);
       expect(onPresetColumns).toHaveBeenCalledWith(COLUMNS);

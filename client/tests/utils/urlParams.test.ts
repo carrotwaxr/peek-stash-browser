@@ -837,6 +837,94 @@ describe("list-owned keys (useListUrlState)", () => {
       read("instance=abc&tab=scenes&sort=title&view=wall&per_page=12&page=2")
     ).toBe(false);
   });
+
+  it("`savedView` is list-owned, read and written, and never sent in a request", () => {
+    expect(listOwnedKeys("scene")).toContain("savedView");
+    expect(isListOwnedKey("clip", "savedView")).toBe(true);
+
+    const read = readListParams(
+      new URLSearchParams("savedView=v1&tab=scenes"),
+      "scene",
+      SCENE_FILTER_OPTIONS
+    );
+    expect(read.savedView).toBe("v1");
+    // Naming a View is not naming a filter: the default View stays on
+    expect(read.hasFilters).toBe(false);
+    expect(
+      readListParams(new URLSearchParams(""), "scene", SCENE_FILTER_OPTIONS)
+        .savedView
+    ).toBeNull();
+
+    const prev = new URLSearchParams("savedView=v1&tab=scenes&favorite=true");
+    // A filter write keeps it; a write naming it sets or removes it
+    expect(
+      writeListParams(prev, { filters: { tagIds: ["1:abc"] } }, ctx).get(
+        "savedView"
+      )
+    ).toBe("v1");
+    expect(
+      writeListParams(prev, { savedView: "v2" }, ctx).get("savedView")
+    ).toBe("v2");
+    const removed = writeListParams(prev, { savedView: null }, ctx);
+    expect(removed.has("savedView")).toBe(false);
+    expect(removed.get("tab")).toBe("scenes");
+    // Each detail tab is its own list: a tab switch drops it
+    expect(switchTabParams(prev, "images", "scenes").has("savedView")).toBe(
+      false
+    );
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(presetsQueryOptions.queryKey, {
+      presets: {
+        scene: [
+          {
+            id: "v1",
+            name: "Faves",
+            filters: { favorite: "true" },
+            sort: "date",
+            direction: "DESC",
+          },
+        ],
+      },
+    });
+    queryClient.setQueryData(defaultPresetsQueryOptions.queryKey, {
+      defaults: {},
+    });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          MemoryRouter,
+          { initialEntries: ["/scenes?savedView=v1&favorite=true"] },
+          children
+        )
+      );
+    const { result } = renderHook(
+      () =>
+        useListUrlState({
+          entityType: "scene",
+          filterOptions: SCENE_FILTER_OPTIONS,
+          sortOptions: (filters) => sortOptionsFor("scene", filters),
+          viewModes: ["grid"],
+          defaults: {
+            sort: "date",
+            direction: "DESC",
+            perPage: 24,
+            viewMode: "grid",
+            zoomLevel: "medium",
+            gridDensity: "medium",
+          },
+        }),
+      { wrapper }
+    );
+    expect(result.current.activeView?.id).toBe("v1");
+    expect(result.current.listKey).not.toBe("");
+    expect(result.current.listKey).not.toContain("savedView");
+    expect(result.current.listKey).not.toContain("v1");
+  });
 });
 
 // ── The URL from the field table (C5) ─────────────────────────────────────
@@ -1615,10 +1703,17 @@ describe("prefixed filter keys (groups and repeated rows)", () => {
   });
 
   it("isListOwnedKey names prefixed filter keys and the list's own keys, not the page's", () => {
-    for (const key of ["g1.tagIds", "2.rating_min", "match", "g3", "sort"]) {
+    for (const key of [
+      "g1.tagIds",
+      "2.rating_min",
+      "match",
+      "g3",
+      "sort",
+      "savedView",
+    ]) {
       expect(isListOwnedKey("scene", key), key).toBe(true);
     }
-    for (const key of ["tab", "instance", "image", "savedView", "g6.tagIds"]) {
+    for (const key of ["tab", "instance", "image", "g6.tagIds"]) {
       expect(isListOwnedKey("scene", key), key).toBe(false);
     }
   });

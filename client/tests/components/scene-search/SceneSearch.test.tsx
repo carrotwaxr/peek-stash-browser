@@ -673,7 +673,7 @@ describe("SceneSearch", () => {
         .map((th) => th.textContent)
         .filter(Boolean);
 
-    it("loading a preset saved in table view restores its columns", async () => {
+    it("loading a View saved in table view from the Views menu restores its columns", async () => {
       api.findScenes.mockResolvedValue(scenes(rowsOf("scene")));
       renderListPage(<SceneSearch title="Scenes" />, {
         initialEntries: ["/scenes"],
@@ -681,8 +681,10 @@ describe("SceneSearch", () => {
       });
       await screen.findByText("scene-1");
 
-      fireEvent.click(screen.getByRole("button", { name: /Load Preset/ }));
-      fireEvent.click(await screen.findByText("Ratings table"));
+      fireEvent.click(screen.getByRole("button", { name: /^Views/ }));
+      fireEvent.click(
+        await screen.findByRole("menuitemradio", { name: /^Ratings table/ })
+      );
 
       await waitFor(() => expect(headers()).toEqual(["Rating", "Title"]));
     });
@@ -712,12 +714,16 @@ describe("SceneSearch", () => {
         userSettings: SAVED_COLUMNS,
       });
       await screen.findByText("scene-1");
-      fireEvent.click(screen.getByRole("button", { name: /Load Preset/ }));
-      fireEvent.click(await screen.findByText("Ratings table"));
+      fireEvent.click(screen.getByRole("button", { name: /^Views/ }));
+      fireEvent.click(
+        await screen.findByRole("menuitemradio", { name: /^Ratings table/ })
+      );
       await waitFor(() => expect(headers()).toEqual(["Rating", "Title"]));
 
-      fireEvent.click(screen.getByRole("button", { name: /Load Preset/ }));
-      fireEvent.click(await screen.findByText("Plain table"));
+      fireEvent.click(screen.getByRole("button", { name: /^Views/ }));
+      fireEvent.click(
+        await screen.findByRole("menuitemradio", { name: /^Plain table/ })
+      );
 
       await waitFor(() => expect(headers()).toEqual(["Title", "Duration"]));
     });
@@ -734,7 +740,7 @@ describe("SceneSearch", () => {
       await waitFor(() => expect(headers()).toEqual(["Title", "Duration"]));
     });
 
-    it("loading a default preset from the menu applies its columns over your saved ones", async () => {
+    it("loading a default View from the Views menu applies its columns over your saved ones", async () => {
       api.findScenes.mockResolvedValue(scenes(rowsOf("scene")));
       renderListPage(<SceneSearch title="Scenes" />, {
         initialEntries: ["/scenes"],
@@ -744,8 +750,10 @@ describe("SceneSearch", () => {
       });
       await waitFor(() => expect(headers()).toEqual(["Title", "Duration"]));
 
-      fireEvent.click(screen.getByRole("button", { name: /Load Preset/ }));
-      fireEvent.click(await screen.findByText("Ratings table"));
+      fireEvent.click(screen.getByRole("button", { name: /^Views/ }));
+      fireEvent.click(
+        await screen.findByRole("menuitemradio", { name: /^Ratings table/ })
+      );
 
       await waitFor(() => expect(headers()).toEqual(["Rating", "Title"]));
     });

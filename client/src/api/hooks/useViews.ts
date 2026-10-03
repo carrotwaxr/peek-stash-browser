@@ -12,21 +12,42 @@ import { ApiError } from "../client";
 import { invalidatePresets } from "./usePresets";
 
 /**
- * What a Views write resolves to: the server's answer, or `{ conflict: true }`
- * for a 409 (another View of the list has the name; a second tab saved at the
- * same moment). A conflict is an answer the dialog shows, not a thrown
- * error; every other failure still rejects.
+ * The server's message for a name another View of the list has
+ * (`DUPLICATE_NAME` in `server/controllers/user.ts`). Its other 409, a write
+ * that lost the compare-and-set to another tab's (`updateUserJson`), says
+ * something else; both are `errorType: "CONFLICT"`, so the message tells
+ * them apart.
+ */
+export const VIEW_NAME_TAKEN = "Another View of this list has that name";
+
+/**
+ * Why a Views write was refused with a 409: `nameTaken`, another View of the
+ * list has the name; `stale`, the user's Views changed elsewhere (another
+ * tab saved first) and the list is read again
+ */
+export type ViewConflict = "nameTaken" | "stale";
+
+/**
+ * What a Views write resolves to: the server's answer, or `{ conflict: true,
+ * reason }` for a 409. A conflict is an answer the dialog shows, not a thrown
+ * error; every other failure still rejects. Either way both preset queries
+ * are read again.
  */
 export type ViewWriteResult<T> =
   | { conflict: false; data: T }
-  | { conflict: true };
+  | { conflict: true; reason: ViewConflict };
+
+const conflictOf = (error: ApiError): ViewConflict =>
+  (error.data.error ?? error.message) === VIEW_NAME_TAKEN
+    ? "nameTaken"
+    : "stale";
 
 async function writeView<T>(request: Promise<T>): Promise<ViewWriteResult<T>> {
   try {
     return { conflict: false, data: await request };
   } catch (error) {
     if (error instanceof ApiError && error.status === 409) {
-      return { conflict: true };
+      return { conflict: true, reason: conflictOf(error) };
     }
     throw error;
   }

@@ -121,7 +121,8 @@
     "zoom",
     "grid_density",
     "timeline_period",
-    "folderPath"
+    "folderPath",
+    "savedView"
   ],
   "roundTrip": [
     {
