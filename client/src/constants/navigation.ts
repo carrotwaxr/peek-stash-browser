@@ -36,7 +36,7 @@ export const NAV_DEFINITIONS = [
     name: "Recommended",
     path: "/recommended",
     icon: "sparkles",
-    description: "AI-recommended scenes based on your preferences",
+    description: "Scenes picked from your own ratings, favorites and watching",
   },
   {
     key: "performers",
