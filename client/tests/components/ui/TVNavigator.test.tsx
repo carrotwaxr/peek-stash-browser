@@ -123,8 +123,10 @@ describe("TVNavigator", () => {
     );
     placeById("tab", { left: 0, top: 0, width: 100, height: 40 });
     placeById("search", { left: 0, top: 100, width: 300, height: 40 });
-    const input = byId("search");
+    const input = byId("search") as HTMLInputElement;
     act(() => input.focus());
+    // The caret between "two" and "words": text lies both ways
+    input.setSelectionRange(3, 3);
 
     // Left and Right are the input's: not prevented, focus stays
     expect(fireEvent.keyDown(input, { key: "ArrowLeft" })).toBe(true);
@@ -135,6 +137,52 @@ describe("TVNavigator", () => {
 
     expect(fireEvent.keyDown(input, { key: "ArrowUp" })).toBe(false);
     expect(document.activeElement?.id).toBe("tab");
+  });
+
+  it("Left and Right leave a text input at the caret's edge, a number or date input at once", () => {
+    renderWithNavigator(
+      <main>
+        <button id="before">Before</button>
+        <input id="text" type="text" defaultValue="abc" />
+        <input id="number" type="number" defaultValue="12" />
+        <input id="date" type="date" />
+        <button id="after">After</button>
+      </main>
+    );
+    // One row: before, text, number, date, after
+    ["before", "text", "number", "date", "after"].forEach((id, i) =>
+      placeById(id, { left: i * 200, top: 0, width: 150, height: 40 })
+    );
+    const text = byId("text") as HTMLInputElement;
+    act(() => text.focus());
+
+    // The caret at the end: Left moves it, Right leaves
+    text.setSelectionRange(3, 3);
+    expect(fireEvent.keyDown(text, { key: "ArrowLeft" })).toBe(true);
+    expect(document.activeElement).toBe(text);
+    expect(fireEvent.keyDown(text, { key: "ArrowRight" })).toBe(false);
+    expect(document.activeElement?.id).toBe("number");
+
+    // A number input shows no caret to the page: both arrows leave it
+    fireEvent.keyDown(byId("number"), { key: "ArrowRight" });
+    expect(document.activeElement?.id).toBe("date");
+    fireEvent.keyDown(byId("date"), { key: "ArrowRight" });
+    expect(document.activeElement?.id).toBe("after");
+    fireEvent.keyDown(byId("after"), { key: "ArrowLeft" });
+    fireEvent.keyDown(byId("date"), { key: "ArrowLeft" });
+    fireEvent.keyDown(byId("number"), { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(text);
+
+    // The caret at the start: Right moves it, Left leaves; text selected
+    // across the edge is the input's too
+    text.setSelectionRange(0, 2);
+    expect(fireEvent.keyDown(text, { key: "ArrowLeft" })).toBe(true);
+    expect(document.activeElement).toBe(text);
+    text.setSelectionRange(0, 0);
+    expect(fireEvent.keyDown(text, { key: "ArrowRight" })).toBe(true);
+    expect(document.activeElement).toBe(text);
+    expect(fireEvent.keyDown(text, { key: "ArrowLeft" })).toBe(false);
+    expect(document.activeElement?.id).toBe("before");
   });
 
   it("Enter on a focused card is the card's (N5)", () => {

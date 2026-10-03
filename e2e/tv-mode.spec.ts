@@ -369,7 +369,7 @@ test.describe("TV mode", () => {
 
     // Down reaches the panel's first section header; Down from there walks
     // the first column: Title, the Tags condition, then the Tags picker,
-    // whose right neighbour is the Collections picker (the arrows move by
+    // whose right neighbour is the Performer Tags picker (the arrows move by
     // position)
     const sectionHeader = page.getByRole("button", { name: "Common Filters" });
     const reachedHeader = await pressUntil(
@@ -387,7 +387,7 @@ test.describe("TV mode", () => {
     await expect(tagPicker).toBeFocused();
     await page.keyboard.press("ArrowRight");
     await expect(
-      page.getByRole("button", { name: /^Collections/ })
+      page.getByRole("button", { name: /^Performer Tags/ })
     ).toBeFocused();
     await page.keyboard.press("ArrowLeft");
     await expect(tagPicker).toBeFocused();
@@ -438,6 +438,37 @@ test.describe("TV mode", () => {
     await expect(
       page.getByRole("button", { name: /^Edit filter: Tags/ })
     ).toContainText(tagName);
+  });
+
+  test("Right crosses the number fields of a filter row to the Orientation boxes, and Space ticks one", async ({
+    page,
+  }) => {
+    const { list } = await openScenes(page, "/scenes");
+    await list.filtersButton.locator("button").focus();
+    await page.keyboard.press("Enter");
+    const section = page.getByRole("button", {
+      name: "Video Properties",
+      exact: true,
+    });
+    await section.focus();
+    if ((await section.getAttribute("aria-expanded")) === "false") {
+      await page.keyboard.press("Enter");
+    }
+
+    // Resolution, then Bitrate's Min and Max, Frame Rate's Min and Max:
+    // an empty number field hands Left and Right on
+    await page.keyboard.press("ArrowDown");
+    await expect(page.locator("#filter-resolution")).toBeFocused();
+    const landscape = page.getByRole("checkbox", { name: "Landscape" });
+    const reached = await pressUntil(
+      page,
+      "ArrowRight",
+      () => landscape.evaluate((el) => el === document.activeElement),
+      6
+    );
+    expect(reached, "Right reaches the Orientation boxes").toBe(true);
+    await page.keyboard.press("Space");
+    await expect(landscape).toBeChecked();
   });
 
   test("Up and Down leave a range slider; Left and Right change it", async ({

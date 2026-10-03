@@ -80,12 +80,30 @@ function asElement(target: EventTarget | null): HTMLElement | null {
 }
 
 /** An `input` that takes a single line of text (text, search, email, ...). */
-export function isSingleLineTextInput(target: EventTarget | null): boolean {
+export function isSingleLineTextInput(
+  target: EventTarget | null
+): target is HTMLInputElement {
   const el = asElement(target);
   return (
     el instanceof HTMLInputElement &&
     !NON_TEXT_INPUT_TYPES.has(el.type.toLowerCase())
   );
+}
+
+/**
+ * Whether Left or Right would leave a single-line text input: its caret
+ * sits at that edge with no text selected (Left at the start, Right at the
+ * end), or the input shows the page no caret at all (number, date, time...).
+ * TV focus then moves on, so no field strands the controls beside it.
+ */
+export function caretAtEdge(
+  input: HTMLInputElement,
+  combo: "left" | "right"
+): boolean {
+  const { selectionStart: start, selectionEnd: end } = input;
+  if (start === null || end === null) return true;
+  if (start !== end) return false;
+  return combo === "left" ? start === 0 : end === input.value.length;
 }
 
 /** A field the user types into: a text input, a textarea or contenteditable. */

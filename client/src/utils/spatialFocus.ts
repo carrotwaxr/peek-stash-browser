@@ -256,15 +256,24 @@ function pickFrom(
     grid && pickInCells(grid, from, fromRect, measured, direction);
   if (inCells) return inCells;
 
+  // Leaving a grid sideways is measured from the cell: from a narrow control
+  // (a checkbox) in the last column, the wider fields lower in that column
+  // would otherwise count as beside it
+  const fromCell =
+    grid && (direction === "left" || direction === "right")
+      ? cellOf(grid, from)
+      : null;
+  const outRect = fromCell ? fromCell.getBoundingClientRect() : fromRect;
+
   const region = regionOf(from);
-  if (!region) return pickNext(fromRect, measured, direction);
+  if (!region) return pickNext(outRect, measured, direction);
   const inRegion = pickNext(
-    fromRect,
+    outRect,
     measured.filter((c) => region.contains(c.el)),
     direction
   );
   if (inRegion || direction === "up" || direction === "down") return inRegion;
-  return pickNext(fromRect, measured, direction);
+  return pickNext(outRect, measured, direction);
 }
 
 /**

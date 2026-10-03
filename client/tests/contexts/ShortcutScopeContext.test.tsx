@@ -212,7 +212,7 @@ describe("ShortcutScopeProvider", () => {
     }
   );
 
-  it("Up and Down in a single-line input reach a tv scope and no other layer; in a textarea they move the caret", () => {
+  it("Up and Down in a single-line input reach a tv scope and no other layer, Left and Right at the caret's edge; in a textarea they move the caret", () => {
     const tvUp = vi.fn();
     const tvDown = vi.fn();
     const tvLeft = vi.fn();
@@ -224,15 +224,22 @@ describe("ShortcutScopeProvider", () => {
       </>
     );
 
-    const input = focusNew("input", { type: "search" });
+    const input = focusNew("input", { type: "search", value: "abc" });
+    input.setSelectionRange(1, 1);
     const upEvent = press("ArrowUp", input);
     press("ArrowDown", input);
-    press("ArrowLeft", input);
+    const leftEvent = press("ArrowLeft", input);
     expect(tvUp).toHaveBeenCalledTimes(1);
     expect(tvDown).toHaveBeenCalledTimes(1);
     expect(upEvent.defaultPrevented).toBe(true);
+    // Text lies to the left: the caret's
     expect(tvLeft).not.toHaveBeenCalled();
+    expect(leftEvent.defaultPrevented).toBe(false);
     expect(pageUp).not.toHaveBeenCalled();
+    // At the start: Left leaves
+    input.setSelectionRange(0, 0);
+    press("ArrowLeft", input);
+    expect(tvLeft).toHaveBeenCalledTimes(1);
     input.remove();
 
     const textarea = focusNew("textarea");
