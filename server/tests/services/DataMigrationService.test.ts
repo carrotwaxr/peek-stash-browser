@@ -90,6 +90,7 @@ const MIGRATIONS = [
   "010_rebuild_link_counts",
   "011_recompute_exclusions_content_counts",
   "012_views_and_carousel_trees",
+  "013_clear_year_one_dates",
 ];
 
 /** Every migration but the named ones, as applied rows */
@@ -193,6 +194,11 @@ describe("DataMigrationService", () => {
           name: "012_views_and_carousel_trees",
           appliedAt: new Date(),
         },
+        {
+          id: 13,
+          name: "013_clear_year_one_dates",
+          appliedAt: new Date(),
+        },
       ]);
 
       const { logger } = await import("../../utils/logger.js");
@@ -226,8 +232,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // All twelve migrations should be marked as applied
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(12);
+      // All thirteen migrations should be marked as applied
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(13);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -267,7 +273,7 @@ describe("DataMigrationService", () => {
     });
 
     it("skips already-applied migration and only runs pending ones", async () => {
-      // 001 already applied, 002 to 012 pending
+      // 001 already applied, 002 to 013 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         {
           id: 1,
@@ -286,8 +292,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // 001 is skipped; 002 to 012 are created
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(11);
+      // 001 is skipped; 002 to 013 are created
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(12);
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -530,6 +536,53 @@ describe("DataMigrationService", () => {
       }
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith({
         data: { name: "008_delete_orphaned_user_rows" },
+      });
+    });
+
+    it("clears the dates Stash answers for none in migration 013, column by column, a chunk a unit until one comes back short", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("013_clear_year_one_dates")
+      );
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
+      mockPrisma.$executeRawUnsafe
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(5000)
+        .mockResolvedValueOnce(141);
+
+      const service = await importFresh();
+      await service.runPendingMigrations();
+
+      const calls = mockPrisma.$executeRawUnsafe.mock.calls.map(
+        ([sql, ...params]) => ({
+          column: /UPDATE "(\w+)" SET "(\w+)"/.exec(sql)?.slice(1).join("."),
+          sql: sql
+            .replace(/\s+/g, " ")
+            .replace(/\( /g, "(")
+            .replace(/ \)/g, ")")
+            .trim(),
+          params,
+        })
+      );
+      // A full chunk of collections, then a short one; one each for the rest
+      expect(calls.map((call) => call.column)).toEqual([
+        "StashScene.date",
+        "StashGroup.date",
+        "StashGroup.date",
+        "StashGallery.date",
+        "StashImage.date",
+        "StashPerformer.birthdate",
+        "StashPerformer.deathDate",
+      ]);
+      for (const call of calls) {
+        const [table, column] = must(call.column).split(".");
+        // Only a date before year 2, at most a chunk at a time
+        expect(call.sql).toBe(
+          `UPDATE "${must(table)}" SET "${must(column)}" = NULL WHERE rowid IN (SELECT rowid FROM "${must(table)}" WHERE "${must(column)}" < ? LIMIT ?)`
+        );
+        expect(call.params).toEqual(["0002", 5000]);
+      }
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith({
+        data: { name: "013_clear_year_one_dates" },
       });
     });
 

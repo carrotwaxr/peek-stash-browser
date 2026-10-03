@@ -58,6 +58,7 @@ import {
 import { shouldLogOnce } from "../utils/logThrottle.js";
 import { logger } from "../utils/logger.js";
 import { summarizeStashStreams } from "../utils/sceneStreams.js";
+import { stashDate } from "../utils/stashDate.js";
 import { stashMediaUrl } from "../utils/stashMediaPath.js";
 import { logSyncFailure } from "../utils/syncLog.js";
 import { clipPreviewProber } from "./ClipPreviewProber.js";
@@ -1544,7 +1545,7 @@ async function processScenesBatch(
     ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
     ${escapeSqlNullable(scene.title)},
     ${escapeSqlNullable(scene.code)},
-    ${escapeSqlNullable(scene.date)},
+    ${escapeSqlNullable(stashDate(scene.date))},
     ${scene.studio?.id ? `'${escapeSql(scene.studio.id)}'` : "NULL"},
     ${scene.rating100 ?? "NULL"},
     ${file?.duration ? Math.round(file.duration) : "NULL"},
@@ -1745,7 +1746,7 @@ async function processPerformersBatch(
     ${escapeSqlNullable(performer.name)},
     ${escapeSqlNullable(performer.disambiguation)},
     ${escapeSqlNullable(performer.gender)},
-    ${escapeSqlNullable(performer.birthdate)},
+    ${escapeSqlNullable(stashDate(performer.birthdate))},
     ${performer.favorite ? 1 : 0},
     ${performer.rating100 ?? "NULL"},
     ${escapeSqlNullable(performer.details)},
@@ -1763,7 +1764,7 @@ async function processPerformersBatch(
     ${escapeSqlNullable(performer.tattoos)},
     ${escapeSqlNullable(performer.piercings)},
     ${escapeSqlNullable(performer.career_length)},
-    ${escapeSqlNullable(performer.death_date)},
+    ${escapeSqlNullable(stashDate(performer.death_date))},
     ${escapeSqlNullable(performer.url)},
     ${escapeSqlNullable(listJson(performer.urls))},
     ${escapeSqlNullable(performer.image_path)},
@@ -2124,7 +2125,7 @@ async function processGroupsBatch(
     ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
     ${escapeSqlNullable(group.name)},
     ${escapeSqlNullable(group.aliases === "" ? null : group.aliases)},
-    ${escapeSqlNullable(group.date)},
+    ${escapeSqlNullable(stashDate(group.date))},
     ${group.studio?.id ? `'${escapeSql(group.studio.id)}'` : "NULL"},
     ${group.rating100 ?? "NULL"},
     ${duration ? Math.round(duration) : "NULL"},
@@ -2241,7 +2242,7 @@ async function processGalleriesBatch(
     '${escapeSql(gallery.id)}',
     ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
     ${escapeSqlNullable(gallery.title)},
-    ${escapeSqlNullable(gallery.date)},
+    ${escapeSqlNullable(stashDate(gallery.date))},
     ${gallery.studio?.id ? `'${escapeSql(gallery.studio.id)}'` : "NULL"},
     ${gallery.studio?.id ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
     ${gallery.rating100 ?? "NULL"},
@@ -2418,7 +2419,7 @@ async function processImagesBatch(
       ${escapeSqlNullable(image.details)},
       ${escapeSqlNullable(image.photographer)},
       ${escapeSqlNullable(JSON.stringify(image.urls))},
-      ${escapeSqlNullable(image.date)},
+      ${escapeSqlNullable(stashDate(image.date))},
       ${image.studio?.id ? `'${escapeSql(image.studio.id)}'` : "NULL"},
       ${image.studio?.id ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
       ${image.rating100 ?? "NULL"},

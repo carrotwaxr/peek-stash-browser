@@ -3,6 +3,7 @@ import prisma from "../prisma/singleton.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { carouselRulesLocked } from "../utils/listRequest.js";
 import { logger } from "../utils/logger.js";
+import { NO_DATE_BEFORE } from "../utils/stashDate.js";
 import { entityImageCountService } from "./EntityImageCountService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
@@ -83,6 +84,53 @@ export async function deleteOrphanedUserRows(
     }
   }
   return deleted;
+}
+
+/**
+ * The entity date columns earlier syncs stored as Stash returned them,
+ * "0001-01-01" (its answer for a collection with no date) included
+ */
+const DATE_COLUMNS = [
+  ["StashScene", "date"],
+  ["StashGroup", "date"],
+  ["StashGallery", "date"],
+  ["StashImage", "date"],
+  ["StashPerformer", "birthdate"],
+  ["StashPerformer", "deathDate"],
+] as const;
+
+type DateColumn =
+  `${(typeof DATE_COLUMNS)[number][0]}.${(typeof DATE_COLUMNS)[number][1]}`;
+
+/** Rows cleared per write unit */
+const DATE_CHUNK = 5000;
+
+/**
+ * Clears the dates Stash answers for none (before year 2, `stashDate`)
+ * that earlier syncs stored (migration 013), column by column, up to
+ * `chunkSize` rows a write unit until a chunk comes back short. Sync stores
+ * them as NULL from now on, so this runs once.
+ */
+export async function clearYearOneDates(
+  chunkSize: number = DATE_CHUNK
+): Promise<Partial<Record<DateColumn, number>>> {
+  const cleared: Partial<Record<DateColumn, number>> = {};
+  for (const [table, column] of DATE_COLUMNS) {
+    const sql = `
+      UPDATE "${table}" SET "${column}" = NULL WHERE rowid IN (
+        SELECT rowid FROM "${table}" WHERE "${column}" < ? LIMIT ?
+      )`;
+    let total = 0;
+    for (;;) {
+      const count = await dbWrite("migration.yearOneDates", () =>
+        prisma.$executeRawUnsafe(sql, NO_DATE_BEFORE, chunkSize)
+      );
+      total += count;
+      if (count < chunkSize) break;
+    }
+    cleared[`${table}.${column}`] = total;
+  }
+  return cleared;
 }
 
 /** A user's saved presets, as stored (and their defaults, for migration 012) */
@@ -882,6 +930,18 @@ const migrations: Migration[] = [
         `${MIGRATION_012} Moved saved Views and carousels to their canonical form`,
         { ...summary }
       );
+    },
+  },
+  // Stash answers a collection with no date as "0001-01-01", which sync
+  // stored and the cards showed; sync now stores it as NULL, and this
+  // clears what earlier syncs stored
+  {
+    name: "013_clear_year_one_dates",
+    description:
+      "Clear the year-1 dates (0001-01-01) Stash answers for an entity with no date, so collections without a date show, sort and filter as undated",
+    run: async () => {
+      const cleared = await clearYearOneDates();
+      logger.info("[Migration 013] Cleared the year-1 dates", cleared);
     },
   },
 ];

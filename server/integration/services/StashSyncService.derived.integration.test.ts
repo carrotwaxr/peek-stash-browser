@@ -9,7 +9,9 @@
  * `titleSort` (routed C7): their title, else `getImageFallbackTitle`. Every
  * type stores Stash's created_at and updated_at as epoch milliseconds.
  * Studio and collection aliases, every performer link, and a gallery's
- * organized flag and zip path are stored as Stash returns them.
+ * organized flag and zip path are stored as Stash returns them. A date
+ * Stash answers for none ("0001-01-01", a collection with no date) is
+ * stored as NULL.
  *
  * The first case of each block reads every row the startup sync wrote. The
  * others write through the batch writers under a made-up instance,
@@ -25,7 +27,9 @@ import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
 import {
   GALLERY_DEFAULTS,
+  GROUP_DEFAULTS,
   IMAGE_DEFAULTS,
+  PERFORMER_DEFAULTS,
   SCENE_DEFAULTS,
   STUDIO_DEFAULTS,
 } from "../../tests/helpers/syncRowDefaults.js";
@@ -547,5 +551,99 @@ describeWithDb("Aliases, links and gallery fields (integration)", () => {
       where: { id_stashInstanceId: { id: "2", stashInstanceId: DERIVED } },
     });
     expect(folder).toMatchObject({ organized: false, filePath: null });
+  });
+});
+
+describeWithDb("Dates Stash answers for none (integration)", () => {
+  const run = () => ({
+    signal: new AbortController().signal,
+    changes: new SyncChangeSet(),
+  });
+  const times = {
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-02T00:00:00Z",
+  };
+  const where = { stashInstanceId: DERIVED, id: { in: ["901", "902"] } };
+
+  afterAll(async () => {
+    await prisma.stashScene.deleteMany({ where });
+    await prisma.stashGallery.deleteMany({ where });
+    await prisma.stashGroup.deleteMany({ where });
+    await prisma.stashPerformer.deleteMany({ where });
+  });
+
+  it("a year-1 date is stored as no date, a real one as Stash returns it", async () => {
+    await ENTITY_SYNC.performer.processBatch(
+      ["901", "902"].map((id) =>
+        partialRow<SyncEntityOf<"performer">>({
+          ...PERFORMER_DEFAULTS,
+          id,
+          name: `Dates IT performer ${id}`,
+          stash_ids: [],
+          birthdate: id === "901" ? "0001-01-01" : "1990-02-03",
+          death_date: id === "901" ? "0001-01-01" : null,
+          ...times,
+        })
+      ),
+      DERIVED,
+      run()
+    );
+    await ENTITY_SYNC.group.processBatch(
+      ["901", "902"].map((id) =>
+        partialRow<SyncEntityOf<"group">>({
+          ...GROUP_DEFAULTS,
+          id,
+          name: `Dates IT collection ${id}`,
+          date: id === "901" ? "0001-01-01" : "2020-05-01",
+          ...times,
+        })
+      ),
+      DERIVED,
+      run()
+    );
+    await ENTITY_SYNC.gallery.processBatch(
+      ["901", "902"].map((id) =>
+        partialRow<SyncEntityOf<"gallery">>({
+          ...GALLERY_DEFAULTS,
+          id,
+          title: `Dates IT gallery ${id}`,
+          date: id === "901" ? "0001-01-01" : "2020-05-01",
+          ...times,
+        })
+      ),
+      DERIVED,
+      run()
+    );
+    await syncScenes([
+      { ...sceneRow("901", { title: "Dates IT 901" }), date: "0001-01-01" },
+      { ...sceneRow("902", { title: "Dates IT 902" }), date: "2020-05-01" },
+    ]);
+
+    const dates = async (table: string, column = "date") =>
+      prisma.$queryRawUnsafe<Array<{ id: string; value: string | null }>>(
+        `SELECT id, "${column}" AS value FROM "${table}"
+         WHERE stashInstanceId = ? AND id IN ('901', '902') ORDER BY id`,
+        DERIVED
+      );
+    expect(await dates("StashGroup")).toEqual([
+      { id: "901", value: null },
+      { id: "902", value: "2020-05-01" },
+    ]);
+    expect(await dates("StashGallery")).toEqual([
+      { id: "901", value: null },
+      { id: "902", value: "2020-05-01" },
+    ]);
+    expect(await dates("StashScene")).toEqual([
+      { id: "901", value: null },
+      { id: "902", value: "2020-05-01" },
+    ]);
+    expect(await dates("StashPerformer", "birthdate")).toEqual([
+      { id: "901", value: null },
+      { id: "902", value: "1990-02-03" },
+    ]);
+    expect(await dates("StashPerformer", "deathDate")).toEqual([
+      { id: "901", value: null },
+      { id: "902", value: null },
+    ]);
   });
 });
