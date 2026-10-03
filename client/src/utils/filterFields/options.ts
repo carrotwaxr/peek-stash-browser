@@ -20,6 +20,7 @@ import {
   type PanelGroup,
   type RefField,
   type RefFieldModifier,
+  type TextField,
 } from "@peek/shared-types";
 
 /** Shared type for filter configuration objects used across filter UI, URL serialization, and filter chips */
@@ -121,6 +122,20 @@ const ENUM_MODIFIER_LABELS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The condition select's words for a text row that offers one (Path); "Has
+ * none" and "Has any" (sent with no text) where its field takes them
+ */
+const TEXT_MODIFIER_LABELS: Readonly<Record<string, string>> = {
+  INCLUDES: "Contains",
+  EXCLUDES: "Excludes",
+  EQUALS: "Equals",
+  NOT_EQUALS: "Not equals",
+  STARTS_WITH: "Starts with",
+  IS_NULL: "Has none",
+  NOT_NULL: "Has any",
+};
+
+/**
  * How an imperial viewer's editor shows a body measure: its unit in the
  * label and, but for Height (drawn as feet and inches), its display bounds.
  * What it holds is metric: the editor converts on input and display.
@@ -169,7 +184,12 @@ function refOption(row: RefField, spec: FieldSpec | undefined): FilterOption {
   const labels = REF_MODIFIER_LABELS[row.modifierLabels ?? "has"];
   return {
     ...head(row),
-    ...(spec?.kind === "ref" ? { entityType: ENTITY_TYPES[spec.target] } : {}),
+    // A playlist field picks from the viewer's playlists
+    ...(spec?.kind === "ref"
+      ? { entityType: ENTITY_TYPES[spec.target] }
+      : spec?.kind === "playlist" || row.source === "playlists"
+        ? { entityType: "playlists" }
+        : {}),
     multi: row.multi,
     defaultValue: row.multi ? [] : "",
     ...placeholderOf(row),
@@ -258,6 +278,34 @@ function numberOption(
   };
 }
 
+/**
+ * A text row's condition select: the modifiers it offers that its field
+ * takes, Contains first when offered, which the select shows untouched.
+ * Nothing for a row offering one modifier or none, or without a
+ * `modifierKey`.
+ */
+function textConditionOf(
+  row: TextField,
+  spec: FieldSpec | undefined
+): Partial<FilterOption> {
+  if (spec?.kind !== "text" || row.modifierKey === undefined) return {};
+  const taken: readonly string[] = spec.modifiers;
+  const offered = (row.modifiers ?? []).filter((modifier) =>
+    taken.includes(modifier)
+  );
+  if (offered.length < 2) return {};
+  return {
+    modifierOptions: offered.map((value) => ({
+      value,
+      label: TEXT_MODIFIER_LABELS[value] ?? value,
+    })),
+    modifierKey: row.modifierKey,
+    defaultModifier: offered.includes("INCLUDES")
+      ? "INCLUDES"
+      : (offered[0] ?? "INCLUDES"),
+  };
+}
+
 /** One row's option */
 function optionOf(
   row: PanelField,
@@ -278,6 +326,7 @@ function optionOf(
         ...placeholderOf(row),
         // An input holds what the server takes (a longer value is a 400)
         ...(spec?.kind === "text" ? { maxLength: spec.maxLength } : {}),
+        ...textConditionOf(row, spec),
       };
     case "enum":
       return {

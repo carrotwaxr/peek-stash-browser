@@ -10,7 +10,12 @@
  * request.
  */
 import { useState } from "react";
-import type { MinimalEntity, MinimalRequest } from "@peek/shared-types";
+import type {
+  GetSharedPlaylistsResponse,
+  GetUserPlaylistsResponse,
+  MinimalEntity,
+  MinimalRequest,
+} from "@peek/shared-types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { untrusted } from "@tests/helpers/untrusted";
@@ -40,6 +45,9 @@ const {
   mockFindStudiosMinimal,
   mockFindGroupsMinimal,
   mockFindGalleriesMinimal,
+  mockFindScenesMinimal,
+  mockGetPlaylists,
+  mockGetSharedPlaylists,
 } = vi.hoisted(() => ({
   mockFindTags: vi.fn<FindMock>(),
   mockFindPerformers: vi.fn<FindMock>(),
@@ -48,6 +56,9 @@ const {
   mockFindStudiosMinimal: vi.fn<FindMinimalMock>(),
   mockFindGroupsMinimal: vi.fn<FindMinimalMock>(),
   mockFindGalleriesMinimal: vi.fn<FindMinimalMock>(),
+  mockFindScenesMinimal: vi.fn<FindMinimalMock>(),
+  mockGetPlaylists: vi.fn<() => Promise<GetUserPlaylistsResponse>>(),
+  mockGetSharedPlaylists: vi.fn<() => Promise<GetSharedPlaylistsResponse>>(),
 }));
 
 const MINIMAL_MOCKS = [
@@ -56,6 +67,7 @@ const MINIMAL_MOCKS = [
   mockFindStudiosMinimal,
   mockFindGroupsMinimal,
   mockFindGalleriesMinimal,
+  mockFindScenesMinimal,
 ];
 
 // Mock useDebounce to return value immediately (no delay)
@@ -72,7 +84,10 @@ vi.mock("../../../src/api", () => ({
     findStudiosMinimal: mockFindStudiosMinimal,
     findGroupsMinimal: mockFindGroupsMinimal,
     findGalleriesMinimal: mockFindGalleriesMinimal,
+    findScenesMinimal: mockFindScenesMinimal,
   },
+  getPlaylists: mockGetPlaylists,
+  getSharedPlaylists: mockGetSharedPlaylists,
 }));
 
 // --- Helpers ---
@@ -859,5 +874,141 @@ describe("SearchableSelect include or exclude per value (F22a)", () => {
     );
     expect(await screen.findByText("Tag 1")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Exclude Tag 1" })).toBeNull();
+  });
+});
+
+describe("SearchableSelect playlist and scene sources (F22b)", () => {
+  /** An own playlist as `GET /api/playlists` lists it */
+  const ownPlaylist = (id: number, name: string) =>
+    untrusted<GetUserPlaylistsResponse["playlists"][number]>({
+      id,
+      userId: 1,
+      name,
+      description: null,
+      _count: { items: 0 },
+      items: [],
+    });
+
+  /** A playlist shared with the viewer, as `GET /api/playlists/shared` lists it */
+  const sharedPlaylist = (id: number, name: string, owner: string) =>
+    untrusted<GetSharedPlaylistsResponse["playlists"][number]>({
+      id,
+      name,
+      description: null,
+      sceneCount: 0,
+      owner: { id: 2, username: owner },
+      sharedViaGroups: ["Friends"],
+      sharedAt: "2026-01-01T00:00:00.000Z",
+      items: [],
+    });
+
+  beforeEach(() => {
+    mockGetPlaylists.mockResolvedValue({
+      playlists: [ownPlaylist(12, "Road trip"), ownPlaylist(3, "Gym")],
+    });
+    mockGetSharedPlaylists.mockResolvedValue({
+      playlists: [sharedPlaylist(40, "Weekend", "alice")],
+    });
+  });
+
+  it("the playlist picker lists own playlists, then shared ones with `by <owner>`", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <SearchableSelect
+        entityType="playlists"
+        label="Playlists"
+        value={[]}
+        onChange={onChange}
+        multi
+      />
+    );
+    // Nothing loads before the list opens
+    expect(mockGetPlaylists).not.toHaveBeenCalled();
+
+    await user.click(trigger());
+
+    const options = await screen.findAllByRole("button", { pressed: false });
+    expect(options.map((option) => option.textContent)).toEqual([
+      "Road trip",
+      "Gym",
+      "Weekend by alice",
+    ]);
+    // Once per opening: typing filters what was read
+    expect(mockGetPlaylists).toHaveBeenCalledTimes(1);
+    expect(mockGetSharedPlaylists).toHaveBeenCalledTimes(1);
+    await user.type(screen.getByPlaceholderText("Type to search..."), "week");
+    expect(
+      screen
+        .getAllByRole("button", { pressed: false })
+        .map((option) => option.textContent)
+    ).toEqual(["Weekend by alice"]);
+    expect(mockGetPlaylists).toHaveBeenCalledTimes(1);
+
+    // A pick is the playlist's Peek id, never joined with an instance
+    await user.click(screen.getByRole("button", { name: "Weekend by alice" }));
+    expect(onChange).toHaveBeenCalledWith(["40"]);
+    // No entity endpoint is asked
+    for (const mock of MINIMAL_MOCKS) expect(mock).not.toHaveBeenCalled();
+  });
+
+  it("a stale playlist id shows `Unavailable playlist` and stays selected", async () => {
+    const onChange = vi.fn();
+    render(
+      <SearchableSelect
+        entityType="playlists"
+        label="Playlists"
+        value={["12", "999"]}
+        onChange={onChange}
+        multi
+      />
+    );
+
+    expect(await screen.findByText("Unavailable playlist")).toBeInTheDocument();
+    expect(screen.getByText("Road trip")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Playlists: Road trip, Unavailable playlist",
+      })
+    ).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("the scene picker searches `/api/library/scenes/minimal`", async () => {
+    const user = userEvent.setup();
+    mockFindScenesMinimal.mockImplementation((params) =>
+      Promise.resolve(
+        params.ids
+          ? [row("5", "a", "Beach day")]
+          : [row("5", "a", "Beach day"), row("6", "a", "Sunset")]
+      )
+    );
+    const onChange = vi.fn();
+    render(
+      <SearchableSelect
+        entityType="scenes"
+        label="Scenes"
+        value={["5:a"]}
+        onChange={onChange}
+        multi
+        countFilterContext="scenes"
+      />
+    );
+
+    expect(await screen.findByText("Beach day")).toBeInTheDocument();
+    expect(must(mockFindScenesMinimal.mock.calls[0])[0]).toEqual({
+      ids: ["5:a"],
+      filter: { per_page: 100 },
+    });
+
+    await user.click(trigger());
+    await user.type(screen.getByPlaceholderText("Type to search..."), "sun");
+    await user.click(await screen.findByRole("button", { name: "Sunset" }));
+
+    expect(onChange).toHaveBeenCalledWith(["5:a", "6:a"]);
+    // The scene endpoint takes no count filter and no scope
+    expect(must(mockFindScenesMinimal.mock.calls.at(-1))[0]).toEqual({
+      filter: { per_page: 50, q: "sun" },
+    });
   });
 });

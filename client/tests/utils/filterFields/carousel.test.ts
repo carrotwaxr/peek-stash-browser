@@ -4,13 +4,19 @@
  * `fromCriterion`, and a rule no row can edit is kept as stored, so editing
  * a carousel never drops one.
  */
-import { PANEL_FIELDS, type PanelField } from "@peek/shared-types";
+import {
+  PANEL_FIELDS,
+  type PanelField,
+  SCENE_FIELDS,
+} from "@peek/shared-types";
 import { describe, expect, it } from "vitest";
 import {
   CAROUSEL_FILTER_DEFINITIONS,
   buildSceneFilter,
   carouselRulesToFilterState,
 } from "@/utils/filterConfig";
+import { buildPanelFilter, readPanelFilter } from "@/utils/filterFields";
+import { PATH_ROW, PLAYLISTS_ROW } from "../../helpers/editorRows";
 
 const SCENE_ROWS: readonly PanelField[] = PANEL_FIELDS.scene;
 
@@ -344,6 +350,43 @@ describe("carousel rules", () => {
     expect(carouselRulesToFilterState(undefined)).toEqual({
       state: {},
       kept: {},
+    });
+  });
+});
+
+describe("carousel rules of the F22b editors (test-local rows; F18 adds the real ones)", () => {
+  const table = {
+    rows: [...SCENE_ROWS, PATH_ROW, PLAYLISTS_ROW],
+    specs: SCENE_FIELDS,
+  };
+
+  it("a Path condition and a playlist rule read back and build the same", () => {
+    const stored = {
+      path: { value: "/media/new", modifier: "STARTS_WITH" },
+      playlists: { value: [12, 7], modifier: "INCLUDES_ALL" },
+    };
+
+    const { state, kept } = readPanelFilter("scene", stored, table);
+
+    expect(state).toEqual({
+      path: "/media/new",
+      pathModifier: "STARTS_WITH",
+      playlistIds: ["12", "7"],
+      playlistIdsModifier: "INCLUDES_ALL",
+    });
+    expect(kept).toEqual({});
+    expect(buildPanelFilter("scene", state, table)).toEqual(stored);
+  });
+
+  it("a condition the row does not offer is kept as stored", () => {
+    const stored = {
+      title: { value: "beach", modifier: "STARTS_WITH" },
+      playlists: { value: [12], modifier: "IS_NULL" },
+    };
+
+    expect(readPanelFilter("scene", stored, table)).toEqual({
+      state: {},
+      kept: stored,
     });
   });
 });

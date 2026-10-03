@@ -66,7 +66,8 @@ const rowsOf = (entity: ListKind) => {
  * The rows a page's options draw: the list's panel row of each option key
  * (the page's own options, the locked ones left out). Options no row
  * stands behind (a caller's own list) read as a row of the option's
- * editor, holding its key, companions and `multi`.
+ * editor, holding its key, companions, offered modifiers and `multi` (a
+ * playlist picker's as a playlist row, its ids never joined).
  */
 function fieldsOf(
   filterOptions: readonly FilterOption[],
@@ -97,6 +98,9 @@ function fieldsOf(
           ...(option.excludeKey === undefined
             ? {}
             : { excludeKey: option.excludeKey }),
+          modifiers: (option.modifierOptions ?? []).map(({ value }) => value),
+          // Playlist ids are Peek's, never joined with the page's instance
+          ...(option.entityType === "playlists" ? { source: "playlists" } : {}),
         } as unknown as PanelField)
     );
   }

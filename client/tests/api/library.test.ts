@@ -46,6 +46,23 @@ describe("libraryApi", () => {
     });
   });
 
+  describe("findScenesMinimal", () => {
+    it("asks `/library/scenes/minimal` and returns its scenes", async () => {
+      const scenes = [{ id: "5", instanceId: "a", name: "Beach day" }];
+      mockApiPost.mockResolvedValue({ scenes });
+      const signal = new AbortController().signal;
+
+      await expect(
+        libraryApi.findScenesMinimal({ filter: { q: "beach" } }, signal)
+      ).resolves.toEqual(scenes);
+      expect(mockApiPost).toHaveBeenCalledWith(
+        "/library/scenes/minimal",
+        { filter: { q: "beach" } },
+        signal
+      );
+    });
+  });
+
   describe("findEntityById", () => {
     it("sends ids and the instance filter, and answers the typed row or null", async () => {
       const row = { id: "9", instanceId: "inst-a", stashUrl: null };

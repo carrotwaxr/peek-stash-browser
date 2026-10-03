@@ -2,6 +2,7 @@ import type { MinimalEntity } from "@peek/shared-types";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { parseCompositeKey } from "../../utils/compositeKey";
 import { libraryApi } from "../library";
+import { getPlaylists, getSharedPlaylists } from "../playlists";
 import { queryKeys } from "../queryKeys";
 import { useLibraryReady } from "./useLibraryReady";
 
@@ -15,6 +16,8 @@ export interface RefNames {
 const IDS_PER_LOOKUP = 100;
 
 const NAMED_ENTITIES = [
+  "scenes",
+  "playlists",
   "performers",
   "studios",
   "tags",
@@ -38,6 +41,10 @@ function findNames(
   signal: AbortSignal
 ): Promise<MinimalEntity[]> {
   switch (entityType) {
+    case "scenes":
+      return libraryApi.findScenesMinimal(request(ids), signal);
+    case "playlists":
+      return playlistsNamed();
     case "performers":
       return libraryApi.findPerformersMinimal(request(ids), signal);
     case "studios":
@@ -51,11 +58,33 @@ function findNames(
   }
 }
 
-/** Each entity's query key, under the root the library queries share */
+/**
+ * The viewer's playlists, their own and those shared with them, as named
+ * ids: Peek playlist ids, which no `/minimal` endpoint knows. The instance
+ * is empty: a playlist id is never joined with one.
+ */
+async function playlistsNamed(): Promise<MinimalEntity[]> {
+  const [own, shared] = await Promise.all([
+    getPlaylists(),
+    getSharedPlaylists(),
+  ]);
+  return [...own.playlists, ...shared.playlists].map((playlist) => ({
+    id: String(playlist.id),
+    instanceId: "",
+    name: playlist.name,
+  }));
+}
+
+/**
+ * Each entity's query key, under the root the library queries share; the
+ * playlists' under the playlists root, which a playlist change invalidates
+ */
 const KEYS: Record<
   NamedEntity,
   (ids: readonly string[]) => readonly unknown[]
 > = {
+  scenes: queryKeys.scenes.names,
+  playlists: queryKeys.playlists.names,
   performers: queryKeys.performers.names,
   studios: queryKeys.studios.names,
   tags: queryKeys.tags.names,
@@ -91,9 +120,11 @@ function namesOf(
 /**
  * The names of the entities a filter chip shows, with one `/minimal`
  * request carrying the ids (the server applies the user's exclusions and
- * instances). Keyed under the entity's root, so a hide, a restore or an
- * instance change asks again and logout clears it. Nothing is asked for an
- * entity without a `/minimal` endpoint or for no ids.
+ * instances); a scene's name is its title. Playlist ids are named from the
+ * viewer's own and shared playlists (an id neither lists is unavailable).
+ * Keyed under the entity's root, so a hide, a restore or an instance change
+ * asks again and logout clears it. Nothing is asked for an entity without a
+ * `/minimal` endpoint or for no ids.
  */
 export function useRefNames(
   entityType: string | undefined,

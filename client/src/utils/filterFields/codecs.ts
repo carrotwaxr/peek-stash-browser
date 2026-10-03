@@ -21,6 +21,12 @@
  * offering Has none or Has any (IS_NULL, NOT_NULL) sends that alone, with no
  * ids, and writes only its modifier to the URL.
  *
+ * A ref row on a `playlist` field (`source: "playlists"`) holds Peek
+ * playlist ids: decimal strings in the state and the URL, never joined with
+ * the page's `instance`, sent as numbers. A text row with a condition select
+ * holds its modifier under `<key>Modifier`; "Has none" and "Has any", where
+ * its field takes them, send no text.
+ *
  * Imports only relative modules and `@peek/shared-types` (see `options.ts`).
  */
 import type {
@@ -29,8 +35,10 @@ import type {
   FieldSpec,
   NumberField,
   PanelField,
+  PlaylistSpec,
   RefField,
   RefFieldModifier,
+  RefModifier,
   RefSpec,
   TextField,
 } from "@peek/shared-types";
@@ -244,6 +252,46 @@ export function refCriterionOf(
   };
 }
 
+/** A playlist field's criterion as the request carries it: Peek playlist ids */
+export interface PlaylistCriterion {
+  value: number[];
+  modifier: RefModifier;
+}
+
+/** A Peek playlist id as the state holds it: a positive whole number's digits */
+const PLAYLIST_ID = /^[1-9]\d*$/;
+
+/**
+ * A playlist row's criterion: its ids that spell a playlist id, as numbers
+ * (an id the viewer can no longer read is sent too, and matches nothing);
+ * the modifier the row's condition select holds when the field takes it,
+ * else the row's default, else the field's. Undefined without an id.
+ */
+export function playlistCriterionOf(
+  spec: PlaylistSpec,
+  row: RefField,
+  state: PanelState
+): PlaylistCriterion | undefined {
+  const value = [
+    ...new Set(
+      valuesOf(state[row.key])
+        .filter((id) => PLAYLIST_ID.test(id))
+        .map(Number)
+    ),
+  ];
+  if (value.length === 0) return undefined;
+  const takes = (candidate: unknown): candidate is RefModifier =>
+    spec.modifiers.some((modifier) => modifier === candidate) &&
+    row.modifiers.some((modifier) => modifier === candidate);
+  const chosen =
+    row.modifierKey === undefined ? undefined : state[row.modifierKey];
+  const modifier =
+    [row.modifiers.length > 1 ? chosen : undefined, row.defaultModifier].find(
+      takes
+    ) ?? spec.defaultModifier;
+  return { value, modifier };
+}
+
 /** A row's key, then its modifier, depth and exclude companions */
 const keysOf = (field: PanelField): readonly string[] =>
   [
@@ -386,6 +434,79 @@ const enumModifierOf = (
 /** A row's value as it is */
 const identity = (_field: PanelField, value: unknown): unknown => value;
 
+/**
+ * The modifiers a text row's condition select offers that its field takes;
+ * none without a select (a `modifierKey` and more than one modifier)
+ */
+const textModifiersOf = (
+  field: TextField,
+  spec: FieldSpec
+): readonly string[] =>
+  field.modifierKey !== undefined &&
+  field.modifiers !== undefined &&
+  field.modifiers.length > 1 &&
+  spec.kind === "text"
+    ? field.modifiers.filter((modifier) =>
+        (spec.modifiers as readonly string[]).includes(modifier)
+      )
+    : [];
+
+/**
+ * The presence choice a text row's condition select holds, when it offers
+ * it ("Has none", "Has any"); while one is set the text is ignored
+ */
+const textPresenceOf = (
+  field: TextField,
+  state: PanelState
+): Presence | undefined => {
+  if (field.modifierKey === undefined) return undefined;
+  const presence = asPresence(state[field.modifierKey]);
+  return presence !== undefined &&
+    field.modifiers !== undefined &&
+    field.modifiers.length > 1 &&
+    field.modifiers.some((modifier) => modifier === presence)
+    ? presence
+    : undefined;
+};
+
+/** What a text row with no condition chosen matches: a substring */
+const TEXT_DEFAULT = "INCLUDES";
+
+/**
+ * A text row's modifier: the condition select's when the row offers it and
+ * its field takes it, else a substring
+ */
+function textModifierOf(
+  field: TextField,
+  spec: FieldSpec,
+  state: PanelState
+): string {
+  const chosen =
+    field.modifierKey === undefined ? undefined : state[field.modifierKey];
+  return (
+    textModifiersOf(field, spec).find((modifier) => modifier === chosen) ??
+    TEXT_DEFAULT
+  );
+}
+
+/** A text row's trimmed text, "" for none */
+const textOf = (field: TextField, state: PanelState): string => {
+  const value = state[field.key];
+  return typeof value === "string" ? value.trim() : "";
+};
+
+/** A text row's request criterion: its presence choice alone, else its text */
+function textCriterion(
+  field: TextField,
+  spec: FieldSpec,
+  state: PanelState
+): { value?: string; modifier: string } | undefined {
+  const modifier = textModifierOf(field, spec, state);
+  if (asPresence(modifier) !== undefined) return { modifier };
+  const text = textOf(field, state);
+  return text === "" ? undefined : { value: text, modifier };
+}
+
 // ── Chips ─────────────────────────────────────────────────────────────────
 
 /** The row's name on a chip: its label without the unit in brackets ("Rating (0-100)") */
@@ -410,6 +531,17 @@ const REF_CONDITIONS = {
   },
 } as const satisfies Record<string, Record<RefFieldModifier, string>>;
 
+/** A text row's condition on a chip, when the row has a condition select */
+const TEXT_CONDITIONS: Readonly<Record<string, string>> = {
+  INCLUDES: "contains",
+  EXCLUDES: "excludes",
+  EQUALS: "equals",
+  NOT_EQUALS: "not equals",
+  STARTS_WITH: "starts with",
+  IS_NULL: "has none",
+  NOT_NULL: "has any",
+};
+
 const ENUM_CONDITIONS: Readonly<Record<string, string>> = {
   EQUALS: "is",
   NOT_EQUALS: "is not",
@@ -427,12 +559,23 @@ function refChip(
   spec: FieldSpec,
   state: PanelState
 ): ChipParts | null {
-  if (spec.kind !== "ref") return null;
-  const criterion = refCriterionOf(spec, field, state);
-  if (criterion === undefined) return null;
   const words: Readonly<Record<string, string>> =
     REF_CONDITIONS[field.modifierLabels ?? "has"];
   const label = chipLabel(field);
+  if (spec.kind === "playlist") {
+    const playlists = playlistCriterionOf(spec, field, state);
+    if (playlists === undefined) return null;
+    const condition =
+      field.modifiers.length > 1 ? words[playlists.modifier] : undefined;
+    return {
+      label,
+      ...(condition === undefined ? {} : { condition }),
+      ids: playlists.value.map(String),
+    };
+  }
+  if (spec.kind !== "ref") return null;
+  const criterion = refCriterionOf(spec, field, state);
+  if (criterion === undefined) return null;
   const presence = asPresence(criterion.modifier);
   if (presence !== undefined) {
     return { label, values: [words[presence] ?? presence.toLowerCase()] };
@@ -730,6 +873,9 @@ function refFromCriterion(
   spec: FieldSpec,
   criterion: unknown
 ): PanelState {
+  if (spec.kind === "playlist") {
+    return playlistFromCriterion(field, spec, criterion);
+  }
   const parts = partsOf(criterion, ["value", "excludes", "modifier", "depth"]);
   if (parts === undefined || spec.kind !== "ref") return {};
   const modifier = parts.modifier ?? spec.defaultModifier;
@@ -766,6 +912,42 @@ function refFromCriterion(
     ...(field.hierarchyKey === undefined || depth === undefined
       ? {}
       : { [field.hierarchyKey]: depth }),
+  };
+}
+
+/**
+ * A stored playlist criterion as the row edits it: its ids as decimal
+ * strings and its modifier when the row offers it. Nothing for an id that
+ * is no positive whole number, a modifier the row does not offer, or no ids.
+ */
+function playlistFromCriterion(
+  field: RefField,
+  spec: PlaylistSpec,
+  criterion: unknown
+): PanelState {
+  const parts = partsOf(criterion, ["value", "modifier"]);
+  if (parts === undefined || !Array.isArray(parts.value)) return {};
+  const ids = (parts.value as unknown[]).map((id) =>
+    typeof id === "number" && Number.isInteger(id) && id > 0
+      ? String(id)
+      : undefined
+  );
+  const modifier = parts.modifier ?? spec.defaultModifier;
+  const offered = field.modifiers.some((each) => each === modifier);
+  if (
+    ids.length === 0 ||
+    ids.some((id) => id === undefined) ||
+    !offered ||
+    (!field.multi && ids.length > 1)
+  ) {
+    return {};
+  }
+  const values = ids.filter((id): id is string => id !== undefined);
+  return {
+    [field.key]: field.multi ? values : values[0],
+    ...(field.modifierKey === undefined
+      ? {}
+      : { [field.modifierKey]: modifier }),
   };
 }
 
@@ -812,7 +994,11 @@ function enumFromCriterion(
   };
 }
 
-/** A stored text criterion: a substring with something in it, else nothing */
+/**
+ * A stored text criterion: text with something in it, under a substring or
+ * a condition the row offers (with that condition when the row has a select),
+ * or a presence check the row offers alone; else nothing
+ */
 function textFromCriterion(
   field: TextField,
   spec: FieldSpec,
@@ -822,10 +1008,22 @@ function textFromCriterion(
   if (parts === undefined || spec.kind !== "text") return {};
   const { value } = parts;
   const modifier = parts.modifier ?? spec.defaultModifier;
+  const offered = textModifiersOf(field, spec);
+  const withModifier =
+    field.modifierKey === undefined || offered.length === 0
+      ? {}
+      : { [field.modifierKey]: modifier };
+  if (typeof modifier !== "string") return {};
+  if (asPresence(modifier) !== undefined) {
+    return offered.includes(modifier) && (value === undefined || value === null)
+      ? withModifier
+      : {};
+  }
+  const known = offered.length > 0 ? offered : [TEXT_DEFAULT];
   return typeof value === "string" &&
     value.trim() !== "" &&
-    modifier === "INCLUDES"
-    ? { [field.key]: value }
+    known.includes(modifier)
+    ? { [field.key]: value, ...withModifier }
     : {};
 }
 
@@ -971,7 +1169,11 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       valuesOf(state[field.key]).length > 0 ||
       excludedOf(field, state).length > 0,
     toCriterion: (field, spec, state) =>
-      spec.kind === "ref" ? refCriterionOf(spec, field, state) : undefined,
+      spec.kind === "ref"
+        ? refCriterionOf(spec, field, state)
+        : spec.kind === "playlist"
+          ? playlistCriterionOf(spec, field, state)
+          : undefined,
     // A presence choice writes its modifier alone. Else a list of ids
     // joined with commas (a lone string is a one-element list), or one id;
     // the excluded ids the same way under the exclude companion; then the
@@ -999,7 +1201,8 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
     // A card's count links with one entity and its instance
     // (/scenes?performerId=82&instance=abc-123 reads performerIds:
     // ["82:abc-123"]); it wins over the row's own list. A list's refs each
-    // name their own instance, the excluded ones too
+    // name their own instance, the excluded ones too. Playlist ids are
+    // Peek's, never joined with an instance
     readUrl: urlReader((field, params) => {
       const one = params.get(entityParamFor(field.key));
       const value = params.get(field.key);
@@ -1010,7 +1213,10 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
           ? {}
           : { [field.excludeKey]: excluded.split(",").filter(Boolean) };
       if (one) {
-        const ref = entityRefFromParam(one, params.get("instance"));
+        const ref =
+          field.source === "playlists"
+            ? one
+            : entityRefFromParam(one, params.get("instance"));
         return { [field.key]: field.multi ? [ref] : ref, ...excludes };
       }
       if (value === null) return excludes;
@@ -1137,30 +1343,50 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
   text: {
     keys: keysOf,
     normalize: identity,
-    writeUrl: urlWriter((field, value, params) => {
-      if (value) setParam(params, field.key, value);
-    }),
+    // A presence choice the row offers writes its modifier alone; else the
+    // text, then the condition beside it
+    writeUrl: (field, state, params) => {
+      const presence = textPresenceOf(field, state);
+      if (presence !== undefined && field.modifierKey !== undefined) {
+        params.set(field.modifierKey, presence);
+        return;
+      }
+      const value = state[field.key];
+      if (isUnset(value) || !value) return;
+      setParam(params, field.key, value);
+      writeCompanions(field, state, params);
+    },
     readUrl: urlReader((field, params) =>
       params.has(field.key) ? { [field.key]: params.get(field.key) } : {}
     ),
-    // A blank search sends nothing
-    isActive: (field, state) => {
-      const value = state[field.key];
-      return typeof value === "string" && value.trim() !== "";
-    },
-    // The trimmed text as a substring
-    toCriterion: (field, _spec, state) => {
-      const value = state[field.key];
-      const text = typeof value === "string" ? value.trim() : "";
-      return text === "" ? undefined : { value: text, modifier: "INCLUDES" };
-    },
+    // A blank search sends nothing; a presence choice filters alone
+    isActive: (field, state) =>
+      textPresenceOf(field, state) !== undefined || textOf(field, state) !== "",
+    // The trimmed text, as a substring unless the row's condition says
+    // otherwise; a presence choice with no text
+    toCriterion: textCriterion,
     fromCriterion: textFromCriterion,
-    chip: (field, _spec, state) => {
-      const value = state[field.key];
-      const text = typeof value === "string" ? value.trim() : "";
-      return text === ""
-        ? null
-        : { label: chipLabel(field), values: [`"${text}"`] };
+    // "Title: "beach"" without a condition select; with one, its condition
+    // ("Path: starts with /media/new", "Details: has none")
+    chip: (field, spec, state) => {
+      const criterion = textCriterion(field, spec, state);
+      if (criterion === undefined) return null;
+      const label = chipLabel(field);
+      const { modifier, value } = criterion;
+      if (value === undefined) {
+        return {
+          label,
+          values: [TEXT_CONDITIONS[modifier] ?? modifier.toLowerCase()],
+        };
+      }
+      if (textModifiersOf(field, spec).length === 0) {
+        return { label, values: [`"${value}"`] };
+      }
+      return {
+        label,
+        condition: TEXT_CONDITIONS[modifier] ?? modifier.toLowerCase(),
+        values: [value],
+      };
     },
   },
   enum: {

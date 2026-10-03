@@ -40,10 +40,14 @@ import {
   useWallPlayback,
 } from "../../../src/hooks/useWallPlayback";
 
-// The scene Collections row offers In none and In any, as F18 opts it in
+// The scene Collections row offers In none and In any, and scenes have a
+// Path row with a condition select, as F18 opts them in
 vi.mock("@peek/shared-types", async (importOriginal) => {
   const { withRefPresence } = await import("@tests/helpers/refPresence");
-  return withRefPresence(await importOriginal(), [["scene", "groupIds"]]);
+  const { withEditorRows } = await import("@tests/helpers/editorRows");
+  return withEditorRows(
+    withRefPresence(await importOriginal(), [["scene", "groupIds"]])
+  );
 });
 
 vi.mock("../../../src/hooks/useTVMode", () => ({
@@ -1242,5 +1246,47 @@ describe("SearchControls", () => {
         wallPlayback: "hover",
       });
     });
+  });
+});
+
+describe("SearchControls text condition (F22b)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("the text condition select is named `<label> condition` and reaches the request", async () => {
+    const user = userEvent.setup();
+    const list = renderSearchControls({}, { url: "/scenes?path=/media" });
+    expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+      path: { value: "/media", modifier: "INCLUDES" },
+    });
+
+    await user.click(must(screen.getByText("Filters").closest("button")));
+    await user.click(screen.getByRole("button", { name: "Other Filters" }));
+    const path = must(
+      screen.getByText("Path", { selector: "label" }).parentElement,
+      "the Path control"
+    );
+    const condition = within(path).getByRole("combobox", {
+      name: "Path condition",
+    });
+    expect(condition).toHaveDisplayValue("Contains");
+    expect(
+      [...condition.querySelectorAll("option")].map((each) => each.text)
+    ).toEqual(["Contains", "Excludes", "Equals", "Not equals", "Starts with"]);
+    await user.selectOptions(condition, "Starts with");
+    await user.click(must(screen.getByText("Apply Filters").closest("button")));
+
+    await waitFor(() =>
+      expect(list.lastQuery().scene_filter).toEqual({
+        path: { value: "/media", modifier: "STARTS_WITH" },
+      })
+    );
+    expect(list.params().get("pathModifier")).toBe("STARTS_WITH");
+    expect(
+      await screen.findByRole("button", {
+        name: "Remove filter: Path: starts with /media",
+      })
+    ).toBeInTheDocument();
   });
 });

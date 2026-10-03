@@ -9,8 +9,10 @@ import type { ListKind } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { untrusted } from "@tests/helpers/untrusted";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { libraryApi } from "@/api/library";
+import { getPlaylists, getSharedPlaylists } from "@/api/playlists";
 import ActiveFilterChips from "@/components/ui/ActiveFilterChips";
 import { filterOptionsOf } from "@/utils/filterFields";
 
@@ -21,17 +23,27 @@ vi.mock("@/api/library", () => ({
     findStudiosMinimal: vi.fn(),
     findGroupsMinimal: vi.fn(),
     findGalleriesMinimal: vi.fn(),
+    findScenesMinimal: vi.fn(),
   },
 }));
 
-// Images' Studios and Scenes' Performers offer Has none and Has any, as F18
-// to F21 opt them in
+vi.mock("@/api/playlists", () => ({
+  getPlaylists: vi.fn(),
+  getSharedPlaylists: vi.fn(),
+}));
+
+// Images' Studios and Scenes' Performers offer Has none and Has any, and
+// scenes have Path and Playlists rows and clips a Scenes row, as F18 to F21
+// opt them in
 vi.mock("@peek/shared-types", async (importOriginal) => {
   const { withRefPresence } = await import("@tests/helpers/refPresence");
-  return withRefPresence(await importOriginal(), [
-    ["image", "studioIds"],
-    ["scene", "performerIds"],
-  ]);
+  const { withEditorRows } = await import("@tests/helpers/editorRows");
+  return withEditorRows(
+    withRefPresence(await importOriginal(), [
+      ["image", "studioIds"],
+      ["scene", "performerIds"],
+    ])
+  );
 });
 
 let unit = "metric";
@@ -339,5 +351,42 @@ describe("ActiveFilterChips", () => {
     );
 
     await waitFor(() => expect(screen.queryByRole("button")).toBeNull());
+  });
+
+  it("a Path condition reads `Path: starts with /media/new`", async () => {
+    renderChips({ path: "/media/new", pathModifier: "STARTS_WITH" });
+
+    expect(await edit("Path: starts with /media/new")).toBeInTheDocument();
+  });
+
+  it("a playlist chip names its playlists from the lists, not `/minimal`", async () => {
+    vi.mocked(getPlaylists).mockResolvedValue(
+      untrusted({ playlists: [{ id: 12, name: "Road trip" }] })
+    );
+    vi.mocked(getSharedPlaylists).mockResolvedValue(
+      untrusted({
+        playlists: [{ id: 40, name: "Weekend", owner: { username: "alice" } }],
+      })
+    );
+
+    renderChips({ playlistIds: ["12"], playlistIdsModifier: "INCLUDES" });
+
+    expect(await edit("Playlists: any of Road trip")).toBeInTheDocument();
+    for (const find of Object.values(libraryApi)) {
+      expect(find).not.toHaveBeenCalled();
+    }
+  });
+
+  it("a clip Scenes chip names its scenes by title", async () => {
+    vi.mocked(libraryApi.findScenesMinimal).mockResolvedValue([
+      { id: "5", instanceId: "a", name: "Beach day" },
+    ]);
+
+    renderChips(
+      { sceneIds: ["5:a"], sceneIdsModifier: "INCLUDES" },
+      { kind: "clip" }
+    );
+
+    expect(await edit("Scenes: any of Beach day")).toBeInTheDocument();
   });
 });

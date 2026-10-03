@@ -52,6 +52,11 @@ import {
   readListParams,
   writeListParams,
 } from "@/utils/urlParams";
+import {
+  DETAILS_WITH_PRESENCE_ROW,
+  PATH_ROW,
+  PLAYLISTS_ROW,
+} from "../helpers/editorRows";
 import { untrusted } from "../helpers/untrusted";
 
 // Wrapper with defaults for optional params to avoid repeating them in every test
@@ -1351,5 +1356,72 @@ describe("include or exclude per value (F22a)", () => {
     expect(
       buildImageFilter({ ...stored, tagIdsExclude: ["5:a"] }).tags
     ).toEqual({ value: ["466", "5:a"], modifier: "EXCLUDES" });
+  });
+});
+
+describe("the text condition and playlist ids in the URL (F22b)", () => {
+  /** A row's state through the URL: written by its codec, then read back */
+  const throughUrl = (row: PanelField, state: Record<string, unknown>) => {
+    const params = new URLSearchParams();
+    codecOf(row).writeUrl(row, state, params);
+    return {
+      query: decodeURIComponent(params.toString()),
+      read: codecOf(row).readUrl(row, params),
+    };
+  };
+
+  it("a text condition round-trips as `<key>Modifier`", () => {
+    const state = { path: "/media/new", pathModifier: "STARTS_WITH" };
+
+    const { query, read } = throughUrl(PATH_ROW, state);
+
+    expect(query).toBe("path=/media/new&pathModifier=STARTS_WITH");
+    expect(read).toEqual(state);
+    // Has none writes the condition alone, and reads back
+    expect(
+      throughUrl(DETAILS_WITH_PRESENCE_ROW, {
+        details: "sunset",
+        detailsModifier: "IS_NULL",
+      })
+    ).toEqual({
+      query: "detailsModifier=IS_NULL",
+      read: { detailsModifier: "IS_NULL" },
+    });
+  });
+
+  it('playlist ids round-trip unjoined; `?playlistIds=12&instance=x` reads `["12"]`', () => {
+    const state = {
+      playlistIds: ["12", "7"],
+      playlistIdsModifier: "INCLUDES_ALL",
+    };
+
+    const { query, read } = throughUrl(PLAYLISTS_ROW, state);
+
+    expect(query).toBe("playlistIds=12,7&playlistIdsModifier=INCLUDES_ALL");
+    expect(read).toEqual(state);
+    // The page's instance names a Stash server: never joined to a Peek id
+    expect(
+      codecOf(PLAYLISTS_ROW).readUrl(
+        PLAYLISTS_ROW,
+        new URLSearchParams("playlistIds=12&instance=x")
+      )
+    ).toEqual({ playlistIds: ["12"] });
+    expect(
+      codecOf(PLAYLISTS_ROW).readUrl(
+        PLAYLISTS_ROW,
+        new URLSearchParams("playlistId=12&instance=x")
+      )
+    ).toEqual({ playlistIds: ["12"] });
+    // An option no row stands behind reads the same
+    expect(
+      parseSearchParams(new URLSearchParams("playlistId=12&instance=x"), [
+        {
+          key: "playlistIds",
+          type: "searchable-select",
+          multi: true,
+          entityType: "playlists",
+        },
+      ]).filters
+    ).toEqual({ playlistIds: ["12"] });
   });
 });

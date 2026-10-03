@@ -6,10 +6,12 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invalidateLibraryQueries } from "@/api/hooks/useLibraryReady";
 import { useRefNames } from "@/api/hooks/useRefNames";
 import { libraryApi } from "@/api/library";
+import { getPlaylists, getSharedPlaylists } from "@/api/playlists";
 import { queryKeys } from "@/api/queryKeys";
 
 vi.mock("@/api/library", () => ({
@@ -19,7 +21,13 @@ vi.mock("@/api/library", () => ({
     findStudiosMinimal: vi.fn(),
     findGroupsMinimal: vi.fn(),
     findGalleriesMinimal: vi.fn(),
+    findScenesMinimal: vi.fn(),
   },
+}));
+
+vi.mock("@/api/playlists", () => ({
+  getPlaylists: vi.fn(),
+  getSharedPlaylists: vi.fn(),
 }));
 
 function setup() {
@@ -139,10 +147,66 @@ describe("useRefNames", () => {
   it("asks nothing for an entity with no /minimal endpoint, or no ids", () => {
     const { wrapper } = setup();
 
-    renderHook(() => useRefNames("scenes", ["1:a"]), { wrapper });
+    renderHook(() => useRefNames("images", ["1:a"]), { wrapper });
     renderHook(() => useRefNames("tags", []), { wrapper });
     renderHook(() => useRefNames(undefined, ["1:a"]), { wrapper });
 
     expect(libraryApi.findTagsMinimal).not.toHaveBeenCalled();
+  });
+
+  it("scene names come from the scene `/minimal` endpoint, keyed under the scenes root", async () => {
+    vi.mocked(libraryApi.findScenesMinimal).mockResolvedValue([
+      { id: "5", instanceId: "a", name: "Beach day" },
+    ]);
+    const { client, wrapper } = setup();
+    const ids = ["5:a", "6:a"];
+
+    const { result } = renderHook(() => useRefNames("scenes", ids), {
+      wrapper,
+    });
+
+    await waitFor(() =>
+      expect(result.current.data).toEqual({
+        names: ["Beach day"],
+        unavailable: 1,
+      })
+    );
+    expect(vi.mocked(libraryApi.findScenesMinimal).mock.calls[0]?.[0]).toEqual({
+      ids,
+      filter: { per_page: 100 },
+    });
+    expect(client.getQueryData(queryKeys.scenes.names(ids))).toBeDefined();
+  });
+
+  it("playlist names come from the viewer's own and shared lists, not `/minimal`", async () => {
+    vi.mocked(getPlaylists).mockResolvedValue(
+      untrusted({ playlists: [{ id: 12, name: "Road trip" }] })
+    );
+    vi.mocked(getSharedPlaylists).mockResolvedValue(
+      untrusted({
+        playlists: [{ id: 40, name: "Weekend", owner: { username: "alice" } }],
+      })
+    );
+    const { client, wrapper } = setup();
+    const ids = ["12", "40", "999"];
+
+    const { result } = renderHook(() => useRefNames("playlists", ids), {
+      wrapper,
+    });
+
+    await waitFor(() =>
+      expect(result.current.data).toEqual({
+        names: ["Road trip", "Weekend"],
+        unavailable: 1,
+      })
+    );
+    expect(getPlaylists).toHaveBeenCalledTimes(1);
+    expect(getSharedPlaylists).toHaveBeenCalledTimes(1);
+    for (const find of Object.values(libraryApi)) {
+      expect(find).not.toHaveBeenCalled();
+    }
+    // Under the playlists root, which a playlist change invalidates
+    expect(client.getQueryData(queryKeys.playlists.names(ids))).toBeDefined();
+    expect(queryKeys.playlists.names(ids)[0]).toBe("playlists");
   });
 });

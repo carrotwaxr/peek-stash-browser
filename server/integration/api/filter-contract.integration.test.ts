@@ -728,6 +728,59 @@ describeWithDb(
       ]);
     });
 
+    it("a text condition is walked under each of its modifiers, and Has none with no text", () => {
+      const title = must(
+        clientList(client, "scene").options.find(
+          (option) => option.key === "title"
+        ),
+        "the scene Title option"
+      );
+      // A test-local condition select, as F18's Path row offers one
+      const withCondition: ClientOption = {
+        ...title,
+        modifierKey: "titleModifier",
+        modifierOptions: [
+          { value: "INCLUDES", label: "Contains" },
+          { value: "STARTS_WITH", label: "Starts with" },
+          { value: "IS_NULL", label: "Has none" },
+        ],
+        defaultModifier: "INCLUDES",
+      };
+
+      expect(
+        optionSamples(withCondition, walk.refs).map((sample) => sample.state)
+      ).toEqual([
+        { title: "contract", titleModifier: "INCLUDES" },
+        { title: "contract", titleModifier: "STARTS_WITH" },
+        { titleModifier: "IS_NULL" },
+      ]);
+    });
+
+    it("a playlist picker is walked with Peek playlist ids, a scene picker with scene refs", () => {
+      const playlists: ClientOption = {
+        key: "playlistIds",
+        type: "searchable-select",
+        entityType: "playlists",
+        multi: true,
+      };
+      const scenes: ClientOption = {
+        key: "sceneIds",
+        type: "searchable-select",
+        entityType: "scenes",
+        multi: true,
+      };
+
+      expect(
+        optionSamples(playlists, walk.refs).map((sample) => sample.state)
+      ).toEqual([{ playlistIds: ["1"] }, { playlistIds: ["1", "2"] }]);
+      expect(
+        optionSamples(scenes, walk.refs).map((sample) => sample.state)
+      ).toEqual([
+        { sceneIds: [walk.refs("scenes")[0]] },
+        { sceneIds: [...walk.refs("scenes")] },
+      ]);
+    });
+
     /**
      * A gallery's or image's tag count is its junction rows on its own
      * instance (an image's include its galleries' tags): for each count, 0
