@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import {
+  FAVORITE_INLINE_LIMIT,
+  favoriteRefs,
+} from "../../services/query/EntityQueryBuilder.js";
 import { parsedListRequest } from "../../tests/helpers/fixtures.js";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -728,6 +733,76 @@ describeWithDb("Scene favourite filters (seeded)", () => {
         key("7895304", A),
         key("7895306", A),
       ].sort()
+    );
+  });
+});
+
+/**
+ * More favourites than `FAVORITE_INLINE_LIMIT`: their exclusions are read
+ * in SQL from one JSON parameter. A user of its own favourites tags
+ * 7896001 onwards on sf-a, hides one there and one on every instance
+ * (`''`), and one of the same id on sf-b (which leaves sf-a's). Seeded
+ * rows (the user's) are deleted before the file ends.
+ */
+describeWithDb("Many favourites (seeded)", () => {
+  const A = "sf-a";
+  const B = "sf-b";
+  const USERNAME = "sf-many";
+  let userId = 0;
+  const ids = Array.from({ length: FAVORITE_INLINE_LIMIT + 6 }, (_, i) =>
+    String(7896001 + i)
+  );
+  const [hiddenOnA, hiddenEverywhere, hiddenOnB] = [
+    must(ids[0], "a first id"),
+    must(ids[1], "a second id"),
+    must(ids[2], "a third id"),
+  ];
+
+  beforeAll(async () => {
+    await prisma.user.deleteMany({ where: { username: USERNAME } });
+    userId = (
+      await prisma.user.create({
+        data: { username: USERNAME, password: "not-a-real-hash", role: "USER" },
+      })
+    ).id;
+    await prisma.tagRating.createMany({
+      data: ids.map((tagId) => ({
+        userId,
+        instanceId: A,
+        tagId,
+        favorite: true,
+      })),
+    });
+    await prisma.userExcludedEntity.createMany({
+      data: [
+        [hiddenOnA, A],
+        [hiddenEverywhere, ""],
+        [hiddenOnB, B],
+      ].map(([entityId, instanceId]) => ({
+        userId,
+        entityType: "tag",
+        entityId: must(entityId, "an id"),
+        instanceId: must(instanceId, "an instance"),
+        reason: "hidden",
+      })),
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.user.deleteMany({ where: { username: USERNAME } });
+  });
+
+  it("drops a favourite hidden on its instance or on every one, and keeps the rest", async () => {
+    const refs = await favoriteRefs("tag", {
+      userId,
+      applyExclusions: true,
+      allowedInstanceIds: [A, B],
+    });
+    expect(refs.map((r) => `${r.id}:${r.instanceId}`).sort()).toEqual(
+      ids
+        .filter((id) => id !== hiddenOnA && id !== hiddenEverywhere)
+        .map((id) => `${id}:${A}`)
+        .sort()
     );
   });
 });
