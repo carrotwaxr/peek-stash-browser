@@ -15,6 +15,7 @@ import {
   listKeyOf,
   listKeyWithoutPageOf,
   lockedFieldsOf,
+  sortOptionsFor,
   withoutLockedFilters,
   withoutLockedOptions,
 } from "@/utils/listQuery";
@@ -96,6 +97,138 @@ describe("buildListQuery", () => {
     expect(listKeyOf(one)).not.toBe(listKeyOf(two));
     expect(listKeyWithoutPageOf(one)).toBe(listKeyWithoutPageOf(two));
     expect(listKeyOf(null)).toBe("");
+  });
+});
+
+const valuesOf = (kind: string, filters: Record<string, unknown> = {}) =>
+  sortOptionsFor(kind, filters).map((option) => option.value);
+
+describe("sortOptionsFor: sorts that read a filter", () => {
+  it("Playlist order appears only with one playlist chosen", () => {
+    const include = (value: unknown[], modifier = "INCLUDES") => ({
+      playlists: { value, modifier },
+    });
+    expect(valuesOf("scene")).not.toContain("playlist_position");
+    expect(valuesOf("scene", include([1]))).toContain("playlist_position");
+    expect(valuesOf("scene", include([1], "INCLUDES_ALL"))).toContain(
+      "playlist_position"
+    );
+    expect(valuesOf("scene", include([1, 2]))).not.toContain(
+      "playlist_position"
+    );
+    expect(valuesOf("scene", include([1], "EXCLUDES"))).not.toContain(
+      "playlist_position"
+    );
+    expect(valuesOf("scene", include([]))).not.toContain("playlist_position");
+    // Another list never offers it
+    expect(valuesOf("group", include([1]))).not.toContain("playlist_position");
+  });
+
+  it("Playlist order is not sent without one playlist", () => {
+    const sort = {
+      field: "playlist_position",
+      direction: "ASC" as const,
+      seed: null,
+    };
+    const bare = buildListQuery("scene", state({ sort }), {});
+    const two = buildListQuery("scene", state({ sort }), {
+      playlists: { value: [1, 2], modifier: "INCLUDES" },
+    });
+    const one = buildListQuery("scene", state({ sort }), {
+      playlists: { value: [1], modifier: "INCLUDES" },
+    });
+    expect(bare?.filter.sort).toBe(DEFAULT_SORT.scene.field);
+    expect(two?.filter.sort).toBe(DEFAULT_SORT.scene.field);
+    expect(one?.filter.sort).toBe("playlist_position");
+  });
+
+  it("Collection order only with one parent collection", () => {
+    expect(valuesOf("group")).not.toContain("sub_group_order");
+    expect(
+      valuesOf("group", {
+        groupIds: ["3:abc"],
+        groupIdsModifier: "INCLUDES",
+      })
+    ).toContain("sub_group_order");
+    expect(valuesOf("group", { groupIds: ["3:abc"] })).toContain(
+      "sub_group_order"
+    );
+    expect(
+      valuesOf("group", {
+        containing_groups: { value: ["3:abc"], modifier: "INCLUDES" },
+      })
+    ).toContain("sub_group_order");
+    expect(
+      valuesOf("group", {
+        groupIds: ["3:abc"],
+        groupIdsModifier: "EXCLUDES",
+      })
+    ).not.toContain("sub_group_order");
+    expect(valuesOf("group", { groupIds: [] })).not.toContain(
+      "sub_group_order"
+    );
+    // The scene list's Scene Number reads `groups`, not the parent collection
+    expect(
+      valuesOf("scene", { groupIds: ["3:abc"], groupIdsModifier: "INCLUDES" })
+    ).not.toContain("sub_group_order");
+  });
+
+  it("Collection order is not sent without a parent collection", () => {
+    const sort = {
+      field: "sub_group_order",
+      direction: "ASC" as const,
+      seed: null,
+    };
+    const bare = buildListQuery("group", state({ sort }), {});
+    const inParent = buildListQuery("group", state({ sort }), {
+      containing_groups: { value: ["3:abc"], modifier: "INCLUDES" },
+    });
+    expect(bare?.filter.sort).toBe(DEFAULT_SORT.group.field);
+    expect(inParent?.filter.sort).toBe("sub_group_order");
+  });
+
+  const OFFERED: Record<string, string[]> = {
+    scene: [
+      "resolution",
+      "studio",
+      "code",
+      "performer_age",
+      "organized",
+      "resume_time",
+    ],
+    image: ["resolution", "tag_count", "performer_count"],
+    gallery: ["tag_count", "performer_count"],
+    studio: [
+      "child_count",
+      "tag_count",
+      "image_count",
+      "gallery_count",
+      "performer_count",
+      "group_count",
+    ],
+    tag: [
+      "child_count",
+      "parent_count",
+      "image_count",
+      "gallery_count",
+      "performer_count",
+      "studio_count",
+      "group_count",
+    ],
+    group: ["tag_count", "o_counter", "performer_count"],
+    performer: [
+      "tag_count",
+      "marker_count",
+      "image_count",
+      "gallery_count",
+      "group_count",
+    ],
+  };
+
+  it.each(Object.keys(OFFERED))("the %s list offers its keys", (kind) => {
+    const values = valuesOf(kind);
+    expect(OFFERED[kind]?.filter((key) => !values.includes(key))).toEqual([]);
+    expect(new Set(values).size).toBe(values.length);
   });
 });
 

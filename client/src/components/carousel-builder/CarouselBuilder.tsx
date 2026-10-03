@@ -26,6 +26,11 @@ import IconPickerButton from "./IconPickerButton";
 import RuleEditor from "./RuleEditor";
 import { getCarouselIcon } from "./carouselIcons";
 
+/** A carousel names no playlist, so Playlist order has no list to read */
+const CAROUSEL_SORT_OPTIONS = SCENE_SORT_OPTIONS.filter(
+  (option) => option.value !== "playlist_position"
+);
+
 // Simple ID generator for rule keys (doesn't need to be cryptographically secure)
 let ruleIdCounter = 0;
 const generateRuleId = () => `rule-${++ruleIdCounter}`;
@@ -564,7 +569,7 @@ const CarouselBuilder = () => {
                   color: "var(--text-primary)",
                 }}
               >
-                {SCENE_SORT_OPTIONS.map((opt) => (
+                {CAROUSEL_SORT_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>

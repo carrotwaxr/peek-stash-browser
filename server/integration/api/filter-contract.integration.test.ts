@@ -114,7 +114,8 @@ const SORT_CONTEXT: Partial<
   // Sub-collection order is offered only beside one parent collection
   group: {
     sub_group_order: (refs) => ({
-      groupIds: { value: [refs("groups")[0]], modifier: "INCLUDES" },
+      groupIds: [refs("groups")[0]],
+      groupIdsModifier: "INCLUDES",
     }),
   },
 };

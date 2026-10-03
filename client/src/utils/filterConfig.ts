@@ -26,9 +26,11 @@ import {
 export type { FilterOption };
 
 // Scene sorting options (alphabetically organized by label)
-// Note: scene_index is added dynamically when group filter is active
+// Note: Scene Number and Playlist Order are added when the filters name a
+// collection or one playlist (`sortOptionsFor`)
 export const SCENE_SORT_OPTIONS_BASE = [
   { value: "bitrate", label: "Bitrate" },
+  { value: "code", label: "Code" },
   { value: "created_at", label: "Created At" },
   { value: "date", label: "Date" },
   { value: "duration", label: "Duration" },
@@ -37,12 +39,17 @@ export const SCENE_SORT_OPTIONS_BASE = [
   { value: "last_o_at", label: "Last O At" },
   { value: "last_played_at", label: "Last Played At" },
   { value: "o_counter", label: "O Count" },
+  { value: "organized", label: "Organized" },
   { value: "path", label: "Path" },
+  { value: "performer_age", label: "Performer Age" },
   { value: "performer_count", label: "Performer Count" },
   { value: "play_count", label: "Play Count" },
   { value: "play_duration", label: "Play Duration" },
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
+  { value: "resolution", label: "Resolution" },
+  { value: "resume_time", label: "Resume Time" },
+  { value: "studio", label: "Studio" },
   { value: "tag_count", label: "Tag Count" },
   { value: "title", label: "Title" },
   { value: "updated_at", label: "Updated At" },
@@ -54,21 +61,31 @@ export const SCENE_INDEX_SORT_OPTION = {
   label: "Scene Number",
 };
 
-// Full list for backwards compatibility
+// Playlist Order option - only shown when exactly one playlist is chosen
+export const PLAYLIST_POSITION_SORT_OPTION = {
+  value: "playlist_position",
+  label: "Playlist Order",
+};
+
+// Full list (every scene sort, the two conditional ones included), by label
 export const SCENE_SORT_OPTIONS = [
-  ...SCENE_SORT_OPTIONS_BASE.slice(0, 15), // up to "rating"
+  ...SCENE_SORT_OPTIONS_BASE,
+  PLAYLIST_POSITION_SORT_OPTION,
   SCENE_INDEX_SORT_OPTION,
-  ...SCENE_SORT_OPTIONS_BASE.slice(15), // "tag_count" onwards
-];
+].sort((a, b) => a.label.localeCompare(b.label));
 
 // Performer sorting options (alphabetically organized by label)
 export const PERFORMER_SORT_OPTIONS = [
   { value: "birthdate", label: "Birthdate" },
   { value: "career_length", label: "Career Length" },
+  { value: "group_count", label: "Collection Count" },
   { value: "created_at", label: "Created At" },
+  { value: "gallery_count", label: "Gallery Count" },
   { value: "height", label: "Height" },
+  { value: "image_count", label: "Image Count" },
   { value: "last_o_at", label: "Last O At" },
   { value: "last_played_at", label: "Last Played At" },
+  { value: "marker_count", label: "Marker Count" },
   { value: "measurements", label: "Measurements" },
   { value: "name", label: "Name" },
   { value: "o_counter", label: "O Count" },
@@ -77,25 +94,18 @@ export const PERFORMER_SORT_OPTIONS = [
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
   { value: "scenes_count", label: "Scene Count" },
+  { value: "tag_count", label: "Tag Count" },
   { value: "updated_at", label: "Updated At" },
   { value: "weight", label: "Weight" },
 ];
 
 // Studio sorting options (alphabetically organized by label)
 export const STUDIO_SORT_OPTIONS = [
+  { value: "child_count", label: "Child Studio Count" },
+  { value: "group_count", label: "Collection Count" },
   { value: "created_at", label: "Created At" },
-  { value: "name", label: "Name" },
-  { value: "o_counter", label: "O Count" },
-  { value: "play_count", label: "Play Count" },
-  { value: "random", label: "Random" },
-  { value: "rating", label: "Rating" },
-  { value: "scenes_count", label: "Scene Count" },
-  { value: "updated_at", label: "Updated At" },
-];
-
-// Tag sorting options (alphabetically organized by label)
-export const TAG_SORT_OPTIONS = [
-  { value: "created_at", label: "Created At" },
+  { value: "gallery_count", label: "Gallery Count" },
+  { value: "image_count", label: "Image Count" },
   { value: "name", label: "Name" },
   { value: "o_counter", label: "O Count" },
   { value: "performer_count", label: "Performer Count" },
@@ -103,18 +113,43 @@ export const TAG_SORT_OPTIONS = [
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
   { value: "scenes_count", label: "Scene Count" },
+  { value: "tag_count", label: "Tag Count" },
   { value: "updated_at", label: "Updated At" },
 ];
 
-// Group sorting options (alphabetically organized by label)
+// Tag sorting options (alphabetically organized by label)
+export const TAG_SORT_OPTIONS = [
+  { value: "child_count", label: "Child Tag Count" },
+  { value: "group_count", label: "Collection Count" },
+  { value: "created_at", label: "Created At" },
+  { value: "gallery_count", label: "Gallery Count" },
+  { value: "image_count", label: "Image Count" },
+  { value: "name", label: "Name" },
+  { value: "o_counter", label: "O Count" },
+  { value: "parent_count", label: "Parent Tag Count" },
+  { value: "performer_count", label: "Performer Count" },
+  { value: "play_count", label: "Play Count" },
+  { value: "random", label: "Random" },
+  { value: "rating", label: "Rating" },
+  { value: "scenes_count", label: "Scene Count" },
+  { value: "studio_count", label: "Studio Count" },
+  { value: "updated_at", label: "Updated At" },
+];
+
+// Collection sorting options (alphabetically organized by label); Collection
+// Order is offered only beside a parent collection (`sortOptionsFor`)
 export const GROUP_SORT_OPTIONS = [
+  { value: "sub_group_order", label: "Collection Order" },
   { value: "created_at", label: "Created At" },
   { value: "date", label: "Date" },
   { value: "duration", label: "Duration" },
   { value: "name", label: "Name" },
+  { value: "o_counter", label: "O Count" },
+  { value: "performer_count", label: "Performer Count" },
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
   { value: "scene_count", label: "Scene Count" },
+  { value: "tag_count", label: "Tag Count" },
   { value: "updated_at", label: "Updated At" },
 ];
 
@@ -124,8 +159,10 @@ export const GALLERY_SORT_OPTIONS = [
   { value: "date", label: "Date" },
   { value: "image_count", label: "Image Count" },
   { value: "path", label: "Path" },
+  { value: "performer_count", label: "Performer Count" },
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
+  { value: "tag_count", label: "Tag Count" },
   { value: "title", label: "Title" },
   { value: "updated_at", label: "Updated At" },
 ];
@@ -137,8 +174,11 @@ export const IMAGE_SORT_OPTIONS = [
   { value: "filesize", label: "File Size" },
   { value: "o_counter", label: "O Count" },
   { value: "path", label: "Path" },
+  { value: "performer_count", label: "Performer Count" },
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
+  { value: "resolution", label: "Resolution" },
+  { value: "tag_count", label: "Tag Count" },
   { value: "title", label: "Title" },
   { value: "updated_at", label: "Updated At" },
 ];
