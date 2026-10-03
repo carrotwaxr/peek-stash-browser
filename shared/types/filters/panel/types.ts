@@ -137,7 +137,7 @@ export interface NumberField<F extends string = string> extends FieldBase<F> {
   };
   /** Panel unit to the stored one: 60 (minutes), 1_000_000 (Mbps) */
   readonly scale?: number;
-  readonly unit?: "minutes" | "Mbps" | "fps" | "years";
+  readonly unit?: "minutes" | "seconds" | "Mbps" | "fps" | "years";
   /** Shown in the viewer's unit system */
   readonly measure?: "height" | "weight" | "length";
   /**
