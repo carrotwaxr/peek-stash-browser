@@ -415,7 +415,15 @@ const OpenSheet = ({
   };
 
   const apply = (next: PanelState) => {
-    if (!filtersEqual(kind, next, filters.filters)) filters.commit(next);
+    if (!filtersEqual(kind, next, filters.filters)) {
+      const nextTree = treeOf(kind, next);
+      // An emptied draft is Clear all: the active View goes too
+      if (nextTree.rows.length === 0 && nextTree.groups.length === 0) {
+        filters.clear();
+      } else {
+        filters.commit(next);
+      }
+    }
     onClose();
   };
 

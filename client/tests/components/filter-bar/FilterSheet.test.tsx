@@ -408,6 +408,31 @@ describe("FilterSheet", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("Clear all, then Show N, drops the active View as the bar's Clear all does", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls(
+      {},
+      {
+        url: "/scenes?savedView=v1&favorite=true",
+        presets: {
+          scene: [{ id: "v1", name: "Faves", filters: { favorite: "true" } }],
+        },
+      }
+    );
+    await list.firstQuery();
+
+    await user.click(filtersButton());
+    await user.click(
+      within(sheet()).getByRole("button", { name: "Clear all" })
+    );
+    await user.click(showButton());
+
+    noSheet();
+    await waitFor(() => expect(list.params().get("filters")).toBe("none"));
+    expect(list.params().has("savedView")).toBe(false);
+    expect(list.actions).toEqual(["PUSH"]);
+  });
+
   it("the count is not asked while the sheet is closed, and a hide refetches it", async () => {
     const user = userEvent.setup();
     const list = renderListControls({}, { url: "/scenes?favorite=true" });

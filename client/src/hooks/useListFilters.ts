@@ -11,7 +11,6 @@ import {
   type FilterOption,
   type PanelState,
   type PanelTree,
-  clearFilters,
   removeGroup,
   removeRow,
   setRow,
@@ -37,6 +36,7 @@ export interface ListFilters {
   setRow(at: RowKey, next: PanelState, opts?: CommitOptions): void;
   removeRow(at: RowKey): void;
   removeGroup(group: number): void;
+  /** Every row and group removed; on the list, the active View goes too */
   clear(): void;
 }
 
@@ -45,7 +45,12 @@ export function useListFilters(
   listState: ListUrlState,
   options: readonly FilterOption[]
 ): ListFilters {
-  const { filters, viewLockedFields, applyFilters } = listState;
+  const {
+    filters,
+    viewLockedFields,
+    applyFilters,
+    clearFilters: clearAll,
+  } = listState;
 
   const tree = useMemo(() => treeOf(kind, filters), [kind, filters]);
   // The page's own locks are offered (their rows are AND-ed with the page's
@@ -70,8 +75,9 @@ export function useListFilters(
       setRow: (at, next, opts) => commit(setRow(kind, filters, at, next), opts),
       removeRow: (at) => commit(removeRow(kind, filters, at)),
       removeGroup: (group) => commit(removeGroup(kind, filters, group)),
-      clear: () => commit(clearFilters(kind, filters)),
+      // Clear all leaves no View, as `listState.clearFilters` writes it
+      clear: clearAll,
     }),
-    [kind, filters, tree, free, commit]
+    [kind, filters, tree, free, commit, clearAll]
   );
 }
