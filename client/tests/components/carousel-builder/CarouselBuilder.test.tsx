@@ -50,6 +50,13 @@ function renderEditor(client: QueryClient) {
   );
 }
 
+/** What a kept row reads */
+const KEPT = "A rule this editor can't show";
+
+/** The row waiting at the end of the rules, whose field select adds a rule */
+const waitingRow = () =>
+  screen.getByRole("combobox", { name: "Add a filter to top level" });
+
 describe("CarouselBuilder", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -90,7 +97,7 @@ describe("CarouselBuilder", () => {
     });
   });
 
-  it("a rule it cannot edit shows on a line, and Remove drops it from the save", async () => {
+  it("rules it cannot edit show as kept rows, and Remove drops each from the save", async () => {
     const stored = {
       ...CAROUSEL,
       rules: { ...CAROUSEL.rules, tagged: true, o_counter: { value: 1 } },
@@ -102,12 +109,12 @@ describe("CarouselBuilder", () => {
     renderEditor(createQueryClient());
 
     await screen.findByDisplayValue("Highly rated");
-    expect(
-      screen.getByText("2 more rules this editor can't show")
-    ).toBeVisible();
+    expect(screen.getAllByText(KEPT)).toHaveLength(2);
 
+    fireEvent.click(must(screen.getAllByRole("button", { name: "Remove" })[0]));
+    expect(screen.getAllByText(KEPT)).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+    expect(screen.queryByText(KEPT)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
     const update = await screen.findByRole("button", { name: /Update/ });
@@ -134,19 +141,11 @@ describe("CarouselBuilder", () => {
     renderEditor(createQueryClient());
 
     await screen.findByDisplayValue("Highly rated");
-    expect(
-      screen.getByText("2 more rules this editor can't show")
-    ).toBeVisible();
+    expect(screen.getAllByText(KEPT)).toHaveLength(2);
 
-    // A new rule, turned into O Count: the kept O Count is replaced
-    fireEvent.click(screen.getByRole("button", { name: /Add Rule/ }));
-    const filters = screen.getAllByRole("combobox", { name: "Filter" });
-    fireEvent.change(must(filters.at(-1), "the new rule's filter"), {
-      target: { value: "oCount" },
-    });
-    expect(
-      screen.getByText("1 more rule this editor can't show")
-    ).toBeVisible();
+    // A new rule of O Count, chosen in the waiting row: the kept O Count is replaced
+    fireEvent.change(waitingRow(), { target: { value: "oCount" } });
+    expect(screen.getAllByText(KEPT)).toHaveLength(1);
     fireEvent.change(screen.getByRole("spinbutton", { name: /^Minimum O/ }), {
       target: { value: "3" },
     });
@@ -300,7 +299,7 @@ describe("CarouselBuilder", () => {
     expect(
       await screen.findByRole("button", { name: "Exclude Tag B" })
     ).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+    expect(screen.queryByText(KEPT)).toBeNull();
     expect(await update(second)).toEqual(saved);
   });
 
@@ -351,7 +350,7 @@ describe("CarouselBuilder", () => {
       screen.getByRole("combobox", { name: "Condition" })
     ).toHaveDisplayValue("Has none");
     expect(screen.queryByText("Value")).toBeNull();
-    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+    expect(screen.queryByText(KEPT)).toBeNull();
 
     const { previewed, saved } = await previewAndUpdate(fetchMock);
     expect(previewed).toEqual({ studios: { modifier: "IS_NULL" } });
@@ -372,7 +371,7 @@ describe("CarouselBuilder", () => {
           }),
       }
     );
-    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+    expect(screen.queryByText(KEPT)).toBeNull();
 
     // Own playlists first, then those shared with the user, named by owner
     fireEvent.click(await screen.findByRole("button", { name: /^Playlists/ }));
@@ -395,7 +394,7 @@ describe("CarouselBuilder", () => {
       screen.getByRole("combobox", { name: "Condition" })
     ).toHaveDisplayValue("Starts with");
     expect(screen.getByDisplayValue("/media/new")).toBeInTheDocument();
-    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+    expect(screen.queryByText(KEPT)).toBeNull();
 
     const { previewed, saved } = await previewAndUpdate(fetchMock);
     expect(previewed).toEqual(stored);
@@ -409,7 +408,7 @@ describe("CarouselBuilder", () => {
     };
     const fetchMock = await openWith(stored);
 
-    expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
+    expect(screen.queryByText(KEPT)).toBeNull();
     expect(screen.getByRole("checkbox", { name: /Landscape$/ })).toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: "Portrait" })
@@ -467,10 +466,7 @@ describe("CarouselBuilder", () => {
       });
       renderNew();
 
-      fireEvent.click(screen.getByRole("button", { name: /Add Rule/ }));
-      fireEvent.change(screen.getByRole("combobox", { name: "Filter" }), {
-        target: { value: "playlistIds" },
-      });
+      fireEvent.change(waitingRow(), { target: { value: "playlistIds" } });
       expect(sortLabels()).not.toContain("Playlist Order");
       fireEvent.click(
         await screen.findByRole("button", { name: /^Playlists/ })
@@ -552,7 +548,10 @@ describe("CarouselBuilder", () => {
       expect(sortSelect()).toHaveDisplayValue("Playlist Order");
       expect(screen.queryByText(/sorted by Random/)).toBeNull();
 
-      fireEvent.click(screen.getByRole("button", { name: "Remove rule" }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Row actions for Playlists" })
+      );
+      fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
 
       expect(sortSelect()).toHaveDisplayValue("Random");
       expect(
@@ -562,7 +561,10 @@ describe("CarouselBuilder", () => {
       ).toBeVisible();
 
       // A new rule of another field is previewed and saved with Random
-      fireEvent.click(screen.getByRole("button", { name: /Add Rule/ }));
+      fireEvent.change(waitingRow(), { target: { value: "oCount" } });
+      fireEvent.change(screen.getByRole("spinbutton", { name: /^Minimum O/ }), {
+        target: { value: "3" },
+      });
       fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
       await waitFor(() =>
         expect(requestsTo(fetchMock, "/carousels/preview")).toHaveLength(1)

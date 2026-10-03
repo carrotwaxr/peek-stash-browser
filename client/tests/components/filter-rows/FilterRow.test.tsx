@@ -1,9 +1,10 @@
 /**
- * RuleEditor's entity picker, with the real SearchableSelect: a carousel
+ * One row of the row editor, with the real SearchableSelect: a carousel
  * rule lists what its owner sees, so the picker asks the `/minimal`
- * endpoints with no scope, for its options and for the names of the rule's
+ * endpoints with no scope, for its options and for the names of the row's
  * ids. Only the Content Restrictions editor sends `scope: "allEnabled"`
  * (tests/components/settings/ContentRestrictionsModalPickers.test.tsx).
+ * The cases are the carousel builder's former RuleEditor's, by name.
  */
 import type {
   GetSharedPlaylistsResponse,
@@ -15,104 +16,28 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type * as api from "../../../src/api";
-import RuleEditor from "../../../src/components/carousel-builder/RuleEditor";
-import type * as filterConfig from "../../../src/utils/filterConfig";
+import type * as api from "@/api";
+import FilterRow from "@/components/filter-rows/FilterRow";
 import {
+  CAROUSEL_FILTER_DEFINITIONS,
   buildSceneFilter,
   carouselRulesToFilterState,
-} from "../../../src/utils/filterConfig";
+} from "@/utils/filterConfig";
+import type { FilterOption, PanelState } from "@/utils/filterFields";
 
 type FindMinimalMock = (
   params: MinimalRequest,
   signal?: AbortSignal
 ) => Promise<MinimalEntity[]>;
 
-const {
-  mockFindTagsMinimal,
-  mockGetPlaylists,
-  mockGetSharedPlaylists,
-  PRESENCE_RULE,
-  PLAYLIST_RULE,
-  PATH_RULE,
-  TOGGLE_RULE,
-} = vi.hoisted(() => ({
-  mockFindTagsMinimal: vi.fn<FindMinimalMock>(),
-  mockGetPlaylists: vi.fn<() => Promise<GetUserPlaylistsResponse>>(),
-  mockGetSharedPlaylists: vi.fn<() => Promise<GetSharedPlaylistsResponse>>(),
-  // Test-local Playlists and Path rules; the scene rows come in F18
-  PLAYLIST_RULE: {
-    key: "testPlaylistIds",
-    type: "searchable-select",
-    label: "Test Playlists",
-    entityType: "playlists",
-    multi: true,
-    defaultValue: [],
-    modifierKey: "testPlaylistIdsModifier",
-    modifierOptions: [
-      { value: "INCLUDES", label: "Has ANY of these" },
-      { value: "INCLUDES_ALL", label: "Has ALL of these" },
-      { value: "EXCLUDES", label: "Has NONE of these" },
-    ],
-    defaultModifier: "INCLUDES",
-  },
-  PATH_RULE: {
-    key: "testPath",
-    type: "text",
-    label: "Test Path",
-    defaultValue: "",
-    placeholder: "Search path...",
-    modifierKey: "testPathModifier",
-    modifierOptions: [
-      { value: "INCLUDES", label: "Contains" },
-      { value: "EXCLUDES", label: "Excludes" },
-      { value: "EQUALS", label: "Equals" },
-      { value: "NOT_EQUALS", label: "Not equals" },
-      { value: "STARTS_WITH", label: "Starts with" },
-    ],
-    defaultModifier: "INCLUDES",
-  },
-  // A test-local toggle: the scene rows have none
-  TOGGLE_RULE: {
-    key: "testToggle",
-    type: "checkbox",
-    label: "Test Favorites",
-    defaultValue: false,
-    placeholder: "Favorites Only",
-  },
-  // A test-local ref rule offering presence; the scene rows opt in at F18
-  PRESENCE_RULE: {
-    key: "testTagIds",
-    type: "searchable-select",
-    label: "Test Tags",
-    entityType: "tags",
-    multi: true,
-    defaultValue: [],
-    modifierKey: "testTagIdsModifier",
-    modifierOptions: [
-      { value: "INCLUDES", label: "Has ANY of these" },
-      { value: "IS_NULL", label: "Has none" },
-      { value: "NOT_NULL", label: "Has any" },
-    ],
-    defaultModifier: "INCLUDES",
-  },
-}));
+const { mockFindTagsMinimal, mockGetPlaylists, mockGetSharedPlaylists } =
+  vi.hoisted(() => ({
+    mockFindTagsMinimal: vi.fn<FindMinimalMock>(),
+    mockGetPlaylists: vi.fn<() => Promise<GetUserPlaylistsResponse>>(),
+    mockGetSharedPlaylists: vi.fn<() => Promise<GetSharedPlaylistsResponse>>(),
+  }));
 
-vi.mock("../../../src/utils/filterConfig", async (importOriginal) => {
-  const actual = await importOriginal<typeof filterConfig>();
-  return {
-    ...actual,
-    CAROUSEL_FILTER_DEFINITIONS: [
-      ...actual.CAROUSEL_FILTER_DEFINITIONS,
-      PRESENCE_RULE,
-      PLAYLIST_RULE,
-      PATH_RULE,
-      TOGGLE_RULE,
-    ],
-  };
-});
-
-vi.mock("../../../src/api", async (importOriginal) => {
+vi.mock("@/api", async (importOriginal) => {
   const actual = await importOriginal<typeof api>();
   return {
     ...actual,
@@ -122,7 +47,106 @@ vi.mock("../../../src/api", async (importOriginal) => {
   };
 });
 
-describe("RuleEditor", () => {
+// Test-local Playlists and Path rows
+const PLAYLIST_RULE: FilterOption = {
+  key: "testPlaylistIds",
+  type: "searchable-select",
+  label: "Test Playlists",
+  entityType: "playlists",
+  multi: true,
+  defaultValue: [],
+  modifierKey: "testPlaylistIdsModifier",
+  modifierOptions: [
+    { value: "INCLUDES", label: "Has ANY of these" },
+    { value: "INCLUDES_ALL", label: "Has ALL of these" },
+    { value: "EXCLUDES", label: "Has NONE of these" },
+  ],
+  defaultModifier: "INCLUDES",
+};
+const PATH_RULE: FilterOption = {
+  key: "testPath",
+  type: "text",
+  label: "Test Path",
+  defaultValue: "",
+  placeholder: "Search path...",
+  modifierKey: "testPathModifier",
+  modifierOptions: [
+    { value: "INCLUDES", label: "Contains" },
+    { value: "EXCLUDES", label: "Excludes" },
+    { value: "EQUALS", label: "Equals" },
+    { value: "NOT_EQUALS", label: "Not equals" },
+    { value: "STARTS_WITH", label: "Starts with" },
+  ],
+  defaultModifier: "INCLUDES",
+};
+// A test-local toggle: the scene rows have none
+const TOGGLE_RULE: FilterOption = {
+  key: "testToggle",
+  type: "checkbox",
+  label: "Test Favorites",
+  defaultValue: false,
+  placeholder: "Favorites Only",
+};
+// A test-local ref row offering presence
+const PRESENCE_RULE: FilterOption = {
+  key: "testTagIds",
+  type: "searchable-select",
+  label: "Test Tags",
+  entityType: "tags",
+  multi: true,
+  defaultValue: [],
+  modifierKey: "testTagIdsModifier",
+  modifierOptions: [
+    { value: "INCLUDES", label: "Has ANY of these" },
+    { value: "IS_NULL", label: "Has none" },
+    { value: "NOT_NULL", label: "Has any" },
+  ],
+  defaultModifier: "INCLUDES",
+};
+
+const OPTIONS: readonly FilterOption[] = [
+  ...CAROUSEL_FILTER_DEFINITIONS,
+  PRESENCE_RULE,
+  PLAYLIST_RULE,
+  PATH_RULE,
+  TOGGLE_RULE,
+];
+const SECTIONS = [
+  {
+    label: "Rules",
+    fields: OPTIONS.map((option) => ({
+      key: option.key,
+      label: option.label ?? option.key,
+    })),
+  },
+];
+
+/** A carousel's row of field `key` holding `state` */
+const rowElement = (
+  key: string,
+  state: PanelState,
+  onChange: (next: PanelState) => void = vi.fn()
+) => (
+  <FilterRow
+    sections={SECTIONS}
+    row={{
+      id: "row-1",
+      key,
+      option: must(
+        OPTIONS.find((option) => option.key === key),
+        key
+      ),
+      state,
+    }}
+    containerLabel="top level"
+    pickFromAll
+    onFieldChange={vi.fn()}
+    onChange={onChange}
+    onRemove={vi.fn()}
+  />
+);
+
+describe("FilterRow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -137,17 +161,10 @@ describe("RuleEditor", () => {
     );
 
     render(
-      <RuleEditor
-        rule={{
-          id: "rule-1",
-          filterKey: "tagIds",
-          value: ["5:server-a"],
-          modifier: "INCLUDES",
-        }}
-        usedFilterKeys={new Set(["tagIds"])}
-        onChange={vi.fn()}
-        onRemove={vi.fn()}
-      />
+      rowElement("tagIds", {
+        tagIds: ["5:server-a"],
+        tagIdsModifier: "INCLUDES",
+      })
     );
 
     expect(await screen.findByText("Rule Tag")).toBeInTheDocument();
@@ -169,14 +186,7 @@ describe("RuleEditor", () => {
   it("the carousel picker is a button named by its rule's label", async () => {
     mockFindTagsMinimal.mockResolvedValue([]);
 
-    render(
-      <RuleEditor
-        rule={{ id: "rule-1", filterKey: "tagIds", value: [] }}
-        usedFilterKeys={new Set(["tagIds"])}
-        onChange={vi.fn()}
-        onRemove={vi.fn()}
-      />
-    );
+    render(rowElement("tagIds", {}));
 
     const picker = screen.getByRole("button", { name: /^Tags/ });
     expect(picker).toHaveAttribute("aria-expanded", "false");
@@ -190,19 +200,14 @@ describe("RuleEditor", () => {
   it("a decimal bound is kept", () => {
     const onChange = vi.fn();
 
-    render(
-      <RuleEditor
-        rule={{ id: "rule-1", filterKey: "bitrate", value: {} }}
-        usedFilterKeys={new Set(["bitrate"])}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
-    );
+    render(rowElement("bitrate", { bitrate: {} }, onChange));
 
     fireEvent.change(screen.getByPlaceholderText("Min"), {
       target: { value: "2.5" },
     });
-    expect(must(onChange.mock.calls[0])[0]).toEqual({ value: { min: 2.5 } });
+    expect(must(onChange.mock.calls[0])[0]).toEqual({
+      bitrate: { min: 2.5 },
+    });
   });
 
   it("a Last Played date rule round-trips rules, state, rules", () => {
@@ -217,16 +222,7 @@ describe("RuleEditor", () => {
     const onChange = vi.fn();
 
     render(
-      <RuleEditor
-        rule={{
-          id: "rule-1",
-          filterKey: "lastPlayedAt",
-          value: state.lastPlayedAt,
-        }}
-        usedFilterKeys={new Set(["lastPlayedAt"])}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
+      rowElement("lastPlayedAt", { lastPlayedAt: state.lastPlayedAt }, onChange)
     );
 
     // The editor shows the stored dates and edits the same shape
@@ -236,7 +232,7 @@ describe("RuleEditor", () => {
     });
     const edited: unknown = must(onChange.mock.calls[0])[0];
     expect(edited).toEqual({
-      value: { start: "2024-01-01", end: "2024-12-31" },
+      lastPlayedAt: { start: "2024-01-01", end: "2024-12-31" },
     });
 
     expect(buildSceneFilter(state)).toEqual(stored);
@@ -255,21 +251,12 @@ describe("RuleEditor", () => {
   });
   it("a ref rule offering presence shows Has none and Has any and hides its picker", () => {
     mockFindTagsMinimal.mockResolvedValue([]);
-    const rule = {
-      id: "rule-1",
-      filterKey: "testTagIds",
-      value: ["5:server-a"],
-      modifier: "IS_NULL",
+    const state = {
+      testTagIds: ["5:server-a"],
+      testTagIdsModifier: "IS_NULL",
     };
     const onChange = vi.fn();
-    const { rerender } = render(
-      <RuleEditor
-        rule={rule}
-        usedFilterKeys={new Set(["testTagIds"])}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
-    );
+    const { rerender } = render(rowElement("testTagIds", state, onChange));
 
     const condition = screen.getByRole("combobox", { name: "Condition" });
     expect(condition).toHaveDisplayValue("Has none");
@@ -279,15 +266,17 @@ describe("RuleEditor", () => {
     expect(screen.queryByRole("button", { name: /^Test Tags/ })).toBeNull();
 
     fireEvent.change(condition, { target: { value: "NOT_NULL" } });
-    expect(must(onChange.mock.calls[0])[0]).toEqual({ modifier: "NOT_NULL" });
+    expect(must(onChange.mock.calls[0])[0]).toEqual({
+      ...state,
+      testTagIdsModifier: "NOT_NULL",
+    });
 
     rerender(
-      <RuleEditor
-        rule={{ ...rule, modifier: "INCLUDES" }}
-        usedFilterKeys={new Set(["testTagIds"])}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
+      rowElement(
+        "testTagIds",
+        { ...state, testTagIdsModifier: "INCLUDES" },
+        onChange
+      )
     );
     expect(
       screen.getByRole("button", { name: /^Test Tags/ })
@@ -308,18 +297,15 @@ describe("RuleEditor", () => {
     const onChange = vi.fn();
 
     render(
-      <RuleEditor
-        rule={{
-          id: "rule-1",
-          filterKey: "tagIds",
-          value: ["5:server-a"],
-          excludes: ["6:server-a"],
-          modifier: "INCLUDES",
-        }}
-        usedFilterKeys={new Set(["tagIds"])}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
+      rowElement(
+        "tagIds",
+        {
+          tagIds: ["5:server-a"],
+          tagIdsExclude: ["6:server-a"],
+          tagIdsModifier: "INCLUDES",
+        },
+        onChange
+      )
     );
 
     const include = await screen.findByRole("button", {
@@ -332,8 +318,9 @@ describe("RuleEditor", () => {
 
     fireEvent.click(include);
     expect(must(onChange.mock.calls[0])[0]).toEqual({
-      value: [],
-      excludes: ["6:server-a", "5:server-a"],
+      tagIds: [],
+      tagIdsExclude: ["6:server-a", "5:server-a"],
+      tagIdsModifier: "INCLUDES",
     });
   });
 
@@ -348,17 +335,11 @@ describe("RuleEditor", () => {
     );
     const onChange = vi.fn();
     render(
-      <RuleEditor
-        rule={{
-          id: "rule-1",
-          filterKey: "testPlaylistIds",
-          value: [],
-          modifier: "INCLUDES",
-        }}
-        usedFilterKeys={new Set(["testPlaylistIds"])}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
+      rowElement(
+        "testPlaylistIds",
+        { testPlaylistIds: [], testPlaylistIdsModifier: "INCLUDES" },
+        onChange
+      )
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^Test Playlists/ }));
@@ -369,25 +350,16 @@ describe("RuleEditor", () => {
     ]);
     fireEvent.click(screen.getByRole("button", { name: "Weekend by alice" }));
 
-    expect(must(onChange.mock.calls[0])[0]).toEqual({ value: ["40"] });
+    expect(must(onChange.mock.calls[0])[0]).toEqual({
+      testPlaylistIds: ["40"],
+      testPlaylistIdsModifier: "INCLUDES",
+    });
   });
 
   it("a Path Starts with rule saves STARTS_WITH", () => {
     const onChange = vi.fn();
-    const rule = {
-      id: "rule-1",
-      filterKey: "testPath",
-      value: "/media/new",
-      modifier: "INCLUDES",
-    };
-    const { rerender } = render(
-      <RuleEditor
-        rule={rule}
-        usedFilterKeys={new Set(["testPath"])}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
-    );
+    const state = { testPath: "/media/new", testPathModifier: "INCLUDES" };
+    const { rerender } = render(rowElement("testPath", state, onChange));
 
     const condition = screen.getByRole("combobox", { name: "Condition" });
     expect(
@@ -395,16 +367,16 @@ describe("RuleEditor", () => {
     ).toEqual(["Contains", "Excludes", "Equals", "Not equals", "Starts with"]);
     fireEvent.change(condition, { target: { value: "STARTS_WITH" } });
     expect(must(onChange.mock.calls[0])[0]).toEqual({
-      modifier: "STARTS_WITH",
+      testPath: "/media/new",
+      testPathModifier: "STARTS_WITH",
     });
 
     rerender(
-      <RuleEditor
-        rule={{ ...rule, modifier: "STARTS_WITH" }}
-        usedFilterKeys={new Set(["testPath"])}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
+      rowElement(
+        "testPath",
+        { ...state, testPathModifier: "STARTS_WITH" },
+        onChange
+      )
     );
     expect(screen.getByDisplayValue("/media/new")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Condition" })).toHaveValue(
@@ -414,14 +386,7 @@ describe("RuleEditor", () => {
 
   it("a toggle rule reads its label", () => {
     const onChange = vi.fn();
-    render(
-      <RuleEditor
-        rule={{ id: "rule-1", filterKey: "testToggle", value: true }}
-        usedFilterKeys={new Set(["testToggle"])}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
-    );
+    render(rowElement("testToggle", { testToggle: true }, onChange));
 
     expect(screen.getByText("Favorites Only")).toBeInTheDocument();
     expect(screen.queryByText("Enabled")).toBeNull();
@@ -429,22 +394,15 @@ describe("RuleEditor", () => {
     expect(toggle).toBeChecked();
 
     fireEvent.click(toggle);
-    expect(must(onChange.mock.calls[0])[0]).toEqual({ value: false });
+    expect(must(onChange.mock.calls[0])[0]).toEqual({ testToggle: false });
   });
 
   it("a text rule offering Has none hides its value", () => {
     render(
-      <RuleEditor
-        rule={{
-          id: "rule-1",
-          filterKey: "testPath",
-          value: "/media",
-          modifier: "IS_NULL",
-        }}
-        usedFilterKeys={new Set(["testPath"])}
-        onChange={vi.fn()}
-        onRemove={vi.fn()}
-      />
+      rowElement("testPath", {
+        testPath: "/media",
+        testPathModifier: "IS_NULL",
+      })
     );
 
     expect(screen.queryByDisplayValue("/media")).toBeNull();
@@ -453,25 +411,16 @@ describe("RuleEditor", () => {
 
 describe("every rule control has a name", () => {
   it.each([
-    { filterKey: "bitrate", value: {} },
-    { filterKey: "lastPlayedAt", value: {} },
-    { filterKey: "testPath", value: "", modifier: "INCLUDES" },
-    { filterKey: "resolution", value: "" },
-    { filterKey: "favorite", value: "" },
-    { filterKey: "testToggle", value: true },
-  ])("$filterKey", (rule) => {
-    const { container } = render(
-      <RuleEditor
-        rule={{ id: "rule-1", ...rule }}
-        usedFilterKeys={new Set([rule.filterKey])}
-        onChange={vi.fn()}
-        onRemove={vi.fn()}
-      />
-    );
+    { key: "bitrate", state: { bitrate: {} } },
+    { key: "lastPlayedAt", state: { lastPlayedAt: {} } },
+    { key: "testPath", state: { testPathModifier: "INCLUDES" } },
+    { key: "resolution", state: {} },
+    { key: "favorite", state: {} },
+    { key: "testToggle", state: { testToggle: true } },
+  ])("$key", ({ key, state }) => {
+    const { container } = render(rowElement(key, state));
 
-    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue(
-      rule.filterKey
-    );
+    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue(key);
     const controls = [...container.querySelectorAll("input, select")];
     expect(controls.length).toBeGreaterThan(1);
     for (const control of controls) {
