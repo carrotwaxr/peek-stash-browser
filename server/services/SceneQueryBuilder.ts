@@ -450,9 +450,11 @@ class SceneQueryBuilder extends EntityQueryBuilder<
 
   /**
    * Scene Number: the number of the scene in the filter's first collection,
-   * scenes without one last. One ref joins the sort's group as an INNER JOIN
-   * (the filter already keeps only its scenes, so the count is unchanged);
-   * several refs LEFT JOIN the first, which no scene matches twice
+   * scenes without one last. One ref without sub-collections joins the
+   * sort's group as an INNER JOIN (the filter already keeps only its scenes,
+   * so the count is unchanged); several refs, or a depth that adds the
+   * sub-collections' scenes, LEFT JOIN the first, so a scene only in a
+   * sub-collection stays, last; no scene matches the join twice
    * (SceneGroup's key is scene and group, and the join names the scene's
    * instance). A bare ref matches that id on the scene's own instance.
    */
@@ -471,7 +473,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     ) {
       return {};
     }
-    const inner = criterion.refs.length === 1;
+    const inner = criterion.refs.length === 1 && criterion.depth === 0;
     const instance =
       first.instanceId === undefined ? "" : " AND sgi.groupInstanceId = ?";
     return {
