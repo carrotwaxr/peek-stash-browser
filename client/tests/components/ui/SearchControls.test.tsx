@@ -784,6 +784,37 @@ describe("SearchControls", () => {
       expect(list.params().has("favorite")).toBe(false);
     });
 
+    it("removing a chip moves focus to the next chip, else the previous, else the Filters button", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls(
+        {},
+        { url: "/scenes?favorite=true&organized=true&rating_min=60" }
+      );
+      await firstQuery(list.onQueryChange);
+      const removeButtons = () =>
+        screen.getAllByRole("button", { name: /^Remove filter:/ });
+      const [first, second, third] = removeButtons();
+
+      // The first chip's removal lands on the chip after it
+      await user.click(must(first, "the first chip"));
+      await waitFor(() => expect(removeButtons()).toHaveLength(2));
+      expect(second).toHaveFocus();
+
+      // The last chip's removal lands on the chip before it
+      await user.click(must(third, "the last chip"));
+      await waitFor(() => expect(removeButtons()).toHaveLength(1));
+      expect(second).toHaveFocus();
+
+      // The only chip's removal lands on the Filters button
+      await user.click(must(second, "the only chip"));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: /^Remove filter:/ })
+        ).not.toBeInTheDocument()
+      );
+      expect(screen.getByRole("button", { name: /^Filters/ })).toHaveFocus();
+    });
+
     it("the badge counts one per filter, as the chips do", async () => {
       const list = renderSearchControls(
         {},
