@@ -38,6 +38,10 @@ const CAROUSEL_TABLE: PanelTable = {
   rows: CAROUSEL_FIELDS,
 };
 
+/** Why a locked carousel's rules show read-only */
+const LOCKED_NOTE =
+  "These rules were saved by an older version and pick fixed scenes; they can't be edited here";
+
 /** Where the builder goes back to: the carousel list, under Settings, User Preferences, Navigation */
 const SETTINGS = "/settings?section=user&tab=navigation";
 
@@ -80,6 +84,9 @@ const CarouselBuilder = () => {
   );
   const [sort, setSort] = useState<string>(NEW_CAROUSEL.sort);
   const [direction, setDirection] = useState<string>(NEW_CAROUSEL.direction);
+  // The stored rules pick fixed scenes no row can hold: they show read-only,
+  // a save sends none (the server keeps them) and needs no preview
+  const [rulesLocked, setRulesLocked] = useState(false);
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -140,6 +147,7 @@ const CarouselBuilder = () => {
         setSort(carousel.sort);
         setDirection(carousel.direction);
         setTree(loaded);
+        setRulesLocked(carousel.rulesLocked);
         // The stored sort as the rules offer it, as the draft reads it
         const offered = sortOptionsFor(
           "scene",
@@ -227,17 +235,17 @@ const CarouselBuilder = () => {
       return;
     }
 
-    if (ruleCount === 0) {
+    if (!rulesLocked && ruleCount === 0) {
       setError("Add at least one rule");
       return;
     }
 
-    if (refused !== null) {
+    if (!rulesLocked && refused !== null) {
       setError(refused);
       return;
     }
 
-    if (!previewValid) {
+    if (!rulesLocked && !previewValid) {
       setError("Preview must succeed before saving");
       return;
     }
@@ -246,16 +254,20 @@ const CarouselBuilder = () => {
     setError(null);
 
     try {
-      const carouselData = {
+      const parts = {
         title: title.trim(),
         icon,
-        rules: body,
         sort: effectiveSort,
         direction,
       };
 
-      // Home's list and every carousel's scenes are asked for again
-      await saveCarousel.mutateAsync({ id, data: carouselData });
+      // Home's list and every carousel's scenes are asked for again. A
+      // locked carousel sends no rules: the server keeps the stored ones
+      await saveCarousel.mutateAsync(
+        id
+          ? { id, data: rulesLocked ? parts : { ...parts, rules: body } }
+          : { data: { ...parts, rules: body } }
+      );
 
       // Saved: nothing is unsaved any more
       setBase(draft);
@@ -269,7 +281,8 @@ const CarouselBuilder = () => {
 
   const IconComponent = getCarouselIcon(icon);
   const canSave =
-    title.trim() && ruleCount > 0 && refused === null && previewValid;
+    title.trim() &&
+    (rulesLocked || (ruleCount > 0 && refused === null && previewValid));
 
   if (loading) {
     return (
@@ -313,20 +326,22 @@ const CarouselBuilder = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => void handlePreview()}
-              disabled={previewing || ruleCount === 0 || refused !== null}
-              icon={
-                previewing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )
-              }
-            >
-              Preview
-            </Button>
+            {!rulesLocked && (
+              <Button
+                variant="secondary"
+                onClick={() => void handlePreview()}
+                disabled={previewing || ruleCount === 0 || refused !== null}
+                icon={
+                  previewing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )
+                }
+              >
+                Preview
+              </Button>
+            )}
             <Button
               variant="primary"
               onClick={() => void handleSave()}
@@ -431,15 +446,25 @@ const CarouselBuilder = () => {
             Filter Rules
           </h2>
 
-          <FilterRowsEditor
-            kind="scene"
-            table={CAROUSEL_TABLE}
-            tree={tree}
-            onChange={changeTree}
-            allowGroups
-            pickFromAll
-          />
-          {refused !== null && (
+          {rulesLocked && (
+            <StatusMessage variant="info" title={null} message={LOCKED_NOTE} />
+          )}
+
+          <fieldset
+            disabled={rulesLocked}
+            inert={rulesLocked}
+            className="m-0 p-0 border-0 min-w-0"
+          >
+            <FilterRowsEditor
+              kind="scene"
+              table={CAROUSEL_TABLE}
+              tree={tree}
+              onChange={rulesLocked ? () => undefined : changeTree}
+              allowGroups
+              pickFromAll
+            />
+          </fieldset>
+          {!rulesLocked && refused !== null && (
             <StatusMessage variant="info" title={null} message={refused} />
           )}
         </div>
@@ -527,16 +552,18 @@ const CarouselBuilder = () => {
           )}
         </div>
 
-        {/* Preview Section */}
-        <CarouselPreview
-          scenes={previewScenes}
-          error={previewError}
-          loading={previewing}
-          onPreview={() => void handlePreview()}
-        />
+        {/* Preview Section: a locked carousel's rules cannot be sent to preview */}
+        {!rulesLocked && (
+          <CarouselPreview
+            scenes={previewScenes}
+            error={previewError}
+            loading={previewing}
+            onPreview={() => void handlePreview()}
+          />
+        )}
 
         {/* Save Hint */}
-        {!previewValid && ruleCount > 0 && (
+        {!rulesLocked && !previewValid && ruleCount > 0 && (
           <p
             className="text-center text-sm"
             style={{ color: "var(--text-muted)" }}

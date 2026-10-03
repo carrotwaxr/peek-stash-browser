@@ -622,6 +622,44 @@ describe("CarouselBuilder", () => {
     expect(requestsTo(fetchMock, "/carousels/preview")).toEqual([]);
   });
 
+  it("a locked carousel shows its rules read-only with a note, and a title edit saves without rules or a preview", async () => {
+    // As the server serves a flat rule set naming ids: the tree has no row
+    // for the ids
+    const locked = {
+      ...CAROUSEL,
+      rules: rootAll({ rating100: { modifier: "GREATER_THAN", value: 80 } }),
+      rulesLocked: true,
+    };
+    const fetchMock = stubApi({
+      "/carousels/c1": () => jsonResponse(200, { carousel: locked }),
+    });
+    renderEditor(createQueryClient());
+
+    const title = await screen.findByDisplayValue("Highly rated");
+    expect(
+      screen.getByText(
+        "These rules were saved by an older version and pick fixed scenes; they can't be edited here"
+      )
+    ).toBeVisible();
+    expect(fieldsIn(document.body)).toEqual(["rating"]);
+    expect(waitingRow()).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Preview/ })).toBeNull();
+
+    fireEvent.change(title, { target: { value: "Renamed" } });
+    const update = screen.getByRole("button", { name: /Update/ });
+    expect(update).toBeEnabled();
+    fireEvent.click(update);
+    await screen.findByText(/^Settings/);
+
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+    expect(JSON.parse(put?.[1]?.body as string)).toEqual({
+      title: "Renamed",
+      icon: "Film",
+      sort: "random",
+      direction: "DESC",
+    });
+  });
+
   describe("Back", () => {
     const back = () => screen.getByRole("button", { name: "Back" });
     const prompt = () =>

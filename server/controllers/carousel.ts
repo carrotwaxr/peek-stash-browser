@@ -31,10 +31,12 @@ import type {
 import type { NormalizedScene } from "../types/index.js";
 import type { ParsedListRequest } from "../types/parsedFilters.js";
 import {
+  carouselRulesLocked,
   carouselRulesToStore,
   isPlainObject,
   logIgnoredStoredRule,
   parseCarouselRequest,
+  parseLockedCarouselRequest,
   parseStoredSceneQuery,
 } from "../utils/listRequest.js";
 import { logger } from "../utils/logger.js";
@@ -70,6 +72,7 @@ const toCarouselData = (row: UserCarousel): CarouselData => ({
   title: row.title,
   icon: row.icon,
   rules: servedRules(row.rules),
+  rulesLocked: carouselRulesLocked(row.rules),
   sort: row.sort,
   direction: row.direction,
   createdAt: row.createdAt.toISOString(),
@@ -216,7 +219,11 @@ export const createCarousel = async (
 };
 
 /**
- * Update an existing carousel
+ * Update an existing carousel. A locked carousel (flat rules stored before
+ * 9b naming `ids` or `instance_id`, served with `rulesLocked`) keeps its
+ * stored rules: `rules` in the body is ignored, so a title, icon or sort
+ * edit from a client that resends the served tree (which has no row for the
+ * ids) cannot widen it, and its sort is checked against the stored rules.
  */
 export const updateCarousel = async (
   req: TypedAuthRequest<UpdateCarouselRequest, UpdateCarouselParams>,
@@ -228,15 +235,6 @@ export const updateCarousel = async (
   // The body is unvalidated: any field may be missing
   const { title, icon, rules, sort, direction } =
     req.body as Partial<CreateCarouselRequest>;
-
-  // The parts sent, against the scene contract; a ValidationError (400)
-  // reaches the central error handler
-  const request = parseCarouselRequest({ rules, sort, direction }, { userId });
-  // The tree, from either shape; a flat ids or instance_id is a 400
-  const stored =
-    rules === undefined
-      ? undefined
-      : carouselRulesToStore(rules as Record<string, unknown>);
 
   // Check ownership
   const existing = await prisma.userCarousel.findFirst({
@@ -250,6 +248,22 @@ export const updateCarousel = async (
     res.status(404).json({ error: "Carousel not found" });
     return;
   }
+
+  // The parts sent, against the scene contract; a ValidationError (400)
+  // reaches the central error handler
+  const locked = carouselRulesLocked(existing.rules);
+  const request = locked
+    ? parseLockedCarouselRequest(
+        existing.rules as Record<string, unknown>,
+        { sort, direction },
+        { userId }
+      )
+    : parseCarouselRequest({ rules, sort, direction }, { userId });
+  // The tree, from either shape; a flat ids or instance_id is a 400
+  const stored =
+    rules === undefined || locked
+      ? undefined
+      : carouselRulesToStore(rules as Record<string, unknown>);
 
   // Validate title if provided
   if (title !== undefined && title.trim() === "") {

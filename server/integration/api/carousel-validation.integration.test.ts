@@ -226,12 +226,22 @@ describe("carousel, recommended and similar requests", () => {
 
     it("updating a carousel with an unknown rule key or direction sideways answers 400 and leaves it as it was", async () => {
       const { id, client } = must(everyInstance, "the viewer");
+      // A tree: a locked carousel's (flat with ids) update ignores rules
+      const kept = {
+        match: "all",
+        rules: [
+          {
+            field: "rating100",
+            criterion: { value: 80, modifier: "GREATER_THAN" },
+          },
+        ],
+      };
       const carousel = await prisma.userCarousel.create({
         data: {
           userId: id,
           title: "Kept",
           icon: "Film",
-          rules: IDS_RULES,
+          rules: kept,
           sort: "title",
           direction: "ASC",
         },
@@ -246,7 +256,7 @@ describe("carousel, recommended and similar requests", () => {
       const stored = await prisma.userCarousel.findUniqueOrThrow({
         where: { id: carousel.id },
       });
-      expect(stored.rules).toEqual(IDS_RULES);
+      expect(stored.rules).toEqual(kept);
       expect(stored.direction).toBe("ASC");
     });
   });
@@ -351,6 +361,58 @@ describe("carousel, recommended and similar requests", () => {
         rules: [titled(`B-${FX_ID.SAME}`)],
       });
       expect(shown(executed.data.scenes)).toEqual([`${FX.B}/B-${FX_ID.SAME}`]);
+    });
+  });
+
+  describe("a locked carousel (flat rules naming ids)", () => {
+    it("a title edit keeps the stored ids and the carousel lists the same scenes, whether the client resends the served tree or no rules", async () => {
+      const { id, client } = must(everyInstance, "the viewer");
+      const carousel = await prisma.userCarousel.create({
+        data: {
+          userId: id,
+          title: "Locked",
+          icon: "Film",
+          rules: IDS_RULES,
+          sort: "title",
+          direction: "ASC",
+        },
+      });
+      const execute = async () =>
+        shown(
+          (
+            await client.get<ExecuteCarouselByIdResponse>(
+              `/api/carousels/${carousel.id}/execute`
+            )
+          ).data.scenes
+        );
+      const before = await execute();
+      const served = await client.get<GetCarouselResponse>(
+        `/api/carousels/${carousel.id}`
+      );
+      expect(served.data.carousel.rulesLocked).toBe(true);
+
+      // A client built before rulesLocked resends the served tree, which
+      // has no row for the ids; this one sends no rules
+      const edits = [
+        { title: "Renamed", rules: served.data.carousel.rules },
+        { title: "Renamed again", sort: "title", direction: "DESC" },
+      ];
+      for (const body of edits) {
+        const response = await client.put<GetCarouselResponse>(
+          `/api/carousels/${carousel.id}`,
+          body
+        );
+        expect(response.status, JSON.stringify(response.data)).toBe(200);
+        expect(response.data.carousel.title).toBe(body.title);
+        expect(response.data.carousel.rulesLocked).toBe(true);
+      }
+
+      const stored = await prisma.userCarousel.findUniqueOrThrow({
+        where: { id: carousel.id },
+      });
+      expect(stored.rules).toEqual(IDS_RULES);
+      expect(before.length).toBeGreaterThan(0);
+      expect(await execute()).toEqual(before);
     });
   });
 

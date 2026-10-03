@@ -25,6 +25,12 @@ export interface CarouselData {
   title: string;
   icon: string;
   rules: WhereGroup<"scene">;
+  /**
+   * The stored rules pick fixed scenes (a flat rule set saved by an older
+   * version naming `ids` or `instance_id`, which no row holds): `rules`
+   * shows the rest, and an update keeps the stored rules, ignoring any sent
+   */
+  rulesLocked: boolean;
   sort: string;
   direction: string;
   createdAt: string;

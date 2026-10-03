@@ -1,4 +1,7 @@
-import type { CreateCarouselRequest } from "@peek/shared-types";
+import type {
+  CreateCarouselRequest,
+  UpdateCarouselRequest,
+} from "@peek/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { libraryApi } from "..";
 import { queryKeys } from "../queryKeys";
@@ -16,6 +19,11 @@ export function useCarousels() {
   });
 }
 
+/** A new carousel, or the parts of one to update (a locked carousel's update sends no rules) */
+type SaveCarouselInput =
+  | { readonly id?: undefined; readonly data: CreateCarouselRequest }
+  | { readonly id: string; readonly data: UpdateCarouselRequest };
+
 /**
  * Creates a carousel, or updates it when `id` is given. Home's list and the
  * scenes of every carousel are asked for again: a rules change shows its new
@@ -24,10 +32,10 @@ export function useCarousels() {
 export function useSaveCarousel() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: CreateCarouselRequest }) =>
-      id
-        ? libraryApi.updateCarousel(id, data)
-        : libraryApi.createCarousel(data),
+    mutationFn: (input: SaveCarouselInput) =>
+      input.id === undefined
+        ? libraryApi.createCarousel(input.data)
+        : libraryApi.updateCarousel(input.id, input.data),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: queryKeys.carousels.all() }),
   });
