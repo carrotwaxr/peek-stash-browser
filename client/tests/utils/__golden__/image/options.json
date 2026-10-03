@@ -8,6 +8,14 @@
       "defaultOpen": true
     },
     {
+      "key": "title",
+      "label": "Title Search",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search title...",
+      "maxLength": 500
+    },
+    {
       "key": "performerIds",
       "label": "Performers",
       "type": "searchable-select",
@@ -27,6 +35,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "performerIdsModifier",
@@ -50,6 +66,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "studioIdsModifier",
@@ -80,6 +104,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "tagIdsModifier",
@@ -110,6 +142,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "galleryIdsModifier",
@@ -162,10 +202,365 @@
       "defaultValue": {},
       "min": 0,
       "max": 50
+    },
+    {
+      "key": "organized",
+      "label": "Organized",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "placeholder": "Any"
+    },
+    {
+      "type": "section-header",
+      "label": "Entity Filters",
+      "key": "section-entities",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "performerTagIds",
+      "label": "Performer Tags",
+      "type": "searchable-select",
+      "entityType": "tags",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select performer tags...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "performerTagIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "performerTagIdsDepth",
+      "hierarchyLabel": "Include sub-tags",
+      "excludeKey": "performerTagIdsExclude"
+    },
+    {
+      "type": "section-header",
+      "label": "Date Ranges",
+      "key": "section-dates",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "date",
+      "label": "Image Date",
+      "type": "date-range",
+      "defaultValue": {}
+    },
+    {
+      "key": "createdAt",
+      "label": "Created Date",
+      "type": "date-range",
+      "defaultValue": {}
+    },
+    {
+      "key": "updatedAt",
+      "label": "Updated Date",
+      "type": "date-range",
+      "defaultValue": {}
+    },
+    {
+      "type": "section-header",
+      "label": "Other Filters",
+      "key": "section-other",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "resolution",
+      "label": "Resolution",
+      "type": "select",
+      "defaultValue": "",
+      "options": [
+        {
+          "value": "VERY_LOW",
+          "label": "144p"
+        },
+        {
+          "value": "LOW",
+          "label": "240p"
+        },
+        {
+          "value": "R360P",
+          "label": "360p"
+        },
+        {
+          "value": "STANDARD",
+          "label": "480p"
+        },
+        {
+          "value": "WEB_HD",
+          "label": "540p"
+        },
+        {
+          "value": "STANDARD_HD",
+          "label": "720p"
+        },
+        {
+          "value": "FULL_HD",
+          "label": "1080p"
+        },
+        {
+          "value": "QUAD_HD",
+          "label": "1440p"
+        },
+        {
+          "value": "FOUR_K",
+          "label": "4K"
+        },
+        {
+          "value": "FIVE_K",
+          "label": "5K"
+        },
+        {
+          "value": "SIX_K",
+          "label": "6K"
+        },
+        {
+          "value": "SEVEN_K",
+          "label": "7K"
+        },
+        {
+          "value": "EIGHT_K",
+          "label": "8K"
+        },
+        {
+          "value": "HUGE",
+          "label": "Huge"
+        }
+      ],
+      "placeholder": "Any resolution",
+      "modifierOptions": [
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "NOT_EQUALS",
+          "label": "Not Equals"
+        },
+        {
+          "value": "GREATER_THAN",
+          "label": "Greater Than"
+        },
+        {
+          "value": "LESS_THAN",
+          "label": "Less Than"
+        }
+      ],
+      "modifierKey": "resolutionModifier",
+      "defaultModifier": "EQUALS"
+    },
+    {
+      "key": "orientation",
+      "label": "Orientation",
+      "type": "select",
+      "defaultValue": "",
+      "options": [
+        {
+          "value": "LANDSCAPE",
+          "label": "Landscape"
+        },
+        {
+          "value": "PORTRAIT",
+          "label": "Portrait"
+        },
+        {
+          "value": "SQUARE",
+          "label": "Square"
+        }
+      ],
+      "placeholder": "Any orientation"
+    },
+    {
+      "key": "details",
+      "label": "Details Search",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search details...",
+      "maxLength": 500
+    },
+    {
+      "key": "code",
+      "label": "Code",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search code...",
+      "maxLength": 500
+    },
+    {
+      "key": "photographer",
+      "label": "Photographer",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search photographer...",
+      "maxLength": 500
+    },
+    {
+      "key": "path",
+      "label": "Path",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search path...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "NOT_EQUALS",
+          "label": "Not equals"
+        },
+        {
+          "value": "STARTS_WITH",
+          "label": "Starts with"
+        }
+      ],
+      "modifierKey": "pathModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "url",
+      "label": "URL",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search URLs...",
+      "maxLength": 500
+    },
+    {
+      "key": "performerFavorite",
+      "label": "Favorite Performers",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "placeholder": "Any"
+    },
+    {
+      "key": "studioFavorite",
+      "label": "Favorite Studios",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "placeholder": "Any"
+    },
+    {
+      "key": "tagFavorite",
+      "label": "Favorite Tags",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        },
+        {
+          "value": "any",
+          "label": "Any"
+        }
+      ],
+      "placeholder": "Any"
+    },
+    {
+      "key": "performerCount",
+      "label": "Performer Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 20
+    },
+    {
+      "key": "performerAge",
+      "label": "Performer Age",
+      "type": "range",
+      "defaultValue": {},
+      "min": 18,
+      "max": 100
     }
   ],
   "imperialOptions": "same as the metric options",
   "locks": [
+    {
+      "field": "title",
+      "lockedFieldsTop": [
+        "title"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "title"
+      ],
+      "removedStateKeys": [
+        "title"
+      ],
+      "removedOptions": [
+        "text:title"
+      ],
+      "optionCountAfter": 29
+    },
     {
       "field": "performers",
       "lockedFieldsTop": [
@@ -182,7 +577,7 @@
       "removedOptions": [
         "searchable-select:performerIds"
       ],
-      "optionCountAfter": 8
+      "optionCountAfter": 29
     },
     {
       "field": "studios",
@@ -201,7 +596,7 @@
       "removedOptions": [
         "searchable-select:studioIds"
       ],
-      "optionCountAfter": 8
+      "optionCountAfter": 29
     },
     {
       "field": "tags",
@@ -220,7 +615,7 @@
       "removedOptions": [
         "searchable-select:tagIds"
       ],
-      "optionCountAfter": 8
+      "optionCountAfter": 29
     },
     {
       "field": "galleries",
@@ -238,7 +633,7 @@
       "removedOptions": [
         "searchable-select:galleryIds"
       ],
-      "optionCountAfter": 8
+      "optionCountAfter": 29
     },
     {
       "field": "rating100",
@@ -256,7 +651,7 @@
       "removedOptions": [
         "range:rating"
       ],
-      "optionCountAfter": 8
+      "optionCountAfter": 29
     },
     {
       "field": "favorite",
@@ -273,7 +668,7 @@
       "removedOptions": [
         "checkbox:favorite"
       ],
-      "optionCountAfter": 8
+      "optionCountAfter": 29
     },
     {
       "field": "o_counter",
@@ -290,7 +685,7 @@
       "removedOptions": [
         "range:oCounter"
       ],
-      "optionCountAfter": 8
+      "optionCountAfter": 29
     },
     {
       "field": "tag_count",
@@ -307,7 +702,301 @@
       "removedOptions": [
         "range:tagCount"
       ],
-      "optionCountAfter": 8
+      "optionCountAfter": 29
+    },
+    {
+      "field": "organized",
+      "lockedFieldsTop": [
+        "organized"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "organized"
+      ],
+      "removedStateKeys": [
+        "organized"
+      ],
+      "removedOptions": [
+        "select:organized"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "performer_tags",
+      "lockedFieldsTop": [
+        "performer_tags"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "performer_tags"
+      ],
+      "removedStateKeys": [
+        "performerTagIds",
+        "performerTagIdsModifier",
+        "performerTagIdsDepth"
+      ],
+      "removedOptions": [
+        "section-header:section-entities",
+        "searchable-select:performerTagIds"
+      ],
+      "optionCountAfter": 28
+    },
+    {
+      "field": "date",
+      "lockedFieldsTop": [
+        "date"
+      ],
+      "lockedFieldsInner": [
+        "date",
+        "image_filter"
+      ],
+      "removedStateKeys": [
+        "date"
+      ],
+      "removedOptions": [
+        "date-range:date"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "created_at",
+      "lockedFieldsTop": [
+        "created_at"
+      ],
+      "lockedFieldsInner": [
+        "created_at",
+        "image_filter"
+      ],
+      "removedStateKeys": [
+        "createdAt"
+      ],
+      "removedOptions": [
+        "date-range:createdAt"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "updated_at",
+      "lockedFieldsTop": [
+        "updated_at"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "updated_at"
+      ],
+      "removedStateKeys": [
+        "updatedAt"
+      ],
+      "removedOptions": [
+        "date-range:updatedAt"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "resolution",
+      "lockedFieldsTop": [
+        "resolution"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "resolution"
+      ],
+      "removedStateKeys": [
+        "resolution",
+        "resolutionModifier"
+      ],
+      "removedOptions": [
+        "select:resolution"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "orientation",
+      "lockedFieldsTop": [
+        "orientation"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "orientation"
+      ],
+      "removedStateKeys": [
+        "orientation"
+      ],
+      "removedOptions": [
+        "select:orientation"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "details",
+      "lockedFieldsTop": [
+        "details"
+      ],
+      "lockedFieldsInner": [
+        "details",
+        "image_filter"
+      ],
+      "removedStateKeys": [
+        "details"
+      ],
+      "removedOptions": [
+        "text:details"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "code",
+      "lockedFieldsTop": [
+        "code"
+      ],
+      "lockedFieldsInner": [
+        "code",
+        "image_filter"
+      ],
+      "removedStateKeys": [
+        "code"
+      ],
+      "removedOptions": [
+        "text:code"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "photographer",
+      "lockedFieldsTop": [
+        "photographer"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "photographer"
+      ],
+      "removedStateKeys": [
+        "photographer"
+      ],
+      "removedOptions": [
+        "text:photographer"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "path",
+      "lockedFieldsTop": [
+        "path"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "path"
+      ],
+      "removedStateKeys": [
+        "path",
+        "pathModifier"
+      ],
+      "removedOptions": [
+        "text:path"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "url",
+      "lockedFieldsTop": [
+        "url"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "url"
+      ],
+      "removedStateKeys": [
+        "url"
+      ],
+      "removedOptions": [
+        "text:url"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "performer_favorite",
+      "lockedFieldsTop": [
+        "performer_favorite"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "performer_favorite"
+      ],
+      "removedStateKeys": [
+        "performerFavorite"
+      ],
+      "removedOptions": [
+        "select:performerFavorite"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "studio_favorite",
+      "lockedFieldsTop": [
+        "studio_favorite"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "studio_favorite"
+      ],
+      "removedStateKeys": [
+        "studioFavorite"
+      ],
+      "removedOptions": [
+        "select:studioFavorite"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "tag_favorite",
+      "lockedFieldsTop": [
+        "tag_favorite"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "tag_favorite"
+      ],
+      "removedStateKeys": [
+        "tagFavorite"
+      ],
+      "removedOptions": [
+        "select:tagFavorite"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "performer_count",
+      "lockedFieldsTop": [
+        "performer_count"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "performer_count"
+      ],
+      "removedStateKeys": [
+        "performerCount"
+      ],
+      "removedOptions": [
+        "range:performerCount"
+      ],
+      "optionCountAfter": 29
+    },
+    {
+      "field": "performer_age",
+      "lockedFieldsTop": [
+        "performer_age"
+      ],
+      "lockedFieldsInner": [
+        "image_filter",
+        "performer_age"
+      ],
+      "removedStateKeys": [
+        "performerAge"
+      ],
+      "removedOptions": [
+        "range:performerAge"
+      ],
+      "optionCountAfter": 29
     }
   ]
 }

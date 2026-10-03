@@ -1192,7 +1192,7 @@ describe("filter requests follow the contract", () => {
     ["gallery", GALLERY_FILTER_OPTIONS],
     ["image", IMAGE_FILTER_OPTIONS],
   ] as const)(
-    "%s studio options offer only Has ANY and Has NONE",
+    "%s studio options offer Has ANY and Has NONE, then Has none and Has any",
     (_kind, options) => {
       const studios = must(
         options.find((option) => option.key === "studioIds"),
@@ -1202,6 +1202,8 @@ describe("filter requests follow the contract", () => {
       expect(studios.modifierOptions).toEqual([
         { value: "INCLUDES", label: "Has ANY of these" },
         { value: "EXCLUDES", label: "Has NONE of these" },
+        { value: "IS_NULL", label: "Has none" },
+        { value: "NOT_NULL", label: "Has any" },
       ]);
     }
   );

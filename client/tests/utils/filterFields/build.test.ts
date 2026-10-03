@@ -96,9 +96,9 @@ describe("buildPanelFilter", () => {
     ).toEqual({ tag_count: { modifier: "EQUALS", value: 0 } });
   });
 
-  it("a permanent date range in panel shape goes through the date codec", () => {
+  it("a permanent date range in panel shape goes through the date codec (the scenes' timeline date)", () => {
     expect(
-      buildPanelFilter("gallery", {
+      buildPanelFilter("scene", {
         date: { start: "2020-01-01", end: "2020-12-31" },
       })
     ).toEqual({

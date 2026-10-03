@@ -368,6 +368,21 @@ function mayAgree(a: string, b: string, ids: number | undefined): boolean {
   );
 }
 
+/**
+ * The "No" choice of a three-state favourite (Favorite Performers, Studios,
+ * Tags): with no favourites it filters nothing
+ */
+function isNoFavouriteFalse(
+  option: ClientOption,
+  sample: OptionSample
+): boolean {
+  return (
+    option.type === "select" &&
+    option.key.endsWith("Favorite") &&
+    sample.variant === "false"
+  );
+}
+
 /** One sample's verdict, beside the option's other samples */
 function judge(
   option: ClientOption,
@@ -393,6 +408,20 @@ function judge(
     }
   };
 
+  if (isNoFavouriteFalse(option, sample)) {
+    // The viewer has no favourites in the replay, so "without a favourite"
+    // keeps every row, as the unfiltered request does: the "No" choice
+    // reaches SQL when it differs from "Yes", which matches nothing
+    const yes = samples.find((other) => other.variant === "true");
+    const yesStatement =
+      yes === undefined ? undefined : outcomes.get(yes.label)?.statement;
+    if (yesStatement === undefined) {
+      failures.push("the Yes choice's statement is missing");
+    } else {
+      compare(yes?.label ?? "Yes", yesStatement, "No does not reach SQL");
+    }
+    return { failures, evidence };
+  }
   compare("the unfiltered request", unfiltered, "does not reach SQL");
   // Equal to the unfiltered statement, it equals every sample that is too
   if (failures.length > 0) return { failures, evidence };
