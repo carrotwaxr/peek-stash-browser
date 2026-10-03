@@ -41,7 +41,10 @@ import {
   updateUserRestrictions,
   updateUserStashInstances,
 } from "../../controllers/user.js";
-import { ValidationError } from "../../middleware/errorHandler.js";
+import {
+  NotFoundError,
+  ValidationError,
+} from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import userRoutes from "../../routes/user.js";
 import { getVisibleEntityKeys } from "../../services/EntityAccessService.js";
@@ -56,7 +59,10 @@ import {
   hashRecoveryKey,
 } from "../../utils/recoveryKey.js";
 import { authenticated } from "../../utils/routeHelpers.js";
-import { updateUserJson } from "../../utils/userJsonColumn.js";
+import {
+  type UserJsonColumn,
+  updateUserJson,
+} from "../../utils/userJsonColumn.js";
 import {
   findHandler,
   malformed,
@@ -182,6 +188,34 @@ const mockExclusionService = vi.mocked(exclusionComputationService);
 const ADMIN = { id: 1, username: "admin", role: "ADMIN" };
 const USER = { id: 2, username: "testuser", role: "USER" };
 
+/**
+ * The Views and defaults stored for the user: the compare-and-set write
+ * (mocked) runs its change on them, and `written()` answers the last write
+ */
+function viewsStored(stored: {
+  filterPresets?: unknown;
+  defaultFilterPresets?: unknown;
+}) {
+  let last: Record<UserJsonColumn, unknown> | undefined;
+  mockUpdateUserJson.mockImplementation((_userId, _columns, mutate) => {
+    last = mutate({
+      filterPresets: stored.filterPresets ?? null,
+      defaultFilterPresets: stored.defaultFilterPresets ?? null,
+      filterPins: null,
+    });
+    return Promise.resolve(last);
+  });
+  return {
+    written: () => {
+      if (!last) throw new Error("nothing was written");
+      return last as {
+        filterPresets: Record<string, Array<{ id: string }>>;
+        defaultFilterPresets: Record<string, string>;
+      };
+    },
+  };
+}
+
 describe("User Controller — Features", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -303,10 +337,10 @@ describe("User Controller — Features", () => {
     });
 
     it("a preset saved as default on a gallery's Scenes tab (scene_gallery) is stored", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({ filterPresets: {}, defaultFilterPresets: {} })
-      );
-      mockPrisma.user.update.mockResolvedValue(userRow());
+      const stored = viewsStored({
+        filterPresets: {},
+        defaultFilterPresets: {},
+      });
       const req = reqFor(saveFilterPreset, {
         body: {
           artifactType: "scene",
@@ -322,22 +356,13 @@ describe("User Controller — Features", () => {
       const res = resFor(saveFilterPreset);
       await saveFilterPreset(req, res);
       expect(res._getStatus()).toBe(200);
-      const data = mockPrisma.user.update.mock.calls[0]?.[0]?.data as
-        | { defaultFilterPresets: Record<string, string> }
-        | undefined;
-      expect(Object.keys(data?.defaultFilterPresets ?? {})).toEqual([
+      expect(Object.keys(stored.written().defaultFilterPresets)).toEqual([
         "scene_gallery",
       ]);
     });
 
     it("saves preset with defaults for optional fields", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          filterPresets: {},
-          defaultFilterPresets: {},
-        })
-      );
-      mockPrisma.user.update.mockResolvedValue(userRow());
+      viewsStored({ filterPresets: {}, defaultFilterPresets: {} });
 
       const req = reqFor(saveFilterPreset, {
         body: {
@@ -362,10 +387,7 @@ describe("User Controller — Features", () => {
     });
 
     it("empty display fields take the defaults and a per page of 0 is kept", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({ filterPresets: {}, defaultFilterPresets: {} })
-      );
-      mockPrisma.user.update.mockResolvedValue(userRow());
+      viewsStored({ filterPresets: {}, defaultFilterPresets: {} });
 
       const req = reqFor(saveFilterPreset, {
         body: {
@@ -391,10 +413,10 @@ describe("User Controller — Features", () => {
     });
 
     it("an empty context makes the preset the default for its artifact type", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({ filterPresets: {}, defaultFilterPresets: {} })
-      );
-      mockPrisma.user.update.mockResolvedValue(userRow());
+      const stored = viewsStored({
+        filterPresets: {},
+        defaultFilterPresets: {},
+      });
 
       const req = reqFor(saveFilterPreset, {
         body: {
@@ -411,23 +433,16 @@ describe("User Controller — Features", () => {
       const res = resFor(saveFilterPreset);
       await saveFilterPreset(req, res);
       const body = res._getOkBody();
-      expect(mockPrisma.user.update).toHaveBeenCalledWith(
-        objectContaining({
-          data: objectContaining({
-            defaultFilterPresets: { scene: body.preset.id },
-          }),
-        })
-      );
+      expect(stored.written().defaultFilterPresets).toEqual({
+        scene: body.preset.id,
+      });
     });
 
     it("sets preset as default when setAsDefault is true", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          filterPresets: {},
-          defaultFilterPresets: {},
-        })
-      );
-      mockPrisma.user.update.mockResolvedValue(userRow());
+      const stored = viewsStored({
+        filterPresets: {},
+        defaultFilterPresets: {},
+      });
 
       const req = reqFor(saveFilterPreset, {
         body: {
@@ -435,7 +450,7 @@ describe("User Controller — Features", () => {
           context: "scene_performer",
           name: "Fav Filter",
           filters: {},
-          sort: "name",
+          sort: "title",
           direction: "ASC",
           setAsDefault: true,
         },
@@ -444,13 +459,9 @@ describe("User Controller — Features", () => {
       const res = resFor(saveFilterPreset);
       await saveFilterPreset(req, res);
 
-      // Check that defaultFilterPresets was updated in the prisma call
-      const updateCall = mockPrisma.user.update.mock.calls[0]?.[0];
-      const defaults = updateCall?.data.defaultFilterPresets as Record<
-        string,
-        unknown
-      >;
-      expect(defaults.scene_performer).toBeDefined();
+      expect(stored.written().defaultFilterPresets).toEqual({
+        scene_performer: res._getOkBody().preset.id,
+      });
     });
   });
 
@@ -465,26 +476,24 @@ describe("User Controller — Features", () => {
       expect(res._getStatus()).toBe(400);
     });
 
-    it("returns 404 when user not found", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+    it("a user who is gone is the write's 404", async () => {
+      mockUpdateUserJson.mockRejectedValue(new NotFoundError("User not found"));
       const req = reqFor(deleteFilterPreset, {
         params: { artifactType: "scene", presetId: "1" },
         user: USER,
       });
       const res = resFor(deleteFilterPreset);
-      await deleteFilterPreset(req, res);
-      expect(res._getStatus()).toBe(404);
+      await expect(deleteFilterPreset(req, res)).rejects.toMatchObject({
+        statusCode: 404,
+      });
     });
 
     it("deletes preset and clears default if it was default", async () => {
       const presetId = "preset-to-delete";
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          filterPresets: { scene: [{ id: presetId, name: "Test" }] },
-          defaultFilterPresets: { scene: presetId },
-        })
-      );
-      mockPrisma.user.update.mockResolvedValue(userRow());
+      const stored = viewsStored({
+        filterPresets: { scene: [{ id: presetId, name: "Test" }] },
+        defaultFilterPresets: { scene: presetId },
+      });
 
       const req = reqFor(deleteFilterPreset, {
         params: { artifactType: "scene", presetId },
@@ -494,17 +503,8 @@ describe("User Controller — Features", () => {
       await deleteFilterPreset(req, res);
       expect(res._getOkBody().success).toBe(true);
 
-      const updateCall = mockPrisma.user.update.mock.calls[0]?.[0];
-      const presets = updateCall?.data.filterPresets as Record<
-        string,
-        unknown[]
-      >;
-      const defaults = updateCall?.data.defaultFilterPresets as Record<
-        string,
-        unknown
-      >;
-      expect(presets.scene).toEqual([]);
-      expect(defaults.scene).toBeUndefined();
+      expect(stored.written().filterPresets.scene).toEqual([]);
+      expect(stored.written().defaultFilterPresets).toEqual({});
     });
   });
 
@@ -559,13 +559,10 @@ describe("User Controller — Features", () => {
         ["scene_gallery", "scene"],
       ] as const) {
         const presetId = `preset-${context}`;
-        mockPrisma.user.findUnique.mockResolvedValue(
-          partialRow({
-            defaultFilterPresets: {},
-            filterPresets: { [artifactType]: [{ id: presetId, name: "P" }] },
-          })
-        );
-        mockPrisma.user.update.mockResolvedValue(userRow());
+        const stored = viewsStored({
+          defaultFilterPresets: {},
+          filterPresets: { [artifactType]: [{ id: presetId, name: "P" }] },
+        });
         const req = reqFor(setDefaultFilterPreset, {
           body: { context, presetId },
           user: USER,
@@ -573,6 +570,9 @@ describe("User Controller — Features", () => {
         const res = resFor(setDefaultFilterPreset);
         await setDefaultFilterPreset(req, res);
         expect(res._getStatus(), context).toBe(200);
+        expect(stored.written().defaultFilterPresets, context).toEqual({
+          [context]: presetId,
+        });
       }
     });
 
@@ -588,30 +588,23 @@ describe("User Controller — Features", () => {
     });
 
     it("returns 400 when preset not found", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          defaultFilterPresets: {},
-          filterPresets: { scene: [] },
-        })
-      );
+      viewsStored({ defaultFilterPresets: {}, filterPresets: { scene: [] } });
       const req = reqFor(setDefaultFilterPreset, {
         body: { context: "scene", presetId: "nonexistent" },
         user: USER,
       });
       const res = resFor(setDefaultFilterPreset);
-      await setDefaultFilterPreset(req, res);
-      expect(res._getStatus()).toBe(400);
-      expect(res._getErrorBody().error).toMatch(/Preset not found/);
+      await expect(setDefaultFilterPreset(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        message: "Preset not found",
+      });
     });
 
     it("clears default when presetId is null", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          defaultFilterPresets: { scene: "some-id" },
-          filterPresets: {},
-        })
-      );
-      mockPrisma.user.update.mockResolvedValue(userRow());
+      const stored = viewsStored({
+        defaultFilterPresets: { scene: "some-id", tag: "other" },
+        filterPresets: {},
+      });
       const req = reqFor(setDefaultFilterPreset, {
         body: { context: "scene" },
         user: USER,
@@ -619,17 +612,15 @@ describe("User Controller — Features", () => {
       const res = resFor(setDefaultFilterPreset);
       await setDefaultFilterPreset(req, res);
       expect(res._getOkBody().success).toBe(true);
+      expect(stored.written().defaultFilterPresets).toEqual({ tag: "other" });
     });
 
     it("validates scene grid contexts against scene presets", async () => {
       const presetId = "existing-preset";
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          defaultFilterPresets: {},
-          filterPresets: { scene: [{ id: presetId, name: "Test" }] },
-        })
-      );
-      mockPrisma.user.update.mockResolvedValue(userRow());
+      viewsStored({
+        defaultFilterPresets: {},
+        filterPresets: { scene: [{ id: presetId, name: "Test" }] },
+      });
       const req = reqFor(setDefaultFilterPreset, {
         body: { context: "scene_performer", presetId },
         user: USER,

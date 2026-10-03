@@ -5,6 +5,7 @@ import {
 import {
   LIST_KINDS,
   type ListKind,
+  PER_PAGE_MAX,
   defaultPinsOf,
 } from "@peek/shared-types/filters/index.js";
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
@@ -27,6 +28,7 @@ import {
 } from "../middleware/auth.js";
 import {
   AppError,
+  ConflictError,
   NotFoundError,
   ValidationError,
 } from "../middleware/errorHandler.js";
@@ -47,6 +49,7 @@ import {
   importOptionsFrom,
 } from "../services/StashImportService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import { bareRefLookupFor } from "../services/StoredFilterCleaner.js";
 import {
   type EntityType,
   isHideableEntityType,
@@ -60,7 +63,7 @@ import {
   defaultRestrictEmpty,
   restrictionsApplyTo,
 } from "../services/exclusionPolicy.js";
-import type { ApiErrorResponse } from "../types/api/common.js";
+import type { ApiErrorIssue, ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type { GetUserGroupMembershipsResponse } from "../types/api/groups.js";
 import type {
@@ -105,11 +108,14 @@ import type {
   HideEntityResponse,
   LandingPagePreference,
   NavPreference,
+  OverwriteViewBody,
   PutFilterPinsBody,
   RegenerateRecoveryKeyBody,
   RegenerateRecoveryKeyResponse,
+  RenameViewBody,
   SaveFilterPresetBody,
   SaveFilterPresetResponse,
+  SavedView,
   SetDefaultFilterPresetBody,
   SetDefaultFilterPresetResponse,
   SyncFromStashBody,
@@ -148,6 +154,7 @@ import {
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
 import { updateUserJson } from "../utils/userJsonColumn.js";
+import { isViewSort, validateViewFilters } from "../utils/viewFilters.js";
 import { USER_GROUP_SUMMARY_SELECT } from "./groups.js";
 
 // Inline the default carousel preferences to avoid ESM loading issues
@@ -1003,169 +1010,369 @@ export const getFilterPresets = async (
   res.json({ presets });
 };
 
+// =============================================================================
+// VIEWS (saved filter presets)
+// =============================================================================
+
+/** The lists a View can be saved for */
+const isViewList = (value: unknown): value is ListKind =>
+  LIST_KINDS.some((kind) => kind === value);
+
+/** The most Views one list holds */
+export const MAX_VIEWS_PER_LIST = 100;
+
+/** The longest View name, after trimming */
+export const VIEW_NAME_MAX = 100;
+
+/** A View's name trimmed, else a 400 naming `name` */
+function viewNameOf(raw: unknown): string {
+  const name = typeof raw === "string" ? raw.trim() : "";
+  if (name === "" || name.length > VIEW_NAME_MAX) {
+    throw new ValidationError("Invalid View name", {
+      issues: [
+        {
+          path: "name",
+          message: `Expected 1 to ${VIEW_NAME_MAX} characters`,
+        },
+      ],
+    });
+  }
+  return name;
+}
+
+/** The stored Views column as a map of list to Views (anything else is none) */
+function storedViewsOf(stored: unknown): FilterPresets {
+  return typeof stored === "object" && stored !== null && !Array.isArray(stored)
+    ? { ...(stored as FilterPresets) }
+    : {};
+}
+
+/** The stored defaults column as a map of context to View id */
+function storedDefaultsOf(stored: unknown): DefaultFilterPresets {
+  return typeof stored === "object" && stored !== null && !Array.isArray(stored)
+    ? { ...(stored as DefaultFilterPresets) }
+    : {};
+}
+
+/** One list's stored Views (anything that is no list is none) */
+const viewsOf = (presets: FilterPresets, kind: string): FilterPreset[] => {
+  const list = presets[kind];
+  return Array.isArray(list) ? list : [];
+};
+
+/** Whether another View of the list (not `exceptId`) has this name, in any case */
+function nameTaken(
+  views: readonly FilterPreset[],
+  name: string,
+  exceptId?: string
+): boolean {
+  const wanted = name.toLowerCase();
+  return views.some(
+    (view) =>
+      view.id !== exceptId &&
+      typeof view.name === "string" &&
+      view.name.trim().toLowerCase() === wanted
+  );
+}
+
+const DUPLICATE_NAME = "Another View of this list has that name";
+
+/** What a View stores beside its id, name and dates */
+type ViewState = Omit<SavedView, "id" | "name" | "createdAt" | "updatedAt">;
+
 /**
- * Save a new filter preset
+ * The filters, sort and presentation of a save, checked: the filters through
+ * `validateViewFilters` (a bare id tied to its one instance through the
+ * cleaner's lookup, else kept bare and logged), the sort one of the list's
+ * (a scene View's may be Recommended's), the direction ASC or DESC in any
+ * case, per page held to PER_PAGE_MAX. Every problem is one 400.
+ */
+async function checkedViewState(
+  userId: number,
+  kind: ListKind,
+  body: OverwriteViewBody
+): Promise<ViewState> {
+  const issues: ApiErrorIssue[] = [];
+
+  // One query per entity type the filters name, for their bare ids
+  const lookup = await bareRefLookupFor((recording) =>
+    validateViewFilters(kind, body.filters, { lookup: recording })
+  );
+  const filters = validateViewFilters(kind, body.filters, { lookup });
+  if ("issues" in filters) issues.push(...filters.issues);
+
+  if (!isViewSort(kind, body.sort)) {
+    issues.push({ path: "sort", message: "Not a sort of this list" });
+  }
+  const upper =
+    typeof body.direction === "string"
+      ? body.direction.toUpperCase()
+      : undefined;
+  const direction = upper === "ASC" || upper === "DESC" ? upper : undefined;
+  if (direction === undefined) {
+    issues.push({ path: "direction", message: "Expected ASC or DESC" });
+  }
+  const perPage = body.perPage ?? null;
+  if (perPage !== null && !(Number.isInteger(perPage) && perPage >= 0)) {
+    issues.push({ path: "perPage", message: "Expected a whole number" });
+  }
+  if ("issues" in filters || direction === undefined || issues.length > 0) {
+    throw new ValidationError("Invalid View", { issues });
+  }
+
+  if (filters.refsLeftBare > 0) {
+    logger.info(
+      "A saved View keeps bare ids it could not tie to one instance",
+      {
+        userId,
+        list: kind,
+        refsLeftBare: filters.refsLeftBare,
+      }
+    );
+  }
+  return {
+    filters: filters.filters,
+    sort: body.sort,
+    direction,
+    viewMode: emptyToNull(body.viewMode) ?? "grid",
+    zoomLevel: emptyToNull(body.zoomLevel) ?? "medium",
+    gridDensity: emptyToNull(body.gridDensity) ?? "comfortable",
+    tableColumns: body.tableColumns ?? null,
+    perPage: perPage === null ? null : Math.min(perPage, PER_PAGE_MAX),
+  };
+}
+
+/** The `:artifactType` param as a list, else a 400 */
+function viewListOf(raw: string | undefined): ListKind {
+  if (!isViewList(raw)) {
+    throw new ValidationError("Invalid artifact type", {
+      issues: [
+        {
+          path: "artifactType",
+          message: `Expected one of ${LIST_KINDS.join(", ")}`,
+        },
+      ],
+    });
+  }
+  return raw;
+}
+
+/**
+ * POST /api/user/filter-presets: Save as new. The View is validated
+ * (`checkedViewState`), its name is trimmed and unique within the list
+ * (409), and a list holds at most 100. With `setAsDefault` it becomes the
+ * default of `context` (else of its list), which must be one of the list's
+ * pages. Written compare-and-set with the defaults.
  */
 export const saveFilterPreset = async (
   req: TypedAuthRequest<SaveFilterPresetBody>,
   res: TypedResponse<SaveFilterPresetResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
-
-  const {
-    artifactType,
-    context,
-    name,
-    filters,
-    sort,
-    direction,
-    viewMode,
-    zoomLevel,
-    gridDensity,
-    tableColumns,
-    perPage,
-    setAsDefault,
-  } = req.body;
+  const { artifactType, context, name, filters, sort, direction } = req.body;
 
   // Validate required fields
   if (!artifactType || !name || !filters || !sort || !direction) {
     res.status(400).json({ error: "Missing required fields" });
     return;
   }
-
-  // Validate artifact type
-  const validTypes = [
-    "scene",
-    "performer",
-    "studio",
-    "tag",
-    "group",
-    "gallery",
-    "image",
-    "clip",
-  ];
-  if (!validTypes.includes(artifactType)) {
+  if (!isViewList(artifactType)) {
     res.status(400).json({ error: "Invalid artifact type" });
     return;
   }
-
   // Validate context if provided (used for setAsDefault)
-  if (context) {
-    if (!isPresetContext(context)) {
-      res.status(400).json({ error: "Invalid context" });
-      return;
-    }
+  if (context && !isPresetContext(context)) {
+    res.status(400).json({ error: "Invalid context" });
+    return;
+  }
+  const defaultContext = emptyToNull(context) ?? artifactType;
+  if (
+    req.body.setAsDefault &&
+    presetArtifactType(defaultContext) !== artifactType
+  ) {
+    throw new ValidationError("Invalid context", {
+      issues: [
+        {
+          path: "context",
+          message: `Not a page that lists ${artifactType} Views`,
+        },
+      ],
+    });
   }
 
-  // Get current presets and defaults
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { filterPresets: true, defaultFilterPresets: true },
-  });
-
-  const currentPresets = (user?.filterPresets as FilterPresets | null) ?? {};
-  const currentDefaults =
-    (user?.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
-
-  // Create new preset
-  const newPreset = {
+  const viewName = viewNameOf(name);
+  const state = await checkedViewState(userId, artifactType, req.body);
+  const view: SavedView = {
     id: randomUUID(),
-    name,
-    filters,
-    sort,
-    direction,
-    viewMode: emptyToNull(viewMode) ?? "grid",
-    zoomLevel: emptyToNull(zoomLevel) ?? "medium",
-    gridDensity: emptyToNull(gridDensity) ?? "comfortable",
-    tableColumns: tableColumns ?? null,
-    perPage: perPage ?? null,
+    name: viewName,
+    ...state,
     createdAt: new Date().toISOString(),
   };
 
-  // Add preset to the appropriate artifact type array
-  currentPresets[artifactType] = [
-    ...(currentPresets[artifactType] ?? []),
-    newPreset,
-  ];
+  await updateUserJson(
+    userId,
+    ["filterPresets", "defaultFilterPresets"],
+    (values) => {
+      const presets = storedViewsOf(values.filterPresets);
+      const views = viewsOf(presets, artifactType);
+      if (views.length >= MAX_VIEWS_PER_LIST) {
+        throw new ValidationError("Too many Views", {
+          issues: [
+            {
+              path: "artifactType",
+              message: `A list holds at most ${MAX_VIEWS_PER_LIST} Views`,
+            },
+          ],
+        });
+      }
+      if (nameTaken(views, viewName)) throw new ConflictError(DUPLICATE_NAME);
+      return {
+        ...values,
+        filterPresets: { ...presets, [artifactType]: [...views, { ...view }] },
+        defaultFilterPresets: req.body.setAsDefault
+          ? {
+              ...storedDefaultsOf(values.defaultFilterPresets),
+              [defaultContext]: view.id,
+            }
+          : values.defaultFilterPresets,
+      };
+    }
+  );
 
-  // If setAsDefault is true, set this preset as default for the context
-  if (setAsDefault) {
-    const defaultContext = emptyToNull(context) ?? artifactType;
-    currentDefaults[defaultContext] = newPreset.id;
-  }
-
-  // Update user
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      filterPresets: currentPresets as never,
-      defaultFilterPresets: currentDefaults as never,
-    },
-  });
-
-  res.json({ success: true, preset: newPreset });
+  res.json({ success: true, preset: { ...view } });
 };
 
 /**
- * Delete a filter preset
+ * PUT /api/user/filter-presets/:artifactType/:presetId: Save changes. The
+ * filters, sort and presentation are validated as on save and replace the
+ * View's; its id, name and createdAt stay, and updatedAt is set. A View the
+ * list does not hold is a 404.
+ */
+export const overwriteFilterPreset = async (
+  req: TypedAuthRequest<OverwriteViewBody, DeleteFilterPresetParams>,
+  res: TypedResponse<SaveFilterPresetResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const kind = viewListOf(req.params.artifactType);
+  const { presetId } = req.params;
+  const state = await checkedViewState(userId, kind, req.body);
+  const updatedAt = new Date().toISOString();
+
+  let saved: SavedView | undefined;
+  await updateUserJson(
+    userId,
+    ["filterPresets", "defaultFilterPresets"],
+    (values) => {
+      const presets = storedViewsOf(values.filterPresets);
+      const views = viewsOf(presets, kind);
+      const index = views.findIndex((view) => view.id === presetId);
+      const current = views[index];
+      if (!current) throw new NotFoundError("View not found");
+      saved = {
+        id: current.id,
+        name: current.name,
+        ...state,
+        createdAt:
+          typeof current.createdAt === "string" ? current.createdAt : updatedAt,
+        updatedAt,
+      };
+      const replacement = { ...saved };
+      return {
+        ...values,
+        filterPresets: {
+          ...presets,
+          [kind]: views.map((view, i) => (i === index ? replacement : view)),
+        },
+      };
+    }
+  );
+
+  if (!saved) throw new Error("overwriteFilterPreset: nothing written");
+  res.json({ success: true, preset: { ...saved } });
+};
+
+/**
+ * PATCH /api/user/filter-presets/:artifactType/:presetId: Rename. The name
+ * is trimmed, 1 to 100 characters, and unique within the list (409); a View
+ * the list does not hold is a 404.
+ */
+export const renameFilterPreset = async (
+  req: TypedAuthRequest<RenameViewBody, DeleteFilterPresetParams>,
+  res: TypedResponse<SaveFilterPresetResponse | ApiErrorResponse>
+) => {
+  const kind = viewListOf(req.params.artifactType);
+  const { presetId } = req.params;
+  const name = viewNameOf(req.body.name);
+  const updatedAt = new Date().toISOString();
+
+  let renamed: FilterPreset | undefined;
+  await updateUserJson(
+    req.user.id,
+    ["filterPresets", "defaultFilterPresets"],
+    (values) => {
+      const presets = storedViewsOf(values.filterPresets);
+      const views = viewsOf(presets, kind);
+      const index = views.findIndex((view) => view.id === presetId);
+      const current = views[index];
+      if (!current) throw new NotFoundError("View not found");
+      if (nameTaken(views, name, presetId)) {
+        throw new ConflictError(DUPLICATE_NAME);
+      }
+      const next: FilterPreset = { ...current, name, updatedAt };
+      renamed = next;
+      return {
+        ...values,
+        filterPresets: {
+          ...presets,
+          [kind]: views.map((view, i) => (i === index ? next : view)),
+        },
+      };
+    }
+  );
+
+  if (!renamed) throw new Error("renameFilterPreset: nothing written");
+  res.json({ success: true, preset: renamed });
+};
+
+/**
+ * DELETE /api/user/filter-presets/:artifactType/:presetId: removes the View
+ * and the default of every context of its list that names it (the list's
+ * page, each detail tab, Recommended)
  */
 export const deleteFilterPreset = async (
   req: TypedAuthRequest<never, DeleteFilterPresetParams>,
   res: TypedResponse<DeleteFilterPresetResponse | ApiErrorResponse>
 ) => {
-  const userId = req.user.id;
-
   const { artifactType, presetId } = req.params;
-
-  // Validate artifact type
-  const validTypes = [
-    "scene",
-    "performer",
-    "studio",
-    "tag",
-    "group",
-    "gallery",
-    "image",
-    "clip",
-  ];
-  if (!artifactType || !validTypes.includes(artifactType)) {
+  if (!isViewList(artifactType)) {
     res.status(400).json({ error: "Invalid artifact type" });
     return;
   }
 
-  // Get current presets and defaults
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { filterPresets: true, defaultFilterPresets: true },
-  });
-
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
-
-  const currentPresets = (user.filterPresets as FilterPresets | null) ?? {};
-  const currentDefaults =
-    (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
-
-  // Remove preset from the appropriate artifact type array
-  currentPresets[artifactType] = (currentPresets[artifactType] ?? []).filter(
-    (preset: FilterPreset) => preset.id !== presetId
+  await updateUserJson(
+    req.user.id,
+    ["filterPresets", "defaultFilterPresets"],
+    (values) => {
+      const presets = storedViewsOf(values.filterPresets);
+      const defaults = Object.entries(
+        storedDefaultsOf(values.defaultFilterPresets)
+      ).filter(
+        ([context, id]) =>
+          !(id === presetId && presetArtifactType(context) === artifactType)
+      );
+      return {
+        ...values,
+        filterPresets: {
+          ...presets,
+          [artifactType]: viewsOf(presets, artifactType).filter(
+            (view) => view.id !== presetId
+          ),
+        },
+        // fromEntries defines own properties, so a stored `__proto__` stays data
+        defaultFilterPresets: Object.fromEntries(defaults),
+      };
+    }
   );
-
-  // If this was the default preset, clear the default
-  if (currentDefaults[artifactType] === presetId) {
-    currentDefaults[artifactType] = undefined;
-  }
-
-  // Update user
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      filterPresets: currentPresets as never,
-      defaultFilterPresets: currentDefaults as never,
-    },
-  });
 
   res.json({ success: true });
 };
@@ -1202,14 +1409,14 @@ export const getDefaultFilterPresets = async (
 /**
  * Set default filter preset for a context
  * Context can be an artifact type (scene, performer, etc.) or a scene grid context
- * (scene_performer, scene_tag, scene_studio, scene_group)
+ * (scene_performer, scene_tag, scene_studio, scene_group). The View must be
+ * one of the context's list; no View clears the default. Written
+ * compare-and-set with the Views, so the View cannot go meanwhile.
  */
 export const setDefaultFilterPreset = async (
   req: TypedAuthRequest<SetDefaultFilterPresetBody>,
   res: TypedResponse<SetDefaultFilterPresetResponse | ApiErrorResponse>
 ) => {
-  const userId = req.user.id;
-
   const { context, presetId } = req.body;
 
   // Validate required fields
@@ -1224,52 +1431,34 @@ export const setDefaultFilterPreset = async (
     return;
   }
 
-  // Get current defaults
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { defaultFilterPresets: true, filterPresets: true },
-  });
-
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
-
-  const currentDefaults =
-    (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
-  const currentPresets = (user.filterPresets as FilterPresets | null) ?? {};
-
   // The defaults map is keyed by any string, not only the declared entity keys
   const contextKey: string = context;
+  const artifactType = presetArtifactType(context);
 
-  // If presetId is provided, validate it exists
-  // For scene and image tab contexts (scene_performer, image_tag, ...), validate against the "scene" or "image" presets
-  if (presetId) {
-    const artifactType = presetArtifactType(context);
-    const presetExists = (currentPresets[artifactType] ?? []).some(
-      (preset: FilterPreset) => preset.id === presetId
-    );
-
-    if (!presetExists) {
-      res.status(400).json({ error: "Preset not found" });
-      return;
+  let written: DefaultFilterPresets = {};
+  await updateUserJson(
+    req.user.id,
+    ["filterPresets", "defaultFilterPresets"],
+    (values) => {
+      const { [contextKey]: _previous, ...others } = storedDefaultsOf(
+        values.defaultFilterPresets
+      );
+      // For scene and image tab contexts (scene_performer, image_tag, ...),
+      // the View is one of the "scene" or "image" Views
+      if (
+        presetId &&
+        !viewsOf(storedViewsOf(values.filterPresets), artifactType).some(
+          (preset) => preset.id === presetId
+        )
+      ) {
+        throw new ValidationError("Preset not found");
+      }
+      written = presetId ? { ...others, [contextKey]: presetId } : others;
+      return { ...values, defaultFilterPresets: written };
     }
+  );
 
-    currentDefaults[contextKey] = presetId;
-  } else {
-    // If presetId is null/undefined, clear the default
-    currentDefaults[contextKey] = undefined;
-  }
-
-  // Update user
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      defaultFilterPresets: currentDefaults as never,
-    },
-  });
-
-  res.json({ success: true, defaults: currentDefaults });
+  res.json({ success: true, defaults: written });
 };
 
 // =============================================================================

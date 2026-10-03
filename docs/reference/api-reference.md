@@ -715,6 +715,75 @@ interface SaveFilterPresetResponse {
 
 ---
 
+### PUT /api/user/filter-presets/:artifactType/:presetId
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+type OverwriteViewBody = Omit<
+  SaveFilterPresetBody,
+  "artifactType" | "context" | "name" | "setAsDefault"
+>;
+```
+
+**URL Parameters:**
+
+```typescript
+interface DeleteFilterPresetParams extends Record<string, string> {
+  artifactType: string;
+  presetId: string;
+}
+```
+
+**Response:**
+
+```typescript
+interface SaveFilterPresetResponse {
+  success: true;
+  preset: FilterPreset;
+}
+```
+
+**Handler:** `overwriteFilterPreset` in `server/controllers/user.ts`
+
+---
+
+### PATCH /api/user/filter-presets/:artifactType/:presetId
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+interface RenameViewBody {
+  name: string;
+}
+```
+
+**URL Parameters:**
+
+```typescript
+interface DeleteFilterPresetParams extends Record<string, string> {
+  artifactType: string;
+  presetId: string;
+}
+```
+
+**Response:**
+
+```typescript
+interface SaveFilterPresetResponse {
+  success: true;
+  preset: FilterPreset;
+}
+```
+
+**Handler:** `renameFilterPreset` in `server/controllers/user.ts`
+
+---
+
 ### DELETE /api/user/filter-presets/:artifactType/:presetId
 
 **Authentication:** Session

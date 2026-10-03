@@ -130,6 +130,21 @@ describe("data migration 009: stored presets and carousel rules", () => {
               direction: "DESC",
             },
           ],
+          // 9b: a View with a group, and beta.7's one gender
+          performer: [
+            {
+              id: "performer-view",
+              name: "Fave Ladies",
+              filters: {
+                gender: "FEMALE",
+                g1: "any",
+                "g1.tagIds": [TAG_A_ONLY, TAG_BOTH],
+                "g1.6.nope": 1,
+              },
+              sort: "rating",
+              direction: "DESC",
+            },
+          ],
         },
       },
     });
@@ -173,7 +188,7 @@ describe("data migration 009: stored presets and carousel rules", () => {
     expect(Object.fromEntries(studios)).toEqual({ [STUDIO_B_ONLY]: B });
   });
 
-  it("a bare tag id on one instance becomes id:instance; one on both instances stays bare", async () => {
+  it("a bare tag id on one instance becomes id:instance, in a group's picker too; one on both instances stays bare", async () => {
     const summary = await cleanStoredFilters([userId]);
 
     const user = must(
@@ -209,6 +224,19 @@ describe("data migration 009: stored presets and carousel rules", () => {
           direction: "DESC",
         },
       ],
+      performer: [
+        {
+          id: "performer-view",
+          name: "Fave Ladies",
+          filters: {
+            gender: ["FEMALE"],
+            g1: "any",
+            "g1.tagIds": [`${TAG_A_ONLY}:${A}`, TAG_BOTH],
+          },
+          sort: "rating",
+          direction: "DESC",
+        },
+      ],
     });
     const carousel = must(
       await prisma.userCarousel.findUnique({ where: { id: carouselId } }),
@@ -223,11 +251,15 @@ describe("data migration 009: stored presets and carousel rules", () => {
     expect([carousel.sort, carousel.direction]).toEqual(["random", "DESC"]);
     expect(summary).toEqual({
       users: 1,
-      presets: 2,
+      presets: 3,
       carousels: 1,
-      droppedKeys: { "image.notAFilter": 1, "carousel.not_a_field": 1 },
-      refsRewritten: 4,
-      refsLeftBare: 2,
+      droppedKeys: {
+        "image.notAFilter": 1,
+        "performer.g1.6.nope": 1,
+        "carousel.not_a_field": 1,
+      },
+      refsRewritten: 5,
+      refsLeftBare: 3,
       skipped: 0,
     });
   });
@@ -244,7 +276,7 @@ describe("data migration 009: stored presets and carousel rules", () => {
       carousels: 0,
       droppedKeys: {},
       refsRewritten: 0,
-      refsLeftBare: 2,
+      refsLeftBare: 3,
       skipped: 0,
     });
   });

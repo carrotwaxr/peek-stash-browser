@@ -141,6 +141,26 @@ export class TestClient {
     };
   }
 
+  async patch<T = unknown>(
+    path: string,
+    body?: object,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "PATCH",
+      headers: this.getHeaders(options),
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    this.captureToken(response);
+
+    const data: unknown = await response.json().catch(() => ({}));
+    return {
+      status: response.status,
+      data: data as T,
+      ok: response.ok,
+    };
+  }
+
   async delete<T = unknown>(
     path: string,
     options?: RequestOptions

@@ -3,7 +3,9 @@
  *
  * Tests getUserSettings, updateUserSettings, changePassword, getRecoveryKey,
  * regenerateRecoveryKey, adminResetPassword, adminRegenerateRecoveryKey,
- * getAllUsers, createUser, deleteUser, updateUserRole.
+ * getAllUsers, createUser, deleteUser, updateUserRole, and the Views
+ * (saved filter presets): save, save changes, rename, delete and set as
+ * default, written compare-and-set.
  */
 import type { CustomTheme, User, UserContentRestriction } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -23,13 +25,18 @@ import {
   adminResetPassword,
   changePassword,
   createUser,
+  deleteFilterPreset,
   deleteUser,
   deleteUserRestrictions,
   getAllUsers,
   getRecoveryKey,
   getUserRestrictions,
   getUserSettings,
+  overwriteFilterPreset,
   regenerateRecoveryKey,
+  renameFilterPreset,
+  saveFilterPreset,
+  setDefaultFilterPreset,
   updateUserRestrictions,
   updateUserRole,
   updateUserSettings,
@@ -42,12 +49,16 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { bumpUser, libraryStampFor } from "../../services/LibraryStamp.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
-import type { UserRestriction } from "../../types/api/index.js";
+import type {
+  SaveFilterPresetBody,
+  UserRestriction,
+} from "../../types/api/index.js";
 import { userDownloadsDir } from "../../utils/downloadPaths.js";
 import { logger } from "../../utils/logger.js";
 import { validatePassword } from "../../utils/passwordValidation.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import {
+  findHandler,
   malformed,
   reqFor,
   resFor,
@@ -2158,6 +2169,444 @@ describe("User Controller", () => {
           unreadable: false,
         },
       ]);
+    });
+  });
+
+  // ─── Views (saved filter presets) ───
+
+  describe("Views", () => {
+    type SettingsColumn = "filterPresets" | "defaultFilterPresets";
+    type Row = Record<SettingsColumn, string | null>;
+
+    const text = (value: unknown) =>
+      value === undefined ? null : JSON.stringify(value);
+
+    /**
+     * The user's settings columns behind the compare-and-set write: the read
+     * answers the stored text, and the write stores its values only while
+     * the text it names is still there. `race` changes the row once, after
+     * the first read, as a save from another tab would. `bareRefs` answers
+     * the bare-id lookup (`resolveBareRefs`): type, then id to instance.
+     */
+    function settingsRow(
+      initial: Partial<Record<SettingsColumn, unknown>>,
+      options: {
+        race?: (row: Row) => void;
+        bareRefs?: Partial<Record<string, Record<string, string>>>;
+      } = {}
+    ) {
+      const row: Row = {
+        filterPresets: text(initial.filterPresets),
+        defaultFilterPresets: text(initial.defaultFilterPresets),
+      };
+      let race = options.race;
+      mockPrisma.$queryRawUnsafe.mockImplementation(
+        prismaImpl((query: string, ...values: unknown[]) => {
+          if (query.includes('FROM "User"')) return [{ ...row }];
+          // resolveBareRefs: one query per entity type over a JSON list of ids
+          const table = /"Stash(\w+)"/.exec(query)?.[1]?.toLowerCase() ?? "";
+          const answers = options.bareRefs?.[table] ?? {};
+          const ids = JSON.parse(String(values[0])) as string[];
+          return ids
+            .filter((id) => answers[id] !== undefined)
+            .map((id) => ({ id, instanceId: answers[id] }));
+        })
+      );
+      mockPrisma.$executeRawUnsafe.mockImplementation(
+        prismaImpl((query: string, ...values: unknown[]) => {
+          if (race) {
+            race(row);
+            race = undefined;
+          }
+          const columns = [...query.matchAll(/"(\w+)" = \?/g)]
+            .map((match) => must(match[1]))
+            .filter((column): column is SettingsColumn => column in row);
+          const guards = values.slice(columns.length + 2);
+          if (columns.some((column, i) => row[column] !== guards[i])) return 0;
+          columns.forEach((column, i) => {
+            row[column] = values[i] as string | null;
+          });
+          return 1;
+        })
+      );
+      return {
+        presets: () =>
+          JSON.parse(row.filterPresets ?? "null") as Record<
+            string,
+            Array<Record<string, unknown>>
+          > | null,
+        defaults: () =>
+          JSON.parse(row.defaultFilterPresets ?? "null") as Record<
+            string,
+            string
+          > | null,
+      };
+    }
+
+    const view = (id: string, name: string, extra = {}) => ({
+      id,
+      name,
+      filters: {},
+      sort: "created_at",
+      direction: "DESC",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      ...extra,
+    });
+
+    const saveBody = (
+      extra: Partial<SaveFilterPresetBody> = {}
+    ): SaveFilterPresetBody => ({
+      artifactType: "scene",
+      name: "Fave tags",
+      filters: { tagIds: ["1:inst-a"] },
+      sort: "created_at",
+      direction: "DESC",
+      ...extra,
+    });
+
+    async function save(body: SaveFilterPresetBody) {
+      const req = reqFor(saveFilterPreset, { body, user: USER });
+      const res = resFor(saveFilterPreset);
+      await saveFilterPreset(req, res);
+      return res;
+    }
+
+    it("POST stores a validated View and answers it", async () => {
+      const stored = settingsRow({});
+
+      const res = await save(saveBody());
+
+      const body = res._getOkBody();
+      expect(body.preset).toMatchObject({
+        name: "Fave tags",
+        filters: { tagIds: ["1:inst-a"] },
+        sort: "created_at",
+        direction: "DESC",
+      });
+      expect(stored.presets()).toEqual({ scene: [body.preset] });
+      expect(stored.defaults()).toBeNull();
+    });
+
+    it("POST with setAsDefault and a context of another artifact type is a 400", async () => {
+      settingsRow({});
+
+      await expect(
+        save(
+          saveBody({
+            artifactType: "performer",
+            context: "scene_performer",
+            setAsDefault: true,
+            sort: "name",
+          })
+        )
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it("POST refuses a View whose name another View of the list has (409), case-insensitive, trimmed", async () => {
+      const stored = settingsRow({
+        filterPresets: { scene: [view("v1", "Fave Tags")] },
+      });
+
+      await expect(
+        save(saveBody({ name: "  fave tags " }))
+      ).rejects.toMatchObject({ statusCode: 409 });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+
+      // another list may hold the name
+      const res = await save(
+        saveBody({
+          artifactType: "performer",
+          name: "Fave tags",
+          filters: {},
+          sort: "name",
+        })
+      );
+      expect(res._getOkBody().preset.name).toBe("Fave tags");
+      expect(stored.presets()?.performer).toHaveLength(1);
+    });
+
+    it("POST trims the name and refuses an empty or over-long one", async () => {
+      const stored = settingsRow({});
+
+      await expect(save(saveBody({ name: "   " }))).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      await expect(
+        save(saveBody({ name: "x".repeat(101) }))
+      ).rejects.toMatchObject({ statusCode: 400 });
+      const res = await save(saveBody({ name: "  Spaced  " }));
+      expect(res._getOkBody().preset.name).toBe("Spaced");
+      expect(must(stored.presets()?.scene?.[0]).name).toBe("Spaced");
+    });
+
+    it("POST refuses the 101st View of a list", async () => {
+      settingsRow({
+        filterPresets: {
+          scene: Array.from({ length: 100 }, (_, i) =>
+            view(`v${i}`, `View ${i}`)
+          ),
+        },
+      });
+
+      await expect(save(saveBody())).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it("POST refuses invalid filters, sort and direction with their paths", async () => {
+      settingsRow({});
+
+      await expect(
+        save(
+          saveBody({
+            filters: { notAFilter: 1, g1: "some" },
+            sort: "bogus",
+            direction: "SIDEWAYS",
+          })
+        )
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [
+          { path: "filters.notAFilter", message: "Not a filter of this list" },
+          { path: "filters.g1", message: 'Expected "all" or "any"' },
+          { path: "sort", message: "Not a sort of this list" },
+          { path: "direction", message: "Expected ASC or DESC" },
+        ],
+      });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it("a scene View sorted by recommended is accepted on save", async () => {
+      const stored = settingsRow({});
+
+      await save(saveBody({ sort: "recommended" }));
+
+      expect(must(stored.presets()?.scene?.[0]).sort).toBe("recommended");
+    });
+
+    it("a bare id is tied to its one instance on save; one held by two instances (or none) is kept bare, logged, and the save succeeds", async () => {
+      const stored = settingsRow({}, { bareRefs: { tag: { "1": "inst-a" } } });
+
+      const res = await save(
+        saveBody({ filters: { tagIds: ["1", "2"], "g1.tagIds": ["3"] } })
+      );
+
+      expect(res._getOkBody().preset.filters).toEqual({
+        tagIds: ["1:inst-a", "2"],
+        "g1.tagIds": ["3"],
+      });
+      expect(must(stored.presets()?.scene?.[0]).filters).toEqual({
+        tagIds: ["1:inst-a", "2"],
+        "g1.tagIds": ["3"],
+      });
+      expect(logger.info).toHaveBeenCalledWith(
+        "A saved View keeps bare ids it could not tie to one instance",
+        { userId: USER.id, list: "scene", refsLeftBare: 2 }
+      );
+    });
+
+    it("PUT overwrites filters, sort and presentation, keeps id, name and createdAt, sets updatedAt", async () => {
+      const stored = settingsRow({
+        filterPresets: {
+          scene: [
+            view("v1", "Mine", { viewMode: "grid", perPage: 40 }),
+            view("v2", "Other"),
+          ],
+        },
+      });
+      const req = reqFor(overwriteFilterPreset, {
+        params: { artifactType: "scene", presetId: "v1" },
+        body: {
+          filters: { "2.tagIds": ["5:inst-a"], tagIds: ["4:inst-a"] },
+          sort: "title",
+          direction: "asc",
+          viewMode: "wall",
+          gridDensity: "compact",
+          perPage: 500,
+        },
+        user: USER,
+      });
+      const res = resFor(overwriteFilterPreset);
+
+      await overwriteFilterPreset(req, res);
+
+      const saved = res._getOkBody().preset;
+      expect(saved).toEqual({
+        id: "v1",
+        name: "Mine",
+        filters: { "2.tagIds": ["5:inst-a"], tagIds: ["4:inst-a"] },
+        sort: "title",
+        direction: "ASC",
+        viewMode: "wall",
+        zoomLevel: "medium",
+        gridDensity: "compact",
+        tableColumns: null,
+        perPage: 250,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: anyOf(String),
+      });
+      expect(stored.presets()).toEqual({
+        scene: [saved, view("v2", "Other")],
+      });
+    });
+
+    it("PUT on a missing View is a 404", async () => {
+      settingsRow({ filterPresets: { scene: [view("v1", "Mine")] } });
+      const req = reqFor(overwriteFilterPreset, {
+        params: { artifactType: "scene", presetId: "gone" },
+        body: { filters: {}, sort: "title", direction: "ASC" },
+        user: USER,
+      });
+
+      await expect(
+        overwriteFilterPreset(req, resFor(overwriteFilterPreset))
+      ).rejects.toMatchObject({ statusCode: 404 });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it("PATCH renames and refuses an empty or duplicate name", async () => {
+      const stored = settingsRow({
+        filterPresets: { scene: [view("v1", "Mine"), view("v2", "Other")] },
+      });
+      const rename = async (name: unknown) => {
+        const req = reqFor(renameFilterPreset, {
+          params: { artifactType: "scene", presetId: "v1" },
+          body: malformed({ name }),
+          user: USER,
+        });
+        const res = resFor(renameFilterPreset);
+        await renameFilterPreset(req, res);
+        return res;
+      };
+
+      const res = await rename(" Renamed ");
+      expect(res._getOkBody().preset).toMatchObject({
+        id: "v1",
+        name: "Renamed",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      expect(stored.presets()?.scene?.map((each) => each.name)).toEqual([
+        "Renamed",
+        "Other",
+      ]);
+
+      await expect(rename("")).rejects.toMatchObject({ statusCode: 400 });
+      await expect(rename(42)).rejects.toMatchObject({ statusCode: 400 });
+      await expect(rename("OTHER")).rejects.toMatchObject({ statusCode: 409 });
+      // its own name in another case is no clash
+      await expect(rename("RENAMED")).resolves.toBeDefined();
+    });
+
+    it("DELETE clears the default of every context that names the View", async () => {
+      const stored = settingsRow({
+        filterPresets: {
+          scene: [view("v1", "Mine"), view("v2", "Other")],
+          image: [view("v1", "Same id, other list")],
+        },
+        defaultFilterPresets: {
+          scene: "v1",
+          scene_performer: "v1",
+          scene_tag: "v2",
+          image: "v1",
+        },
+      });
+      const req = reqFor(deleteFilterPreset, {
+        params: { artifactType: "scene", presetId: "v1" },
+        user: USER,
+      });
+
+      await deleteFilterPreset(req, resFor(deleteFilterPreset));
+
+      expect(stored.presets()).toEqual({
+        scene: [view("v2", "Other")],
+        image: [view("v1", "Same id, other list")],
+      });
+      expect(stored.defaults()).toEqual({ scene_tag: "v2", image: "v1" });
+    });
+
+    it("DELETE clears a scene_recommended default naming the View", async () => {
+      const stored = settingsRow({
+        filterPresets: { scene: [view("v1", "Mine")] },
+        defaultFilterPresets: { scene_recommended: "v1" },
+      });
+      const req = reqFor(deleteFilterPreset, {
+        params: { artifactType: "scene", presetId: "v1" },
+        user: USER,
+      });
+
+      await deleteFilterPreset(req, resFor(deleteFilterPreset));
+
+      expect(stored.defaults()).toEqual({});
+    });
+
+    it("set as default writes through the compare-and-set write and checks the View is in the context's list", async () => {
+      const stored = settingsRow({
+        filterPresets: { scene: [view("v1", "Mine")] },
+      });
+      const setDefault = async (context: string, presetId?: string) => {
+        const req = reqFor(setDefaultFilterPreset, {
+          body: { context, ...(presetId === undefined ? {} : { presetId }) },
+          user: USER,
+        });
+        const res = resFor(setDefaultFilterPreset);
+        await setDefaultFilterPreset(req, res);
+        return res;
+      };
+
+      expect((await setDefault("scene_recommended", "v1"))._getStatus()).toBe(
+        200
+      );
+      expect(stored.defaults()).toEqual({ scene_recommended: "v1" });
+      await expect(setDefault("performer", "v1")).rejects.toMatchObject({
+        statusCode: 400,
+        message: "Preset not found",
+      });
+      expect(stored.defaults()).toEqual({ scene_recommended: "v1" });
+      await setDefault("scene_recommended");
+      expect(stored.defaults()).toEqual({});
+    });
+
+    it("writes are compare-and-set: a save from another tab between the read and the write is kept", async () => {
+      const stored = settingsRow(
+        { filterPresets: { scene: [view("v1", "Mine")] } },
+        {
+          race: (row) => {
+            row.filterPresets = JSON.stringify({
+              scene: [view("v1", "Mine"), view("v2", "Other tab")],
+            });
+          },
+        }
+      );
+
+      const res = await save(saveBody({ setAsDefault: true }));
+
+      const id = res._getOkBody().preset.id;
+      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(2);
+      expect(stored.presets()?.scene?.map((each) => each.id)).toEqual([
+        "v1",
+        "v2",
+        id,
+      ]);
+      expect(stored.defaults()).toEqual({ scene: id });
+    });
+
+    it("registers save changes and rename on the View's path", () => {
+      expect(
+        findHandler(
+          userRoutes,
+          "put",
+          "/filter-presets/:artifactType/:presetId"
+        )
+      ).toBeTypeOf("function");
+      expect(
+        findHandler(
+          userRoutes,
+          "patch",
+          "/filter-presets/:artifactType/:presetId"
+        )
+      ).toBeTypeOf("function");
     });
   });
 });

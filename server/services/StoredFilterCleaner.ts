@@ -6,15 +6,21 @@
  * - A preset keeps its panel keys (`shared/types/filters/uiKeys.ts`) with
  *   their modifier, depth and exclude companions, and its list's contract fields
  *   (a page's permanent criterion saved in the request's shape: the folder
- *   view's tag, the timeline's date). Any other key goes, and so does a
- *   companion whose value its field refuses (the panel then shows the
- *   default). `perPage` is held to PER_PAGE_MAX.
+ *   view's tag, the timeline's date). A panel key or companion may carry a
+ *   row prefix (`g1.`, `2.`, `g1.2.`; 9b's key grammar, read by
+ *   `parseRowKey`), and the root's `match` and a group's `gN` ("all" or
+ *   "any") stay; a contract field stays at the root only. Any other key goes,
+ *   and so does a companion whose value its field refuses (the panel then
+ *   shows the default). A multi row's lone value (beta.7's one gender)
+ *   becomes a one-element list. `perPage` is held to PER_PAGE_MAX.
  * - A carousel's rules are parsed leniently with the scene contract, one key
  *   at a time: a key the parser drops (unknown, or a criterion it refuses,
  *   which the query ignores whole) goes; the rest stays as stored.
  * - A sort outside the list becomes the default sort and direction (a
  *   carousel's is random, DESC); a direction outside ASC and DESC the
- *   default direction, and a lower-case one is upper-cased.
+ *   default direction, and a lower-case one is upper-cased. A scene preset
+ *   may also sort by Recommended's sorts (Recommended shares the scene
+ *   Views).
  * - A bare id from before multi-instance support becomes `id:instance` when
  *   exactly one live entity of its type has it on an enabled instance;
  *   otherwise it stays bare and keeps matching that id on every server. A
@@ -32,12 +38,19 @@ import {
   LIST_FIELDS,
   LIST_KINDS,
   type ListKind,
+  MATCHES,
+  PANEL_FIELDS,
   PER_PAGE_MAX,
+  type PanelField,
+  RECOMMENDED_SORTS,
+  ROOT_MATCH_KEY,
   SCENE_FIELDS,
   SORT_DIRECTIONS,
   type SortDirection,
   UI_KEYS,
   type UiKey,
+  WHERE_LIMITS,
+  parseRowKey,
 } from "@peek/shared-types/filters/index.js";
 import { makeEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
@@ -77,6 +90,8 @@ export interface CleanReport {
   readonly refsRewritten: number;
   /** Bare ids no single live entity has, left bare */
   readonly refsLeftBare: number;
+  /** A multi row's lone values made one-element lists */
+  readonly valuesListed: number;
 }
 
 export interface Cleaned<T> {
@@ -116,6 +131,7 @@ class Tally {
   perPageCapped = false;
   refsRewritten = 0;
   refsLeftBare = 0;
+  valuesListed = 0;
 
   get changed(): boolean {
     return (
@@ -123,7 +139,8 @@ class Tally {
       this.sortReset ||
       this.directionFixed ||
       this.perPageCapped ||
-      this.refsRewritten > 0
+      this.refsRewritten > 0 ||
+      this.valuesListed > 0
     );
   }
 
@@ -135,6 +152,7 @@ class Tally {
       perPageCapped: this.perPageCapped,
       refsRewritten: this.refsRewritten,
       refsLeftBare: this.refsLeftBare,
+      valuesListed: this.valuesListed,
     };
   }
 }
@@ -286,6 +304,18 @@ export async function bareRefLookupFor(
 // SORTS
 // =============================================================================
 
+/**
+ * Whether `raw` is a sort a View of the list may store: one of the list's
+ * (`isListSort`), or for a scene View one of Recommended's, which shares the
+ * scene Views
+ */
+export function isViewSort(kind: ListKind, raw: unknown): boolean {
+  if (isListSort(kind, raw)) return true;
+  if (kind !== "scene") return false;
+  const recommended: readonly string[] = RECOMMENDED_SORTS;
+  return typeof raw === "string" && recommended.includes(raw);
+}
+
 interface SortParts {
   readonly sort: unknown;
   readonly direction: unknown;
@@ -328,6 +358,10 @@ function cleanSort(
 interface PresetKeys {
   /** Panel keys and exclude companions, with the field each fills */
   readonly panel: ReadonlyMap<string, FieldSpec>;
+  /** Each panel key and companion, with the panel key of its row */
+  readonly rowOf: ReadonlyMap<string, string>;
+  /** The panel keys of multi rows, whose value is a list */
+  readonly multi: ReadonlySet<string>;
   /** Modifier companions, with their field */
   readonly modifiers: ReadonlyMap<string, FieldSpec>;
   /** Depth companions, with their field */
@@ -344,6 +378,7 @@ const PRESET_KEYS = new Map<string, { kind: ListKind; keys: PresetKeys }>(
   LIST_KINDS.map((kind) => {
     const fields = fieldsOf(kind);
     const panel = new Map<string, FieldSpec>();
+    const rowOf = new Map<string, string>();
     const modifiers = new Map<string, FieldSpec>();
     const depths = new Map<string, FieldSpec>();
     const uiKeys: readonly UiKey[] = UI_KEYS[kind];
@@ -351,13 +386,35 @@ const PRESET_KEYS = new Map<string, { kind: ListKind; keys: PresetKeys }>(
       const spec = fields[uiKey.field];
       if (!spec) continue;
       panel.set(uiKey.key, spec);
+      rowOf.set(uiKey.key, uiKey.key);
       // A picker's excluded ids, cleaned like its picks
-      if (uiKey.excludeKey) panel.set(uiKey.excludeKey, spec);
-      if (uiKey.modifierKey) modifiers.set(uiKey.modifierKey, spec);
-      if (uiKey.hierarchyKey) depths.set(uiKey.hierarchyKey, spec);
+      if (uiKey.excludeKey) {
+        panel.set(uiKey.excludeKey, spec);
+        rowOf.set(uiKey.excludeKey, uiKey.key);
+      }
+      if (uiKey.modifierKey) {
+        modifiers.set(uiKey.modifierKey, spec);
+        rowOf.set(uiKey.modifierKey, uiKey.key);
+      }
+      if (uiKey.hierarchyKey) {
+        depths.set(uiKey.hierarchyKey, spec);
+        rowOf.set(uiKey.hierarchyKey, uiKey.key);
+      }
     }
+    const rows: readonly PanelField[] = PANEL_FIELDS[kind];
+    const multi = new Set(
+      rows
+        .filter(
+          (row) =>
+            (row.editor === "ref" || row.editor === "enum") &&
+            row.multi === true
+        )
+        .map((row) => row.key)
+    );
     const keys: PresetKeys = {
       panel,
+      rowOf,
+      multi,
       modifiers,
       depths,
       fields: new Map(Object.entries(fields)),
@@ -379,18 +436,83 @@ function takesDepth(spec: FieldSpec, value: unknown): boolean {
   return typeof value === "number" && Number.isInteger(value) && value >= -1;
 }
 
+/** A group's match key, `g1` to `g99` (only `g1` to `g5` are groups) */
+const GROUP_KEY = /^g(\d+)$/;
+
+/** A filter key's place in the state, read with the key grammar */
+export type FilterKeyRole =
+  /** The root's `match` or a group's `gN` declaration */
+  | { readonly kind: "match"; readonly group: number }
+  /** A panel key or companion of a row; `row` is the row's panel key */
+  | {
+      readonly kind: "row";
+      readonly group: number;
+      readonly occurrence: number;
+      readonly key: string;
+      readonly row: string;
+    }
+  /** A contract field at the root: a page's permanent criterion */
+  | { readonly kind: "permanent" }
+  /** A contract field under a row prefix: permanent criteria are root only */
+  | { readonly kind: "prefixedPermanent" }
+  /** Not a key of the list, or outside the grammar (`g6.`, `21.`) */
+  | { readonly kind: "unknown" };
+
+/** A stored filter key's role in the list `kind`'s state */
+export function filterKeyRole(kind: ListKind, raw: string): FilterKeyRole {
+  const list = PRESET_KEYS.get(kind);
+  return list ? roleOf(list.keys, raw) : { kind: "unknown" };
+}
+
+function roleOf(keys: PresetKeys, raw: string): FilterKeyRole {
+  if (raw === ROOT_MATCH_KEY) return { kind: "match", group: 0 };
+  const group = GROUP_KEY.exec(raw)?.[1];
+  if (group !== undefined) {
+    const number = Number(group);
+    return number >= 1 && number <= WHERE_LIMITS.groups
+      ? { kind: "match", group: number }
+      : { kind: "unknown" };
+  }
+  const parsed = parseRowKey(raw);
+  if (!parsed) return { kind: "unknown" };
+  const row = keys.rowOf.get(parsed.key);
+  if (row !== undefined) return { kind: "row", ...parsed, row };
+  if (!keys.fields.has(parsed.key)) return { kind: "unknown" };
+  return parsed.group === 0 && parsed.occurrence === 1
+    ? { kind: "permanent" }
+    : { kind: "prefixedPermanent" };
+}
+
+/** A group's or the root's match: "all" or "any" */
+export function isMatchValue(value: unknown): boolean {
+  return MATCHES.some((match) => match === value);
+}
+
 /** Whether a preset's filter key stays */
 function keepsFilterKey(
   keys: PresetKeys,
-  key: string,
+  rawKey: string,
   value: unknown
 ): boolean {
+  const role = roleOf(keys, rawKey);
+  if (role.kind === "match") return isMatchValue(value);
+  if (role.kind === "permanent") return true;
+  if (role.kind !== "row") return false;
+  const { key } = role;
   if (keys.panel.has(key)) return true;
   const modifierOf = keys.modifiers.get(key);
   if (modifierOf) return takesModifier(modifierOf, value);
   const depthOf = keys.depths.get(key);
   if (depthOf) return takesDepth(depthOf, value);
-  return keys.fields.has(key);
+  return false;
+}
+
+/** A multi row's value: a lone string or number becomes a one-element list */
+function listedValue(value: unknown, tally: Tally): unknown {
+  if (typeof value !== "string" && typeof value !== "number") return value;
+  if (value === "") return value;
+  tally.valuesListed++;
+  return [value];
 }
 
 function cleanPresetFilters(
@@ -401,25 +523,44 @@ function cleanPresetFilters(
 ): Record<string, unknown> {
   let changed = false;
   const entries: [string, unknown][] = [];
-  for (const [key, value] of Object.entries(filters)) {
-    if (!keepsFilterKey(keys, key, value)) {
-      tally.droppedKeys.push(key);
+  for (const [rawKey, value] of Object.entries(filters)) {
+    if (!keepsFilterKey(keys, rawKey, value)) {
+      tally.droppedKeys.push(rawKey);
       changed = true;
       continue;
     }
+    // a root key reads as itself; a prefixed one by its base key
+    const key = parseRowKey(rawKey)?.key ?? rawKey;
     const panel = keys.panel.get(key);
     const field = panel ?? keys.fields.get(key);
-    let next = value;
+    let next = keys.multi.has(key) ? listedValue(value, tally) : value;
     if (field?.kind === "ref") {
       next = panel
-        ? cleanRefs(value, field.target, lookup, tally)
-        : cleanRefCriterion(value, field.target, lookup, tally);
+        ? cleanRefs(next, field.target, lookup, tally)
+        : cleanRefCriterion(next, field.target, lookup, tally);
     }
     if (next !== value) changed = true;
-    entries.push([key, next]);
+    entries.push([rawKey, next]);
   }
   // fromEntries defines own properties, so a stored `__proto__` key stays data
   return changed ? Object.fromEntries(entries) : filters;
+}
+
+/**
+ * One View's filters (the flat prefixed state) cleaned as a stored preset's
+ * are: unknown keys and refused companions go, bare ids are tied through
+ * `lookup`, a multi row's lone value becomes a list
+ */
+export function cleanViewFilters(
+  kind: ListKind,
+  filters: Record<string, unknown>,
+  lookup: BareRefLookup = NO_LOOKUP
+): Cleaned<Record<string, unknown>> {
+  const tally = new Tally();
+  const list = PRESET_KEYS.get(kind);
+  if (!list) return { value: filters, changed: false, report: tally.report() };
+  const value = cleanPresetFilters(list.keys, filters, lookup, tally);
+  return { value, changed: tally.changed, report: tally.report() };
 }
 
 /**
@@ -444,7 +585,7 @@ export function cleanPresetState(
   const sort = cleanSort(
     { sort: preset.sort, direction: preset.direction },
     DEFAULT_SORT[list.kind],
-    isListSort(list.kind, preset.sort),
+    isViewSort(list.kind, preset.sort),
     tally
   );
   const perPage =
