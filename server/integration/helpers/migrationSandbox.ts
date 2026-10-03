@@ -108,3 +108,33 @@ export async function createDatabaseAt(
   }
   return sandbox;
 }
+
+/**
+ * Inserts a `User` row naming only the columns it is given, plus the ones the
+ * schema requires without a database default, and returns its id. Raw SQL:
+ * the client follows the current schema, so `client.user.create` names (and
+ * reads back) every `User` column, including ones a later migration adds,
+ * which a database built up to an older migration does not have. A value that
+ * is an object or array is stored as JSON text, as Prisma stores a Json column.
+ */
+export async function insertUser(
+  client: PrismaClient,
+  columns: Record<string, unknown>
+): Promise<number> {
+  const now = Date.now();
+  const row: Record<string, unknown> = {
+    createdAt: now,
+    updatedAt: now,
+    ...columns,
+  };
+  const names = Object.keys(row);
+  const values = Object.values(row).map((value) =>
+    value !== null && typeof value === "object" ? JSON.stringify(value) : value
+  );
+  const inserted = await client.$queryRawUnsafe<Array<{ id: number }>>(
+    `INSERT INTO "User" (${names.map((name) => `"${name}"`).join(", ")})
+     VALUES (${names.map(() => "?").join(", ")}) RETURNING "id"`,
+    ...values
+  );
+  return Number(inserted[0]?.id);
+}

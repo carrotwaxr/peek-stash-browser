@@ -15,6 +15,7 @@ import {
   type MigrationSandbox,
   PRISMA_DIR,
   createDatabaseAt,
+  insertUser,
 } from "../helpers/migrationSandbox.js";
 
 /** The newest migration before this one */
@@ -114,17 +115,15 @@ describe("history JSON arrays migration", () => {
     const db = await createDatabaseAt(BEFORE);
     sandbox = db;
     const { client } = db;
-    const user = await client.user.create({
-      data: { username: "u", password: "x" },
-    });
+    const userId = await insertUser(client, { username: "u", password: "x" });
 
-    await seedScene(client, user.id, "encoded", ENCODED, ENCODED);
-    await seedScene(client, user.id, "array", ARRAY, ARRAY);
-    await seedScene(client, user.id, "notjson", NOT_JSON, NOT_JSON);
-    await seedScene(client, user.id, "notarray", NOT_ARRAY, NOT_ARRAY);
-    await seedImage(client, user.id, "encoded", ENCODED, ENCODED);
-    await seedImage(client, user.id, "array", ARRAY, ARRAY);
-    await seedImage(client, user.id, "notjson", NOT_JSON, NOT_JSON);
+    await seedScene(client, userId, "encoded", ENCODED, ENCODED);
+    await seedScene(client, userId, "array", ARRAY, ARRAY);
+    await seedScene(client, userId, "notjson", NOT_JSON, NOT_JSON);
+    await seedScene(client, userId, "notarray", NOT_ARRAY, NOT_ARRAY);
+    await seedImage(client, userId, "encoded", ENCODED, ENCODED);
+    await seedImage(client, userId, "array", ARRAY, ARRAY);
+    await seedImage(client, userId, "notjson", NOT_JSON, NOT_JSON);
 
     const sceneBefore = await types(client, "WatchHistory", "sceneId", [
       "oHistory",

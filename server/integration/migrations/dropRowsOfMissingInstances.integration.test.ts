@@ -17,6 +17,7 @@ import {
   type MigrationSandbox,
   PRISMA_DIR,
   createDatabaseAt,
+  insertUser,
 } from "../helpers/migrationSandbox.js";
 
 /** The newest migration before this one */
@@ -235,11 +236,9 @@ describe("drop rows of missing instances migration", () => {
 
     // A per-user row naming the gone instance is not this migration's to
     // delete (instance deletion, B2, owns per-user rows)
-    const user = await client.user.create({
-      data: { username: "u", password: "x" },
-    });
+    const userId = await insertUser(client, { username: "u", password: "x" });
     await insert(client, "SceneRating", {
-      userId: user.id,
+      userId,
       sceneId: "1",
       instanceId: "gone",
       rating: 80,

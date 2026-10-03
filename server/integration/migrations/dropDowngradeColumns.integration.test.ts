@@ -20,6 +20,7 @@ import {
   type MigrationSandbox,
   PRISMA_DIR,
   createDatabaseAt,
+  insertUser,
 } from "../helpers/migrationSandbox.js";
 
 /** The newest migration before the drop */
@@ -62,27 +63,23 @@ describe("drop downgrade columns migration", () => {
     // the hash from before the downgrade still in recoveryKeyHash
     const oldKey = generateRecoveryKey();
     const downgradeKey = generateRecoveryKey();
-    const downgraded = await db.client.user.create({
-      data: {
-        username: "downgraded",
-        password: "x",
-        recoveryKeyHash: hashRecoveryKey(oldKey),
-      },
+    const downgradedId = await insertUser(db.client, {
+      username: "downgraded",
+      password: "x",
+      recoveryKeyHash: hashRecoveryKey(oldKey),
     });
     // A user 3.3.6 wrote no key for keeps the hash it has
     const otherKey = generateRecoveryKey();
-    const other = await db.client.user.create({
-      data: {
-        username: "other",
-        password: "x",
-        recoveryKeyHash: hashRecoveryKey(otherKey),
-      },
+    const otherId = await insertUser(db.client, {
+      username: "other",
+      password: "x",
+      recoveryKeyHash: hashRecoveryKey(otherKey),
     });
     await db.client.$executeRaw`
-      UPDATE "User" SET "recoveryKey" = ${downgradeKey} WHERE id = ${downgraded.id}
+      UPDATE "User" SET "recoveryKey" = ${downgradeKey} WHERE id = ${downgradedId}
     `;
     await db.client.$executeRaw`
-      UPDATE "User" SET "recoveryKey" = '' WHERE id = ${other.id}
+      UPDATE "User" SET "recoveryKey" = '' WHERE id = ${otherId}
     `;
     // A scene row an older version stored with its stream list. Raw SQL: the
     // current client's create names columns later migrations add
@@ -111,16 +108,16 @@ describe("drop downgrade columns migration", () => {
     ).toEqual([{ id: "1", stashInstanceId: "inst-a", title: "Kept" }]);
 
     expect(hashed).toBe(1);
-    const hash = await storedHash(db.client, downgraded.id);
+    const hash = await storedHash(db.client, downgradedId);
     expect(hash).toBe(hashRecoveryKey(downgradeKey));
     expect(recoveryKeyMatches(downgradeKey, hash ?? "")).toBe(true);
     expect(recoveryKeyMatches(oldKey, hash ?? "")).toBe(false);
-    expect(await storedHash(db.client, other.id)).toBe(
+    expect(await storedHash(db.client, otherId)).toBe(
       hashRecoveryKey(otherKey)
     );
 
     // Idempotent: the next start leaves the hashes alone
     expect(await hashLegacyRecoveryKeys(db.client)).toBe(0);
-    expect(await storedHash(db.client, downgraded.id)).toBe(hash);
+    expect(await storedHash(db.client, downgradedId)).toBe(hash);
   });
 });
