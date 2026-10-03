@@ -485,6 +485,62 @@ export const proxyScenePreview = async (
 };
 
 /**
+ * Proxy a scene's poster (its screenshot)
+ * GET /api/scene/:sceneId/poster?instanceId=
+ * Requires a Peek session, or a signed media link for this scene and
+ * instance (authenticatePosterRequest: a Cast receiver sends no cookie). The
+ * scene must be visible to the user, checked on every request. Served from
+ * the instance `instanceId` names (400 without one).
+ */
+export const proxyScenePoster = async (
+  req: TypedAuthRequest<never, { sceneId: string }, { instanceId?: string }>,
+  res: TypedResponse<ApiErrorResponse>
+) => {
+  const { sceneId } = req.params;
+  const { instanceId } = req.query;
+
+  if (!sceneId || !SCENE_ID_PATTERN.test(sceneId)) {
+    res.status(400).json({ error: "Invalid scene ID" });
+    return;
+  }
+
+  if (!instanceIdOrRespond(instanceId, res)) return;
+
+  // Same check and same answer as the preview: a missing scene and a
+  // refused one are both 404
+  if (!(await canUserAccessEntity(req.user.id, "scene", sceneId, instanceId))) {
+    res.status(404).json({ error: NOT_FOUND });
+    return;
+  }
+
+  const creds = credentialsOrRespond(instanceId, res);
+  if (!creds) return;
+  const { baseUrl: stashUrl, apiKey } = creds;
+
+  const fullUrl = stashMediaUrl(
+    stashUrl,
+    `/scene/${sceneId}/screenshot`,
+    apiKey
+  );
+  if (!fullUrl) {
+    res.status(404).json({ error: NOT_FOUND });
+    return;
+  }
+
+  logger.debug("Proxying scene poster", { sceneId });
+
+  await proxyWhenSlotFree(req.user.id, {
+    fullUrl,
+    res,
+    label: "[PROXY scene poster]",
+    defaultCacheControl: "private, max-age=86400",
+    timeoutMs: 60000,
+    requestHeaders: rangeHeaders(req),
+    headOnly: isHead(req),
+  });
+};
+
+/**
  * Proxy scene WebP animated preview
  * GET /api/proxy/scene/:id/webp?instanceId=
  * Requires a Peek session; the scene must be visible to the user.

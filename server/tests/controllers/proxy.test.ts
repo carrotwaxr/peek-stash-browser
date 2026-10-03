@@ -7,6 +7,7 @@ import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   proxyClipPreview,
   proxyImage,
+  proxyScenePoster,
   proxyScenePreview,
   proxySceneWebp,
   proxyStashMedia,
@@ -903,6 +904,107 @@ describe("Proxy Controller", () => {
         expect.any(Object),
         expect.any(Function)
       );
+    });
+  });
+
+  // ===========================================================================
+  // proxyScenePoster
+  // ===========================================================================
+
+  describe("proxyScenePoster", () => {
+    it("answers the scene's screenshot with a session, private", async () => {
+      setupHttpGetSuccess({ "cache-control": "public, max-age=3600" });
+
+      const req = reqFor(proxyScenePoster, {
+        params: { sceneId: "42" },
+        query: { instanceId: "inst-a" },
+        user: USER,
+      });
+      const res = resFor(proxyScenePoster);
+
+      await proxyScenePoster(req, res);
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "scene",
+        "42",
+        "inst-a"
+      );
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        "http://stash:9999/scene/42/screenshot?apikey=test-api-key",
+        expect.any(Object),
+        expect.any(Function)
+      );
+      expect(res.setHeader).toHaveBeenCalledWith(
+        "Cache-Control",
+        "private, max-age=3600"
+      );
+    });
+
+    it("is served from the instance the request names", async () => {
+      await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
+      setupHttpGetSuccess();
+
+      const req = reqFor(proxyScenePoster, {
+        params: { sceneId: "42" },
+        query: { instanceId: "default" },
+        user: USER,
+      });
+      await proxyScenePoster(req, resFor(proxyScenePoster));
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        "http://stash-default:9999/scene/42/screenshot?apikey=key-default",
+        expect.any(Object),
+        expect.any(Function)
+      );
+    });
+
+    it("returns 404 for a scene the user may not see, with no fetch", async () => {
+      mockCanUserAccessEntity.mockResolvedValue(false);
+      setupHttpGetSuccess();
+
+      const req = reqFor(proxyScenePoster, {
+        params: { sceneId: "42" },
+        query: { instanceId: "inst-a" },
+        user: USER,
+      });
+      const res = resFor(proxyScenePoster);
+
+      await proxyScenePoster(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Not found" });
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 without instanceId, before any check", async () => {
+      setupHttpGetSuccess();
+
+      const req = reqFor(proxyScenePoster, {
+        params: { sceneId: "42" },
+        user: USER,
+      });
+      const res = resFor(proxyScenePoster);
+
+      await proxyScenePoster(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 for a non-numeric scene id", async () => {
+      const req = reqFor(proxyScenePoster, {
+        params: { sceneId: "scene-1" },
+        query: { instanceId: "inst-a" },
+        user: USER,
+      });
+      const res = resFor(proxyScenePoster);
+
+      await proxyScenePoster(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
     });
   });
 

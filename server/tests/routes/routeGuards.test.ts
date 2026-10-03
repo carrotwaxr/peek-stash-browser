@@ -7,7 +7,7 @@
  *
  * - Every route ending in an `authenticated()` handler runs `authenticate`
  *   (or, on the stream and caption routes, `authenticateStreamRequest` or
- *   `authenticateCaptionRequest`) before it.
+ *   `authenticateCaptionRequest` or `authenticatePosterRequest`) before it.
  * - Every route without one of them is on PUBLIC_ROUTES.
  * - The routes behind `requireAdmin` are exactly ADMIN_ROUTES, each after a
  *   session check.
@@ -29,6 +29,7 @@ import {
 import { requireAdminOnceSetupStarted } from "../../middleware/setupGuards.js";
 import {
   authenticateCaptionRequest,
+  authenticatePosterRequest,
   authenticateStreamRequest,
 } from "../../middleware/streamAuth.js";
 import { LIBRARY_HANDLER } from "../../utils/routeHelpers.js";
@@ -321,7 +322,8 @@ describe("route guards", () => {
       (route) =>
         route.before.includes(authenticate) ||
         route.before.includes(authenticateStreamRequest) ||
-        route.before.includes(authenticateCaptionRequest)
+        route.before.includes(authenticateCaptionRequest) ||
+        route.before.includes(authenticatePosterRequest)
     );
     const unguarded = routes
       .filter((route) => typeof route.handler === "function")
@@ -335,13 +337,21 @@ describe("route guards", () => {
     expect(unguarded).toEqual([]);
   });
 
+  it("guards the scene poster with authenticatePosterRequest", () => {
+    const poster = routes.find(
+      (r) => r.key === "GET /api/scene/:sceneId/poster"
+    );
+    expect(poster?.before).toContain(authenticatePosterRequest);
+  });
+
   it("leaves only PUBLIC_ROUTES without a session check", () => {
     const open = routes
       .filter(
         (route) =>
           !route.before.includes(authenticate) &&
           !route.before.includes(authenticateStreamRequest) &&
-          !route.before.includes(authenticateCaptionRequest)
+          !route.before.includes(authenticateCaptionRequest) &&
+          !route.before.includes(authenticatePosterRequest)
       )
       .map((route) => route.key);
     expect(open.sort()).toEqual([...PUBLIC_ROUTES].sort());

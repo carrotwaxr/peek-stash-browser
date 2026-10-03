@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticate } from "../../middleware/auth.js";
 import {
   authenticateCaptionRequest,
+  authenticatePosterRequest,
   authenticateStreamRequest,
 } from "../../middleware/streamAuth.js";
 import prisma from "../../prisma/singleton.js";
@@ -472,6 +473,85 @@ describe("authenticateStreamRequest", () => {
       const plainNext = vi.fn();
       await authenticateCaptionRequest(plain, plainRes, plainNext);
       expect(mockAuthenticate).toHaveBeenCalledWith(plain, plainRes, plainNext);
+    });
+
+    it("a media link opens the poster route with no cookie, for its own scene only", async () => {
+      const claims = media({ sceneId: "5" });
+      const sig = signStreamLink(claims, KEY);
+      const posterReq = (sceneId: string, query: Record<string, string> = {}) =>
+        reqFor(authenticatePosterRequest, {
+          params: { sceneId },
+          query: {
+            instanceId: claims.instanceId,
+            uid: String(claims.userId),
+            exp: String(claims.exp),
+            scope: "media",
+            sig,
+            ...query,
+          },
+        });
+
+      const req = posterReq("5");
+      const next = vi.fn();
+      await authenticatePosterRequest(
+        req,
+        resFor(authenticatePosterRequest),
+        next
+      );
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).toEqual({ id: 7, username: "u", role: "USER" });
+      expect(mockAuthenticate).not.toHaveBeenCalled();
+
+      // Scene 6's poster, another instance and a tampered scope are 401
+      for (const [sceneId, query] of [
+        ["6", {}],
+        ["5", { instanceId: "inst-b" }],
+        ["5", { scope: "other" }],
+      ] as const) {
+        const bad = posterReq(sceneId, query);
+        const res = resFor(authenticatePosterRequest);
+        const badNext = vi.fn();
+        await authenticatePosterRequest(bad, res, badNext);
+        expect(
+          res.status,
+          JSON.stringify([sceneId, query])
+        ).toHaveBeenCalledWith(401);
+        expect(badNext).not.toHaveBeenCalled();
+      }
+    });
+
+    it("a v1 link is refused on the poster route", async () => {
+      const v1 = claimsFor({ sceneId: "5" });
+      const req = reqFor(authenticatePosterRequest, {
+        params: { sceneId: "5" },
+        query: {
+          instanceId: v1.instanceId,
+          uid: String(v1.userId),
+          exp: String(v1.exp),
+          sig: signStreamLink(v1, KEY),
+        },
+      });
+      const res = resFor(authenticatePosterRequest);
+      const next = vi.fn();
+
+      await authenticatePosterRequest(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).not.toHaveBeenCalled();
+      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("the poster route needs the session without sig", async () => {
+      const req = reqFor(authenticatePosterRequest, {
+        params: { sceneId: "5" },
+        query: { instanceId: "inst-a" },
+      });
+      const res = resFor(authenticatePosterRequest);
+      const next = vi.fn();
+
+      await authenticatePosterRequest(req, res, next);
+
+      expect(mockAuthenticate).toHaveBeenCalledWith(req, res, next);
     });
 
     it("the verified claims are on `res.locals.streamLink`", async () => {

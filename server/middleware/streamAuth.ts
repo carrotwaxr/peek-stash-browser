@@ -1,5 +1,5 @@
 /**
- * Session or signed link for the stream and caption routes (sweep item 2,
+ * Session or signed link for the stream, caption and poster routes (sweep item 2,
  * casting).
  *
  * External players and Cast receivers cannot send cookies, so these routes
@@ -11,7 +11,7 @@
  *   direct stream (`proxy-stream/stream`) only.
  * - A `media` link opens its one scene and instance: the direct stream, the
  *   HLS playlist and its segments (`stream.m3u8`, `stream.m3u8/<n>.ts`), and
- *   whatever the guard's own `allow` adds (the caption route). Never DASH or
+ *   whatever the guard's own `allow` adds (the caption and poster routes). Never DASH or
  *   the piped MP4, WebM and MKV transcodes.
  * - Any other `scope`, an empty one or a repeated one is 401.
  *
@@ -185,5 +185,10 @@ export const authenticateStreamRequest: RequestHandler = streamAuthFor(
 
 /** The caption route: a media link only, never a v1 link. */
 export const authenticateCaptionRequest: RequestHandler = streamAuthFor(
+  (_req, scope) => scope === "media"
+);
+
+/** The poster route: a media link only, never a v1 link. */
+export const authenticatePosterRequest: RequestHandler = streamAuthFor(
   (_req, scope) => scope === "media"
 );
