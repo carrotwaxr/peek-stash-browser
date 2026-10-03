@@ -409,7 +409,7 @@ describe("CarouselBuilder", () => {
     const fetchMock = await openWith(stored);
 
     expect(screen.queryByText(/more rules? this editor can't show/)).toBeNull();
-    expect(screen.getByRole("checkbox", { name: "Landscape" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Landscape$/ })).toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: "Portrait" })
     ).not.toBeChecked();

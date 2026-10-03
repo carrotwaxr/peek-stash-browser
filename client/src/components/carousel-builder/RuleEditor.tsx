@@ -1,12 +1,12 @@
 import { useId } from "react";
+import deepEqual from "fast-deep-equal";
 import { Trash2 } from "lucide-react";
 import {
   CAROUSEL_FILTER_DEFINITIONS,
   type FilterOption,
 } from "../../utils/filterConfig";
-import CheckboxGroup from "../ui/CheckboxGroup";
-import SearchableSelect from "../ui/SearchableSelect";
-import { Button } from "../ui/index";
+import { type PanelState, valuesOf } from "../../utils/filterFields";
+import { Button, FieldEditor } from "../ui/index";
 
 interface CarouselRule {
   id: string;
@@ -24,6 +24,67 @@ interface Props {
   onChange: (updates: Partial<CarouselRule>) => void;
   onRemove: () => void;
 }
+
+/** The row's state from a rule: its value, condition, depth and excluded picks */
+const rowStateOf = (def: FilterOption, rule: CarouselRule): PanelState => {
+  const entries: Array<[string | undefined, unknown]> = [
+    [def.key, rule.value],
+    [def.modifierKey, rule.modifier],
+    [def.hierarchyKey, rule.depth],
+    [def.excludeKey, rule.excludes],
+  ];
+  return Object.fromEntries(
+    entries.filter(
+      (entry): entry is [string, unknown] =>
+        entry[0] !== undefined && entry[1] !== undefined
+    )
+  );
+};
+
+/**
+ * The option the value cell draws: this editor keeps its own condition and
+ * sub-items controls, and a carousel's picks are not narrowed to what the
+ * library holds
+ */
+const valueOption = (def: FilterOption): FilterOption => {
+  const {
+    modifierOptions: _conditions,
+    supportsHierarchy: _subItems,
+    countFilterContext: _counted,
+    ...rest
+  } = def;
+  return rest;
+};
+
+/** What a row's next state changes on its rule */
+const updatesOf = (
+  def: FilterOption,
+  before: PanelState,
+  after: PanelState
+): Partial<CarouselRule> => {
+  const changed = (key: string | undefined): key is string =>
+    key !== undefined && !deepEqual(before[key], after[key]);
+  const { modifierKey, hierarchyKey, excludeKey } = def;
+  const modifier = modifierKey === undefined ? undefined : after[modifierKey];
+  const depth = hierarchyKey === undefined ? undefined : after[hierarchyKey];
+  return {
+    ...(changed(def.key) ? { value: after[def.key] ?? "" } : {}),
+    ...(changed(modifierKey)
+      ? { modifier: typeof modifier === "string" ? modifier : undefined }
+      : {}),
+    ...(changed(hierarchyKey)
+      ? { depth: typeof depth === "number" ? depth : undefined }
+      : {}),
+    ...(changed(excludeKey)
+      ? {
+          excludes:
+            after[excludeKey] === undefined
+              ? undefined
+              : valuesOf(after[excludeKey]),
+        }
+      : {}),
+  };
+};
 
 /**
  * RuleEditor Component
@@ -51,6 +112,8 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
   const presence =
     takesPresence &&
     (rule.modifier === "IS_NULL" || rule.modifier === "NOT_NULL");
+
+  const rowState = filterDef ? rowStateOf(filterDef, rule) : {};
 
   const handleFilterChange = (newFilterKey: string) => {
     const newDef = CAROUSEL_FILTER_DEFINITIONS.find(
@@ -114,7 +177,7 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
           </label>
           <select
             aria-label="Condition"
-            value={rule.modifier || filterDef.defaultModifier}
+            value={rule.modifier ?? filterDef.defaultModifier}
             onChange={(e) => onChange({ modifier: e.target.value })}
             className="w-full px-3 py-2 rounded-lg border text-sm"
             style={{
@@ -141,11 +204,20 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
           >
             Value
           </label>
-          <RuleValueInput
-            filterDef={filterDef}
-            rule={rule}
-            onChange={onChange}
-          />
+          {filterDef ? (
+            <FieldEditor
+              option={valueOption(filterDef)}
+              state={rowState}
+              onChange={(next) =>
+                onChange(updatesOf(filterDef, rowState, next))
+              }
+              hideLabel
+            />
+          ) : (
+            <span style={{ color: "var(--text-secondary)" }}>
+              Unknown filter
+            </span>
+          )}
         </div>
       )}
 
@@ -186,292 +258,6 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
           title="Remove rule"
         />
       </div>
-    </div>
-  );
-};
-
-interface RuleValueInputProps {
-  filterDef: FilterOption | undefined;
-  rule: CarouselRule;
-  onChange: (updates: Partial<CarouselRule>) => void;
-}
-
-/**
- * RuleValueInput Component
- * Renders the appropriate input for the filter type.
- */
-const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
-  if (!filterDef) {
-    return (
-      <span style={{ color: "var(--text-secondary)" }}>Unknown filter</span>
-    );
-  }
-
-  switch (filterDef.type) {
-    case "searchable-select":
-      return (
-        <SearchableSelect
-          label={filterDef.label ?? filterDef.key}
-          // A Playlists rule picks the owner's playlists, then those shared
-          // with them; its value is the playlist ids
-          entityType={
-            filterDef.entityType as
-              | "scenes"
-              | "performers"
-              | "studios"
-              | "tags"
-              | "galleries"
-              | "groups"
-              | "playlists"
-          }
-          value={rule.value as string | string[]}
-          onChange={(val) => onChange({ value: val })}
-          multi={filterDef.multi}
-          // A field that takes exclusions: each pick includes or excludes,
-          // but under Has NONE, where every pick excludes
-          excluded={filterDef.excludeKey ? rule.excludes : undefined}
-          onSelectionChange={
-            filterDef.excludeKey
-              ? (included, excluded) =>
-                  onChange({
-                    value: included,
-                    excludes: excluded.length > 0 ? excluded : undefined,
-                  })
-              : undefined
-          }
-          excludeToggle={
-            (rule.modifier ?? filterDef.defaultModifier) !== "EXCLUDES"
-          }
-          placeholder={
-            filterDef.placeholder ??
-            `Select ${(filterDef.label ?? filterDef.key).toLowerCase()}...`
-          }
-        />
-      );
-
-    case "range":
-      return (
-        <RangeInput
-          filterDef={filterDef}
-          value={rule.value as { min?: number; max?: number } | undefined}
-          onChange={(val) => onChange({ value: val })}
-        />
-      );
-
-    case "checkbox":
-      return (
-        <div className="py-2">
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-            Enabled
-          </span>
-        </div>
-      );
-
-    case "select":
-      // A multi select (Orientation) is a box for each value; a rule stored
-      // while it was single holds one string, which reads as one box
-      if (filterDef.multi) {
-        const picked = Array.isArray(rule.value)
-          ? (rule.value as unknown[]).map(String)
-          : typeof rule.value === "string" && rule.value !== ""
-            ? [rule.value]
-            : [];
-        return (
-          <CheckboxGroup
-            label={filterDef.label ?? filterDef.key}
-            options={filterDef.options ?? []}
-            value={picked}
-            onChange={(next) => onChange({ value: next })}
-          />
-        );
-      }
-      return (
-        <select
-          aria-label={filterDef.label ?? filterDef.key}
-          value={(rule.value as string) || ""}
-          onChange={(e) => onChange({ value: e.target.value })}
-          className="w-full px-3 py-2 rounded-lg border text-sm"
-          style={{
-            backgroundColor: "var(--bg-primary)",
-            borderColor: "var(--border-color)",
-            color: "var(--text-primary)",
-          }}
-        >
-          <option value="">Select...</option>
-          {filterDef.options?.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      );
-
-    case "text":
-      return (
-        <input
-          type="text"
-          aria-label={filterDef.label ?? filterDef.key}
-          value={(rule.value as string) || ""}
-          onChange={(e) => onChange({ value: e.target.value })}
-          placeholder={filterDef.placeholder || "Enter value..."}
-          maxLength={filterDef.maxLength}
-          className="w-full px-3 py-2 rounded-lg border text-sm"
-          style={{
-            backgroundColor: "var(--bg-primary)",
-            borderColor: "var(--border-color)",
-            color: "var(--text-primary)",
-          }}
-        />
-      );
-
-    case "date-range":
-      return (
-        <DateRangeInput
-          label={filterDef.label ?? filterDef.key}
-          value={rule.value as DateRange | undefined}
-          onChange={(val) => onChange({ value: val })}
-        />
-      );
-
-    default:
-      return (
-        <span style={{ color: "var(--text-secondary)" }}>
-          Unsupported type: {filterDef.type}
-        </span>
-      );
-  }
-};
-
-interface RangeInputProps {
-  filterDef: FilterOption;
-  value: { min?: number; max?: number } | undefined;
-  onChange: (value: { min?: number; max?: number }) => void;
-}
-
-/**
- * A typed bound: a number, decimals kept unless the field steps in whole
- * units; nothing for a blank or a non-number
- */
-const boundOf = (
-  text: string,
-  step: number | undefined
-): number | undefined => {
-  if (text.trim() === "") return undefined;
-  const value = Number(text);
-  if (!Number.isFinite(value)) return undefined;
-  return step !== undefined && Number.isInteger(step)
-    ? Math.trunc(value)
-    : value;
-};
-
-/**
- * RangeInput Component
- * Min/max input for numeric range filters, in the unit its label names.
- */
-const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
-  const label = filterDef.label ?? filterDef.key;
-  const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...value, min: boundOf(e.target.value, filterDef.step) });
-  };
-
-  const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...value, max: boundOf(e.target.value, filterDef.step) });
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="number"
-        aria-label={`Minimum ${label}`}
-        value={value?.min ?? ""}
-        onChange={handleMinChange}
-        placeholder="Min"
-        min={filterDef.min}
-        max={filterDef.max}
-        step={filterDef.step ?? "any"}
-        className="w-24 px-3 py-2 rounded-lg border text-sm"
-        style={{
-          backgroundColor: "var(--bg-primary)",
-          borderColor: "var(--border-color)",
-          color: "var(--text-primary)",
-        }}
-      />
-      <span style={{ color: "var(--text-secondary)" }}>to</span>
-      <input
-        type="number"
-        aria-label={`Maximum ${label}`}
-        value={value?.max ?? ""}
-        onChange={handleMaxChange}
-        placeholder="Max"
-        min={filterDef.min}
-        max={filterDef.max}
-        step={filterDef.step ?? "any"}
-        className="w-24 px-3 py-2 rounded-lg border text-sm"
-        style={{
-          backgroundColor: "var(--bg-primary)",
-          borderColor: "var(--border-color)",
-          color: "var(--text-primary)",
-        }}
-      />
-    </div>
-  );
-};
-
-/** A date rule, as the filter panel's date range holds it (the date codec reads it) */
-interface DateRange {
-  start?: string;
-  end?: string;
-}
-
-interface DateRangeInputProps {
-  /** The rule's field, naming each date ("Last Played from") */
-  label: string;
-  value: DateRange | undefined;
-  onChange: (value: DateRange) => void;
-}
-
-/**
- * DateRangeInput Component
- * Date pickers for date range filters.
- */
-const DateRangeInput = ({ label, value, onChange }: DateRangeInputProps) => {
-  const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const start = e.target.value || undefined;
-    onChange({ ...value, start });
-  };
-
-  const handleToChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const end = e.target.value || undefined;
-    onChange({ ...value, end });
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="date"
-        aria-label={`${label} from`}
-        value={value?.start || ""}
-        onChange={handleFromChange}
-        className="px-3 py-2 rounded-lg border text-sm"
-        style={{
-          backgroundColor: "var(--bg-primary)",
-          borderColor: "var(--border-color)",
-          color: "var(--text-primary)",
-        }}
-      />
-      <span style={{ color: "var(--text-secondary)" }}>to</span>
-      <input
-        type="date"
-        aria-label={`${label} to`}
-        value={value?.end || ""}
-        onChange={handleToChange}
-        className="px-3 py-2 rounded-lg border text-sm"
-        style={{
-          backgroundColor: "var(--bg-primary)",
-          borderColor: "var(--border-color)",
-          color: "var(--text-primary)",
-        }}
-      />
     </div>
   );
 };
