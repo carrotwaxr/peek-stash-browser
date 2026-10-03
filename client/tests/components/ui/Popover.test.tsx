@@ -103,6 +103,8 @@ describe("Popover", () => {
       offsetLeft: { value: 5 },
       offsetHeight: { value: 30 },
     });
+    target.getBoundingClientRect = () =>
+      ({ top: 10, bottom: 40, left: 105, right: 145 }) as DOMRect;
     fireEvent.click(target);
 
     const dialog = screen.getByRole("dialog", { name: "Things" });
@@ -114,6 +116,27 @@ describe("Popover", () => {
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "Second" })
     );
+  });
+
+  it("stays on screen sideways: an anchor near either edge keeps it 8px in", () => {
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(390);
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(
+      function (this: HTMLElement) {
+        return this.getAttribute("role") === "dialog" ? 320 : 40;
+      }
+    );
+    renderHarness(<button>Only</button>);
+    const target = anchor();
+    // The anchor 300px from the screen's left, 300px into its wrapper
+    Object.defineProperty(target, "offsetLeft", { value: 300 });
+    target.getBoundingClientRect = () =>
+      ({ top: 0, bottom: 30, left: 300, right: 340 }) as DOMRect;
+    fireEvent.click(target);
+
+    // 300 + 320 would run past 390: its right edge 8px in, at 62px
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.style.left).toBe("62px");
+    expect(dialog.style.transform).toBe("");
   });
 
   it("flips above the anchor near the bottom of the viewport", () => {
