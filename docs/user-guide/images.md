@@ -20,13 +20,14 @@ Each image card displays:
 
 - Thumbnail preview
 - Title (if set)
-- Rating stars (your Peek rating)
-- O counter indicator
+- A rating badge with your rating as a number from 0 to 10, or `--` when you have not rated the image
+- O counter
 - Favorite heart icon
+- A menu with **Hide** (see [Hidden Items](hidden-items.md))
 
-**Hover actions:**
+**Card actions:**
 
-- Click the **star** to rate the image
+- Click the **rating badge** to open a slider and rate the image from 0 to 10
 - Click the **heart** to favorite/unfavorite
 - Click the **O** button to increment the O counter
 
@@ -34,7 +35,7 @@ Each image card displays:
 
 Click any image to open it in the full-screen lightbox viewer.
 
-Small images are scaled up to fill the viewer, keeping their proportions. Video files that Stash stores as images (mp4, m4v, webm, mov) play in the viewer with the browser's video controls, muted and looping; the arrow keys and swipes still move to the next image.
+Small images are scaled up to fill the viewer, keeping their proportions. Pinch to zoom on a touch screen, or scroll to zoom with a mouse (up to 5 times), then drag to pan the zoomed image. Video files that Stash stores as images (mp4, m4v, webm, mov) play in the viewer with the browser's video controls, muted and looping; the arrow keys and swipes still move to the next image.
 
 The open image is part of the page's address. Your browser's **Back** button (or the phone's back gesture) closes the viewer and leaves you on the list where you were, and copying or bookmarking the address while an image is open opens the viewer straight on that image. Moving from image to image, even onto the next page, does not add history entries, so one Back always closes the viewer. Closing the viewer, with Back or its own close button, leaves the list on the page of the last image you viewed, and the next Back leaves the list. If the next page of images fails to load, the viewer stays on the image you were on and a message says what went wrong.
 
@@ -73,31 +74,31 @@ Start an automatic slideshow:
 Rate images directly in the lightbox:
 
 - **R key**: Enter rating mode, then:
-    - **1-5**: Set rating (1=20%, 2=40%, 3=60%, 4=80%, 5=100%)
+    - **1-5**: Set the rating to 2, 4, 6, 8 or 10
     - **0**: Clear rating
-- **F key**: Toggle favorite
+    - **F**: Toggle favorite
+- In the info drawer, click the rating badge for a slider (0 to 10 in steps of 0.1) and use the heart to favorite
+- A **double-tap** (touch) or **double-click** (mouse) on the image does one action you choose in Settings → User Preferences → Customization → **Image Lightbox Double-Tap Action**: toggle favorite (the default), add an O, or toggle fullscreen
 
-Your ratings and favorites are saved to Peek (separate from Stash ratings). Filtering and sorting images by rating or O count use your own ratings and O counts: an image you have not rated counts as unrated, whatever its rating in Stash.
+Ratings and favorites are yours, per user, and show as you set them, not as Stash has them. Filtering and sorting images by rating or O count use your own ratings and O counts: an image you have not rated counts as unrated, whatever its rating in Stash. With **Sync to Stash** on for your account, an image rating you set is also written to Stash; favorites stay in Peek (see [Sync to Stash](user-management.md#sync-to-stash-export)).
 
 ### O Counter
 
 Track special moments:
 
-- Press **O** or click the O button to increment
+- Click the O button on an image card, or in the info drawer, to increment (the lightbox has no O key)
 - Pressed it by mistake? **Remove last O**, in the menu (⋮) beside the O button in the info drawer or on an image card, takes your newest O away. It shows only while the count is above 0.
 - With Sync to Stash on (an admin sets it in User Management), the O is added to and removed from the image in Stash too
-- View your O history in the info drawer
 
 ### Info Drawer
 
-Press **I** or click the info button to see image metadata:
+Press **I** or click the info button to see image metadata and your own controls:
 
-- Title and code
-- Date and photographer
-- Studio information
+- Title, with your rating badge, O counter (and its **Remove last O** menu) and favorite heart
+- Studio, date, photographer and resolution
 - Performers and tags
-- File details (resolution, size)
-- Gallery associations
+- Details
+- Links
 
 The drawer slides in from the right and can stay open while navigating.
 
@@ -107,31 +108,12 @@ Press **F** or click the expand button to enter fullscreen mode. Press **Escape*
 
 ## Filtering Images
 
-### By Performer
+### By Performer, Gallery and Tag
 
-1. Click **Filters** in the search controls
-2. Select **Performers**
-3. Choose one or more performers
-4. Images featuring those performers will display
-
-### By Gallery
-
-Filter to see images from specific galleries:
-
-1. Click **Filters**
-2. Select **Galleries**
-3. Choose the gallery
-4. Only images from that gallery appear
-
-### By Tag
-
-1. Click **Filters**
-2. Select **Tags**
-3. Choose one or more tags
-4. Matching images display
+Pick one or more performers, galleries or tags, and only the matching images list. Combine them with ANY, ALL or NONE as described in the table below.
 
 !!! note "Inherited Tags"
-    Images can inherit tags from their parent gallery, performers, and studio.
+    An image with no tags of its own takes its gallery's tags, and the filters see them. The same holds for performers.
 
 With **Include sub-tags** on, a chosen tag also matches its sub-tags, and "has all of" matches an image tagged with any sub-tag of each chosen tag. With more than one Stash server, a tag or studio picked from one server (and its sub-tags or sub-studios) matches only that server's content.
 
@@ -148,6 +130,9 @@ With **Include sub-tags** on, a chosen tag also matches its sub-tags, and "has a
 | **Path** | The image file's path: **Contains**, **Excludes**, **Equals** or **Starts with**. No regular expressions |
 | **URL** | Text search on any of the image's links |
 | **Performers**, **Studios**, **Tags**, **Galleries** | ANY / ALL / NONE (a studio: ANY or NONE), include or exclude each value, and **Has none / Has any** (see [Browse and Display](browse-and-display.md#include-or-exclude-each-value)) |
+| **Rating (0-100)** | A range on the stored 0-100 scale, which is ten times the rating shown, or Rated / Not rated. It uses your own ratings |
+| **Favorite Images** | Show only your favorited images |
+| **O Count** | A range on your own O count |
 | **Performer Tags** | Images with a performer who has the tag, with sub-tags |
 | **Performer Count**, **Performer Age** | Range filters: how many performers you can see on the image, and a performer's age on the image's date |
 | **Favorite Performers**, **Favorite Studios**, **Favorite Tags** | Yes / No / Any, by your favorites (their sub-tags and sub-studios, and the tags an image gets from its galleries, included) |
@@ -156,7 +141,7 @@ With **Include sub-tags** on, a chosen tag also matches its sub-tags, and "has a
 | **Orientation** | Landscape, portrait or square: pick one or several |
 | **Image Date**, **Created Date**, **Updated Date** | A start date, an end date, or both; both ends are included |
 
-You can also sort by Resolution, Tag Count and Performer Count.
+You can sort by Created At, Date, File Size, O Count, Path, Performer Count, Random, Rating, Resolution, Tag Count, Title and Updated At.
 
 ### Combined Filters
 
@@ -181,14 +166,14 @@ Navigate seamlessly across gallery pages:
 
 ### Inherited Metadata
 
-Images in galleries inherit metadata from the parent:
+An image that has none of its own takes these from its gallery:
 
-- Gallery's studio
-- Gallery's performers
-- Gallery's tags
-- Photographer information
+- Studio
+- Performers
+- Tags
+- Date, photographer and details
 
-This inherited data appears in the info drawer.
+An image in several galleries takes its studio, date, photographer and details from the first gallery that has one, and its performers and tags from all of its galleries. This inherited data appears in the info drawer and counts in the filters.
 
 ## View Tracking
 
@@ -196,9 +181,8 @@ Peek automatically tracks which images you view:
 
 - **View count**: Incremented after viewing for 3+ seconds
 - **View history**: Timestamps of each view
-- **Last viewed**: When you last saw the image
 
-View this data in the info drawer or on performer/studio detail pages.
+Your most viewed image shows in [My Stats](stats.md). The info drawer does not show view counts.
 
 ## Tips & Tricks
 
@@ -206,7 +190,7 @@ View this data in the info drawer or on performer/studio detail pages.
 
 Use number keys while in the lightbox for rapid rating:
 
-- View image → Press **4** → Instantly 4-star rated → **→** → Next image
+- View image → Press **R**, then **4** → Rated 8.0 → **→** → Next image
 
 ### Random Browse
 
@@ -219,7 +203,8 @@ The lightbox is fully touch-optimized:
 - Swipe left/right to navigate
 - Tap center to show/hide controls
 - Use the back gesture to close the viewer
-- Pinch to zoom (coming soon)
+- Pinch to zoom, then drag to pan
+- Double-tap for the action you set in Settings (favorite by default)
 
 ### Keyboard-Only Navigation
 
@@ -234,8 +219,7 @@ For TV mode or keyboard-only use:
 
 ### Images not loading
 
-- Check your Stash connection in Server Settings
-- Verify path mappings are configured correctly
+- Ask an admin to check the Stash connection (Settings → Server Settings → Server Configuration → Stash Instances)
 - Ensure Stash has generated thumbnails
 
 ### Lightbox not opening
