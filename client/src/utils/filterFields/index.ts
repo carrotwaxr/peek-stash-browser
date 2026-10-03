@@ -45,6 +45,7 @@ export {
   filterObjectOf,
   filtersEqual,
   isFilterUrlKey,
+  isStaleFilterUrlKey,
   mergeAnyRows,
   prefixedParams,
   readTreeUrl,

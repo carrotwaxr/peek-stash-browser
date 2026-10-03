@@ -13,6 +13,7 @@ import {
   codecOf,
   entityParamFor,
   isFilterUrlKey,
+  isStaleFilterUrlKey,
   readTreeUrl,
   urlKeysOf,
   writeTreeUrl,
@@ -469,7 +470,8 @@ const setOrDelete = (
 
 /**
  * The next URL for a list change: rewrites only the keys of the fields the
- * patch names, all of them the entity's list-owned keys, and keeps every
+ * patch names, all of them the entity's list-owned keys (a filter write
+ * also drops filter keys under a prefix past the limits), and keeps every
  * other key. Presentation keys are written only when they differ from what
  * the page shows without them; `page` is left out at 1. Filters that leave
  * no filter key write `filters=none`, so the default preset stays off.
@@ -482,7 +484,9 @@ export const writeListParams = (
   const next = new URLSearchParams(prev);
   if (patch.filters !== undefined) {
     for (const key of [...new Set(next.keys())]) {
-      if (isFilterUrlKey(entity, key)) next.delete(key);
+      if (isFilterUrlKey(entity, key) || isStaleFilterUrlKey(entity, key)) {
+        next.delete(key);
+      }
     }
     next.delete(NO_FILTERS_KEY);
     const written = filtersToUrlParams(patch.filters, filterOptions, entity);
