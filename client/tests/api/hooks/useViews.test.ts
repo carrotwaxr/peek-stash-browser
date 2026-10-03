@@ -1,6 +1,6 @@
 /**
  * The Views write hooks: each calls its route, marks both preset queries
- * stale, and a 409 comes back as `{ conflict: true, reason }`, not a thrown
+ * stale (on any answer), and a 409 comes back as `{ conflict: true, reason }`, not a thrown
  * error: `nameTaken` for a name another View has, `stale` for a write another
  * tab beat.
  */
@@ -206,17 +206,22 @@ describe("the Views write hooks", () => {
     expect(invalidatedKeys(invalidate)).toHaveLength(2);
   });
 
-  it("any other failure still rejects", async () => {
-    mockApiDelete.mockRejectedValue(new ApiError("boom", 500));
-    const { wrapper, invalidate } = setup();
-    const { result } = renderHook(() => useDeleteView(), { wrapper });
+  it("any other failure still rejects, and the Views are read again (a 404: another tab deleted the View)", async () => {
+    for (const status of [404, 500]) {
+      mockApiDelete.mockRejectedValue(new ApiError("View not found", status));
+      const { wrapper, invalidate } = setup();
+      const { result } = renderHook(() => useDeleteView(), { wrapper });
 
-    act(() => {
-      result.current.mutate({ artifactType: "scene", presetId: "p1" });
-    });
+      act(() => {
+        result.current.mutate({ artifactType: "scene", presetId: "p1" });
+      });
 
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error).toBeInstanceOf(ApiError);
-    expect(invalidate).not.toHaveBeenCalled();
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.error).toBeInstanceOf(ApiError);
+      expect(invalidatedKeys(invalidate)).toEqual([
+        queryKeys.user.filterPresets(),
+        queryKeys.user.defaultPresets(),
+      ]);
+    }
   });
 });

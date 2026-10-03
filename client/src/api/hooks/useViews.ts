@@ -31,8 +31,8 @@ export type ViewConflict = "nameTaken" | "stale";
 /**
  * What a Views write resolves to: the server's answer, or `{ conflict: true,
  * reason }` for a 409. A conflict is an answer the dialog shows, not a thrown
- * error; every other failure still rejects. Either way both preset queries
- * are read again.
+ * error; every other failure still rejects. Whatever the answer, both
+ * preset queries are read again.
  */
 export type ViewWriteResult<T> =
   | { conflict: false; data: T }
@@ -58,14 +58,18 @@ async function writeView<T>(request: Promise<T>): Promise<ViewWriteResult<T>> {
 const viewPath = (artifactType: string, presetId: string) =>
   `/user/filter-presets/${encodeURIComponent(artifactType)}/${encodeURIComponent(presetId)}`;
 
-/** A Views write, then both preset queries marked stale and read again */
+/**
+ * A Views write, then both preset queries marked stale and read again,
+ * whatever the answer: a refused write (a 404 for a View another tab
+ * deleted) still shows the Views as the server holds them
+ */
 function useViewMutation<Variables, T>(
   write: (variables: Variables) => Promise<T>
 ) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (variables: Variables) => writeView(write(variables)),
-    onSuccess: () => invalidatePresets(queryClient),
+    onSettled: () => invalidatePresets(queryClient),
   });
 }
 
