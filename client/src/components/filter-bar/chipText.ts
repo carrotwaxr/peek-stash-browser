@@ -85,6 +85,9 @@ export interface PermanentFiltersMetadata {
   performers?: Array<{ id: string; name: string }>;
   studios?: Array<{ id: string; name: string }>;
   tags?: Array<{ id: string; name: string }>;
+  /** A gallery's page names it by its title */
+  galleries?: Array<{ id: string; title: string }>;
+  groups?: Array<{ id: string; name: string }>;
   [key: string]: unknown;
 }
 
@@ -106,5 +109,13 @@ export const permanentChipsOf = (
   ...(metadata.tags ?? []).map((tag) => ({
     key: "tags",
     parts: { label: "Tag", values: [tag.name] },
+  })),
+  ...(metadata.galleries ?? []).map((gallery) => ({
+    key: "galleries",
+    parts: { label: "Gallery", values: [gallery.title] },
+  })),
+  ...(metadata.groups ?? []).map((group) => ({
+    key: "groups",
+    parts: { label: "Collection", values: [group.name] },
   })),
 ];

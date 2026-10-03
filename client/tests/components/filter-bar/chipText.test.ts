@@ -4,7 +4,11 @@
  * names and how many more, or how many are selected while names load.
  */
 import { describe, expect, it } from "vitest";
-import { chipText, namesText } from "@/components/filter-bar/chipText";
+import {
+  chipText,
+  namesText,
+  permanentChipsOf,
+} from "@/components/filter-bar/chipText";
 
 const resolved = (names: string[], unavailable = 0) => ({
   names,
@@ -65,5 +69,25 @@ describe("chipText", () => {
     expect(chipText({ label: "Organized" }, undefined, undefined)).toBe(
       "Organized"
     );
+  });
+});
+
+describe("permanentChipsOf", () => {
+  it("names every page's own filter: a performer, studio or tag, a gallery by its title, a collection by its name", () => {
+    expect(
+      permanentChipsOf({
+        performers: [{ id: "1:a", name: "Ada" }],
+        studios: [{ id: "2:a", name: "Brazzers" }],
+        tags: [{ id: "3:a", name: "Blonde" }],
+        galleries: [{ id: "4:a", title: "Beach day" }],
+        groups: [{ id: "5:a", name: "Summer" }],
+      }).map(({ key, parts }) => [key, parts.label, parts.values])
+    ).toEqual([
+      ["performers", "Performer", ["Ada"]],
+      ["studios", "Studio", ["Brazzers"]],
+      ["tags", "Tag", ["Blonde"]],
+      ["galleries", "Gallery", ["Beach day"]],
+      ["groups", "Collection", ["Summer"]],
+    ]);
   });
 });
