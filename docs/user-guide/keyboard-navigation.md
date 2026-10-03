@@ -44,7 +44,7 @@ On a scene, performer, studio, tag, collection or gallery page, and on the image
 
 | Keys | Action |
 |------|--------|
-| `r` `1` to `r` `5` | Rate 1 to 5 stars (20, 40, 60, 80 or 100) |
+| `r` `1` to `r` `5` | Rate 2, 4, 6, 8 or 10 out of 10 |
 | `r` `0` | Clear the rating |
 | `r` `f` | Toggle favorite |
 
@@ -152,6 +152,19 @@ In fullscreen, your browser's own `Escape` exits it.
 |-----|--------|
 | `Shift+N` | Next scene in playlist |
 | `Shift+P` | Previous scene in playlist |
+
+## Image Lightbox
+
+These keys work while the lightbox is open, in a gallery or on the Images page:
+
+| Key | Action |
+|-----|--------|
+| `←` / `→` | Previous / next image |
+| `Space` | Start or stop the slideshow |
+| `I` | Open or close the info drawer |
+| `F` | Toggle fullscreen |
+| `Escape` | Close the info drawer if it is open, otherwise the lightbox |
+| `r` `1` to `r` `5`, `r` `0`, `r` `f` | Rate, clear the rating, favorite the image (see [Rate and Favorite](#rate-and-favorite)) |
 
 ## Search and Filtering
 
