@@ -30,8 +30,8 @@ import {
   moveRow,
   normalizeEditTree,
   panelTreeOf,
-  removeGroup,
-  removeRow,
+  removeEditGroup,
+  removeEditRow,
   setMatch,
   setRowField,
   stateOf,
@@ -239,17 +239,17 @@ describe("rows", () => {
     ]);
   });
 
-  it("removeRow removes it wherever it is", () => {
+  it("removeEditRow removes it wherever it is", () => {
     let tree = withRow(empty(), "root", "tagIds", { tagIds: [A] });
     tree = addGroup(tree);
     const group = groupId(tree);
     tree = withRow(tree, group, "performerIds", { performerIds: [B] });
     tree = withRow(tree, group, "studioId", { studioId: [C] });
 
-    const fromRoot = removeRow(tree, lastIn(tree, "root").id);
+    const fromRoot = removeEditRow(tree, lastIn(tree, "root").id);
     expect(fromRoot.rows).toEqual([]);
     expect(itemsIn(fromRoot, group)).toHaveLength(2);
-    const fromGroup = removeRow(tree, lastIn(tree, group).id);
+    const fromGroup = removeEditRow(tree, lastIn(tree, group).id);
     expect(rowsOf(fromGroup, group)).toEqual([
       ["performerIds", { performerIds: [B] }],
     ]);
@@ -289,13 +289,13 @@ describe("groups", () => {
     expect(setMatch(tree, "root", "any").match).toBe("any");
   });
 
-  it("removeGroup removes it with its rows", () => {
+  it("removeEditGroup removes it with its rows", () => {
     let tree = addGroup(addGroup(empty()));
     const first = groupId(tree, 0);
     const second = groupId(tree, 1);
     tree = withRow(tree, first, "tagIds", { tagIds: [A] });
 
-    const removed = removeGroup(tree, first);
+    const removed = removeEditGroup(tree, first);
     expect(removed.groups.map((group) => group.id)).toEqual([second]);
     expect(idsOf(removed)).toEqual([second]);
   });

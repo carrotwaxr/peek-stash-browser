@@ -25,8 +25,8 @@ import {
   mergeNotes,
   moveRow,
   panelTableOf,
-  removeGroup,
-  removeRow,
+  removeEditGroup,
+  removeEditRow,
   setMatch,
   setRowField,
   updateRow,
@@ -195,7 +195,7 @@ const FilterRowsEditor = ({
         : next.kind === "row"
           ? rowControlIds(next.id).field
           : `filter-${next.id}-remove`;
-    change(removeRow(tree, itemId), focus);
+    change(removeEditRow(tree, itemId), focus);
   };
 
   const renderItems = (
@@ -435,7 +435,7 @@ const FilterRowsEditor = ({
                 onClick={() => {
                   const after = tree.groups[at + 1] ?? tree.groups[at - 1];
                   change(
-                    removeGroup(tree, group.id),
+                    removeEditGroup(tree, group.id),
                     after === undefined
                       ? waitingSelectId(ROOT)
                       : matchSelectId(after.id)
