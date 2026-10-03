@@ -12,7 +12,11 @@ import type { CriterionInput } from "./wire.js";
 export const MATCHES = ["all", "any"] as const;
 export type Match = (typeof MATCHES)[number];
 
-/** The root plus one level of groups; 20 rows, 5 groups, 2000 ids across the tree */
+/**
+ * The root plus one level of groups; 20 rows, 5 groups, and 2000 values
+ * across the tree (`refs`: every ref, playlist id and enum value a row names,
+ * its excludes included)
+ */
 export const WHERE_LIMITS = {
   depth: 2,
   rows: 20,

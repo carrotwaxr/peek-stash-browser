@@ -173,14 +173,18 @@ function parseGroup<E extends ListKind>(
   return { match, rules };
 }
 
-/** The ids a criterion names, `refs` and `excludes`; 0 for a criterion of another kind */
-function refCountOf(criterion: unknown): number {
+/**
+ * The values a parsed criterion names, as the "any" merge counts them
+ * (`anyMergeCap`): a ref criterion's `refs`, a playlist criterion's `ids`, a
+ * multi-valued enum's `values`, and any `excludes`; 0 for a criterion of
+ * another kind
+ */
+function valueCountOf(criterion: unknown): number {
   if (!isPlainObject(criterion)) return 0;
-  const { refs, excludes } = criterion;
-  return (
-    (Array.isArray(refs) ? refs.length : 0) +
-    (Array.isArray(excludes) ? excludes.length : 0)
-  );
+  return ["refs", "ids", "values", "excludes"].reduce((sum, key) => {
+    const list = criterion[key];
+    return sum + (Array.isArray(list) ? list.length : 0);
+  }, 0);
 }
 
 interface TreeCounts {
@@ -199,7 +203,7 @@ function countInto<E extends ListKind>(
       countInto(node, counts);
     } else {
       counts.rows += 1;
-      counts.refs += refCountOf(node.criterion);
+      counts.refs += valueCountOf(node.criterion);
     }
   }
 }

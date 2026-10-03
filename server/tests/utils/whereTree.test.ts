@@ -144,6 +144,25 @@ describe("parseWhere", () => {
     ]);
   });
 
+  it("the values limit counts playlist ids and enum values beside refs", () => {
+    const ids = (n: number) =>
+      Array.from({ length: 1000 }, (_, i) => `${n * 10000 + i}:a`);
+    const full = [tagRow(...ids(1)), tagRow(...ids(2))];
+    expect(parse("scene", { match: "all", rules: full }).issues).toEqual([]);
+    for (const extra of [
+      { field: "playlists", criterion: { value: [1] } },
+      {
+        field: "orientation",
+        criterion: { value: ["LANDSCAPE"], modifier: "INCLUDES" },
+      },
+    ]) {
+      expect(
+        parse("scene", { match: "all", rules: [...full, extra] }).issues,
+        extra.field
+      ).toEqual([{ path: "where", reason: "At most 2000 values in where" }]);
+    }
+  });
+
   it("the limits count rows after empty rows drop", () => {
     const rows = [
       ...Array.from({ length: 20 }, (_, i) => ({
