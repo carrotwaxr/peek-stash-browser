@@ -45,6 +45,19 @@ Each instance can be:
 
 Peek always keeps one enabled instance: the last one can be neither disabled nor deleted. Add another first, or change its address under **Edit**.
 
+### The VR tag
+
+**Location:** Settings → Server Settings → Server Configuration → Stash Instances (admins)
+
+Peek shows a **VR** button on a scene when one of its own tags is its server's VR tag, or a tag below it (see [VR Playback](../user-guide/vr.md)). Each server has its own VR tag:
+
+- **Stash's tag, by default.** Every sync reads the VR Tag setting from the server's Stash interface settings. The instance row reads "Stash's VR tag: <name>", or "Stash has no VR tag set". Peek finds the tag by that exact name on the same server; if two tags share it, the one with the lowest id wins.
+- **An admin override.** **Choose VR tag** picks a tag on that server, and the row then shows "Chosen here: <name>". It wins over Stash's setting. **Use Stash's tag** removes the override. If the chosen tag is deleted in Stash, Peek goes back to Stash's tag.
+- Changing a server's **URL** clears both, since the new address may be another Stash.
+- Only admins see this setting and the tag's name. Users just see the VR button.
+
+The picker lists tags the way your own library does: a tag you have hidden does not show in it, and a server that is disabled lists none until you enable it. A new tag or setting reaches the scene pages after the next sync.
+
 ### Sync Status
 
 **Location:** Settings → Server Settings → Server Configuration → Sync status
@@ -152,7 +165,7 @@ The image trusts its own nginx, so sign-in lockouts and rate limits see each vis
 
 The bundled nginx sends a Content Security Policy and four other security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` and `Permissions-Policy`) on every response. A reverse proxy in front should pass them through unchanged. Peek sends no HSTS header, because it usually runs over plain HTTP on a LAN: if you serve it over HTTPS, set HSTS on that proxy.
 
-Peek serves its own fonts. The browser loads nothing from third parties, apart from two things: the admin-only update check, which asks the GitHub API for the latest release, and, on the Scene page of a Chromium browser (Chrome, Edge, Brave and others) over HTTPS, Google's Cast sender script from `www.gstatic.com`, which is how casting works. TV mode and other browsers (Firefox, Safari) do not load it, and neither does a plain `http://` address. See [Casting](../user-guide/casting.md).
+Peek serves its own fonts. The browser loads nothing from third parties, apart from two things: the admin-only update check, which asks the GitHub API for the latest release, and, on the Scene page of a Chromium browser (Chrome, Edge, Brave and others) over HTTPS, Google's Cast sender script from `www.gstatic.com`, which is how casting works. TV mode and other browsers (Firefox, Safari) do not load it, and neither does a plain `http://` address. See [Casting](../user-guide/casting.md). VR playback makes no third-party request: its code is part of Peek, and the headset compatibility layer it includes has its device-database and wake-lock requests switched off. See [VR Playback](../user-guide/vr.md).
 
 ## Proxy Authentication
 

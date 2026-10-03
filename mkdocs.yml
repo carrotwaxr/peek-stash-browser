@@ -150,6 +150,7 @@ nav:
       - Recommendations: user-guide/recommendations.md
       - User Management: user-guide/user-management.md
       - User Stats: user-guide/stats.md
+      - VR Playback: user-guide/vr.md
       - Watch History: user-guide/watch-history.md
   - Reference:
       - Docker Basics: reference/docker-basics.md

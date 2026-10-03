@@ -78,6 +78,7 @@ Merges (`MergeReconciliationService`): the scene branch soft-deletes first and t
 
 ## Stash requests
 
+- Each instance's sync reads `configuration.ui.vrTag` (`StashClient.configurationUi`, `readStashVrTag`) into `StashInstance.stashVrTag`, one write only when it changed; a failed read keeps the stored value and never logs the `ui` map. The admin's `vrTagId` override is never touched by sync.
 - Every `StashClient` request fails after `STASH_REQUEST_TIMEOUT_MS` (120 s) with `StashRequestTimeoutError`. While a job holds the lock, `getStashClient` returns `client.withSignal(abortController.signal)`, so `abort()` ends a request in flight with `Error("Sync aborted")`. A test's stub client used under the lock needs `withSignal` (returning the stub).
 - Report a Stash failure through `describeStashError`: a graphql-request `ClientError`'s own message embeds the query and its variables. It gives the operation, each GraphQL message with its `path` (the field that broke) and the HTTP status.
 
