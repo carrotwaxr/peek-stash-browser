@@ -1,5 +1,10 @@
 import type { MinimalEntity } from "@peek/shared-types";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  skipToken,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { parseCompositeKey } from "../../utils/compositeKey";
 import { libraryApi } from "../library";
 import { getPlaylists, getSharedPlaylists } from "../playlists";
@@ -38,13 +43,14 @@ const request = (ids: readonly string[]) => ({
 function findNames(
   entityType: NamedEntity,
   ids: readonly string[],
-  signal: AbortSignal
+  signal: AbortSignal,
+  queryClient: QueryClient
 ): Promise<MinimalEntity[]> {
   switch (entityType) {
     case "scenes":
       return libraryApi.findScenesMinimal(request(ids), signal);
     case "playlists":
-      return playlistsNamed();
+      return playlistsNamed(queryClient);
     case "performers":
       return libraryApi.findPerformersMinimal(request(ids), signal);
     case "studios":
@@ -61,12 +67,23 @@ function findNames(
 /**
  * The viewer's playlists, their own and those shared with them, as named
  * ids: Peek playlist ids, which no `/minimal` endpoint knows. The instance
- * is empty: a playlist id is never joined with one.
+ * is empty: a playlist id is never joined with one. The lists come through
+ * their own query keys, so each new set of ids reads them from the cache
+ * while fresh, and a playlist change (which invalidates the playlists root)
+ * asks for them again.
  */
-async function playlistsNamed(): Promise<MinimalEntity[]> {
+async function playlistsNamed(
+  queryClient: QueryClient
+): Promise<MinimalEntity[]> {
   const [own, shared] = await Promise.all([
-    getPlaylists(),
-    getSharedPlaylists(),
+    queryClient.fetchQuery({
+      queryKey: queryKeys.playlists.list(),
+      queryFn: () => getPlaylists(),
+    }),
+    queryClient.fetchQuery({
+      queryKey: queryKeys.playlists.shared(),
+      queryFn: () => getSharedPlaylists(),
+    }),
   ]);
   return [...own.playlists, ...shared.playlists].map((playlist) => ({
     id: String(playlist.id),
@@ -131,6 +148,7 @@ export function useRefNames(
   ids: readonly string[]
 ) {
   const { ready } = useLibraryReady();
+  const queryClient = useQueryClient();
   const named = isNamedEntity(entityType) ? entityType : undefined;
   return useQuery({
     queryKey:
@@ -139,7 +157,7 @@ export function useRefNames(
         : KEYS[named](ids),
     queryFn:
       named !== undefined && ids.length > 0 && ready
-        ? ({ signal }) => findNames(named, ids, signal)
+        ? ({ signal }) => findNames(named, ids, signal, queryClient)
         : skipToken,
     select: (entities) => namesOf(ids, entities),
   });
