@@ -297,7 +297,8 @@ const SearchControls = ({
 
   // The list's own keys, enabled in every mode. Not from inside a popover
   // (the View settings dropdown too), a dialog (a Modal's overlay scope
-  // stops them anyway), an open menu or the player
+  // stops them anyway), an open menu or the player, nor from a select on a
+  // desktop (its letters are its typeahead; a TV's select hands keys on)
   const listKey =
     (run: (event: KeyboardEvent) => boolean) =>
     (event: KeyboardEvent): boolean => {
@@ -308,18 +309,23 @@ const SearchControls = ({
       ) {
         return false;
       }
+      if (target instanceof HTMLSelectElement && !isTVMode) return false;
       return run(event);
     };
+
+  const focusSearch = listKey(() => {
+    const input = searchRef.current?.querySelector("input");
+    if (!input) return false;
+    input.focus();
+    return true;
+  });
 
   useShortcutScope({
     layer: "page",
     keys: {
-      "/": listKey(() => {
-        const input = searchRef.current?.querySelector("input");
-        if (!input) return false;
-        input.focus();
-        return true;
-      }),
+      "/": focusSearch,
+      // Where `/` takes Shift (German, French: Shift+7, Shift+:)
+      "shift+/": focusSearch,
       // Shift+F is left free
       f: listKey((event) => {
         if (event.shiftKey || !filterable) return false;
