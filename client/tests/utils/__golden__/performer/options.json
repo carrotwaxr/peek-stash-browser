@@ -71,7 +71,8 @@
           "value": "false",
           "label": "No"
         }
-      ]
+      ],
+      "noBlank": true
     },
     {
       "key": "gender",
@@ -799,7 +800,8 @@
           "value": "false",
           "label": "No"
         }
-      ]
+      ],
+      "noBlank": true
     },
     {
       "key": "gender",
