@@ -1,6 +1,7 @@
 /**
  * Pins are one query under `user`: the defaults show until the answer, a
- * change shows before the server answers and is put back on a failure.
+ * change shows before the server answers and is put back on a failure;
+ * saves run in order, and a failure reads the pins again.
  */
 import { type ReactNode, createElement } from "react";
 import type { FilterPins, ListPins } from "@peek/shared-types";
@@ -197,6 +198,70 @@ describe("useSetPins", () => {
 
     await waitFor(() => expect(result.current.set.isError).toBe(true));
     expect(result.current.pins).toEqual(defaultPinsOf("scene"));
+  });
+
+  it("a failed save is read again from the server", async () => {
+    mockApiGet.mockResolvedValue({ pins: serverPins() });
+    mockApiPut.mockRejectedValue(new ApiError("boom", 500));
+    const { wrapper } = setup();
+    const { result } = renderHook(
+      () => ({ pins: useFilterPins("scene"), set: useSetPins() }),
+      { wrapper }
+    );
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      result.current.set.mutate({ kind: "scene", pins: MINE });
+    });
+
+    await waitFor(() => expect(result.current.set.isError).toBe(true));
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalledTimes(2));
+    expect(result.current.pins).toEqual(defaultPinsOf("scene"));
+  });
+
+  it("overlapping saves run one after another, and an earlier one failing does not undo a later one", async () => {
+    mockApiGet.mockResolvedValue({ pins: serverPins() });
+    const first = deferred<unknown>();
+    const second = deferred<unknown>();
+    mockApiPut
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const { wrapper } = setup();
+    const { result } = renderHook(
+      () => ({
+        pins: useFilterPins("scene"),
+        a: useSetPins(),
+        b: useSetPins(),
+      }),
+      { wrapper }
+    );
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalledTimes(1));
+    const ONE: ListPins = { fields: ["rating"], filters: [] };
+    const TWO: ListPins = { fields: ["rating", "tags"], filters: [] };
+
+    act(() => {
+      result.current.a.mutate({ kind: "scene", pins: ONE });
+      result.current.b.mutate({ kind: "scene", pins: TWO });
+    });
+    await waitFor(() => expect(result.current.pins).toEqual(TWO));
+    // The second waits for the first
+    expect(mockApiPut).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      first.reject(new ApiError("boom", 500));
+      await first.promise.catch(() => undefined);
+    });
+    await waitFor(() => expect(result.current.a.isError).toBe(true));
+    expect(result.current.pins).toEqual(TWO);
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalledTimes(2));
+    expect(mockApiPut).toHaveBeenLastCalledWith("/user/filter-pins/scene", TWO);
+
+    await act(async () => {
+      second.resolve({});
+      await second.promise;
+    });
+    await waitFor(() => expect(result.current.b.isSuccess).toBe(true));
+    expect(result.current.pins).toEqual(TWO);
   });
 
   it("changes only the one list's entry", async () => {
