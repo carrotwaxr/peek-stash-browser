@@ -638,6 +638,8 @@ describe("ViewsMenu", () => {
     tv = true;
     const user = userEvent.setup();
     const list = renderMenu();
+    // The button says what it opens
+    expect(viewsButton()).toHaveAttribute("aria-haspopup", "dialog");
     await user.click(viewsButton());
 
     const dialog = await screen.findByRole("dialog", { name: "Views" });

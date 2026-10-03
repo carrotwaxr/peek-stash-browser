@@ -362,7 +362,8 @@ const ViewsMenu = ({
           color: "var(--text-primary)",
         }}
         aria-label={modified ? `${name}, modified` : name}
-        aria-haspopup="menu"
+        // In TV mode it opens a dialog (a Modal), elsewhere a menu
+        aria-haspopup={isTVMode ? "dialog" : "menu"}
         aria-expanded={isOpen}
         title={modified ? `${name} (modified)` : name}
       >
