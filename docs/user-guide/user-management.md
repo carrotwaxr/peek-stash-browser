@@ -212,15 +212,26 @@ Promoting a user to admin stops their restrictions applying; demoting an admin a
 
 ### What Users Can Configure
 
-Each user can customize their own experience:
+Each user can customize their own experience under **Settings** → **User Preferences**, in six tabs:
 
-| Setting | Options |
-|---------|---------|
-| **Preview Quality** | Sprite, WebP, MP4 |
-| **Theme** | Peek, Light, Midnight Blue, Deep Purple, The Hub, Custom |
-| **Home Carousels** | Enable/disable and reorder |
-| **Navigation** | Customize menu items |
-| **Wall Playback** | Autoplay, Hover, Static |
+| Tab | Setting | Options |
+|-----|---------|---------|
+| **Theme** | Theme | Peek, Light, Midnight Blue, Deep Purple, The Hub, or a custom theme you build |
+| **Playback** | Minimum Play Percent | How much of a scene must play before it counts as played, in steps of 5% (see [Watch History](watch-history.md)) |
+| **Customization** | Scene Card Preview Quality | Sprite, WebP or MP4 |
+| | Wall View Preview Behavior | Autoplay All, Play on Hover Only or Static Thumbnails |
+| | Measurement Units | Metric or Imperial |
+| | Image Lightbox Double-Tap Action | Toggle Favorite, Increment O Counter or Toggle Fullscreen |
+| | Card Display | What each kind of card and detail page shows, and each page's default view |
+| | Table Columns | The columns each table shows |
+| **Navigation** | Landing Page After Login | One page, or a random one of several |
+| | Navigation Menu | Reorder and hide menu items |
+| | Homepage Carousels | Reorder, hide and build carousels |
+| **Content** | Content Sources | Which Stash servers you see (see [Using Several Stash Servers](multiple-stash-servers.md)) |
+| | Hidden Items | Review and unhide what you hid; skip the confirmation when hiding |
+| **Account** | Change Password, Recovery Key | See [Security](#security) |
+
+Admins also see **Server Settings** (Server Configuration, User Management, Merge Recovery and Backup) beside **User Preferences**. See [Personalization](personalization.md) and [Browse and Display](browse-and-display.md) for the details.
 
 ### Accessing Settings
 
