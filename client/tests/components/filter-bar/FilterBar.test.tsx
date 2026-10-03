@@ -555,7 +555,7 @@ describe("chips and rows", () => {
     );
   });
 
-  it("no filters and no permanent ones draw only + Filter", () => {
+  it("no filters and no permanent ones draw only + Filter and Advanced", () => {
     const client = new QueryClient();
     client.setQueryData(queryKeys.user.filterPins(), pinsAnswer());
     render(
@@ -564,7 +564,10 @@ describe("chips and rows", () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getAllByRole("button")).toEqual([addFilter()]);
+    expect(screen.getAllByRole("button")).toEqual([
+      addFilter(),
+      screen.getByRole("button", { name: "Advanced" }),
+    ]);
   });
 });
 
@@ -927,5 +930,151 @@ describe("pins", () => {
     await user.click(screen.getByRole("button", { name: "Unwatched" }));
     await waitFor(() => expect(list.params().has("watched")).toBe(false));
     expect(list.actions).toEqual(["PUSH", "PUSH"]);
+  });
+});
+
+describe("groups and the Advanced entry", () => {
+  const advanced = () => screen.getByRole("button", { name: "Advanced" });
+  const view = () => screen.getByRole("dialog", { name: "Advanced filters" });
+
+  it("Advanced opens the row view over the current state; Apply there commits once", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls({}, { url: "/scenes?favorite=true" });
+    await list.firstQuery();
+
+    await user.click(advanced());
+
+    expect(
+      within(view())
+        .getAllByRole("combobox", { name: "Filter" })
+        .map((select) => (select as HTMLSelectElement).value)
+    ).toEqual(["favorite"]);
+    fireEvent.change(
+      within(view()).getByRole("combobox", {
+        name: "Add a filter to top level",
+      }),
+      { target: { value: "watched" } }
+    );
+    fireEvent.change(must(document.activeElement), {
+      target: { value: "false" },
+    });
+    expect(list.actions).toEqual([]);
+
+    await user.click(within(view()).getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(list.params().get("watched")).toBe("false"));
+    expect(list.params().get("favorite")).toBe("true");
+    expect(list.actions).toEqual(["PUSH"]);
+    expect(
+      screen.queryByRole("dialog", { name: "Advanced filters" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("Advanced is in the bar with no filter set, and Cancel leaves the list as it was", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls({}, { url: "/scenes" });
+    await list.firstQuery();
+
+    await user.click(advanced());
+    await user.click(within(view()).getByRole("button", { name: "Cancel" }));
+
+    expect(
+      screen.queryByRole("dialog", { name: "Advanced filters" })
+    ).not.toBeInTheDocument();
+    expect(list.actions).toEqual([]);
+    expect(advanced()).toHaveFocus();
+  });
+
+  it("the badge and Clear all count a group as one filter", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls(
+      {},
+      { url: "/scenes?g1=any&g1.tagFavorite=true&g1.performerFavorite=true" }
+    );
+    await list.firstQuery();
+
+    // A group alone: one chip, and Clear all is there for it
+    expect(
+      screen.getAllByRole("button", { name: /^Edit filter/ })
+    ).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
+
+    await waitFor(() =>
+      expect(
+        [...list.params().keys()].filter((key) => key.startsWith("g1"))
+      ).toEqual([])
+    );
+    expect(list.actions).toEqual(["PUSH"]);
+  });
+
+  it("the hierarchy view's note counts a group as a filter", async () => {
+    renderListControls(
+      { artifactType: "tag", filterable: false },
+      { url: "/tags?g1=any&g1.favorite=true&g1.playCount_min=1" }
+    );
+
+    expect(
+      await screen.findByText(/Filters don't apply to the hierarchy view/)
+    ).toBeInTheDocument();
+  });
+
+  it("a URL with groups and no root rows shows only group chips", async () => {
+    const list = renderListControls(
+      {},
+      {
+        url: "/scenes?g1=any&g1.tagFavorite=true&g1.performerFavorite=true&g2.favorite=true",
+      }
+    );
+    await list.firstQuery();
+
+    expect(
+      screen
+        .getAllByRole("button", { name: /^Edit filter/ })
+        .map((chip) => chip.getAttribute("aria-label"))
+    ).toEqual([
+      "Edit filter group: Any of: Favorite Performers, Favorite Tags",
+      "Edit filter group: All of: Favorite Scenes",
+    ]);
+  });
+
+  it("at 5 groups the Advanced button still opens (the limit is the view's to show)", async () => {
+    const user = userEvent.setup();
+    const groups = [1, 2, 3, 4, 5]
+      .map((number) => `g${number}.favorite=true`)
+      .join("&");
+    const list = renderListControls({}, { url: `/scenes?${groups}` });
+    await list.firstQuery();
+
+    await user.click(advanced());
+
+    expect(view()).toBeInTheDocument();
+    expect(
+      within(view()).getAllByRole("group", { name: /^Group \d$/ })
+    ).toHaveLength(5);
+  });
+
+  it("the view lists the page's own filters by name, not by count", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls(
+      {
+        permanentFilters: {
+          performers: { value: ["9"], modifier: "INCLUDES" },
+        },
+        permanentFiltersMetadata: {
+          performers: [{ id: "9", name: "Jane Roe" }],
+          studios: [{ id: "4", name: "Brazzers" }],
+        },
+      },
+      { url: "/scenes" }
+    );
+    await list.firstQuery();
+
+    await user.click(advanced());
+
+    expect(
+      within(view()).getByText(
+        "Fixed by this page: Performer: Jane Roe; Studio: Brazzers"
+      )
+    ).toBeInTheDocument();
   });
 });

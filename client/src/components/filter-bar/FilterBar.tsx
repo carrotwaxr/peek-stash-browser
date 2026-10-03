@@ -6,12 +6,14 @@ import {
   type RowKey,
   rowKeyOf,
 } from "@peek/shared-types";
+import { LucideSlidersHorizontal } from "lucide-react";
 import { useFilterPins, useSetPins } from "../../api/hooks/useFilterPins";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import type { ListFilters } from "../../hooks/useListFilters";
 import {
   type ChipParts,
   type FilterOption,
+  type FilterChip as PermanentChip,
   rowChip,
 } from "../../utils/filterFields";
 import {
@@ -27,6 +29,7 @@ import {
   unpinFilter,
   visiblePins,
 } from "../../utils/filterFields/pins";
+import AdvancedFilterView from "../filter-rows/AdvancedFilterView";
 import Button from "../ui/Button";
 import AddFilterMenu from "./AddFilterMenu";
 import ChipEditor, {
@@ -34,7 +37,9 @@ import ChipEditor, {
   type ChipPinning,
 } from "./ChipEditor";
 import FilterChip from "./FilterChip";
+import GroupChip from "./GroupChip";
 import PinnedFilterToggle from "./PinnedFilterToggle";
+import { groupText } from "./chipText";
 
 interface PermanentFiltersMetadata {
   performers?: Array<{ id: string; name: string }>;
@@ -73,6 +78,11 @@ interface ChipItem {
 
 const NONE: Record<string, unknown> = {};
 
+/** The Advanced view's opening: at a group (1 to 5), else at the root */
+interface AdvancedOpen {
+  readonly focusGroup: number | undefined;
+}
+
 const keyOf = (at: RowKey): string => rowKeyOf(at.group, at.occurrence, at.key);
 
 const sameAt = (a: RowKey, b: RowKey): boolean =>
@@ -83,7 +93,10 @@ const sameAt = (a: RowKey, b: RowKey): boolean =>
  * the user's pinned filters as one-tap toggles, the pinned fields (an empty
  * chip, `Tags`, until set, then that field's chips in the same place), then
  * one chip per other root row of the filters (a field twice is two chips),
- * in the panel's order, then "+ Filter" and, while a filter is set,
+ * in the panel's order, then one chip per group (its match and its rows'
+ * field names; its body opens the Advanced view at the group, its button
+ * removes the group), led by "Match any" when the root matches any, then
+ * "+ Filter", "Advanced" (the row view) and, while a filter is set,
  * "Clear all". A chip's body opens its editor in a popover under it
  * (`ChipEditor`), whose changes apply as they are made, and whose header
  * pins the field or its value; its button removes the row. A field picked
@@ -107,6 +120,7 @@ const FilterBar = ({
   const addRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<(() => void) | null>(null);
   const [editor, setEditor] = useState<OpenEditor | null>(null);
+  const [advanced, setAdvanced] = useState<AdvancedOpen | null>(null);
 
   const stored = useFilterPins(kind);
   const { mutate: savePins } = useSetPins();
@@ -268,6 +282,24 @@ const FilterBar = ({
     [items, shownPins]
   );
 
+  // One chip per group, numbered as the URL numbers them (`g1`...), its
+  // text from its rows' field names
+  const groupChips = useMemo(
+    () =>
+      tree.groups.map((group, index) => ({
+        number: index + 1,
+        text: groupText(
+          group.match,
+          group.rows.map(
+            (row) =>
+              options.find((option) => option.key === row.field.key)?.label ??
+              row.field.key
+          )
+        ),
+      })),
+    [tree, options]
+  );
+
   const removeChip = (at: RowKey) => {
     focusNeighbour(at, true);
     filters.removeRow(at);
@@ -341,6 +373,24 @@ const FilterBar = ({
     setEditor({ session: keyOf(at), at, fromMenu: chip === undefined });
   };
 
+  const openAdvanced = (focusGroup?: number) => {
+    if (editor !== null) closeRef.current?.();
+    setAdvanced({ focusGroup });
+  };
+
+  // Focus leaves a removed group's chip for the next group's, which takes
+  // its number (the same element, so its button keeps focus), else the
+  // previous group's, else "+ Filter"
+  const removeGroupChip = (number: number) => {
+    if (number >= groupChips.length) {
+      const previous = barRef.current?.querySelector<HTMLElement>(
+        `[data-chip-row="g${number - 1}"] [data-chip-remove]`
+      );
+      (previous ?? addRef.current)?.focus();
+    }
+    filters.removeGroup(number);
+  };
+
   const clearAll = () => {
     if (editor !== null) setEditor(null);
     filters.clear();
@@ -384,15 +434,27 @@ const FilterBar = ({
   }, []);
 
   // A detail page's own filters: a plain label, no edit and no remove
-  const permanentLabels = [
-    ...(permanentFiltersMetadata.performers ?? []).map(
-      (performer) => `Performer: ${performer.name}`
-    ),
-    ...(permanentFiltersMetadata.studios ?? []).map(
-      (studio) => `Studio: ${studio.name}`
-    ),
-    ...(permanentFiltersMetadata.tags ?? []).map((tag) => `Tag: ${tag.name}`),
-  ];
+  // (also the Advanced view's "Fixed by this page", which then names them)
+  const permanentChips = useMemo(
+    (): PermanentChip[] => [
+      ...(permanentFiltersMetadata.performers ?? []).map((performer) => ({
+        key: "performers",
+        parts: { label: "Performer", values: [performer.name] },
+      })),
+      ...(permanentFiltersMetadata.studios ?? []).map((studio) => ({
+        key: "studios",
+        parts: { label: "Studio", values: [studio.name] },
+      })),
+      ...(permanentFiltersMetadata.tags ?? []).map((tag) => ({
+        key: "tags",
+        parts: { label: "Tag", values: [tag.name] },
+      })),
+    ],
+    [permanentFiltersMetadata]
+  );
+  const permanentLabels = permanentChips.map(
+    ({ parts }) => `${parts.label}: ${(parts.values ?? []).join(", ")}`
+  );
 
   const hasFilters = tree.rows.length > 0 || tree.groups.length > 0;
 
@@ -430,6 +492,13 @@ const FilterBar = ({
           onUnpin={() => save(unpinFilter(pins, pin.id))}
         />
       ))}
+      {tree.match === "any" && (
+        <GroupChip
+          rowKey="match"
+          text="Match any"
+          onEdit={() => openAdvanced()}
+        />
+      )}
       {items.map((item) => {
         const open = editor !== null && sameAt(editor.at, item.at);
         const key = keyOf(item.at);
@@ -466,6 +535,15 @@ const FilterBar = ({
           </FilterChip>
         );
       })}
+      {groupChips.map(({ number, text }) => (
+        <GroupChip
+          key={`g${number}`}
+          rowKey={`g${number}`}
+          text={text}
+          onEdit={() => openAdvanced(number)}
+          onRemove={() => removeGroupChip(number)}
+        />
+      ))}
       <AddFilterMenu
         filters={filters}
         pinnedFields={shownPins.fields}
@@ -474,11 +552,37 @@ const FilterBar = ({
         onPick={pick}
         triggerRef={addRef}
       />
+      <div data-tv-search-item="advanced-filters">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => openAdvanced()}
+          aria-haspopup="dialog"
+          aria-expanded={advanced !== null}
+          className="rounded-full"
+          icon={
+            <LucideSlidersHorizontal className="w-4 h-4" aria-hidden="true" />
+          }
+        >
+          Advanced
+        </Button>
+      </div>
       {hasFilters && (
         <Button variant="tertiary" size="sm" onClick={clearAll}>
           Clear all
         </Button>
       )}
+      <AdvancedFilterView
+        isOpen={advanced !== null}
+        onClose={() => setAdvanced(null)}
+        kind={kind}
+        value={filters.filters}
+        onApply={(next) => filters.commit(next)}
+        permanentChips={permanentChips}
+        {...(advanced?.focusGroup === undefined
+          ? {}
+          : { focusGroup: advanced.focusGroup })}
+      />
     </div>
   );
 };
