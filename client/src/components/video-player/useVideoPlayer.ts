@@ -10,6 +10,7 @@ import { makeCompositeKey } from "../../utils/compositeKey";
 import { getSceneTitle } from "../../utils/format";
 import { mayTakeFocus } from "../../utils/pageFocus";
 import { buildPlayerSources } from "./playerSources";
+import { type AirPlayPlayer, setupAirPlay } from "./plugins/airplay";
 import {
   SESSION_EXPIRED_PLAYBACK_MESSAGE,
   isSessionExpired,
@@ -245,6 +246,9 @@ export function useVideoPlayer({
       focusAtStartRef.current
     );
 
+    // Safari's AirPlay button (and the attribute on the tech's <video>)
+    const stopAirPlay = setupAirPlay(player as AirPlayPlayer);
+
     // Volume persistence is now handled by persistVolume plugin
     // Watch history tracking is now handled by the trackActivity plugin
 
@@ -252,6 +256,7 @@ export function useVideoPlayer({
     return () => {
       playerRef.current = null;
       registerPlayer(null);
+      stopAirPlay();
 
       try {
         player.dispose();

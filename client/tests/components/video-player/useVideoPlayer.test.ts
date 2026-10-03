@@ -15,6 +15,7 @@ import videojs from "video.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, apiGet, apiPost, redirectToLogin } from "@/api";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
+import { setupAirPlay } from "@/components/video-player/plugins/airplay";
 import { isSessionExpired } from "@/components/video-player/sessionCheck";
 import { useVideoPlayer } from "@/components/video-player/useVideoPlayer";
 import { useVrMode } from "@/components/video-player/vr/useVrMode";
@@ -53,6 +54,11 @@ vi.mock("@/components/video-player/plugins/skip-buttons", () => ({}));
 vi.mock("@/components/video-player/plugins/source-selector", () => ({}));
 vi.mock("@/components/video-player/plugins/track-activity", () => ({}));
 vi.mock("@/components/video-player/plugins/media-session", () => ({}));
+// A module that extends videojs.getComponent("Button") at import crashes the
+// bare-function video.js mock below
+vi.mock("@/components/video-player/plugins/airplay", () => ({
+  setupAirPlay: vi.fn(() => () => {}),
+}));
 
 interface SendOptions {
   keepalive?: boolean;
@@ -590,6 +596,24 @@ describe("useVideoPlayer", () => {
     await expect(beforeFallback()).resolves.toBe(true);
     expect(redirectToLogin).toHaveBeenCalledWith("expired");
     unmount();
+  });
+
+  it("sets the AirPlay button up on the new player and tears it down with it", () => {
+    const player = { ...fakePlayer(), dispose: vi.fn() };
+    const stop = vi.fn();
+    vi.mocked(videojs).mockReturnValueOnce(player as never);
+    vi.mocked(setupAirPlay).mockReturnValueOnce(stop);
+    const { unmount } = renderPlayer(
+      player,
+      onA,
+      document.createElement("div")
+    );
+
+    expect(setupAirPlay).toHaveBeenCalledWith(player);
+    expect(stop).not.toHaveBeenCalled();
+
+    unmount();
+    expect(stop).toHaveBeenCalledTimes(1);
   });
 
   it("a blocked autoplay retries muted", async () => {
