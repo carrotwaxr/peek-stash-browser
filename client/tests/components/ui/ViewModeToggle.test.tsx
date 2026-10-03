@@ -6,8 +6,11 @@
  * - Custom modes support
  * - Click handlers and selection state
  * - Dropdown open/close behavior
+ * - The keyboard: Enter opens it on the current mode, the arrows move, Escape
+ *   closes (the D-pad of TV mode)
  */
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import ViewModeToggle from "../../../src/components/ui/ViewModeToggle";
 
@@ -110,10 +113,56 @@ describe("ViewModeToggle", () => {
     fireEvent.click(screen.getByRole("button", { name: /view mode/i }));
     expect(screen.getByRole("listbox")).toBeInTheDocument();
 
-    // Press Escape
-    fireEvent.keyDown(document, { key: "Escape" });
+    // Press Escape on the focused mode
+    fireEvent.keyDown(screen.getByRole("option", { name: /grid view/i }), {
+      key: "Escape",
+    });
 
     // Dropdown should close
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("Enter opens the menu with focus on the current mode; ArrowDown then Enter picks the next; Escape closes and returns focus", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const modes = [
+      { id: "grid", label: "Grid view" },
+      { id: "wall", label: "Wall view" },
+      { id: "table", label: "Table view" },
+    ];
+    render(<ViewModeToggle modes={modes} value="wall" onChange={onChange} />);
+    const trigger = screen.getByRole("button", { name: /view mode/i });
+
+    // Enter on the focused button (a remote's OK) opens the menu on "wall"
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("option", { name: /wall view/i })).toHaveFocus();
+
+    // Escape closes it and focus is back on the button
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+
+    // Open again: ArrowDown moves to the next mode, Enter picks it
+    await user.keyboard("{Enter}");
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("option", { name: /table view/i })).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    expect(onChange).toHaveBeenCalledWith("table");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("ArrowUp wraps from the first mode to the last", async () => {
+    const user = userEvent.setup();
+    render(<ViewModeToggle value="grid" onChange={() => {}} />);
+    screen.getByRole("button", { name: /view mode/i }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("option", { name: /grid view/i })).toHaveFocus();
+
+    await user.keyboard("{ArrowUp}");
+
+    expect(screen.getByRole("option", { name: /wall view/i })).toHaveFocus();
   });
 });

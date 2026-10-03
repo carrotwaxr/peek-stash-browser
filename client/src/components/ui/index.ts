@@ -54,6 +54,7 @@ export { default as Pagination } from "./Pagination";
 export { default as Paper } from "./Paper";
 export { PerformerCard } from "../cards/index";
 export { default as PlayCountIndicator } from "./PlayCountIndicator";
+export { default as Popover } from "./Popover";
 export { default as RatingBadge } from "./RatingBadge";
 export { default as RatingSlider } from "./RatingSlider";
 export { default as RatingSliderDialog } from "./RatingSliderDialog";

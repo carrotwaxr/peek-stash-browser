@@ -9,6 +9,8 @@ import {
   LucideNetwork,
   LucideSquare,
 } from "lucide-react";
+import { useRovingFocus } from "../../hooks/useRovingFocus";
+import Popover from "./Popover";
 
 interface ViewMode {
   id: string;
@@ -42,6 +44,10 @@ const MODE_ICONS = {
 /**
  * Toggle between view modes via icon dropdown.
  *
+ * Keyboard and D-pad: Enter on the button opens the menu with focus on the
+ * current mode, the arrows move between modes, Enter picks one and Escape
+ * closes it (focus returns to the button).
+ *
  * @param {Array} modes - Optional custom modes array [{id, label, icon?}]
  *                        If not provided, defaults to grid/wall
  * @param {string} value - Currently selected mode id
@@ -56,47 +62,16 @@ const ViewModeToggle = ({
   // Local state for immediate visual feedback (optimistic update)
   const [localValue, setLocalValue] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const onListKeyDown = useRovingFocus(listRef, {
+    itemSelector: '[role="option"]',
+  });
 
   // Sync local state when parent value changes (authoritative)
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
-
-  // Close dropdown when clicking outside,
-  // in the capture phase: a Modal stops the press bubbling past its backdrop
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside, true);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside, true);
-    }
-    return undefined;
-  }, [isOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleEscape);
-      return () => document.removeEventListener("keydown", handleEscape);
-    }
-    return undefined;
-  }, [isOpen]);
 
   const handleSelect = (modeId: string) => {
     setLocalValue(modeId); // Immediate visual feedback
@@ -120,9 +95,10 @@ const ViewModeToggle = ({
   const CurrentIcon = currentMode.icon;
 
   return (
-    <div ref={dropdownRef} className={`relative ${className}`}>
+    <div className={`relative ${className}`}>
       {/* Trigger button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="inline-flex items-center gap-1 px-2.5 h-[34px] rounded-lg transition-colors"
@@ -134,7 +110,7 @@ const ViewModeToggle = ({
         title={`View: ${currentMode.label}`}
         aria-label={`View mode: ${currentMode.label}`}
         aria-expanded={isOpen}
-        aria-haspopup="listbox"
+        aria-haspopup="dialog"
       >
         <CurrentIcon size={18} />
         <LucideChevronDown
@@ -148,19 +124,22 @@ const ViewModeToggle = ({
       </button>
 
       {/* Dropdown menu - icons only */}
-      {isOpen && (
+      <Popover
+        anchorRef={triggerRef}
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        label="View modes"
+      >
         <div
-          className="absolute top-full left-0 mt-1 p-1 rounded-lg shadow-lg z-50 flex flex-col gap-0.5 min-w-[100px]"
-          style={{
-            backgroundColor: "var(--bg-secondary)",
-            border: "1px solid var(--border-color)",
-          }}
+          ref={listRef}
+          className="p-1 flex flex-col gap-0.5 min-w-[100px]"
           role="listbox"
           aria-label="View modes"
+          onKeyDown={onListKeyDown}
         >
           {effectiveModes.map((mode) => {
             const ModeIcon = mode.icon;
-            const isSelected = localValue === mode.id;
+            const isSelected = currentMode.id === mode.id;
             // Extract single word (remove "view" suffix)
             const shortLabel = mode.label.replace(/ view$/i, "");
 
@@ -181,6 +160,7 @@ const ViewModeToggle = ({
                 role="option"
                 aria-selected={isSelected}
                 aria-label={mode.label}
+                data-popover-focus={isSelected ? "" : undefined}
               >
                 <ModeIcon size={16} />
                 <span className="text-sm">{shortLabel}</span>
@@ -188,7 +168,7 @@ const ViewModeToggle = ({
             );
           })}
         </div>
-      )}
+      </Popover>
     </div>
   );
 };
