@@ -9,7 +9,7 @@
  * "5." on the way to "5.5"): it takes text from the state only on mount and
  * when the state changes from outside (the URL, a preset, Clear).
  */
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useId, useState } from "react";
 import {
   type RangeSide,
   cmToFeetInches,
@@ -232,6 +232,10 @@ function HeightBound({
   inputStyle,
 }: HeightBoundProps) {
   const word = side === "min" ? "Minimum" : "Maximum";
+  // Ids of this editor's own: two height editors on a page never share one
+  const own = useId();
+  const feetId = id ?? `${own}feet`;
+  const inchesId = `${own}inches`;
   const shown = (each: string) => {
     const cm = Number(each);
     return each === "" || !Number.isFinite(cm) ? null : cmToFeetInches(cm);
@@ -268,11 +272,11 @@ function HeightBound({
       </legend>
       <div className="flex space-x-2 mt-1">
         <div className="flex-1">
-          <label htmlFor={id ?? `height-feet-${side}`} className="sr-only">
+          <label htmlFor={feetId} className="sr-only">
             {word} height feet
           </label>
           <input
-            id={id ?? `height-feet-${side}`}
+            id={feetId}
             type="text"
             inputMode="numeric"
             value={feet}
@@ -288,11 +292,11 @@ function HeightBound({
           />
         </div>
         <div className="flex-1">
-          <label htmlFor={`height-inches-${side}`} className="sr-only">
+          <label htmlFor={inchesId} className="sr-only">
             {word} height inches
           </label>
           <input
-            id={`height-inches-${side}`}
+            id={inchesId}
             type="text"
             inputMode="numeric"
             value={inches}
