@@ -1,8 +1,8 @@
 import { presetArtifactType } from "@peek/shared-types/presetContexts.js";
 import prisma from "../prisma/singleton.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
+import { carouselRulesLocked } from "../utils/listRequest.js";
 import { logger } from "../utils/logger.js";
-import { isWhereShape } from "../utils/whereTree.js";
 import { entityImageCountService } from "./EntityImageCountService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
@@ -372,18 +372,6 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
- * A flat carousel that names `ids` or `instance_id`: the tree has no rows
- * for them, so converting it would widen the carousel. It runs flat, with
- * its ids, as the readers keep it.
- */
-const namesIdsOrInstance = (rules: unknown): boolean =>
-  isObject(rules) &&
-  !isWhereShape(rules) &&
-  ["ids", "instance_id"].some((key) =>
-    Object.prototype.hasOwnProperty.call(rules, key)
-  );
-
-/**
  * The defaults that still name a View their list holds: a default of a
  * context names a View of `presetArtifactType(context)`.
  */
@@ -438,7 +426,7 @@ async function migrateUserStoredFilters(
       MIGRATION_012
     );
     if (!rules) summary.skipped++;
-    if (rules && namesIdsOrInstance(rules.value)) {
+    if (rules && carouselRulesLocked(rules.value)) {
       summary.carouselsLeftFlat++;
       return [];
     }
