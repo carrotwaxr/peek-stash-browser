@@ -11,6 +11,8 @@ export interface ConfirmOptions {
   title?: string;
   message: ReactNode;
   confirmText?: string;
+  /** The answer no's button; default "Cancel" */
+  cancelText?: string;
   confirmStyle?: "danger" | "primary";
 }
 
@@ -65,6 +67,7 @@ export function useConfirmDialog(): {
       title={options?.title}
       message={options?.message}
       confirmText={options?.confirmText}
+      cancelText={options?.cancelText}
       confirmStyle={options?.confirmStyle}
     />
   );

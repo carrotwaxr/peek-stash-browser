@@ -34,7 +34,7 @@ import {
 } from "../../utils/filterFields";
 import { Button, StatusMessage } from "../ui/index";
 import FilterRow, { type FieldSection, type MoveTarget } from "./FilterRow";
-import { rowControlIds, waitingSelectId } from "./controlIds";
+import { matchSelectId, rowControlIds, waitingSelectId } from "./controlIds";
 
 export interface FilterRowsEditorProps {
   kind: ListKind;
@@ -52,9 +52,6 @@ export interface FilterRowsEditorProps {
 
 const ROOT: ContainerId = "root";
 const ROOT_LABEL = "top level";
-
-const matchSelectId = (containerId: ContainerId) =>
-  `filter-match-${containerId}`;
 
 /** The field select's sections: each run of a section in the table's order */
 function sectionsOf(
