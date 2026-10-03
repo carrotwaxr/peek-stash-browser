@@ -864,6 +864,9 @@ describeWithDb(
  *   7902002 (nothing set, links `[]`), 7902003 (aliases ""), 7902004 (hidden
  *   by the viewer, matching everything 7902001 matches).
  * - gp-b collection 7902001 (aliases "Zulu", a link).
+ * - Studios: gp-a 7902002's is live, gp-a 7902003's is hidden by the viewer
+ *   (a studio hide does not cascade to collections), gp-b 7902001's is
+ *   deleted.
  * Every seeded row is deleted before the file ends.
  */
 describeWithDb("Collection parity filters (seeded)", () => {
@@ -873,6 +876,7 @@ describeWithDb("Collection parity filters (seeded)", () => {
   let viewerId = 0;
 
   const [G1, G2, G3, GH] = ["7902001", "7902002", "7902003", "7902004"];
+  const [S_LIVE, S_HIDDEN, S_DELETED] = ["7902101", "7902102", "7902103"];
   const k = (id: string, instance: string) => `${id}:${instance}`;
   /** Every collection the viewer can see */
   const VISIBLE = [k(G1, A), k(G2, A), k(G3, A), k(G1, B)].sort();
@@ -881,6 +885,9 @@ describeWithDb("Collection parity filters (seeded)", () => {
 
   async function removeRows(): Promise<void> {
     await prisma.stashGroup.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+    await prisma.stashStudio.deleteMany({
       where: { stashInstanceId: { in: [A, B] } },
     });
     await prisma.user.deleteMany({ where: { username: VIEWER } });
@@ -925,23 +932,45 @@ describeWithDb("Collection parity filters (seeded)", () => {
     await prisma.stashGroup.createMany({
       data: [
         group(G1, A, { aliases: "Old Name, Other", urls: links }),
-        group(G2, A, { urls: "[]" }),
-        group(G3, A, { aliases: "" }),
+        group(G2, A, { urls: "[]", studioId: S_LIVE }),
+        group(G3, A, { aliases: "", studioId: S_HIDDEN }),
         group(GH, A, { aliases: "Old Name, Other", urls: links }),
         group(G1, B, {
           aliases: "Zulu",
           urls: JSON.stringify(["https://zulu.example/gp"]),
+          studioId: S_DELETED,
         }),
       ],
     });
-    await prisma.userExcludedEntity.create({
-      data: {
-        userId: viewerId,
-        entityType: "group",
-        entityId: GH,
-        instanceId: A,
-        reason: "hidden",
-      },
+    await prisma.stashStudio.createMany({
+      data: [
+        { id: S_LIVE, stashInstanceId: A, name: "GP live studio" },
+        { id: S_HIDDEN, stashInstanceId: A, name: "GP hidden studio" },
+        {
+          id: S_DELETED,
+          stashInstanceId: B,
+          name: "GP deleted studio",
+          deletedAt: new Date(),
+        },
+      ],
+    });
+    await prisma.userExcludedEntity.createMany({
+      data: [
+        {
+          userId: viewerId,
+          entityType: "group",
+          entityId: GH,
+          instanceId: A,
+          reason: "hidden",
+        },
+        {
+          userId: viewerId,
+          entityType: "studio",
+          entityId: S_HIDDEN,
+          instanceId: A,
+          reason: "hidden",
+        },
+      ],
     });
   });
 
@@ -1002,6 +1031,15 @@ describeWithDb("Collection parity filters (seeded)", () => {
     );
     expect(await listed({ url: { modifier: "IS_NULL" } })).toEqual(
       [k(G2, A), k(G3, A)].sort()
+    );
+  });
+
+  it("Studio has any counts only a live studio the viewer can see; has none the rest", async () => {
+    expect(await listed({ studios: { modifier: "NOT_NULL" } })).toEqual([
+      k(G2, A),
+    ]);
+    expect(await listed({ studios: { modifier: "IS_NULL" } })).toEqual(
+      without(k(G2, A))
     );
   });
 });

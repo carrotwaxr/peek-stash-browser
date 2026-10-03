@@ -382,8 +382,11 @@ class GroupQueryBuilder extends EntityQueryBuilder<
     criterion: RefFieldCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
+    // "Has any" and "has none" count only a studio the viewer can see: a
+    // studio hide does not cascade to its collections
     return hierarchicalRefClause("studio", GROUP_STUDIO, criterion, ctx, {
       name: ctx.name,
+      related: { table: "StashStudio", entityType: "studio" },
     });
   }
 

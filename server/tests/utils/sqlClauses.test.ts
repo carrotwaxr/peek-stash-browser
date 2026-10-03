@@ -1059,6 +1059,33 @@ describe("refPresenceClause", () => {
     });
   });
 
+  it("a live ref on a column counts only a live related row the viewer has not excluded", () => {
+    const studio = {
+      kind: "column",
+      parentTable: "StashGroup",
+      parentAlias: "g",
+      idCol: "studioId",
+      instanceCol: "stashInstanceId",
+    } as const;
+    const exists = `EXISTS (SELECT 1 FROM StashStudio g_studioId_ref ${exclusionJoin("g_studioId_x", "studio", "g_studioId_ref.id", "g_studioId_ref.stashInstanceId")} WHERE g_studioId_ref.id = g.studioId AND g_studioId_ref.stashInstanceId = g.stashInstanceId AND g_studioId_ref.deletedAt IS NULL AND g_studioId_x.id IS NULL)`;
+    const liveRef = { table: "StashStudio", entityType: "studio", userId: 9 };
+
+    expect(refPresenceClause(studio, true, { liveRef })).toEqual({
+      sql: exists,
+      params: [9],
+    });
+    expect(refPresenceClause(studio, false, { liveRef })).toEqual({
+      sql: `NOT ${exists}`,
+      params: [9],
+    });
+    expect(
+      refPresenceClause(studio, true, { liveRef: { ...liveRef, userId: null } })
+    ).toEqual({
+      sql: "EXISTS (SELECT 1 FROM StashStudio g_studioId_ref WHERE g_studioId_ref.id = g.studioId AND g_studioId_ref.stashInstanceId = g.stashInstanceId AND g_studioId_ref.deletedAt IS NULL)",
+      params: [],
+    });
+  });
+
   it("with an inherited junction both arms: none in either, or any in one", () => {
     const own =
       "EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId)";
