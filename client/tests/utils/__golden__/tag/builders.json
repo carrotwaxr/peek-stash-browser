@@ -429,6 +429,606 @@
       }
     },
     {
+      "label": "parentIds: INCLUDES_ALL one id",
+      "state": {
+        "parentIds": [
+          "1:inst-a"
+        ],
+        "parentIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "parentIds: INCLUDES_ALL two ids",
+      "state": {
+        "parentIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "parentIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "parentIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "parentIds": [
+          "1:inst-a"
+        ],
+        "parentIdsDepth": -1,
+        "parentIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "parentIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "parentIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "parentIdsDepth": -1,
+        "parentIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "parentIds: INCLUDES one id",
+      "state": {
+        "parentIds": [
+          "1:inst-a"
+        ],
+        "parentIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "parentIds: INCLUDES two ids",
+      "state": {
+        "parentIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "parentIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "parentIds: INCLUDES one id, with sub-items",
+      "state": {
+        "parentIds": [
+          "1:inst-a"
+        ],
+        "parentIdsDepth": -1,
+        "parentIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "parentIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "parentIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "parentIdsDepth": -1,
+        "parentIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "parentIds: EXCLUDES one id",
+      "state": {
+        "parentIds": [
+          "1:inst-a"
+        ],
+        "parentIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "parentIds: EXCLUDES two ids",
+      "state": {
+        "parentIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "parentIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "parentIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "parentIds": [
+          "1:inst-a"
+        ],
+        "parentIdsDepth": -1,
+        "parentIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "parentIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "parentIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "parentIdsDepth": -1,
+        "parentIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "parentIds: one id",
+      "state": {
+        "parentIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "parentIds: two ids",
+      "state": {
+        "parentIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "parentIds: one id, with sub-items",
+      "state": {
+        "parentIds": [
+          "1:inst-a"
+        ],
+        "parentIdsDepth": -1
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "parentIds: two ids, with sub-items",
+      "state": {
+        "parentIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "parentIdsDepth": -1
+      },
+      "request": {
+        "parents": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "childIds: INCLUDES_ALL one id",
+      "state": {
+        "childIds": [
+          "1:inst-a"
+        ],
+        "childIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "childIds: INCLUDES_ALL two ids",
+      "state": {
+        "childIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "childIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "childIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "childIds": [
+          "1:inst-a"
+        ],
+        "childIdsDepth": -1,
+        "childIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "childIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "childIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "childIdsDepth": -1,
+        "childIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "childIds: INCLUDES one id",
+      "state": {
+        "childIds": [
+          "1:inst-a"
+        ],
+        "childIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "childIds: INCLUDES two ids",
+      "state": {
+        "childIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "childIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "childIds: INCLUDES one id, with sub-items",
+      "state": {
+        "childIds": [
+          "1:inst-a"
+        ],
+        "childIdsDepth": -1,
+        "childIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "childIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "childIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "childIdsDepth": -1,
+        "childIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "childIds: EXCLUDES one id",
+      "state": {
+        "childIds": [
+          "1:inst-a"
+        ],
+        "childIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "childIds: EXCLUDES two ids",
+      "state": {
+        "childIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "childIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "childIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "childIds": [
+          "1:inst-a"
+        ],
+        "childIdsDepth": -1,
+        "childIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "childIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "childIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "childIdsDepth": -1,
+        "childIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "childIds: one id",
+      "state": {
+        "childIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "childIds: two ids",
+      "state": {
+        "childIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "childIds: one id, with sub-items",
+      "state": {
+        "childIds": [
+          "1:inst-a"
+        ],
+        "childIdsDepth": -1
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "childIds: two ids, with sub-items",
+      "state": {
+        "childIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "childIdsDepth": -1
+      },
+      "request": {
+        "children": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
       "label": "createdAt: start only",
       "state": {
         "createdAt": {
@@ -513,6 +1113,469 @@
           "modifier": "BETWEEN",
           "value": "2020-01-01",
           "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "parentCount: min only",
+      "state": {
+        "parentCount": {
+          "min": "25"
+        }
+      },
+      "request": {
+        "parent_count": {
+          "modifier": "BETWEEN",
+          "value": 25
+        }
+      }
+    },
+    {
+      "label": "parentCount: max only",
+      "state": {
+        "parentCount": {
+          "max": "75"
+        }
+      },
+      "request": {
+        "parent_count": {
+          "modifier": "BETWEEN",
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "parentCount: min and max",
+      "state": {
+        "parentCount": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "request": {
+        "parent_count": {
+          "modifier": "BETWEEN",
+          "value": 25,
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "childCount: min only",
+      "state": {
+        "childCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "child_count": {
+          "modifier": "BETWEEN",
+          "value": 250
+        }
+      }
+    },
+    {
+      "label": "childCount: max only",
+      "state": {
+        "childCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "child_count": {
+          "modifier": "BETWEEN",
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "childCount: min and max",
+      "state": {
+        "childCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "child_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "imageCount: min only",
+      "state": {
+        "imageCount": {
+          "min": "2500"
+        }
+      },
+      "request": {
+        "image_count": {
+          "modifier": "BETWEEN",
+          "value": 2500
+        }
+      }
+    },
+    {
+      "label": "imageCount: max only",
+      "state": {
+        "imageCount": {
+          "max": "7500"
+        }
+      },
+      "request": {
+        "image_count": {
+          "modifier": "BETWEEN",
+          "value2": 7500
+        }
+      }
+    },
+    {
+      "label": "imageCount: min and max",
+      "state": {
+        "imageCount": {
+          "min": "2500",
+          "max": "7500"
+        }
+      },
+      "request": {
+        "image_count": {
+          "modifier": "BETWEEN",
+          "value": 2500,
+          "value2": 7500
+        }
+      }
+    },
+    {
+      "label": "galleryCount: min only",
+      "state": {
+        "galleryCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "gallery_count": {
+          "modifier": "BETWEEN",
+          "value": 250
+        }
+      }
+    },
+    {
+      "label": "galleryCount: max only",
+      "state": {
+        "galleryCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "gallery_count": {
+          "modifier": "BETWEEN",
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "galleryCount: min and max",
+      "state": {
+        "galleryCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "gallery_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "performerCount: min only",
+      "state": {
+        "performerCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "performer_count": {
+          "modifier": "BETWEEN",
+          "value": 250
+        }
+      }
+    },
+    {
+      "label": "performerCount: max only",
+      "state": {
+        "performerCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "performer_count": {
+          "modifier": "BETWEEN",
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "performerCount: min and max",
+      "state": {
+        "performerCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "performer_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "studioCount: min only",
+      "state": {
+        "studioCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "studio_count": {
+          "modifier": "BETWEEN",
+          "value": 250
+        }
+      }
+    },
+    {
+      "label": "studioCount: max only",
+      "state": {
+        "studioCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "studio_count": {
+          "modifier": "BETWEEN",
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "studioCount: min and max",
+      "state": {
+        "studioCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "studio_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "groupCount: min only",
+      "state": {
+        "groupCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "group_count": {
+          "modifier": "BETWEEN",
+          "value": 250
+        }
+      }
+    },
+    {
+      "label": "groupCount: max only",
+      "state": {
+        "groupCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "group_count": {
+          "modifier": "BETWEEN",
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "groupCount: min and max",
+      "state": {
+        "groupCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "group_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "markerCount: min only",
+      "state": {
+        "markerCount": {
+          "min": "2500"
+        }
+      },
+      "request": {
+        "marker_count": {
+          "modifier": "BETWEEN",
+          "value": 2500
+        }
+      }
+    },
+    {
+      "label": "markerCount: max only",
+      "state": {
+        "markerCount": {
+          "max": "7500"
+        }
+      },
+      "request": {
+        "marker_count": {
+          "modifier": "BETWEEN",
+          "value2": 7500
+        }
+      }
+    },
+    {
+      "label": "markerCount: min and max",
+      "state": {
+        "markerCount": {
+          "min": "2500",
+          "max": "7500"
+        }
+      },
+      "request": {
+        "marker_count": {
+          "modifier": "BETWEEN",
+          "value": 2500,
+          "value2": 7500
+        }
+      }
+    },
+    {
+      "label": "aliases: INCLUDES text",
+      "state": {
+        "aliases": "contract",
+        "aliasesModifier": "INCLUDES"
+      },
+      "request": {
+        "aliases": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "aliases: EXCLUDES text",
+      "state": {
+        "aliases": "contract",
+        "aliasesModifier": "EXCLUDES"
+      },
+      "request": {
+        "aliases": {
+          "value": "contract",
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "aliases: IS_NULL text",
+      "state": {
+        "aliases": "contract",
+        "aliasesModifier": "IS_NULL"
+      },
+      "request": {
+        "aliases": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "aliases: NOT_NULL text",
+      "state": {
+        "aliases": "contract",
+        "aliasesModifier": "NOT_NULL"
+      },
+      "request": {
+        "aliases": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "aliases: text",
+      "state": {
+        "aliases": "contract"
+      },
+      "request": {
+        "aliases": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "stashId: EQUALS text",
+      "state": {
+        "stashId": "contract",
+        "stashIdModifier": "EQUALS"
+      },
+      "request": {
+        "stash_id": {
+          "value": "contract",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "stashId: IS_NULL text",
+      "state": {
+        "stashId": "contract",
+        "stashIdModifier": "IS_NULL"
+      },
+      "request": {
+        "stash_id": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "stashId: NOT_NULL text",
+      "state": {
+        "stashId": "contract",
+        "stashIdModifier": "NOT_NULL"
+      },
+      "request": {
+        "stash_id": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "stashId: text",
+      "state": {
+        "stashId": "contract"
+      },
+      "request": {
+        "stash_id": {
+          "value": "contract",
+          "modifier": "EQUALS"
         }
       }
     }

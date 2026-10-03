@@ -43,6 +43,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "tagIdsModifier",
@@ -110,6 +118,45 @@
     },
     {
       "type": "section-header",
+      "label": "Entity Filters",
+      "key": "section-entities",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "parentIds",
+      "label": "Parent Studio",
+      "type": "searchable-select",
+      "entityType": "studios",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select studios...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "parentIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "parentIdsDepth",
+      "hierarchyLabel": "Include sub-studios"
+    },
+    {
+      "type": "section-header",
       "label": "Date Ranges",
       "key": "section-dates",
       "collapsible": true,
@@ -126,6 +173,141 @@
       "label": "Updated Date",
       "type": "date-range",
       "defaultValue": {}
+    },
+    {
+      "type": "section-header",
+      "label": "Other Filters",
+      "key": "section-other",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "childCount",
+      "label": "Child Studio Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "tagCount",
+      "label": "Tag Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "imageCount",
+      "label": "Image Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 10000
+    },
+    {
+      "key": "galleryCount",
+      "label": "Gallery Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "performerCount",
+      "label": "Performer Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "groupCount",
+      "label": "Collection Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "aliases",
+      "label": "Aliases",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search aliases...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "aliasesModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "url",
+      "label": "URL",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search URL...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "urlModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "stashId",
+      "label": "StashDB ID",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search StashDB ID...",
+      "maxLength": 100,
+      "modifierOptions": [
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "stashIdModifier",
+      "defaultModifier": "EQUALS"
     }
   ],
   "imperialOptions": "same as the metric options",
@@ -145,7 +327,7 @@
       "removedOptions": [
         "text:name"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
     },
     {
       "field": "details",
@@ -162,7 +344,7 @@
       "removedOptions": [
         "text:details"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
     },
     {
       "field": "tags",
@@ -181,7 +363,7 @@
       "removedOptions": [
         "searchable-select:tagIds"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
     },
     {
       "field": "rating100",
@@ -199,7 +381,7 @@
       "removedOptions": [
         "range:rating"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
     },
     {
       "field": "scene_count",
@@ -216,7 +398,7 @@
       "removedOptions": [
         "range:sceneCount"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
     },
     {
       "field": "o_counter",
@@ -233,7 +415,7 @@
       "removedOptions": [
         "range:oCounter"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
     },
     {
       "field": "play_count",
@@ -250,7 +432,7 @@
       "removedOptions": [
         "range:playCount"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
     },
     {
       "field": "favorite",
@@ -267,7 +449,27 @@
       "removedOptions": [
         "checkbox:favorite"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
+    },
+    {
+      "field": "parents",
+      "lockedFieldsTop": [
+        "parents"
+      ],
+      "lockedFieldsInner": [
+        "parents",
+        "studio_filter"
+      ],
+      "removedStateKeys": [
+        "parentIds",
+        "parentIdsModifier",
+        "parentIdsDepth"
+      ],
+      "removedOptions": [
+        "section-header:section-entities",
+        "searchable-select:parentIds"
+      ],
+      "optionCountAfter": 22
     },
     {
       "field": "created_at",
@@ -284,7 +486,7 @@
       "removedOptions": [
         "date-range:createdAt"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
     },
     {
       "field": "updated_at",
@@ -301,7 +503,163 @@
       "removedOptions": [
         "date-range:updatedAt"
       ],
-      "optionCountAfter": 11
+      "optionCountAfter": 23
+    },
+    {
+      "field": "child_count",
+      "lockedFieldsTop": [
+        "child_count"
+      ],
+      "lockedFieldsInner": [
+        "child_count",
+        "studio_filter"
+      ],
+      "removedStateKeys": [
+        "childCount"
+      ],
+      "removedOptions": [
+        "range:childCount"
+      ],
+      "optionCountAfter": 23
+    },
+    {
+      "field": "tag_count",
+      "lockedFieldsTop": [
+        "tag_count"
+      ],
+      "lockedFieldsInner": [
+        "studio_filter",
+        "tag_count"
+      ],
+      "removedStateKeys": [
+        "tagCount"
+      ],
+      "removedOptions": [
+        "range:tagCount"
+      ],
+      "optionCountAfter": 23
+    },
+    {
+      "field": "image_count",
+      "lockedFieldsTop": [
+        "image_count"
+      ],
+      "lockedFieldsInner": [
+        "image_count",
+        "studio_filter"
+      ],
+      "removedStateKeys": [
+        "imageCount"
+      ],
+      "removedOptions": [
+        "range:imageCount"
+      ],
+      "optionCountAfter": 23
+    },
+    {
+      "field": "gallery_count",
+      "lockedFieldsTop": [
+        "gallery_count"
+      ],
+      "lockedFieldsInner": [
+        "gallery_count",
+        "studio_filter"
+      ],
+      "removedStateKeys": [
+        "galleryCount"
+      ],
+      "removedOptions": [
+        "range:galleryCount"
+      ],
+      "optionCountAfter": 23
+    },
+    {
+      "field": "performer_count",
+      "lockedFieldsTop": [
+        "performer_count"
+      ],
+      "lockedFieldsInner": [
+        "performer_count",
+        "studio_filter"
+      ],
+      "removedStateKeys": [
+        "performerCount"
+      ],
+      "removedOptions": [
+        "range:performerCount"
+      ],
+      "optionCountAfter": 23
+    },
+    {
+      "field": "group_count",
+      "lockedFieldsTop": [
+        "group_count"
+      ],
+      "lockedFieldsInner": [
+        "group_count",
+        "studio_filter"
+      ],
+      "removedStateKeys": [
+        "groupCount"
+      ],
+      "removedOptions": [
+        "range:groupCount"
+      ],
+      "optionCountAfter": 23
+    },
+    {
+      "field": "aliases",
+      "lockedFieldsTop": [
+        "aliases"
+      ],
+      "lockedFieldsInner": [
+        "aliases",
+        "studio_filter"
+      ],
+      "removedStateKeys": [
+        "aliases",
+        "aliasesModifier"
+      ],
+      "removedOptions": [
+        "text:aliases"
+      ],
+      "optionCountAfter": 23
+    },
+    {
+      "field": "url",
+      "lockedFieldsTop": [
+        "url"
+      ],
+      "lockedFieldsInner": [
+        "studio_filter",
+        "url"
+      ],
+      "removedStateKeys": [
+        "url",
+        "urlModifier"
+      ],
+      "removedOptions": [
+        "text:url"
+      ],
+      "optionCountAfter": 23
+    },
+    {
+      "field": "stash_id",
+      "lockedFieldsTop": [
+        "stash_id"
+      ],
+      "lockedFieldsInner": [
+        "stash_id",
+        "studio_filter"
+      ],
+      "removedStateKeys": [
+        "stashId",
+        "stashIdModifier"
+      ],
+      "removedOptions": [
+        "text:stashId"
+      ],
+      "optionCountAfter": 23
     }
   ]
 }

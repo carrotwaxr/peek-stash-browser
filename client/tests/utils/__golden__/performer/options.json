@@ -35,6 +35,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "tagIdsModifier",
@@ -44,6 +52,26 @@
       "hierarchyLabel": "Include sub-tags",
       "countFilterContext": "performers",
       "excludeKey": "tagIdsExclude"
+    },
+    {
+      "key": "tagFavorite",
+      "label": "Has a Favorite Tag",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "any",
+          "label": "Any"
+        },
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        }
+      ]
     },
     {
       "key": "gender",
@@ -124,6 +152,93 @@
       "type": "checkbox",
       "defaultValue": false,
       "placeholder": "Favorites Only"
+    },
+    {
+      "type": "section-header",
+      "label": "Entity Filters",
+      "key": "section-entities",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "studioIds",
+      "label": "Studios",
+      "type": "searchable-select",
+      "entityType": "studios",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select studios...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "studioIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "studioIdsDepth",
+      "hierarchyLabel": "Include sub-studios",
+      "excludeKey": "studioIdsExclude"
+    },
+    {
+      "key": "groupIds",
+      "label": "Collections",
+      "type": "searchable-select",
+      "entityType": "groups",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select collections...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "In ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "In ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "NOT in these"
+        }
+      ],
+      "modifierKey": "groupIdsModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "performerIds",
+      "label": "Appears With",
+      "type": "searchable-select",
+      "entityType": "performers",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select performers...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "performerIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "excludeKey": "performerIdsExclude"
     },
     {
       "type": "section-header",
@@ -348,6 +463,31 @@
       "placeholder": "Any"
     },
     {
+      "key": "country",
+      "label": "Country",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "e.g. US",
+      "maxLength": 500
+    },
+    {
+      "key": "circumcised",
+      "label": "Circumcised",
+      "type": "select",
+      "defaultValue": "",
+      "options": [
+        {
+          "value": "CUT",
+          "label": "Cut"
+        },
+        {
+          "value": "UNCUT",
+          "label": "Uncut"
+        }
+      ],
+      "placeholder": "Any"
+    },
+    {
       "key": "measurements",
       "label": "Measurements",
       "type": "text",
@@ -459,6 +599,126 @@
       "max": 1000
     },
     {
+      "key": "tagCount",
+      "label": "Tag Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "imageCount",
+      "label": "Image Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 10000
+    },
+    {
+      "key": "galleryCount",
+      "label": "Gallery Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "markerCount",
+      "label": "Marker Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "disambiguation",
+      "label": "Disambiguation",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search disambiguation...",
+      "maxLength": 500
+    },
+    {
+      "key": "aliases",
+      "label": "Aliases",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search aliases...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "aliasesModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "url",
+      "label": "URL",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search URLs...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "urlModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "stashId",
+      "label": "StashDB ID",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search StashDB ID...",
+      "maxLength": 100,
+      "modifierOptions": [
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "stashIdModifier",
+      "defaultModifier": "EQUALS"
+    },
+    {
       "key": "details",
       "label": "Details Search",
       "type": "text",
@@ -503,6 +763,14 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "tagIdsModifier",
@@ -512,6 +780,26 @@
       "hierarchyLabel": "Include sub-tags",
       "countFilterContext": "performers",
       "excludeKey": "tagIdsExclude"
+    },
+    {
+      "key": "tagFavorite",
+      "label": "Has a Favorite Tag",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "any",
+          "label": "Any"
+        },
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        }
+      ]
     },
     {
       "key": "gender",
@@ -592,6 +880,93 @@
       "type": "checkbox",
       "defaultValue": false,
       "placeholder": "Favorites Only"
+    },
+    {
+      "type": "section-header",
+      "label": "Entity Filters",
+      "key": "section-entities",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "studioIds",
+      "label": "Studios",
+      "type": "searchable-select",
+      "entityType": "studios",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select studios...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "studioIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "studioIdsDepth",
+      "hierarchyLabel": "Include sub-studios",
+      "excludeKey": "studioIdsExclude"
+    },
+    {
+      "key": "groupIds",
+      "label": "Collections",
+      "type": "searchable-select",
+      "entityType": "groups",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select collections...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "In ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "In ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "NOT in these"
+        }
+      ],
+      "modifierKey": "groupIdsModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "performerIds",
+      "label": "Appears With",
+      "type": "searchable-select",
+      "entityType": "performers",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select performers...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "performerIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "excludeKey": "performerIdsExclude"
     },
     {
       "type": "section-header",
@@ -811,6 +1186,31 @@
         {
           "value": "Natural",
           "label": "Natural"
+        }
+      ],
+      "placeholder": "Any"
+    },
+    {
+      "key": "country",
+      "label": "Country",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "e.g. US",
+      "maxLength": 500
+    },
+    {
+      "key": "circumcised",
+      "label": "Circumcised",
+      "type": "select",
+      "defaultValue": "",
+      "options": [
+        {
+          "value": "CUT",
+          "label": "Cut"
+        },
+        {
+          "value": "UNCUT",
+          "label": "Uncut"
         }
       ],
       "placeholder": "Any"
@@ -930,6 +1330,126 @@
       "max": 1000
     },
     {
+      "key": "tagCount",
+      "label": "Tag Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "imageCount",
+      "label": "Image Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 10000
+    },
+    {
+      "key": "galleryCount",
+      "label": "Gallery Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "markerCount",
+      "label": "Marker Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "disambiguation",
+      "label": "Disambiguation",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search disambiguation...",
+      "maxLength": 500
+    },
+    {
+      "key": "aliases",
+      "label": "Aliases",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search aliases...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "aliasesModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "url",
+      "label": "URL",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search URLs...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "urlModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "stashId",
+      "label": "StashDB ID",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search StashDB ID...",
+      "maxLength": 100,
+      "modifierOptions": [
+        {
+          "value": "EQUALS",
+          "label": "Equals"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "stashIdModifier",
+      "defaultModifier": "EQUALS"
+    },
+    {
       "key": "details",
       "label": "Details Search",
       "type": "text",
@@ -954,7 +1474,7 @@
       "removedOptions": [
         "text:name"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "tags",
@@ -973,7 +1493,24 @@
       "removedOptions": [
         "searchable-select:tagIds"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
+    },
+    {
+      "field": "tag_favorite",
+      "lockedFieldsTop": [
+        "tag_favorite"
+      ],
+      "lockedFieldsInner": [
+        "performer_filter",
+        "tag_favorite"
+      ],
+      "removedStateKeys": [
+        "tagFavorite"
+      ],
+      "removedOptions": [
+        "select:tagFavorite"
+      ],
+      "optionCountAfter": 45
     },
     {
       "field": "gender",
@@ -990,7 +1527,7 @@
       "removedOptions": [
         "select:gender"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "rating100",
@@ -1008,7 +1545,7 @@
       "removedOptions": [
         "range:rating"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "o_counter",
@@ -1025,7 +1562,7 @@
       "removedOptions": [
         "range:oCounter"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "scene_count",
@@ -1042,7 +1579,7 @@
       "removedOptions": [
         "range:sceneCount"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "favorite",
@@ -1059,7 +1596,62 @@
       "removedOptions": [
         "checkbox:favorite"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
+    },
+    {
+      "field": "studios",
+      "lockedFieldsTop": [
+        "studios"
+      ],
+      "lockedFieldsInner": [
+        "performer_filter",
+        "studios"
+      ],
+      "removedStateKeys": [
+        "studioIds",
+        "studioIdsModifier",
+        "studioIdsDepth"
+      ],
+      "removedOptions": [
+        "searchable-select:studioIds"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "groups",
+      "lockedFieldsTop": [
+        "groups"
+      ],
+      "lockedFieldsInner": [
+        "groups",
+        "performer_filter"
+      ],
+      "removedStateKeys": [
+        "groupIds",
+        "groupIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:groupIds"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "performers",
+      "lockedFieldsTop": [
+        "performers"
+      ],
+      "lockedFieldsInner": [
+        "performer_filter",
+        "performers"
+      ],
+      "removedStateKeys": [
+        "performerIds",
+        "performerIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:performerIds"
+      ],
+      "optionCountAfter": 45
     },
     {
       "field": "age",
@@ -1076,7 +1668,7 @@
       "removedOptions": [
         "range:age"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "birth_year",
@@ -1093,7 +1685,7 @@
       "removedOptions": [
         "range:birthYear"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "death_year",
@@ -1110,7 +1702,7 @@
       "removedOptions": [
         "range:deathYear"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "career_length",
@@ -1128,7 +1720,7 @@
       "removedOptions": [
         "range:careerLength"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "birthdate",
@@ -1145,7 +1737,7 @@
       "removedOptions": [
         "date-range:birthdate"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "death_date",
@@ -1162,7 +1754,7 @@
       "removedOptions": [
         "date-range:deathDate"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "created_at",
@@ -1179,7 +1771,7 @@
       "removedOptions": [
         "date-range:createdAt"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "updated_at",
@@ -1196,7 +1788,7 @@
       "removedOptions": [
         "date-range:updatedAt"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "hair_color",
@@ -1213,7 +1805,7 @@
       "removedOptions": [
         "select:hairColor"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "eye_color",
@@ -1230,7 +1822,7 @@
       "removedOptions": [
         "select:eyeColor"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "ethnicity",
@@ -1247,7 +1839,7 @@
       "removedOptions": [
         "select:ethnicity"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "fake_tits",
@@ -1264,7 +1856,41 @@
       "removedOptions": [
         "select:fakeTits"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
+    },
+    {
+      "field": "country",
+      "lockedFieldsTop": [
+        "country"
+      ],
+      "lockedFieldsInner": [
+        "country",
+        "performer_filter"
+      ],
+      "removedStateKeys": [
+        "country"
+      ],
+      "removedOptions": [
+        "text:country"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "circumcised",
+      "lockedFieldsTop": [
+        "circumcised"
+      ],
+      "lockedFieldsInner": [
+        "circumcised",
+        "performer_filter"
+      ],
+      "removedStateKeys": [
+        "circumcised"
+      ],
+      "removedOptions": [
+        "select:circumcised"
+      ],
+      "optionCountAfter": 45
     },
     {
       "field": "measurements",
@@ -1281,7 +1907,7 @@
       "removedOptions": [
         "text:measurements"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "tattoos",
@@ -1298,7 +1924,7 @@
       "removedOptions": [
         "text:tattoos"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "piercings",
@@ -1315,7 +1941,7 @@
       "removedOptions": [
         "text:piercings"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "height",
@@ -1333,7 +1959,7 @@
       "removedOptions": [
         "range:height"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "weight",
@@ -1351,7 +1977,7 @@
       "removedOptions": [
         "range:weight"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "penis_length",
@@ -1369,7 +1995,7 @@
       "removedOptions": [
         "range:penisLength"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     },
     {
       "field": "play_count",
@@ -1386,7 +2012,146 @@
       "removedOptions": [
         "range:playCount"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
+    },
+    {
+      "field": "tag_count",
+      "lockedFieldsTop": [
+        "tag_count"
+      ],
+      "lockedFieldsInner": [
+        "performer_filter",
+        "tag_count"
+      ],
+      "removedStateKeys": [
+        "tagCount"
+      ],
+      "removedOptions": [
+        "range:tagCount"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "image_count",
+      "lockedFieldsTop": [
+        "image_count"
+      ],
+      "lockedFieldsInner": [
+        "image_count",
+        "performer_filter"
+      ],
+      "removedStateKeys": [
+        "imageCount"
+      ],
+      "removedOptions": [
+        "range:imageCount"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "gallery_count",
+      "lockedFieldsTop": [
+        "gallery_count"
+      ],
+      "lockedFieldsInner": [
+        "gallery_count",
+        "performer_filter"
+      ],
+      "removedStateKeys": [
+        "galleryCount"
+      ],
+      "removedOptions": [
+        "range:galleryCount"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "marker_count",
+      "lockedFieldsTop": [
+        "marker_count"
+      ],
+      "lockedFieldsInner": [
+        "marker_count",
+        "performer_filter"
+      ],
+      "removedStateKeys": [
+        "markerCount"
+      ],
+      "removedOptions": [
+        "range:markerCount"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "disambiguation",
+      "lockedFieldsTop": [
+        "disambiguation"
+      ],
+      "lockedFieldsInner": [
+        "disambiguation",
+        "performer_filter"
+      ],
+      "removedStateKeys": [
+        "disambiguation"
+      ],
+      "removedOptions": [
+        "text:disambiguation"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "aliases",
+      "lockedFieldsTop": [
+        "aliases"
+      ],
+      "lockedFieldsInner": [
+        "aliases",
+        "performer_filter"
+      ],
+      "removedStateKeys": [
+        "aliases",
+        "aliasesModifier"
+      ],
+      "removedOptions": [
+        "text:aliases"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "url",
+      "lockedFieldsTop": [
+        "url"
+      ],
+      "lockedFieldsInner": [
+        "performer_filter",
+        "url"
+      ],
+      "removedStateKeys": [
+        "url",
+        "urlModifier"
+      ],
+      "removedOptions": [
+        "text:url"
+      ],
+      "optionCountAfter": 45
+    },
+    {
+      "field": "stash_id",
+      "lockedFieldsTop": [
+        "stash_id"
+      ],
+      "lockedFieldsInner": [
+        "performer_filter",
+        "stash_id"
+      ],
+      "removedStateKeys": [
+        "stashId",
+        "stashIdModifier"
+      ],
+      "removedOptions": [
+        "text:stashId"
+      ],
+      "optionCountAfter": 45
     },
     {
       "field": "details",
@@ -1403,7 +2168,7 @@
       "removedOptions": [
         "text:details"
       ],
-      "optionCountAfter": 30
+      "optionCountAfter": 45
     }
   ]
 }

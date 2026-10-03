@@ -66,6 +66,29 @@
       "multi": false,
       "defaultValue": "",
       "placeholder": "Select studio...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "studioIdModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "studioIdDepth",
+      "hierarchyLabel": "Include sub-studios",
       "countFilterContext": "groups"
     },
     {
@@ -88,10 +111,21 @@
         {
           "value": "EXCLUDES",
           "label": "Has NONE of these"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
         }
       ],
       "modifierKey": "tagIdsModifier",
       "defaultModifier": "INCLUDES_ALL",
+      "supportsHierarchy": true,
+      "hierarchyKey": "tagIdsDepth",
+      "hierarchyLabel": "Include sub-tags",
       "countFilterContext": "groups",
       "excludeKey": "tagIdsExclude"
     },
@@ -197,7 +231,177 @@
       "entityType": "groups",
       "multi": true,
       "defaultValue": [],
-      "placeholder": "Select collections..."
+      "placeholder": "Select collections...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "In ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "In ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "NOT in these"
+        }
+      ],
+      "modifierKey": "groupIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "groupIdsDepth",
+      "hierarchyLabel": "Include sub-collections"
+    },
+    {
+      "key": "subGroupIds",
+      "label": "Sub-collections",
+      "type": "searchable-select",
+      "entityType": "groups",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select collections...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "subGroupIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "subGroupIdsDepth",
+      "hierarchyLabel": "Include all parent collections"
+    },
+    {
+      "type": "section-header",
+      "label": "Other Filters",
+      "key": "section-other",
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    {
+      "key": "subGroupCount",
+      "label": "Sub-collection Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 100
+    },
+    {
+      "key": "containingGroupCount",
+      "label": "Parent Collection Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 100
+    },
+    {
+      "key": "tagCount",
+      "label": "Tag Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "oCounter",
+      "label": "O Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "playCount",
+      "label": "Play Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "performerFavorite",
+      "label": "Has a Favorite Performer",
+      "type": "select",
+      "defaultValue": "any",
+      "options": [
+        {
+          "value": "any",
+          "label": "Any"
+        },
+        {
+          "value": "true",
+          "label": "Yes"
+        },
+        {
+          "value": "false",
+          "label": "No"
+        }
+      ]
+    },
+    {
+      "key": "aliases",
+      "label": "Aliases",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search aliases...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "aliasesModifier",
+      "defaultModifier": "INCLUDES"
+    },
+    {
+      "key": "url",
+      "label": "URL",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search URLs...",
+      "maxLength": 500,
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Contains"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Excludes"
+        },
+        {
+          "value": "IS_NULL",
+          "label": "Has none"
+        },
+        {
+          "value": "NOT_NULL",
+          "label": "Has any"
+        }
+      ],
+      "modifierKey": "urlModifier",
+      "defaultModifier": "INCLUDES"
     }
   ],
   "imperialOptions": "same as the metric options",
@@ -217,7 +421,7 @@
       "removedOptions": [
         "text:name"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "synopsis",
@@ -234,7 +438,7 @@
       "removedOptions": [
         "text:synopsis"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "director",
@@ -251,7 +455,7 @@
       "removedOptions": [
         "text:director"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "performers",
@@ -269,7 +473,7 @@
       "removedOptions": [
         "searchable-select:performerIds"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "studios",
@@ -281,12 +485,14 @@
         "studios"
       ],
       "removedStateKeys": [
-        "studioId"
+        "studioId",
+        "studioIdModifier",
+        "studioIdDepth"
       ],
       "removedOptions": [
         "searchable-select:studioId"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "tags",
@@ -299,12 +505,13 @@
       ],
       "removedStateKeys": [
         "tagIds",
-        "tagIdsModifier"
+        "tagIdsModifier",
+        "tagIdsDepth"
       ],
       "removedOptions": [
         "searchable-select:tagIds"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "rating100",
@@ -322,7 +529,7 @@
       "removedOptions": [
         "range:rating"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "scene_count",
@@ -339,7 +546,7 @@
       "removedOptions": [
         "range:sceneCount"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "duration",
@@ -357,7 +564,7 @@
       "removedOptions": [
         "range:duration"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "favorite",
@@ -374,7 +581,7 @@
       "removedOptions": [
         "checkbox:favorite"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "date",
@@ -391,7 +598,7 @@
       "removedOptions": [
         "date-range:date"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "created_at",
@@ -408,7 +615,7 @@
       "removedOptions": [
         "date-range:createdAt"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "updated_at",
@@ -425,7 +632,7 @@
       "removedOptions": [
         "date-range:updatedAt"
       ],
-      "optionCountAfter": 16
+      "optionCountAfter": 26
     },
     {
       "field": "containing_groups",
@@ -437,13 +644,171 @@
         "group_filter"
       ],
       "removedStateKeys": [
-        "groupIds"
+        "groupIds",
+        "groupIdsModifier",
+        "groupIdsDepth"
       ],
       "removedOptions": [
-        "section-header:section-entities",
         "searchable-select:groupIds"
       ],
-      "optionCountAfter": 15
+      "optionCountAfter": 26
+    },
+    {
+      "field": "sub_groups",
+      "lockedFieldsTop": [
+        "sub_groups"
+      ],
+      "lockedFieldsInner": [
+        "group_filter",
+        "sub_groups"
+      ],
+      "removedStateKeys": [
+        "subGroupIds",
+        "subGroupIdsModifier",
+        "subGroupIdsDepth"
+      ],
+      "removedOptions": [
+        "searchable-select:subGroupIds"
+      ],
+      "optionCountAfter": 26
+    },
+    {
+      "field": "sub_group_count",
+      "lockedFieldsTop": [
+        "sub_group_count"
+      ],
+      "lockedFieldsInner": [
+        "group_filter",
+        "sub_group_count"
+      ],
+      "removedStateKeys": [
+        "subGroupCount"
+      ],
+      "removedOptions": [
+        "range:subGroupCount"
+      ],
+      "optionCountAfter": 26
+    },
+    {
+      "field": "containing_group_count",
+      "lockedFieldsTop": [
+        "containing_group_count"
+      ],
+      "lockedFieldsInner": [
+        "containing_group_count",
+        "group_filter"
+      ],
+      "removedStateKeys": [
+        "containingGroupCount"
+      ],
+      "removedOptions": [
+        "range:containingGroupCount"
+      ],
+      "optionCountAfter": 26
+    },
+    {
+      "field": "tag_count",
+      "lockedFieldsTop": [
+        "tag_count"
+      ],
+      "lockedFieldsInner": [
+        "group_filter",
+        "tag_count"
+      ],
+      "removedStateKeys": [
+        "tagCount"
+      ],
+      "removedOptions": [
+        "range:tagCount"
+      ],
+      "optionCountAfter": 26
+    },
+    {
+      "field": "o_counter",
+      "lockedFieldsTop": [
+        "o_counter"
+      ],
+      "lockedFieldsInner": [
+        "group_filter",
+        "o_counter"
+      ],
+      "removedStateKeys": [
+        "oCounter"
+      ],
+      "removedOptions": [
+        "range:oCounter"
+      ],
+      "optionCountAfter": 26
+    },
+    {
+      "field": "play_count",
+      "lockedFieldsTop": [
+        "play_count"
+      ],
+      "lockedFieldsInner": [
+        "group_filter",
+        "play_count"
+      ],
+      "removedStateKeys": [
+        "playCount"
+      ],
+      "removedOptions": [
+        "range:playCount"
+      ],
+      "optionCountAfter": 26
+    },
+    {
+      "field": "performer_favorite",
+      "lockedFieldsTop": [
+        "performer_favorite"
+      ],
+      "lockedFieldsInner": [
+        "group_filter",
+        "performer_favorite"
+      ],
+      "removedStateKeys": [
+        "performerFavorite"
+      ],
+      "removedOptions": [
+        "select:performerFavorite"
+      ],
+      "optionCountAfter": 26
+    },
+    {
+      "field": "aliases",
+      "lockedFieldsTop": [
+        "aliases"
+      ],
+      "lockedFieldsInner": [
+        "aliases",
+        "group_filter"
+      ],
+      "removedStateKeys": [
+        "aliases",
+        "aliasesModifier"
+      ],
+      "removedOptions": [
+        "text:aliases"
+      ],
+      "optionCountAfter": 26
+    },
+    {
+      "field": "url",
+      "lockedFieldsTop": [
+        "url"
+      ],
+      "lockedFieldsInner": [
+        "group_filter",
+        "url"
+      ],
+      "removedStateKeys": [
+        "url",
+        "urlModifier"
+      ],
+      "removedOptions": [
+        "text:url"
+      ],
+      "optionCountAfter": 26
     }
   ]
 }

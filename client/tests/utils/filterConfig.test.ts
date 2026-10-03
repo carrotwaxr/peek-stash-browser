@@ -1132,12 +1132,14 @@ describe("filter requests follow the contract", () => {
         modifier: option.defaultModifier ?? "INCLUDES",
       });
       for (const { value: modifier } of option.modifierOptions ?? []) {
+        // Has none and Has any are sent alone, with no ids
+        const presence = modifier === "IS_NULL" || modifier === "NOT_NULL";
         expect(
           sentRef(kind, option, {
             [option.key]: ids,
             [must(option.modifierKey, `${option.key} modifierKey`)]: modifier,
           })
-        ).toEqual({ value: ids, modifier });
+        ).toEqual({ value: presence ? undefined : ids, modifier });
       }
     }
   );
@@ -1209,9 +1211,11 @@ describe("filter requests follow the contract", () => {
 
     expect(keys(TAG_FILTER_OPTIONS)).not.toContain("sceneId");
     expect(keys(GROUP_FILTER_OPTIONS)).not.toContain("sceneId");
-    expect(
-      buildPerformerFilter({ sceneId: "1:server-a", groupIds: ["2:server-a"] })
-    ).toEqual({});
+    expect(buildPerformerFilter({ sceneId: "1:server-a" })).toEqual({});
+    // The performers' Collections is the performer filter's own `groups`
+    expect(buildPerformerFilter({ groupIds: ["2:server-a"] })).toEqual({
+      groups: { value: ["2:server-a"], modifier: "INCLUDES" },
+    });
   });
 
   it.each([

@@ -3,6 +3,24 @@
 import type { PERFORMER_FIELDS } from "../fields.js";
 import { HAS_MODIFIERS, type PanelField } from "./types.js";
 
+/** Has ALL, ANY or NONE of these, or has none or any at all */
+const HAS_OR_PRESENCE = [...HAS_MODIFIERS, "IS_NULL", "NOT_NULL"] as const;
+
+/** A text box's condition select: contains or not, or has none or any */
+const TEXT_OR_PRESENCE = [
+  "INCLUDES",
+  "EXCLUDES",
+  "IS_NULL",
+  "NOT_NULL",
+] as const;
+
+/** Yes, No or Any: Any sends nothing */
+const YES_NO_ANY = [
+  { value: "any", label: "Any", sends: undefined },
+  { value: "true", label: "Yes", sends: true },
+  { value: "false", label: "No", sends: false },
+] as const;
+
 export const PERFORMER_PANEL = [
   // Common
   {
@@ -21,7 +39,7 @@ export const PERFORMER_PANEL = [
     editor: "ref",
     multi: true,
     placeholder: "Select tags...",
-    modifiers: HAS_MODIFIERS,
+    modifiers: HAS_OR_PRESENCE,
     modifierKey: "tagIdsModifier",
     defaultModifier: "INCLUDES_ALL",
     modifierLabels: "has",
@@ -30,6 +48,15 @@ export const PERFORMER_PANEL = [
     countContext: "performers",
     pinnedByDefault: true,
     excludeKey: "tagIdsExclude",
+  },
+  {
+    key: "tagFavorite",
+    field: "tag_favorite",
+    label: "Has a Favorite Tag",
+    group: "common",
+    editor: "choice",
+    choices: YES_NO_ANY,
+    defaultValue: "any",
   },
   {
     key: "gender",
@@ -82,6 +109,52 @@ export const PERFORMER_PANEL = [
     group: "common",
     editor: "toggle",
     placeholder: "Favorites Only",
+  },
+
+  // Entities: the performers' scenes
+  {
+    key: "studioIds",
+    field: "studios",
+    label: "Studios",
+    group: "entities",
+    editor: "ref",
+    multi: true,
+    placeholder: "Select studios...",
+    modifiers: HAS_MODIFIERS,
+    modifierKey: "studioIdsModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "has",
+    hierarchyKey: "studioIdsDepth",
+    hierarchyLabel: "Include sub-studios",
+    excludeKey: "studioIdsExclude",
+  },
+  {
+    key: "groupIds",
+    field: "groups",
+    label: "Collections",
+    group: "entities",
+    editor: "ref",
+    multi: true,
+    placeholder: "Select collections...",
+    modifiers: HAS_MODIFIERS,
+    modifierKey: "groupIdsModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "in",
+  },
+  {
+    // Shares a scene the viewer can see with these performers
+    key: "performerIds",
+    field: "performers",
+    label: "Appears With",
+    group: "entities",
+    editor: "ref",
+    multi: true,
+    placeholder: "Select performers...",
+    modifiers: HAS_MODIFIERS,
+    modifierKey: "performerIdsModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "has",
+    excludeKey: "performerIdsExclude",
   },
 
   // Dates
@@ -216,6 +289,26 @@ export const PERFORMER_PANEL = [
     ],
   },
   {
+    key: "country",
+    field: "country",
+    label: "Country",
+    group: "attributes",
+    editor: "text",
+    placeholder: "e.g. US",
+  },
+  {
+    key: "circumcised",
+    field: "circumcised",
+    label: "Circumcised",
+    group: "attributes",
+    editor: "enum",
+    placeholder: "Any",
+    choices: [
+      { value: "CUT", label: "Cut" },
+      { value: "UNCUT", label: "Uncut" },
+    ],
+  },
+  {
     key: "measurements",
     field: "measurements",
     label: "Measurements",
@@ -278,6 +371,76 @@ export const PERFORMER_PANEL = [
     group: "other",
     editor: "number",
     bounds: { min: 0, max: 1000 },
+  },
+  {
+    key: "tagCount",
+    field: "tag_count",
+    label: "Tag Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 1000 },
+  },
+  {
+    key: "imageCount",
+    field: "image_count",
+    label: "Image Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 10000 },
+  },
+  {
+    key: "galleryCount",
+    field: "gallery_count",
+    label: "Gallery Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 1000 },
+  },
+  {
+    key: "markerCount",
+    field: "marker_count",
+    label: "Marker Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 1000 },
+  },
+  {
+    key: "disambiguation",
+    field: "disambiguation",
+    label: "Disambiguation",
+    group: "other",
+    editor: "text",
+    placeholder: "Search disambiguation...",
+  },
+  {
+    key: "aliases",
+    field: "aliases",
+    label: "Aliases",
+    group: "other",
+    editor: "text",
+    placeholder: "Search aliases...",
+    modifierKey: "aliasesModifier",
+    modifiers: TEXT_OR_PRESENCE,
+  },
+  {
+    key: "url",
+    field: "url",
+    label: "URL",
+    group: "other",
+    editor: "text",
+    placeholder: "Search URLs...",
+    modifierKey: "urlModifier",
+    modifiers: TEXT_OR_PRESENCE,
+  },
+  {
+    key: "stashId",
+    field: "stash_id",
+    label: "StashDB ID",
+    group: "other",
+    editor: "text",
+    placeholder: "Search StashDB ID...",
+    modifierKey: "stashIdModifier",
+    modifiers: ["EQUALS", "IS_NULL", "NOT_NULL"],
   },
   {
     key: "details",

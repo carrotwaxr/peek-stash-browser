@@ -1,7 +1,15 @@
 // shared/types/filters/panel/tag.ts
 /** The Tags panel's rows, in the panel's order */
 import type { TAG_FIELDS } from "../fields.js";
-import { INCLUDES_ONLY, type PanelField } from "./types.js";
+import { HAS_MODIFIERS, INCLUDES_ONLY, type PanelField } from "./types.js";
+
+/** A text box's condition select: contains or not, or has none or any */
+const TEXT_OR_PRESENCE = [
+  "INCLUDES",
+  "EXCLUDES",
+  "IS_NULL",
+  "NOT_NULL",
+] as const;
 
 export const TAG_PANEL = [
   // Common
@@ -97,6 +105,38 @@ export const TAG_PANEL = [
     placeholder: "Select collections...",
     modifiers: INCLUDES_ONLY,
   },
+  {
+    // The tags directly under these, or at any depth
+    key: "parentIds",
+    field: "parents",
+    label: "Parent Tags",
+    group: "entities",
+    editor: "ref",
+    multi: true,
+    placeholder: "Select tags...",
+    modifiers: HAS_MODIFIERS,
+    modifierKey: "parentIdsModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "has",
+    hierarchyKey: "parentIdsDepth",
+    hierarchyLabel: "Include sub-tags",
+  },
+  {
+    // The tags directly above these, or at any height
+    key: "childIds",
+    field: "children",
+    label: "Child Tags",
+    group: "entities",
+    editor: "ref",
+    multi: true,
+    placeholder: "Select tags...",
+    modifiers: HAS_MODIFIERS,
+    modifierKey: "childIdsModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "has",
+    hierarchyKey: "childIdsDepth",
+    hierarchyLabel: "Include all parent tags",
+  },
 
   // Dates
   {
@@ -112,6 +152,92 @@ export const TAG_PANEL = [
     label: "Updated Date",
     group: "dates",
     editor: "date",
+  },
+
+  // Other
+  {
+    key: "parentCount",
+    field: "parent_count",
+    label: "Parent Tag Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 100 },
+  },
+  {
+    key: "childCount",
+    field: "child_count",
+    label: "Child Tag Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 1000 },
+  },
+  {
+    key: "imageCount",
+    field: "image_count",
+    label: "Image Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 10000 },
+  },
+  {
+    key: "galleryCount",
+    field: "gallery_count",
+    label: "Gallery Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 1000 },
+  },
+  {
+    key: "performerCount",
+    field: "performer_count",
+    label: "Performer Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 1000 },
+  },
+  {
+    key: "studioCount",
+    field: "studio_count",
+    label: "Studio Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 1000 },
+  },
+  {
+    key: "groupCount",
+    field: "group_count",
+    label: "Collection Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 1000 },
+  },
+  {
+    key: "markerCount",
+    field: "marker_count",
+    label: "Marker Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 10000 },
+  },
+  {
+    key: "aliases",
+    field: "aliases",
+    label: "Aliases",
+    group: "other",
+    editor: "text",
+    placeholder: "Search aliases...",
+    modifierKey: "aliasesModifier",
+    modifiers: TEXT_OR_PRESENCE,
+  },
+  {
+    key: "stashId",
+    field: "stash_id",
+    label: "StashDB ID",
+    group: "other",
+    editor: "text",
+    placeholder: "Search StashDB ID...",
+    modifierKey: "stashIdModifier",
+    modifiers: ["EQUALS", "IS_NULL", "NOT_NULL"],
   },
 ] as const satisfies readonly PanelField<
   Extract<keyof typeof TAG_FIELDS, string>
