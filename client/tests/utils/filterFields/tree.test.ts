@@ -668,6 +668,23 @@ describe("filtersEqual", () => {
     ).toBe(false);
     expect(filtersEqual("scene", { title: "x" }, { title: "y" })).toBe(false);
   });
+
+  it("a number an editor wrote equals the string the URL reads back", () => {
+    expect(
+      filtersEqual(
+        "scene",
+        { rating: { min: 60, max: 90 } },
+        { rating: { min: "60", max: "90" } }
+      )
+    ).toBe(true);
+    expect(
+      filtersEqual(
+        "scene",
+        { rating: { min: 60, max: 90 } },
+        { rating: { min: "65", max: "90" } }
+      )
+    ).toBe(false);
+  });
 });
 
 describe("viewModified", () => {

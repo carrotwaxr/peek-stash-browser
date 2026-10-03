@@ -26,6 +26,11 @@ export interface AdvancedFilterViewProps {
   kind: ListKind;
   /** The list's applied state (Contract 3) */
   value: PanelState;
+  /**
+   * The state to open over when the list does not draw it yet (a chip
+   * editor's edit flushed as the view opened); `value` otherwise
+   */
+  openedOver?: PanelState;
   /** Called once on Apply with the normalized state */
   onApply: (next: PanelState) => void;
   /** The page's permanent chips, shown read-only */
@@ -57,15 +62,16 @@ const OpenView = ({
   onClose,
   kind,
   value,
+  openedOver: opening,
   onApply,
   permanentChips,
   focusGroup,
 }: Omit<AdvancedFilterViewProps, "isOpen">) => {
   // The draft is seeded once, when the view opens; the list's state is not
   // copied into it again (Back while open leaves it as it is)
-  const [openedOver] = useState(value);
+  const [openedOver] = useState(opening ?? value);
   const [draft, setDraft] = useState(() =>
-    editTreeOf(kind, treeOf(kind, value))
+    editTreeOf(kind, treeOf(kind, openedOver))
   );
   const { confirm, dialog } = useConfirmDialog();
   const { isTVMode } = useTVMode();

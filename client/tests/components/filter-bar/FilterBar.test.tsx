@@ -716,6 +716,58 @@ describe("the chip's editor", () => {
     ).toHaveFocus();
   });
 
+  it("a pinned filter tapped while a typed change waits applies both: the pin over the flushed edit", async () => {
+    vi.useFakeTimers();
+    const list = renderListControls(
+      {},
+      { url: "/scenes?rating_max=90", pins: { scene: defaultPinsOf("scene") } }
+    );
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit filter: Rating: at most 90" })
+    );
+    fireEvent.change(
+      within(dialog()).getByRole("spinbutton", { name: /^Minimum Rating/ }),
+      { target: { value: "60" } }
+    );
+    await act(() => vi.advanceTimersByTimeAsync(100));
+    fireEvent.click(screen.getByRole("button", { name: "Unwatched" }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(list.params().get("watched")).toBe("false");
+    expect(list.params().get("rating_min")).toBe("60");
+    expect(list.params().get("rating_max")).toBe("90");
+  });
+
+  it("Advanced opened while a typed change waits opens over the flushed edit, with no warning", async () => {
+    vi.useFakeTimers();
+    const list = renderListControls({}, { url: "/scenes?rating_max=90" });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit filter: Rating: at most 90" })
+    );
+    fireEvent.change(
+      within(dialog()).getByRole("spinbutton", { name: /^Minimum Rating/ }),
+      { target: { value: "60" } }
+    );
+    await act(() => vi.advanceTimersByTimeAsync(100));
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(list.params().get("rating_min")).toBe("60");
+    const view = screen.getByRole("dialog", { name: "Advanced filters" });
+    expect(
+      within(view).getByRole<HTMLInputElement>("spinbutton", {
+        name: /^Minimum Rating/,
+      }).value
+    ).toBe("60");
+    expect(
+      within(view).queryByText(/The list's filters changed/)
+    ).not.toBeInTheDocument();
+  });
+
   it("the URL changing from outside while the popover is open (Back) closes it", async () => {
     const user = userEvent.setup();
     const list = renderListControls({}, { url: "/scenes?favorite=true" });
