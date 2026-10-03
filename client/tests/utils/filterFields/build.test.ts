@@ -5,6 +5,7 @@
  * replay entry by entry, key order included.
  */
 import {
+  CLIP_FIELDS,
   type FieldSpec,
   LIST_KINDS,
   type ListKind,
@@ -17,6 +18,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildPanelFilter } from "@/utils/filterFields";
+import {
+  CLIP_SCENES_ROW,
+  DETAILS_WITH_PRESENCE_ROW,
+  PATH_ROW,
+  PLAYLISTS_ROW,
+} from "../../helpers/editorRows";
 
 interface GoldenEntry {
   label: string;
@@ -329,5 +336,105 @@ describe("buildPanelFilter", () => {
       favorite: true,
       marker_count: { modifier: "BETWEEN", value: 3, value2: 9 },
     });
+  });
+});
+
+describe("buildPanelFilter: the text condition and the playlist and scene pickers (F22b)", () => {
+  // Test-local rows: F18 adds the real Path and Playlists, F21 clip Scenes
+  const sceneTable = (...rows: PanelField[]) => ({
+    rows: [
+      ...(PANEL_FIELDS.scene as readonly PanelField[]).filter(
+        (row) => !rows.some((each) => each.key === row.key)
+      ),
+      ...rows,
+    ],
+    specs: SCENE_FIELDS,
+  });
+
+  it("a text condition Starts with sends `STARTS_WITH`", () => {
+    const table = sceneTable(PATH_ROW);
+
+    expect(
+      buildPanelFilter(
+        "scene",
+        { path: " /media/new ", pathModifier: "STARTS_WITH" },
+        table
+      )
+    ).toEqual({ path: { value: "/media/new", modifier: "STARTS_WITH" } });
+    expect(
+      buildPanelFilter(
+        "scene",
+        { path: "old", pathModifier: "NOT_EQUALS" },
+        table
+      )
+    ).toEqual({ path: { value: "old", modifier: "NOT_EQUALS" } });
+    // No condition chosen, or one the row does not offer: Contains
+    expect(buildPanelFilter("scene", { path: "x" }, table)).toEqual({
+      path: { value: "x", modifier: "INCLUDES" },
+    });
+    expect(
+      buildPanelFilter("scene", { path: "x", pathModifier: "IS_NULL" }, table)
+    ).toEqual({ path: { value: "x", modifier: "INCLUDES" } });
+    // A row without a condition select ignores a stale one
+    expect(
+      buildPanelFilter("scene", {
+        title: "beach",
+        titleModifier: "EQUALS",
+      })
+    ).toEqual({ title: { value: "beach", modifier: "INCLUDES" } });
+  });
+
+  it("a text row offering Has none sends `IS_NULL` with no value", () => {
+    const table = sceneTable(DETAILS_WITH_PRESENCE_ROW);
+
+    expect(
+      buildPanelFilter(
+        "scene",
+        { details: "sunset", detailsModifier: "IS_NULL" },
+        table
+      )
+    ).toEqual({ details: { modifier: "IS_NULL" } });
+    expect(
+      buildPanelFilter("scene", { detailsModifier: "IS_NULL" }, table)
+    ).toEqual({ details: { modifier: "IS_NULL" } });
+  });
+
+  it("playlist ids are sent as numbers", () => {
+    const table = sceneTable(PLAYLISTS_ROW);
+
+    expect(
+      buildPanelFilter(
+        "scene",
+        { playlistIds: ["12", "7"], playlistIdsModifier: "INCLUDES_ALL" },
+        table
+      )
+    ).toEqual({ playlists: { value: [12, 7], modifier: "INCLUDES_ALL" } });
+    // A lone id, a stale one and a value no id spells: the ids are sent,
+    // the rest dropped
+    expect(
+      buildPanelFilter(
+        "scene",
+        { playlistIds: ["999", "x", "12:a", "-3", "12"] },
+        table
+      )
+    ).toEqual({ playlists: { value: [999, 12], modifier: "INCLUDES" } });
+    expect(buildPanelFilter("scene", { playlistIds: ["x"] }, table)).toEqual(
+      {}
+    );
+  });
+
+  it('a scene picker value sends its `"id:instance"`', () => {
+    const table = {
+      rows: [...(PANEL_FIELDS.clip as readonly PanelField[]), CLIP_SCENES_ROW],
+      specs: CLIP_FIELDS,
+    };
+
+    expect(
+      buildPanelFilter(
+        "clip",
+        { sceneIds: ["5:a", "5:b"], sceneIdsModifier: "EXCLUDES" },
+        table
+      ).scenes
+    ).toEqual({ value: ["5:a", "5:b"], modifier: "EXCLUDES" });
   });
 });

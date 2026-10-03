@@ -38,10 +38,12 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
     (f) => f.key === rule.filterKey || !usedFilterKeys.has(f.key)
   );
 
-  // "Not set" and "Set" on a range, "Has none" and "Has any" on a picker,
-  // take no value
+  // "Not set" and "Set" on a range, "Has none" and "Has any" on a picker
+  // or a text field, take no value
   const takesPresence =
-    filterDef?.type === "range" || filterDef?.type === "searchable-select";
+    filterDef?.type === "range" ||
+    filterDef?.type === "searchable-select" ||
+    filterDef?.type === "text";
   const presence =
     takesPresence &&
     (rule.modifier === "IS_NULL" || rule.modifier === "NOT_NULL");
@@ -201,13 +203,17 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
       return (
         <SearchableSelect
           label={filterDef.label ?? filterDef.key}
+          // A Playlists rule picks the owner's playlists, then those shared
+          // with them; its value is the playlist ids
           entityType={
             filterDef.entityType as
+              | "scenes"
               | "performers"
               | "studios"
               | "tags"
               | "galleries"
               | "groups"
+              | "playlists"
           }
           value={rule.value as string | string[]}
           onChange={(val) => onChange({ value: val })}

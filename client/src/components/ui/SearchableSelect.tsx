@@ -18,23 +18,32 @@ import {
   LucideSearch,
   LucideX,
 } from "lucide-react";
-import { libraryApi } from "../../api";
+import { getPlaylists, getSharedPlaylists, libraryApi } from "../../api";
 import { useDebouncedValue } from "../../hooks/useDebounce";
 import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
 import Button from "./Button";
 
 /**
- * Searchable select for performers, studios, tags, groups and galleries, in
- * single or multi-select mode. Its options come from the entity's `/minimal`
- * endpoint (one page in name order, searched on the server, with the user's
- * exclusions and instances applied): nothing loads until the dropdown opens,
- * each search aborts the one before it, and a response for a search that is
- * no longer current is dropped. Nothing is kept in the browser between
- * openings, so the list is always the current user's. The selected values'
- * names are resolved with one minimal request carrying their ids. With
- * `scope`, both kinds of request carry it: the Content Restrictions editor
- * sends "allEnabled" to list every enabled server's entities, including
- * what the admin hid for themselves (admins only).
+ * Searchable select for scenes, performers, studios, tags, groups and
+ * galleries, in single or multi-select mode. Its options come from the
+ * entity's `/minimal` endpoint (one page in name order, searched on the
+ * server, with the user's exclusions and instances applied; a scene's name
+ * is its title): nothing loads until the dropdown opens, each search aborts
+ * the one before it, and a response for a search that is no longer current
+ * is dropped. Nothing is kept in the browser between openings, so the list
+ * is always the current user's. The selected values' names are resolved
+ * with one minimal request carrying their ids. With `scope`, both kinds of
+ * request carry it: the Content Restrictions editor sends "allEnabled" to
+ * list every enabled server's entities, including what the admin hid for
+ * themselves (admins only). The scene endpoint takes no scope or count
+ * filter.
+ *
+ * `entityType="playlists"` picks Peek playlists instead: the viewer's own,
+ * then those shared with them marked "by <owner>", read from
+ * `GET /api/playlists` and `GET /api/playlists/shared` once per opening and
+ * searched in the browser. A value is the playlist's id, never joined with
+ * an instance; an id neither list holds (deleted, or no longer shared)
+ * shows as "Unavailable playlist" and stays selected.
  *
  * The trigger is a button (Enter or Space opens the list, focus moves to the
  * search box, Escape closes it and returns focus to the trigger, a focus that
@@ -50,7 +59,7 @@ import Button from "./Button";
  * it.
  *
  * @param {Object} props
- * @param {"performers"|"studios"|"tags"|"groups"|"galleries"} props.entityType - Type of entity to search
+ * @param {"scenes"|"performers"|"studios"|"tags"|"groups"|"galleries"|"playlists"} props.entityType - Type of entity to search
  * @param {Array|string} props.value - Selected value(s) - array for multi, string for single
  * @param {Function} props.onChange - Callback when selection changes
  * @param {boolean} props.multi - Enable multi-select mode
@@ -63,9 +72,19 @@ import Button from "./Button";
 interface SelectOption {
   id: string;
   name: string;
+  /** A playlist shared with the viewer: its owner's name */
+  owner?: string | undefined;
 }
 
-type EntityType = "performers" | "studios" | "tags" | "groups" | "galleries";
+type MinimalEntityType =
+  | "scenes"
+  | "performers"
+  | "studios"
+  | "tags"
+  | "groups"
+  | "galleries";
+
+type EntityType = MinimalEntityType | "playlists";
 
 /** Options listed per search: one page */
 const PAGE_SIZE = 50;
@@ -80,7 +99,13 @@ type FindMinimal = (
 
 /** The entity's `/minimal` endpoint; undefined for a type that has none */
 function minimalFinder(entityType: string): FindMinimal | undefined {
-  const finders: Record<EntityType, FindMinimal> = {
+  const finders: Record<MinimalEntityType, FindMinimal> = {
+    // The scene endpoint takes neither a scope nor a count filter
+    scenes: ({ ids, filter }, signal) =>
+      libraryApi.findScenesMinimal(
+        { ...(ids ? { ids } : {}), ...(filter ? { filter } : {}) },
+        signal
+      ),
     performers: libraryApi.findPerformersMinimal,
     studios: libraryApi.findStudiosMinimal,
     tags: libraryApi.findTagsMinimal,
@@ -88,9 +113,49 @@ function minimalFinder(entityType: string): FindMinimal | undefined {
     galleries: libraryApi.findGalleriesMinimal,
   };
   return Object.prototype.hasOwnProperty.call(finders, entityType)
-    ? finders[entityType as EntityType]
+    ? finders[entityType as MinimalEntityType]
     : undefined;
 }
+
+/** What a stale playlist id shows as: deleted, or no longer shared */
+const UNAVAILABLE_PLAYLIST = "Unavailable playlist";
+
+/**
+ * The viewer's playlists as options: their own, then those shared with
+ * them, each id once
+ */
+async function playlistOptions(): Promise<SelectOption[]> {
+  const [own, shared] = await Promise.all([
+    getPlaylists(),
+    getSharedPlaylists(),
+  ]);
+  const seen = new Set<string>();
+  const options: SelectOption[] = [];
+  for (const playlist of own.playlists) {
+    const id = String(playlist.id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    options.push({ id, name: playlist.name });
+  }
+  for (const playlist of shared.playlists) {
+    const id = String(playlist.id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    options.push({ id, name: playlist.name, owner: playlist.owner.username });
+  }
+  return options;
+}
+
+/** An option as the picker writes it: a shared playlist with its owner */
+const shownName = (option: SelectOption) =>
+  option.owner === undefined
+    ? option.name
+    : `${option.name} by ${option.owner}`;
+
+/** Whether an option matches the search text, its owner included */
+const matchesSearch = (option: SelectOption, search: string) =>
+  search.trim() === "" ||
+  shownName(option).toLowerCase().includes(search.trim().toLowerCase());
 
 /** An entity as an option: its "id:instanceId" key and its name */
 const toOption = (entity: MinimalEntity): SelectOption => ({
@@ -167,6 +232,9 @@ const SearchableSelect = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [options, setOptions] = useState<SelectOption[]>([]);
+  const isPlaylists = entityType === "playlists";
+  // The viewer's playlists, read once per opening and searched here
+  const [playlists, setPlaylists] = useState<SelectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(false);
   // Filled by the selected-names effect once it knows their names
@@ -194,8 +262,18 @@ const SearchableSelect = ({
       compositeKeys: string[],
       signal: AbortSignal
     ): Promise<SelectOption[]> => {
-      const find = minimalFinder(entityType);
       const ids = [...new Set(compositeKeys)];
+      if (entityType === "playlists" && ids.length > 0) {
+        const listed = await playlistOptions();
+        return ids.map(
+          (id) =>
+            listed.find((option) => option.id === id) ?? {
+              id,
+              name: UNAVAILABLE_PLAYLIST,
+            }
+        );
+      }
+      const find = minimalFinder(entityType);
       if (!find || ids.length === 0) return [];
 
       const chunks: string[][] = [];
@@ -236,7 +314,11 @@ const SearchableSelect = ({
 
     // Names already known: resolved before, or in the options listed now
     const known = new Map<string, SelectOption>();
-    for (const option of [...selectedItemsRef.current, ...options]) {
+    for (const option of [
+      ...selectedItemsRef.current,
+      ...options,
+      ...playlists,
+    ]) {
       known.set(option.id, option);
     }
     const found = valueArray.flatMap((id) => {
@@ -266,7 +348,7 @@ const SearchableSelect = ({
         if (!signal.aborted) setIsLoadingInitial(false);
       });
     return () => controller.abort();
-  }, [value, excluded, options, entityType, multi, fetchItemsByIds]);
+  }, [value, excluded, options, playlists, entityType, multi, fetchItemsByIds]);
 
   // Build count_filter based on context
   const getCountFilter = useCallback(() => {
@@ -321,11 +403,40 @@ const SearchableSelect = ({
   // each (debounced) change of the search text. Each run aborts the request
   // of the run before it.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isPlaylists) return;
     const controller = new AbortController();
     void loadOptions(debouncedSearchTerm, controller.signal);
     return () => controller.abort();
-  }, [isOpen, debouncedSearchTerm, loadOptions]);
+  }, [isOpen, isPlaylists, debouncedSearchTerm, loadOptions]);
+
+  // The playlists load once per opening; the search filters what was read.
+  // An answer that arrives after the list closed is dropped.
+  useEffect(() => {
+    if (!isOpen || !isPlaylists) return;
+    let current = true;
+    setLoading(true);
+    playlistOptions()
+      .then((rows) => {
+        if (!current) return;
+        setPlaylists(rows);
+        setLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (!current) return;
+        console.error("Error loading playlists:", error);
+        setPlaylists([]);
+        setLoading(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [isOpen, isPlaylists]);
+
+  // What the list shows: the playlists matching the search, else the page
+  // the endpoint answered
+  const shown = isPlaylists
+    ? playlists.filter((option) => matchesSearch(option, searchTerm))
+    : options;
 
   // Reset options when entityType or countFilterContext changes
   useEffect(() => {
@@ -335,6 +446,7 @@ const SearchableSelect = ({
     ) {
       // Clear options to force reload
       setOptions([]);
+      setPlaylists([]);
       setSelectedItems([]);
       setSearchTerm("");
 
@@ -495,7 +607,9 @@ const SearchableSelect = ({
   // an excluded value as "not <name>"
   const pickedNames = selectedItems
     .map((item) =>
-      toggleable && isExcluded(item.id) ? `not ${item.name}` : item.name
+      toggleable && isExcluded(item.id)
+        ? `not ${shownName(item)}`
+        : shownName(item)
     )
     .join(", ");
   const triggerName = label
@@ -548,22 +662,24 @@ const SearchableSelect = ({
                     variant="tertiary"
                     className="hover:opacity-70 !p-0 !border-0 rounded"
                     aria-pressed={out}
-                    aria-label={`Exclude ${item.name}`}
+                    aria-label={`Exclude ${shownName(item)}`}
                     title={
-                      out ? `Include ${item.name}` : `Exclude ${item.name}`
+                      out
+                        ? `Include ${shownName(item)}`
+                        : `Exclude ${shownName(item)}`
                     }
                     icon={<LucideBan size={14} />}
                   />
                 )}
                 <span className={out ? "line-through" : undefined}>
-                  {item.name}
+                  {shownName(item)}
                 </span>
                 <Button
                   data-remove
                   onClick={(e) => handleRemove(item.id, e)}
                   variant="tertiary"
                   className="hover:opacity-70 !p-0 !border-0"
-                  aria-label={`Remove ${item.name}`}
+                  aria-label={`Remove ${shownName(item)}`}
                   icon={<LucideX size={14} />}
                 />
               </span>
@@ -594,7 +710,7 @@ const SearchableSelect = ({
                 : placeholder
               : multi
                 ? "Add more..."
-                : selectedItems[0]?.name}
+                : selectedItems[0] && shownName(selectedItems[0])}
           </span>
           <LucideChevronDown
             size={14}
@@ -615,7 +731,7 @@ const SearchableSelect = ({
             }}
             variant="tertiary"
             className="hover:opacity-70 !p-1 !border-0"
-            aria-label={`Remove ${selectedItems[0].name}`}
+            aria-label={`Remove ${shownName(selectedItems[0])}`}
             icon={<LucideX size={16} />}
           />
         )}
@@ -679,7 +795,7 @@ const SearchableSelect = ({
               >
                 Loading...
               </div>
-            ) : options.length === 0 ? (
+            ) : shown.length === 0 ? (
               <div
                 className="p-4 text-center"
                 style={{ color: "var(--text-muted)" }}
@@ -687,7 +803,7 @@ const SearchableSelect = ({
                 No {entityType} found
               </div>
             ) : (
-              options.map((option) => (
+              shown.map((option) => (
                 <Button
                   key={option.id}
                   onClick={() => handleSelect(option)}
@@ -704,7 +820,21 @@ const SearchableSelect = ({
                       : "var(--text-primary)",
                   }}
                 >
-                  <span>{option.name}</span>
+                  <span>
+                    {option.name}
+                    {option.owner !== undefined && (
+                      <span
+                        className="text-sm"
+                        style={{
+                          color: isSelected(option.id)
+                            ? "inherit"
+                            : "var(--text-muted)",
+                        }}
+                      >
+                        {` by ${option.owner}`}
+                      </span>
+                    )}
+                  </span>
                   {isSelected(option.id) && <span className="text-sm">✓</span>}
                 </Button>
               ))

@@ -177,6 +177,17 @@ export type RefPair = readonly [string, string];
 export type RefPool = (entityType: string) => RefPair;
 
 /**
+ * The playlist picker's sample ids: Peek playlist ids, not Stash refs. Any
+ * id reaches SQL (one the viewer cannot read holds no scenes for them), so
+ * the walk needs no playlist of its own.
+ */
+const PLAYLIST_SAMPLE_IDS: RefPair = ["1", "2"];
+
+/** Two ids for a picker: playlists' are Peek's, the rest from the pool */
+const pickerIds = (entityType: string, refs: RefPool): RefPair =>
+  entityType === "playlists" ? PLAYLIST_SAMPLE_IDS : refs(entityType);
+
+/**
  * One panel state for one option: a value (one sample per bound or
  * choice), the modifier when the option offers a choice, and sub-items on
  * or off where the option supports them.
@@ -196,6 +207,9 @@ export interface OptionSample {
   readonly withoutSubItems: string | undefined;
 }
 
+/** Has none and Has any: a presence check, sampled with no value */
+const PRESENCE_MODIFIERS: readonly string[] = ["IS_NULL", "NOT_NULL"];
+
 const TEXT_SAMPLE = "contract";
 const DATE_START = "2020-01-01";
 const DATE_END = "2024-12-31";
@@ -206,7 +220,9 @@ const SUB_ITEMS = ", with sub-items";
  * start only, end only, both; text; each select value but the one the
  * control shows when unset (its `defaultValue`, the unfiltered state);
  * checkbox checked; searchable select one id and (multi) two ids, with and
- * without sub-items. Each under every modifier the option offers. A picker
+ * without sub-items (a playlist picker's ids are Peek playlist ids). Each
+ * under every modifier the option offers: a text option's every condition
+ * (Contains to Starts with), and its Has none and Has any with no text. A picker
  * with an exclude companion adds one include plus one exclude under Has ANY
  * and Has ALL, and excludes alone under its default modifier; a picker's
  * Has none and Has any (IS_NULL, NOT_NULL) are one sample each, with no
@@ -221,29 +237,39 @@ export function optionSamples(
     option.modifierOptions?.map((choice) => choice.value) ?? [undefined];
   const values = sampleValues(option, refs);
   const picker = option.type === "searchable-select";
+  const valuesUnder = (modifier: string | undefined) => {
+    if (picker) return pickerValues(option, refs, modifier, values);
+    // A text option's presence choice takes no text
+    return option.type === "text" &&
+      modifier !== undefined &&
+      PRESENCE_MODIFIERS.includes(modifier)
+      ? [
+          {
+            variant: "no text",
+            state: {},
+            ids: undefined,
+            withoutSubItems: undefined,
+          },
+        ]
+      : values;
+  };
   return modifiers.flatMap((modifier) =>
-    (picker ? pickerValues(option, refs, modifier, values) : values).map(
-      (value) => ({
-        label:
-          modifier === undefined
-            ? value.variant
-            : `${modifier} ${value.variant}`,
-        state: {
-          ...value.state,
-          ...(modifier !== undefined && option.modifierKey !== undefined
-            ? { [option.modifierKey]: modifier }
-            : {}),
-        },
-        modifier,
-        variant: value.variant,
-        ids: value.ids,
-        withoutSubItems: value.withoutSubItems,
-      })
-    )
+    valuesUnder(modifier).map((value) => ({
+      label:
+        modifier === undefined ? value.variant : `${modifier} ${value.variant}`,
+      state: {
+        ...value.state,
+        ...(modifier !== undefined && option.modifierKey !== undefined
+          ? { [option.modifierKey]: modifier }
+          : {}),
+      },
+      modifier,
+      variant: value.variant,
+      ids: value.ids,
+      withoutSubItems: value.withoutSubItems,
+    }))
   );
 }
-
-const PRESENCE_MODIFIERS: readonly string[] = ["IS_NULL", "NOT_NULL"];
 
 /** The modifiers under which a picker's values may each include or exclude */
 const TOGGLE_MODIFIERS: readonly (string | undefined)[] = [
@@ -278,7 +304,7 @@ function pickerValues(
   ) {
     return [...values];
   }
-  const [first, second] = refs(entityType);
+  const [first, second] = pickerIds(entityType, refs);
   const isDefault =
     modifier === (option.defaultModifier ?? option.modifierOptions?.[0]?.value);
   return [
@@ -363,7 +389,7 @@ function refSamples(option: ClientOption, refs: RefPool): SampleValue[] {
   if (entityType === undefined) {
     throw new Error(`Searchable select ${key} names no entityType`);
   }
-  const [first, second] = refs(entityType);
+  const [first, second] = pickerIds(entityType, refs);
   const picks: { variant: string; ids: string[] }[] =
     option.multi === true
       ? [

@@ -258,11 +258,13 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                   label={label}
                   entityType={
                     entityType as
+                      | "scenes"
                       | "performers"
                       | "studios"
                       | "tags"
                       | "galleries"
                       | "groups"
+                      | "playlists"
                   }
                   value={value as string | string[]}
                   onChange={onChange as (value: string | string[]) => void}
@@ -322,11 +324,19 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               style={baseInputStyle}
             />
           );
-        case "text":
-          return (
+        case "text": {
+          // A field with a condition select (Path's Starts with): the select
+          // first, named "<label> condition"; "Has none" and "Has any" take
+          // no text, so the box is not drawn
+          const hasCondition =
+            modifierOptions !== undefined && modifierOptions.length > 0;
+          const presence =
+            modifierValue === "IS_NULL" || modifierValue === "NOT_NULL";
+          const box = (
             <input
-              id={controlId}
+              id={hasCondition ? undefined : controlId}
               type="text"
+              aria-label={hasCondition ? label : undefined}
               value={value as string | undefined}
               onChange={(e) => onChange(e.target.value)}
               placeholder={placeholder}
@@ -335,6 +345,27 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               style={baseInputStyle}
             />
           );
+          if (!hasCondition) return box;
+          return (
+            <div className="space-y-2">
+              <select
+                id={controlId}
+                aria-label={`${label} condition`}
+                value={modifierValue}
+                onChange={(e) => onModifierChange?.(e.target.value)}
+                className={inputClasses}
+                style={baseInputStyle}
+              >
+                {modifierOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {presence ? null : box}
+            </div>
+          );
+        }
         case "date":
           return (
             <input

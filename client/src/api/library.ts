@@ -21,6 +21,8 @@ import type {
   FindPerformersMinimalResponse,
   FindPerformersRequest,
   FindPerformersResponse,
+  FindScenesMinimalRequest,
+  FindScenesMinimalResponse,
   FindScenesRequest,
   FindScenesResponse,
   FindStudiosMinimalRequest,
@@ -242,6 +244,19 @@ export const libraryApi = {
         signal
       )
     ).performers,
+
+  // A scene's minimal is its title; the endpoint takes no count filter or scope
+  findScenesMinimal: async (
+    params: FindScenesMinimalRequest = {},
+    signal?: AbortSignal
+  ) =>
+    (
+      await apiPost<FindScenesMinimalResponse>(
+        "/library/scenes/minimal",
+        params,
+        signal
+      )
+    ).scenes,
 
   findStudiosMinimal: async (
     params: FindStudiosMinimalRequest = {},

@@ -32,6 +32,9 @@ export const queryKeys = {
       ["scenes", instanceId, "similar", id, page] as const,
     recommended: (page: number, perPage: number) =>
       ["scenes", undefined, "recommended", { page, perPage }] as const,
+    // The names of the ids a filter chip shows (`useRefNames`)
+    names: (ids: readonly string[]) =>
+      ["scenes", undefined, "names", ids] as const,
   },
   performers: {
     all: (instanceId?: string) => ["performers", instanceId] as const,
@@ -167,6 +170,8 @@ export const queryKeys = {
     list: (params: { containsScene?: string } = {}) =>
       ["playlists", "list", params] as const,
     shared: () => ["playlists", "shared"] as const,
+    /** The names of the playlist ids a filter chip shows (`useRefNames`) */
+    names: (ids: readonly string[]) => ["playlists", "names", ids] as const,
     /** One page of one playlist's items in one order */
     detail: (playlistId: number, params: object = {}) =>
       ["playlists", "detail", playlistId, params] as const,

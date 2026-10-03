@@ -34,8 +34,8 @@ const panelOf = (kind: ListKind): readonly PanelField[] => PANEL_FIELDS[kind];
 /** The editors each contract kind may be offered with */
 const EDITORS_FOR: Readonly<Record<FieldKind, readonly EditorKind[]>> = {
   ref: ["ref"],
-  // No panel row offers playlists yet (F18, F22)
-  playlist: [],
+  // Peek playlist ids, picked from the viewer's playlists (F18's row)
+  playlist: ["ref"],
   number: ["number"],
   date: ["date"],
   // A performer attribute Stash stores as free text is picked from a list
@@ -149,9 +149,11 @@ describe("panel field table", () => {
       panelOf(kind).flatMap((field) => {
         if (field.editor !== "ref") return [];
         const spec = TABLES[kind][field.field];
-        if (spec?.kind !== "ref") return [`${kind}.${field.key}: not a ref`];
+        if (spec?.kind !== "ref" && spec?.kind !== "playlist") {
+          return [`${kind}.${field.key}: not a ref`];
+        }
         const problems: string[] = [];
-        if (field.hierarchyKey && !spec.hierarchical) {
+        if (field.hierarchyKey && (spec.kind !== "ref" || !spec.hierarchical)) {
           problems.push("hierarchyKey without a hierarchical spec");
         }
         if (field.hierarchyKey && !field.hierarchyLabel) {
@@ -170,18 +172,61 @@ describe("panel field table", () => {
     expect(wrong).toEqual([]);
   });
 
+  it("editor `ref` maps to contract kind `ref` or `playlist`", () => {
+    expect(
+      (Object.keys(EDITORS_FOR) as FieldKind[]).filter((kind) =>
+        EDITORS_FOR[kind].includes("ref")
+      )
+    ).toEqual(["ref", "playlist"]);
+    // A playlist field is picked from the playlists, a ref field from its
+    // entity's `/minimal` endpoint
+    const wrong = LIST_KINDS.flatMap((kind) =>
+      panelOf(kind).flatMap((field) => {
+        if (field.editor !== "ref") return [];
+        const playlist = TABLES[kind][field.field]?.kind === "playlist";
+        return playlist === (field.source === "playlists")
+          ? []
+          : [`${kind}.${field.key}: source ${field.source ?? "minimal"}`];
+      })
+    );
+
+    expect(wrong).toEqual([]);
+  });
+
+  it("a text field names a modifierKey only when it offers more than one modifier", () => {
+    const wrong = LIST_KINDS.flatMap((kind) =>
+      panelOf(kind).flatMap((field) =>
+        field.editor === "text" &&
+        (field.modifierKey !== undefined) !==
+          (field.modifiers !== undefined && field.modifiers.length > 1)
+          ? [`${kind}.${field.key}`]
+          : []
+      )
+    );
+
+    expect(wrong).toEqual([]);
+  });
+
   it("every offered modifier is one its field takes, and the default is offered", () => {
     const wrong = LIST_KINDS.flatMap((kind) =>
       panelOf(kind).flatMap((field) => {
-        if (field.editor !== "ref" && field.editor !== "enum") return [];
+        if (
+          field.editor !== "ref" &&
+          field.editor !== "enum" &&
+          field.editor !== "text"
+        ) {
+          return [];
+        }
         const spec = TABLES[kind][field.field];
         const taken: readonly string[] =
           spec && "modifiers" in spec ? spec.modifiers : [];
         const offered: readonly string[] = field.modifiers ?? [];
+        const fallback =
+          field.editor === "text" ? undefined : field.defaultModifier;
         return [
           ...offered.filter((modifier) => !taken.includes(modifier)),
-          ...(field.defaultModifier && !offered.includes(field.defaultModifier)
-            ? [`default ${field.defaultModifier}`]
+          ...(fallback && !offered.includes(fallback)
+            ? [`default ${fallback}`]
             : []),
         ].map((modifier) => `${kind}.${field.key} ${modifier}`);
       })

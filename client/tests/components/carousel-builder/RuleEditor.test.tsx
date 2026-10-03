@@ -5,8 +5,14 @@
  * ids. Only the Content Restrictions editor sends `scope: "allEnabled"`
  * (tests/components/settings/ContentRestrictionsModalPickers.test.tsx).
  */
-import type { MinimalEntity, MinimalRequest } from "@peek/shared-types";
+import type {
+  GetSharedPlaylistsResponse,
+  GetUserPlaylistsResponse,
+  MinimalEntity,
+  MinimalRequest,
+} from "@peek/shared-types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as api from "../../../src/api";
@@ -22,8 +28,49 @@ type FindMinimalMock = (
   signal?: AbortSignal
 ) => Promise<MinimalEntity[]>;
 
-const { mockFindTagsMinimal, PRESENCE_RULE } = vi.hoisted(() => ({
+const {
+  mockFindTagsMinimal,
+  mockGetPlaylists,
+  mockGetSharedPlaylists,
+  PRESENCE_RULE,
+  PLAYLIST_RULE,
+  PATH_RULE,
+} = vi.hoisted(() => ({
   mockFindTagsMinimal: vi.fn<FindMinimalMock>(),
+  mockGetPlaylists: vi.fn<() => Promise<GetUserPlaylistsResponse>>(),
+  mockGetSharedPlaylists: vi.fn<() => Promise<GetSharedPlaylistsResponse>>(),
+  // Test-local Playlists and Path rules; the scene rows come in F18
+  PLAYLIST_RULE: {
+    key: "testPlaylistIds",
+    type: "searchable-select",
+    label: "Test Playlists",
+    entityType: "playlists",
+    multi: true,
+    defaultValue: [],
+    modifierKey: "testPlaylistIdsModifier",
+    modifierOptions: [
+      { value: "INCLUDES", label: "Has ANY of these" },
+      { value: "INCLUDES_ALL", label: "Has ALL of these" },
+      { value: "EXCLUDES", label: "Has NONE of these" },
+    ],
+    defaultModifier: "INCLUDES",
+  },
+  PATH_RULE: {
+    key: "testPath",
+    type: "text",
+    label: "Test Path",
+    defaultValue: "",
+    placeholder: "Search path...",
+    modifierKey: "testPathModifier",
+    modifierOptions: [
+      { value: "INCLUDES", label: "Contains" },
+      { value: "EXCLUDES", label: "Excludes" },
+      { value: "EQUALS", label: "Equals" },
+      { value: "NOT_EQUALS", label: "Not equals" },
+      { value: "STARTS_WITH", label: "Starts with" },
+    ],
+    defaultModifier: "INCLUDES",
+  },
   // A test-local ref rule offering presence; the scene rows opt in at F18
   PRESENCE_RULE: {
     key: "testTagIds",
@@ -49,6 +96,8 @@ vi.mock("../../../src/utils/filterConfig", async (importOriginal) => {
     CAROUSEL_FILTER_DEFINITIONS: [
       ...actual.CAROUSEL_FILTER_DEFINITIONS,
       PRESENCE_RULE,
+      PLAYLIST_RULE,
+      PATH_RULE,
     ],
   };
 });
@@ -58,6 +107,8 @@ vi.mock("../../../src/api", async (importOriginal) => {
   return {
     ...actual,
     libraryApi: { ...actual.libraryApi, findTagsMinimal: mockFindTagsMinimal },
+    getPlaylists: mockGetPlaylists,
+    getSharedPlaylists: mockGetSharedPlaylists,
   };
 });
 
@@ -274,5 +325,98 @@ describe("RuleEditor", () => {
       value: [],
       excludes: ["6:server-a", "5:server-a"],
     });
+  });
+
+  it("a Playlists rule lists own and shared playlists and saves the playlist id", async () => {
+    mockGetPlaylists.mockResolvedValue(
+      untrusted({ playlists: [{ id: 12, name: "Road trip" }] })
+    );
+    mockGetSharedPlaylists.mockResolvedValue(
+      untrusted({
+        playlists: [{ id: 40, name: "Weekend", owner: { username: "alice" } }],
+      })
+    );
+    const onChange = vi.fn();
+    render(
+      <RuleEditor
+        rule={{
+          id: "rule-1",
+          filterKey: "testPlaylistIds",
+          value: [],
+          modifier: "INCLUDES",
+        }}
+        usedFilterKeys={new Set(["testPlaylistIds"])}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^Test Playlists/ }));
+    const options = await screen.findAllByRole("button", { pressed: false });
+    expect(options.map((option) => option.textContent)).toEqual([
+      "Road trip",
+      "Weekend by alice",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Weekend by alice" }));
+
+    expect(must(onChange.mock.calls[0])[0]).toEqual({ value: ["40"] });
+  });
+
+  it("a Path Starts with rule saves STARTS_WITH", () => {
+    const onChange = vi.fn();
+    const rule = {
+      id: "rule-1",
+      filterKey: "testPath",
+      value: "/media/new",
+      modifier: "INCLUDES",
+    };
+    const { rerender } = render(
+      <RuleEditor
+        rule={rule}
+        usedFilterKeys={new Set(["testPath"])}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+
+    const condition = screen.getByRole("combobox", { name: "Condition" });
+    expect(
+      [...condition.querySelectorAll("option")].map((each) => each.text)
+    ).toEqual(["Contains", "Excludes", "Equals", "Not equals", "Starts with"]);
+    fireEvent.change(condition, { target: { value: "STARTS_WITH" } });
+    expect(must(onChange.mock.calls[0])[0]).toEqual({
+      modifier: "STARTS_WITH",
+    });
+
+    rerender(
+      <RuleEditor
+        rule={{ ...rule, modifier: "STARTS_WITH" }}
+        usedFilterKeys={new Set(["testPath"])}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+    expect(screen.getByDisplayValue("/media/new")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Condition" })).toHaveValue(
+      "STARTS_WITH"
+    );
+  });
+
+  it("a text rule offering Has none hides its value", () => {
+    render(
+      <RuleEditor
+        rule={{
+          id: "rule-1",
+          filterKey: "testPath",
+          value: "/media",
+          modifier: "IS_NULL",
+        }}
+        usedFilterKeys={new Set(["testPath"])}
+        onChange={vi.fn()}
+        onRemove={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByDisplayValue("/media")).toBeNull();
   });
 });

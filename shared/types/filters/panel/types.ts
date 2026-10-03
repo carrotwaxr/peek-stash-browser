@@ -10,6 +10,7 @@ import type {
   EnumModifier,
   RefFieldModifier,
   RefModifier,
+  TextModifier,
 } from "../criteria.js";
 
 /** The panel's sections, in the order a list draws them */
@@ -118,6 +119,13 @@ export interface RefField<F extends string = string> extends FieldBase<F> {
    * or excludes (`{ value, excludes }`)
    */
   readonly excludeKey?: string;
+  /**
+   * Where the picker's options come from: the entity's `/minimal` endpoint
+   * (the default), or the viewer's playlists, their own then those shared
+   * with them, for a `playlist` field (Peek playlist ids, never joined with
+   * an instance)
+   */
+  readonly source?: "minimal" | "playlists";
 }
 
 export interface NumberField<F extends string = string> extends FieldBase<F> {
@@ -147,9 +155,16 @@ export interface DateField<F extends string = string> extends FieldBase<F> {
   readonly editor: "date";
 }
 
-/** A text box; its most characters are the contract field's `maxLength` */
+/**
+ * A text box; its most characters are the contract field's `maxLength`.
+ * With more than one modifier (and a `modifierKey`) a condition select
+ * offers them (Path's Starts with); IS_NULL and NOT_NULL, where the field
+ * takes them, are sent with no text. Without, the text is a substring.
+ */
 export interface TextField<F extends string = string> extends FieldBase<F> {
   readonly editor: "text";
+  /** The modifiers the condition select offers, a subset of the field's */
+  readonly modifiers?: readonly TextModifier[];
 }
 
 export interface EnumField<F extends string = string> extends FieldBase<F> {
