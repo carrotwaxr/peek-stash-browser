@@ -8,6 +8,7 @@
  * read it, so these checks keep the tables consistent with themselves.
  */
 import {
+  DEFAULT_RECOMMENDED_SORT,
   DEFAULT_SORT,
   type FieldSpec,
   LIST_FIELDS,
@@ -16,6 +17,7 @@ import {
   PANEL_FIELDS,
   PLAYLIST_ITEM_SORTS,
   type PanelField,
+  RECOMMENDED_SORTS,
   SCENE_FIELDS,
   SORTS,
   UI_KEYS,
@@ -145,6 +147,24 @@ describe("filter contract", () => {
 
     expect(scene).toContain("playlist_position");
     expect(items).not.toContain("playlist_position");
+  });
+
+  it("every Recommended sort is a scene sort or `recommended`", () => {
+    const scene: readonly string[] = SORTS.scene;
+    const stray = RECOMMENDED_SORTS.filter(
+      (sort) => sort !== "recommended" && !scene.includes(sort)
+    );
+
+    expect(stray).toEqual([]);
+    expect(RECOMMENDED_SORTS[0]).toBe("recommended");
+    expect(new Set(RECOMMENDED_SORTS).size).toBe(RECOMMENDED_SORTS.length);
+  });
+
+  it("the Recommended default is `recommended` DESC", () => {
+    expect(DEFAULT_RECOMMENDED_SORT).toEqual({
+      field: "recommended",
+      direction: "DESC",
+    });
   });
 
   it("each sort list has no duplicates and holds its default sort", () => {

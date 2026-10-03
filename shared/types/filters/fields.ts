@@ -755,6 +755,20 @@ export const PLAYLIST_ITEM_SORTS = [
 ] as const;
 export type PlaylistItemSort = (typeof PLAYLIST_ITEM_SORTS)[number];
 
+/** How many ranked scenes Recommended keeps per user, and filters within */
+export const RECOMMENDED_LIMIT = 500;
+
+/**
+ * The sorts Recommended offers: its rank, then every scene sort. DESC on
+ * `recommended` is best first, so the list's usual default direction reads right.
+ */
+export const RECOMMENDED_SORTS = ["recommended", ...SORTS.scene] as const;
+export type RecommendedSort = (typeof RECOMMENDED_SORTS)[number];
+export const DEFAULT_RECOMMENDED_SORT = {
+  field: "recommended",
+  direction: "DESC",
+} as const;
+
 /** A playlist's items come in the playlist's own order unless asked */
 export const DEFAULT_PLAYLIST_ITEM_SORT = {
   field: "position",

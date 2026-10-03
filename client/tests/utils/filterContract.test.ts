@@ -10,6 +10,7 @@ import {
   type FieldSpec,
   LIST_KINDS,
   type ListKind,
+  RECOMMENDED_SORTS,
   SORTS,
   UI_KEYS,
 } from "@peek/shared-types";
@@ -26,6 +27,7 @@ import {
   IMAGE_SORT_OPTIONS,
   PERFORMER_FILTER_OPTIONS,
   PERFORMER_SORT_OPTIONS,
+  RECOMMENDED_SORT_OPTIONS,
   SCENE_FILTER_OPTIONS,
   SCENE_SORT_OPTIONS,
   STUDIO_FILTER_OPTIONS,
@@ -138,4 +140,20 @@ describe("client filter options and the shared contract", () => {
       ).toEqual([]);
     }
   );
+
+  it("the Recommended sort options name every Recommended sort once, `Recommended` first", () => {
+    const values = RECOMMENDED_SORT_OPTIONS.map((option) => option.value);
+
+    expect(RECOMMENDED_SORT_OPTIONS[0]).toEqual({
+      value: "recommended",
+      label: "Recommended",
+    });
+    const sorts: readonly string[] = RECOMMENDED_SORTS;
+
+    expect(values.filter((value) => !sorts.includes(value))).toEqual([]);
+    expect(values.slice(1)).toEqual(
+      SCENE_SORT_OPTIONS.map((option) => option.value)
+    );
+    expect(new Set(values).size).toBe(values.length);
+  });
 });

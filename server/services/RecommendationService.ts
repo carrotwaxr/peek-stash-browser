@@ -26,6 +26,7 @@
  * Every entity key is entityKey(id, instanceId): two Stash servers reuse
  * small ids, and a favorite on one says nothing about the other.
  */
+import { RECOMMENDED_LIMIT } from "@peek/shared-types/filters/index.js";
 import prisma from "../prisma/singleton.js";
 import type { ScoredSceneId } from "../types/api/index.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
@@ -48,7 +49,7 @@ import {
 import { stashEntityService } from "./StashEntityService.js";
 
 /** How many ranked scenes are kept per user */
-export const RANKED_LIMIT = 500;
+export const RANKED_LIMIT = RECOMMENDED_LIMIT;
 /** How many users' lists are kept */
 const CACHED_USERS = 100;
 
