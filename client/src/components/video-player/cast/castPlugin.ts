@@ -4,14 +4,7 @@
  * show and handles the click.
  */
 import videojs from "video.js";
-import type { ControlBarPlayer, addOrderedControl } from "../controlBarOrder";
-
-/**
- * `addOrderedControl` (C9), handed in by the caller: this module loads in the
- * cast chunk, and importing it here would make that chunk import the Scene
- * chunk, whose whole dependency list Vite then writes into the Scene chunk
- */
-export type AddOrderedControl = typeof addOrderedControl;
+import { type ControlBarPlayer, addOrderedControl } from "../controlBarOrder";
 
 /** The control's name in `CONTROL_BAR_ORDER` */
 const BUTTON_NAME = "peekCastButton";
@@ -118,8 +111,7 @@ export interface CastButtonControl {
  */
 export function addCastButton(
   player: CastControlsPlayer,
-  onPress: () => void,
-  addOrderedControl: AddOrderedControl
+  onPress: () => void
 ): CastButtonControl {
   const button = addOrderedControl(
     player,

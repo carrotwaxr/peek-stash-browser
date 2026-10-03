@@ -61,11 +61,7 @@ afterEach(() => {
 describe("Cast button", () => {
   it("is hidden while NO_DEVICES_AVAILABLE and shown otherwise", () => {
     const player = makePlayer();
-    const button = addCastButton(
-      asCastPlayer(player),
-      vi.fn(),
-      addOrderedControl
-    );
+    const button = addCastButton(asCastPlayer(player), vi.fn());
 
     // Nothing is known before the SDK says a device is in range
     expect(castButton(player)?.hasClass("vjs-hidden")).toBe(true);
@@ -82,11 +78,7 @@ describe("Cast button", () => {
 
   it("its accessible name is Cast when idle and 'Stop casting (<device>)' when connected", () => {
     const player = makePlayer();
-    const button = addCastButton(
-      asCastPlayer(player),
-      vi.fn(),
-      addOrderedControl
-    );
+    const button = addCastButton(asCastPlayer(player), vi.fn());
 
     button.setCastState("NOT_CONNECTED", null);
     expect(castButton(player)?.controlText()).toBe("Cast");
@@ -105,11 +97,7 @@ describe("Cast button", () => {
 
   it("on a page whose scene the session does not play, it reads 'Cast this scene (<device>)' and still shows connected", () => {
     const player = makePlayer();
-    const button = addCastButton(
-      asCastPlayer(player),
-      vi.fn(),
-      addOrderedControl
-    );
+    const button = addCastButton(asCastPlayer(player), vi.fn());
 
     button.setCastState("CONNECTED", "Living Room TV", false);
 
@@ -121,7 +109,7 @@ describe("Cast button", () => {
 
   it("is added through addOrderedControl as peekCastButton, before the fullscreen toggle", () => {
     const player = makePlayer();
-    addCastButton(asCastPlayer(player), vi.fn(), addOrderedControl);
+    addCastButton(asCastPlayer(player), vi.fn());
 
     expect(vi.mocked(addOrderedControl)).toHaveBeenCalledWith(
       player,
@@ -140,11 +128,7 @@ describe("Cast button", () => {
   it("a click calls the handler", () => {
     const player = makePlayer();
     const onClick = vi.fn();
-    const button = addCastButton(
-      asCastPlayer(player),
-      onClick,
-      addOrderedControl
-    );
+    const button = addCastButton(asCastPlayer(player), onClick);
     button.setCastState("NOT_CONNECTED", null);
 
     // video.js reads event props a DOM event lacks in happy-dom: trigger its own
@@ -155,12 +139,8 @@ describe("Cast button", () => {
 
   it("a second add keeps one button, and remove takes it out", () => {
     const player = makePlayer();
-    addCastButton(asCastPlayer(player), vi.fn(), addOrderedControl);
-    const second = addCastButton(
-      asCastPlayer(player),
-      vi.fn(),
-      addOrderedControl
-    );
+    addCastButton(asCastPlayer(player), vi.fn());
+    const second = addCastButton(asCastPlayer(player), vi.fn());
 
     expect(player.el().querySelectorAll(".vjs-cast-button")).toHaveLength(1);
 

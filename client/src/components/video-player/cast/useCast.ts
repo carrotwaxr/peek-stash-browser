@@ -1,8 +1,8 @@
 /**
  * Casting for the Scene page's player.
  *
- * Loads Google's Cast sender where Cast can work (`loadCastSdk`: a secure
- * Chromium tab), never in TV mode, then the cast chunk, and hands the player
+ * Loads Google's Cast sender where Cast can work (`canCast`: a secure Chromium
+ * tab), never in TV mode, then the cast chunk, and hands the player
  * to a `CastSessionController`, which adds the Cast button and follows the
  * session, which records the TV's progress while attached
  * (`castActivity.ts`). Each render tells the controller, so a scene change on
@@ -17,22 +17,23 @@ import { sceneMediaLinkQuery } from "../../../api/hooks/useScenes";
 import { useTVMode } from "../../../hooks/useTVMode";
 import { showError } from "../../../utils/toast";
 import type { Viewing } from "../activitySenders";
-import { addOrderedControl } from "../controlBarOrder";
-import { loadCastSdk } from "./castSdk";
 import type {
   CastPlayer,
   CastScene,
   CastSessionController,
 } from "./castSession";
+import { canCast } from "./castSupport";
 
 /**
- * The cast UI and session code are their own chunk, loaded only once the SDK
- * has resolved a framework: a tab that cannot cast never fetches it, and the
- * Scene chunk stays within its budget. `castMiddleware` stays static, since
- * video.js picks middleware when a source is set. An object, so a test can
- * watch the request.
+ * The cast code is two lazy chunks, so the Scene chunk stays within its
+ * budget and a tab that cannot cast fetches neither: the SDK loader
+ * (`castSdk`), requested once `canCast` passes, and the cast UI and session
+ * code (`castSession`), once the SDK has resolved a framework.
+ * `castMiddleware` stays static, since video.js picks middleware when a
+ * source is set. An object, so a test can watch the requests.
  */
 export const castChunk = {
+  loadSdk: () => import("./castSdk"),
   load: () => import("./castSession"),
 };
 
@@ -75,8 +76,9 @@ export function useCast(options: UseCastOptions): void {
   });
 
   useEffect(() => {
-    // A TV browser never contacts Google, and shows no Cast button
-    if (isTVMode) return;
+    // A TV browser, or one that cannot cast, never contacts Google, and
+    // shows no Cast button
+    if (isTVMode || !canCast()) return;
     const player = playerRef.current as CastPlayer | null;
     if (!player) return;
 
@@ -86,6 +88,8 @@ export function useCast(options: UseCastOptions): void {
     let controller: CastSessionController | null = null;
 
     const start = async () => {
+      const { loadCastSdk } = await castChunk.loadSdk();
+      if (isCancelled()) return;
       const framework = await loadCastSdk();
       if (isCancelled() || !framework) return;
       const { CastSessionController } = await castChunk.load();
@@ -99,13 +103,15 @@ export function useCast(options: UseCastOptions): void {
             sceneMediaLinkQuery(scene.id, scene.instanceId)
           ),
         notify: showError,
-        addOrderedControl,
       });
       session.attach();
       controller = live.current = session;
     };
 
-    void start();
+    start().catch((error: unknown) => {
+      // No Cast button on this page; the next page tries again
+      console.error("[Cast] could not load the cast code", error);
+    });
 
     return () => {
       cancelled = true;

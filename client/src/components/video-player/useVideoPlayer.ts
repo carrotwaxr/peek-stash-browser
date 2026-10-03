@@ -18,7 +18,8 @@ import type { CastAwarePlayer } from "./cast/castMiddleware";
 import type { CastScene } from "./cast/castSession";
 import { useCast } from "./cast/useCast";
 import { buildPlayerSources } from "./playerSources";
-import { type AirPlayPlayer, setupAirPlay } from "./plugins/airplay";
+import type { AirPlayPlayer } from "./plugins/airplay";
+import { startAirPlay } from "./plugins/loadAirPlay";
 import {
   SESSION_EXPIRED_PLAYBACK_MESSAGE,
   isSessionExpired,
@@ -270,8 +271,9 @@ export function useVideoPlayer({
       focusAtStartRef.current
     );
 
-    // Safari's AirPlay button (and the attribute on the tech's <video>)
-    const stopAirPlay = setupAirPlay(player as AirPlayPlayer);
+    // Safari's AirPlay button (and the attribute on the tech's <video>),
+    // whose code loads only in Safari
+    const stopAirPlay = startAirPlay(player as AirPlayPlayer);
 
     // Volume persistence is now handled by persistVolume plugin
     // Watch history tracking is now handled by the trackActivity plugin

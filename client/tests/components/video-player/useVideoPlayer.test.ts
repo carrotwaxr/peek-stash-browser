@@ -21,7 +21,7 @@ import { apiFetch, apiGet, apiPost, redirectToLogin } from "@/api";
 import { queryKeys } from "@/api/queryKeys";
 import { useCast } from "@/components/video-player/cast/useCast";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
-import { setupAirPlay } from "@/components/video-player/plugins/airplay";
+import { startAirPlay } from "@/components/video-player/plugins/loadAirPlay";
 import { isSessionExpired } from "@/components/video-player/sessionCheck";
 import { useVideoPlayer } from "@/components/video-player/useVideoPlayer";
 import { useVrMode } from "@/components/video-player/vr/useVrMode";
@@ -62,8 +62,8 @@ vi.mock("@/components/video-player/plugins/track-activity", () => ({}));
 vi.mock("@/components/video-player/plugins/media-session", () => ({}));
 // A module that extends videojs.getComponent("Button") at import crashes the
 // bare-function video.js mock below
-vi.mock("@/components/video-player/plugins/airplay", () => ({
-  setupAirPlay: vi.fn(() => () => {}),
+vi.mock("@/components/video-player/plugins/loadAirPlay", () => ({
+  startAirPlay: vi.fn(() => () => {}),
 }));
 // The same for the Cast button; useCast needs providers and Google's SDK
 vi.mock("@/components/video-player/cast/castPlugin", () => ({}));
@@ -865,14 +865,14 @@ describe("useVideoPlayer", () => {
     const player = { ...fakePlayer(), dispose: vi.fn() };
     const stop = vi.fn();
     vi.mocked(videojs).mockReturnValueOnce(player as never);
-    vi.mocked(setupAirPlay).mockReturnValueOnce(stop);
+    vi.mocked(startAirPlay).mockReturnValueOnce(stop);
     const { unmount } = renderPlayer(
       player,
       onA,
       document.createElement("div")
     );
 
-    expect(setupAirPlay).toHaveBeenCalledWith(player);
+    expect(startAirPlay).toHaveBeenCalledWith(player);
     expect(stop).not.toHaveBeenCalled();
 
     unmount();

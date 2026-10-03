@@ -3,7 +3,8 @@
  * pauses the local player and loads the scene on the receiver with the
  * user's signed link, the page's controls then drive the receiver, and a
  * session end hands the scene back to the local player where the TV left it.
- * TV mode never loads Google's script.
+ * TV mode, or a tab that cannot cast, loads no cast code and never Google's
+ * script.
  */
 import { StrictMode, createElement } from "react";
 import type { ReactNode } from "react";
@@ -23,6 +24,8 @@ import {
 import { loadCastSdk } from "@/components/video-player/cast/castSdk";
 import type * as castSdkModule from "@/components/video-player/cast/castSdk";
 import { castSenderId } from "@/components/video-player/cast/castSenderId";
+import { canCast } from "@/components/video-player/cast/castSupport";
+import type * as castSupportModule from "@/components/video-player/cast/castSupport";
 import {
   type UseCastOptions,
   castChunk,
@@ -48,6 +51,10 @@ import {
 
 vi.mock("@/components/video-player/cast/castSdk", () => ({
   loadCastSdk: vi.fn(),
+}));
+// Every case but the browser checks' own runs as a tab that can cast
+vi.mock("@/components/video-player/cast/castSupport", () => ({
+  canCast: vi.fn(),
 }));
 vi.mock("@/components/video-player/cast/castSenderId", () => ({
   castSenderId: vi.fn(),
@@ -97,6 +104,7 @@ beforeEach(() => {
   fake = fakeFramework();
   media = stubMediaElement();
   vi.stubGlobal("chrome", { cast: { media: fakeMedia } });
+  vi.mocked(canCast).mockReturnValue(true);
   vi.mocked(loadCastSdk).mockResolvedValue(fake.framework);
   vi.mocked(apiPost).mockResolvedValue(mediaLink());
   vi.mocked(apiFetch).mockResolvedValue({ success: true });
@@ -599,10 +607,33 @@ describe("useCast", () => {
     expect(fake.context.requestSession).toHaveBeenCalledTimes(1);
   });
 
-  it("TV mode never calls loadCastSdk and never shows the button", async () => {
+  it("in TV mode no cast module loads and no button shows", async () => {
+    const loadSdk = vi.spyOn(castChunk, "loadSdk");
     const load = vi.spyOn(castChunk, "load");
     const { player } = await renderCast({ tvMode: true });
 
+    expect(loadSdk).not.toHaveBeenCalled();
+    expect(vi.mocked(loadCastSdk)).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
+    expect(castButton(player)).toBeUndefined();
+  });
+
+  it("in a non-Chromium browser no cast module loads", async () => {
+    // The real browser check, in a secure Firefox tab
+    const actual = await vi.importActual<typeof castSupportModule>(
+      "@/components/video-player/cast/castSupport"
+    );
+    vi.mocked(canCast).mockImplementation(actual.canCast);
+    vi.stubGlobal("isSecureContext", true);
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0"
+    );
+    const loadSdk = vi.spyOn(castChunk, "loadSdk");
+    const load = vi.spyOn(castChunk, "load");
+    const { player } = await renderCast({ waitForAttach: false });
+
+    expect(vi.mocked(canCast)).toHaveBeenCalled();
+    expect(loadSdk).not.toHaveBeenCalled();
     expect(vi.mocked(loadCastSdk)).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
     expect(castButton(player)).toBeUndefined();
@@ -619,9 +650,11 @@ describe("useCast", () => {
       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
     );
     vi.spyOn(document.head, "appendChild").mockImplementation((node) => node);
+    const loadSdk = vi.spyOn(castChunk, "loadSdk");
     const load = vi.spyOn(castChunk, "load");
     const { player } = await renderCast({ waitForAttach: false });
 
+    expect(loadSdk).toHaveBeenCalledTimes(1);
     expect(vi.mocked(loadCastSdk)).toHaveBeenCalledTimes(1);
     expect(load).not.toHaveBeenCalled();
 

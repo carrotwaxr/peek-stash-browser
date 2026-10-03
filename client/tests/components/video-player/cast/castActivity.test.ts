@@ -23,7 +23,6 @@ import {
   type CastPlayer,
   CastSessionController,
 } from "@/components/video-player/cast/castSession";
-import { addOrderedControl } from "@/components/video-player/controlBarOrder";
 import type TrackActivityPlugin from "@/components/video-player/plugins/track-activity";
 import "@/components/video-player/plugins/track-activity";
 // The production registration of the cast middleware
@@ -356,7 +355,6 @@ describe("the session controller", () => {
           poster: null,
         }),
       notify: vi.fn(),
-      addOrderedControl,
     });
     session.attach();
     return { fake, local, session };

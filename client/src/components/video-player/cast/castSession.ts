@@ -23,7 +23,6 @@ import type { Viewing } from "../activitySenders";
 import { CastActivity } from "./castActivity";
 import type { CastAwarePlayer, CastRemote } from "./castMiddleware";
 import {
-  type AddOrderedControl,
   type CastButtonControl,
   type CastControlsPlayer,
   type CastStatusControl,
@@ -254,8 +253,6 @@ export interface CastSessionOptions {
   fetchLink(scene: CastScene): Promise<SceneMediaLinkResponse>;
   /** Tells the user something went wrong (a toast) */
   notify(message: string): void;
-  /** Places the Cast button in the control bar's order */
-  addOrderedControl: AddOrderedControl;
 }
 
 export const NO_CAST_SOURCE_MESSAGE =
@@ -368,11 +365,7 @@ export class CastSessionController {
       this.controller.addEventListener(type, handler);
     }
     player.textTracks().addEventListener("change", this.onTextTracks);
-    this.button = addCastButton(
-      player,
-      this.onPress,
-      this.options.addOrderedControl
-    );
+    this.button = addCastButton(player, this.onPress);
     this.status = addCastStatus(player);
     this.seen = this.pageMark();
     this.castState = this.context.getCastState();

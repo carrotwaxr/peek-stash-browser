@@ -1,16 +1,12 @@
+/**
+ * The loader adds Google's script once and resolves the framework it
+ * installs, or null when it fails or never answers. Whether a tab may load it
+ * at all is `canCast` (castSupport.test.ts), checked by `useCast` first.
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SCRIPT_URL =
   "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
-
-const CHROME_UA =
-  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
-const HEADLESS_UA = CHROME_UA.replace("Chrome/", "HeadlessChrome/");
-const EDGE_UA = `${CHROME_UA} Edg/130.0.0.0`;
-const CRIOS_UA =
-  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.0.0 Mobile/15E148 Safari/604.1";
-const FIREFOX_UA =
-  "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0";
 
 type CastWindow = Window & {
   __onGCastApiAvailable?: (available: boolean) => void;
@@ -45,11 +41,6 @@ async function freshLoader() {
     .loadCastSdk;
 }
 
-function setEnvironment(secure: boolean, userAgent: string) {
-  vi.stubGlobal("isSecureContext", secure);
-  vi.spyOn(navigator, "userAgent", "get").mockReturnValue(userAgent);
-}
-
 describe("loadCastSdk", () => {
   beforeEach(() => {
     setOptions.mockClear();
@@ -61,61 +52,12 @@ describe("loadCastSdk", () => {
     delete castWindow.__onGCastApiAvailable;
     delete castWindow.cast;
     delete castWindow.chrome;
-    setEnvironment(true, CHROME_UA);
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
-  });
-
-  it("resolves null on an insecure context without adding a script, and a later call in a secure context still loads", async () => {
-    const loadCastSdk = await freshLoader();
-    vi.stubGlobal("isSecureContext", false);
-
-    await expect(loadCastSdk()).resolves.toBeNull();
-    expect(castScripts).toHaveLength(0);
-
-    vi.stubGlobal("isSecureContext", true);
-    installFramework();
-    const loading = loadCastSdk();
-    expect(castScripts).toHaveLength(1);
-    expect(castScripts[0]?.src).toBe(SCRIPT_URL);
-    castWindow.__onGCastApiAvailable?.(true);
-    await expect(loading).resolves.not.toBeNull();
-  });
-
-  it("resolves null in a non-Chromium browser", async () => {
-    setEnvironment(true, FIREFOX_UA);
-    const loadCastSdk = await freshLoader();
-
-    await expect(loadCastSdk()).resolves.toBeNull();
-    expect(castScripts).toHaveLength(0);
-  });
-
-  it("a HeadlessChrome UA loads", async () => {
-    setEnvironment(true, HEADLESS_UA);
-    const loadCastSdk = await freshLoader();
-
-    void loadCastSdk();
-    expect(castScripts).toHaveLength(1);
-  });
-
-  it("a CriOS UA resolves null without a script", async () => {
-    setEnvironment(true, CRIOS_UA);
-    const loadCastSdk = await freshLoader();
-
-    await expect(loadCastSdk()).resolves.toBeNull();
-    expect(castScripts).toHaveLength(0);
-  });
-
-  it("an Edg UA loads", async () => {
-    setEnvironment(true, EDGE_UA);
-    const loadCastSdk = await freshLoader();
-
-    void loadCastSdk();
-    expect(castScripts).toHaveLength(1);
   });
 
   it("adds one script for two calls and resolves the framework when __onGCastApiAvailable(true)", async () => {
