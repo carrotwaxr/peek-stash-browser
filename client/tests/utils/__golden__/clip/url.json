@@ -3,6 +3,7 @@
     "tagIds",
     "tagId",
     "tagIdsModifier",
+    "tagIdsDepth",
     "tagIdsExclude",
     "tagIds_min",
     "tagIds_max",
@@ -11,6 +12,7 @@
     "sceneTagIds",
     "sceneTagId",
     "sceneTagIdsModifier",
+    "sceneTagIdsDepth",
     "sceneTagIdsExclude",
     "sceneTagIds_min",
     "sceneTagIds_max",
@@ -25,15 +27,40 @@
     "performerIds_start",
     "performerIds_end",
     "studioId",
+    "studioIdModifier",
+    "studioIdDepth",
+    "studioIdExclude",
     "studioId_min",
     "studioId_max",
     "studioId_start",
     "studioId_end",
+    "sceneIds",
+    "sceneId",
+    "sceneIdsModifier",
+    "sceneIds_min",
+    "sceneIds_max",
+    "sceneIds_start",
+    "sceneIds_end",
     "isGenerated",
     "isGenerated_min",
     "isGenerated_max",
     "isGenerated_start",
     "isGenerated_end",
+    "duration",
+    "duration_min",
+    "duration_max",
+    "duration_start",
+    "duration_end",
+    "createdAt",
+    "createdAt_min",
+    "createdAt_max",
+    "createdAt_start",
+    "createdAt_end",
+    "updatedAt",
+    "updatedAt_min",
+    "updatedAt_max",
+    "updatedAt_start",
+    "updatedAt_end",
     "filters",
     "q",
     "sort",
@@ -71,6 +98,31 @@
       "lossless": true
     },
     {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
       "label": "tagIds: INCLUDES one id",
       "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
       "parsed": {
@@ -90,6 +142,31 @@
           "2:inst-b"
         ],
         "tagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
       },
       "lossless": true
     },
@@ -117,6 +194,31 @@
       "lossless": true
     },
     {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
       "label": "tagIds: one id",
       "params": "tagIds=1%3Ainst-a",
       "parsed": {
@@ -134,6 +236,29 @@
           "1:inst-a",
           "2:inst-b"
         ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "params": "tagIds=1%3Ainst-a&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "params": "tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsDepth=-1",
+      "parsed": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
       },
       "lossless": true
     },
@@ -161,6 +286,31 @@
       "lossless": true
     },
     {
+      "label": "sceneTagIds: INCLUDES_ALL one id, with sub-items",
+      "params": "sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES_ALL&sceneTagIdsDepth=-1",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL",
+        "sceneTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES_ALL two ids, with sub-items",
+      "params": "sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=INCLUDES_ALL&sceneTagIdsDepth=-1",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL",
+        "sceneTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
       "label": "sceneTagIds: INCLUDES one id",
       "params": "sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES",
       "parsed": {
@@ -180,6 +330,31 @@
           "2:inst-b"
         ],
         "sceneTagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES one id, with sub-items",
+      "params": "sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES&sceneTagIdsDepth=-1",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES",
+        "sceneTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES two ids, with sub-items",
+      "params": "sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=INCLUDES&sceneTagIdsDepth=-1",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES",
+        "sceneTagIdsDepth": -1
       },
       "lossless": true
     },
@@ -207,6 +382,31 @@
       "lossless": true
     },
     {
+      "label": "sceneTagIds: EXCLUDES one id, with sub-items",
+      "params": "sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=EXCLUDES&sceneTagIdsDepth=-1",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES",
+        "sceneTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: EXCLUDES two ids, with sub-items",
+      "params": "sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=EXCLUDES&sceneTagIdsDepth=-1",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES",
+        "sceneTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
       "label": "sceneTagIds: one id",
       "params": "sceneTagIds=1%3Ainst-a",
       "parsed": {
@@ -224,6 +424,29 @@
           "1:inst-a",
           "2:inst-b"
         ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: one id, with sub-items",
+      "params": "sceneTagIds=1%3Ainst-a&sceneTagIdsDepth=-1",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneTagIds: two ids, with sub-items",
+      "params": "sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsDepth=-1",
+      "parsed": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsDepth": -1
       },
       "lossless": true
     },
@@ -318,10 +541,209 @@
       "lossless": true
     },
     {
+      "label": "studioId: INCLUDES one id",
+      "params": "studioId=1%3Ainst-a&studioIdModifier=INCLUDES",
+      "parsed": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: INCLUDES two ids",
+      "params": "studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=INCLUDES",
+      "parsed": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: INCLUDES one id, with sub-items",
+      "params": "studioId=1%3Ainst-a&studioIdModifier=INCLUDES&studioIdDepth=-1",
+      "parsed": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES",
+        "studioIdDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: INCLUDES two ids, with sub-items",
+      "params": "studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=INCLUDES&studioIdDepth=-1",
+      "parsed": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES",
+        "studioIdDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: EXCLUDES one id",
+      "params": "studioId=1%3Ainst-a&studioIdModifier=EXCLUDES",
+      "parsed": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: EXCLUDES two ids",
+      "params": "studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=EXCLUDES",
+      "parsed": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: EXCLUDES one id, with sub-items",
+      "params": "studioId=1%3Ainst-a&studioIdModifier=EXCLUDES&studioIdDepth=-1",
+      "parsed": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "EXCLUDES",
+        "studioIdDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: EXCLUDES two ids, with sub-items",
+      "params": "studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=EXCLUDES&studioIdDepth=-1",
+      "parsed": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "EXCLUDES",
+        "studioIdDepth": -1
+      },
+      "lossless": true
+    },
+    {
       "label": "studioId: one id",
       "params": "studioId=1%3Ainst-a",
       "parsed": {
-        "studioId": "1:inst-a"
+        "studioId": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: two ids",
+      "params": "studioId=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: one id, with sub-items",
+      "params": "studioId=1%3Ainst-a&studioIdDepth=-1",
+      "parsed": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: two ids, with sub-items",
+      "params": "studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdDepth=-1",
+      "parsed": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneIds: INCLUDES one id",
+      "params": "sceneIds=1%3Ainst-a&sceneIdsModifier=INCLUDES",
+      "parsed": {
+        "sceneIds": [
+          "1:inst-a"
+        ],
+        "sceneIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneIds: INCLUDES two ids",
+      "params": "sceneIds=1%3Ainst-a%2C2%3Ainst-b&sceneIdsModifier=INCLUDES",
+      "parsed": {
+        "sceneIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneIds: EXCLUDES one id",
+      "params": "sceneIds=1%3Ainst-a&sceneIdsModifier=EXCLUDES",
+      "parsed": {
+        "sceneIds": [
+          "1:inst-a"
+        ],
+        "sceneIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneIds: EXCLUDES two ids",
+      "params": "sceneIds=1%3Ainst-a%2C2%3Ainst-b&sceneIdsModifier=EXCLUDES",
+      "parsed": {
+        "sceneIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneIds: one id",
+      "params": "sceneIds=1%3Ainst-a",
+      "parsed": {
+        "sceneIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneIds: two ids",
+      "params": "sceneIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "sceneIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
       },
       "lossless": true
     },
@@ -338,6 +760,99 @@
       "params": "isGenerated=all",
       "parsed": {
         "isGenerated": "all"
+      },
+      "lossless": true
+    },
+    {
+      "label": "duration: min only",
+      "params": "duration_min=901",
+      "parsed": {
+        "duration": {
+          "min": "901"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "duration: max only",
+      "params": "duration_max=2700",
+      "parsed": {
+        "duration": {
+          "max": "2700"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "duration: min and max",
+      "params": "duration_min=901&duration_max=2700",
+      "parsed": {
+        "duration": {
+          "min": "901",
+          "max": "2700"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start only",
+      "params": "createdAt_start=2020-01-01",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: end only",
+      "params": "createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "params": "createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "params": "updatedAt_start=2020-01-01",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "params": "updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "params": "updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
       },
       "lossless": true
     }
@@ -368,6 +883,31 @@
       "hasFilters": true
     },
     {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
       "label": "tagIds: INCLUDES one id",
       "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES",
       "filters": {
@@ -387,6 +927,31 @@
           "2:inst-b"
         ],
         "tagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=INCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES",
+        "tagIdsDepth": -1
       },
       "hasFilters": true
     },
@@ -414,6 +979,31 @@
       "hasFilters": true
     },
     {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsModifier=EXCLUDES&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES",
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
       "label": "tagIds: one id",
       "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a",
       "filters": {
@@ -431,6 +1021,29 @@
           "1:inst-a",
           "2:inst-b"
         ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a%2C2%3Ainst-b&tagIdsDepth=-1",
+      "filters": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
       },
       "hasFilters": true
     },
@@ -458,6 +1071,31 @@
       "hasFilters": true
     },
     {
+      "label": "sceneTagIds: INCLUDES_ALL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES_ALL&sceneTagIdsDepth=-1",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL",
+        "sceneTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES_ALL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=INCLUDES_ALL&sceneTagIdsDepth=-1",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES_ALL",
+        "sceneTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
       "label": "sceneTagIds: INCLUDES one id",
       "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES",
       "filters": {
@@ -477,6 +1115,31 @@
           "2:inst-b"
         ],
         "sceneTagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=INCLUDES&sceneTagIdsDepth=-1",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "INCLUDES",
+        "sceneTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: INCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=INCLUDES&sceneTagIdsDepth=-1",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "INCLUDES",
+        "sceneTagIdsDepth": -1
       },
       "hasFilters": true
     },
@@ -504,6 +1167,31 @@
       "hasFilters": true
     },
     {
+      "label": "sceneTagIds: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a&sceneTagIdsModifier=EXCLUDES&sceneTagIdsDepth=-1",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES",
+        "sceneTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: EXCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsModifier=EXCLUDES&sceneTagIdsDepth=-1",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsModifier": "EXCLUDES",
+        "sceneTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
       "label": "sceneTagIds: one id",
       "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a",
       "filters": {
@@ -521,6 +1209,29 @@
           "1:inst-a",
           "2:inst-b"
         ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a&sceneTagIdsDepth=-1",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneTagIds: two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&sceneTagIds=1%3Ainst-a%2C2%3Ainst-b&sceneTagIdsDepth=-1",
+      "filters": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsDepth": -1
       },
       "hasFilters": true
     },
@@ -615,10 +1326,209 @@
       "hasFilters": true
     },
     {
+      "label": "studioId: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdModifier=INCLUDES",
+      "filters": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=INCLUDES",
+      "filters": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdModifier=INCLUDES&studioIdDepth=-1",
+      "filters": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES",
+        "studioIdDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: INCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=INCLUDES&studioIdDepth=-1",
+      "filters": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES",
+        "studioIdDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdModifier=EXCLUDES",
+      "filters": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=EXCLUDES",
+      "filters": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdModifier=EXCLUDES&studioIdDepth=-1",
+      "filters": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "EXCLUDES",
+        "studioIdDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: EXCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdModifier=EXCLUDES&studioIdDepth=-1",
+      "filters": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "EXCLUDES",
+        "studioIdDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
       "label": "studioId: one id",
       "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a",
       "filters": {
-        "studioId": "1:inst-a"
+        "studioId": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: two ids",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a&studioIdDepth=-1",
+      "filters": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a%2C2%3Ainst-b&studioIdDepth=-1",
+      "filters": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&sceneIds=1%3Ainst-a&sceneIdsModifier=INCLUDES",
+      "filters": {
+        "sceneIds": [
+          "1:inst-a"
+        ],
+        "sceneIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&sceneIds=1%3Ainst-a%2C2%3Ainst-b&sceneIdsModifier=INCLUDES",
+      "filters": {
+        "sceneIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&sceneIds=1%3Ainst-a&sceneIdsModifier=EXCLUDES",
+      "filters": {
+        "sceneIds": [
+          "1:inst-a"
+        ],
+        "sceneIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&sceneIds=1%3Ainst-a%2C2%3Ainst-b&sceneIdsModifier=EXCLUDES",
+      "filters": {
+        "sceneIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneIds: one id",
+      "written": "instance=inst-a&tab=x&sceneIds=1%3Ainst-a",
+      "filters": {
+        "sceneIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneIds: two ids",
+      "written": "instance=inst-a&tab=x&sceneIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "sceneIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
       },
       "hasFilters": true
     },
@@ -637,17 +1547,114 @@
         "isGenerated": "all"
       },
       "hasFilters": true
+    },
+    {
+      "label": "duration: min only",
+      "written": "instance=inst-a&tab=x&duration_min=901",
+      "filters": {
+        "duration": {
+          "min": "901"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: max only",
+      "written": "instance=inst-a&tab=x&duration_max=2700",
+      "filters": {
+        "duration": {
+          "max": "2700"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "duration: min and max",
+      "written": "instance=inst-a&tab=x&duration_min=901&duration_max=2700",
+      "filters": {
+        "duration": {
+          "min": "901",
+          "max": "2700"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start only",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: end only",
+      "written": "instance=inst-a&tab=x&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "written": "instance=inst-a&tab=x&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
     }
   ],
   "imperialListParams": [],
   "filteredListPath": [
     {
       "entityType": "scenes",
-      "hasMultipleInstances": true
+      "hasMultipleInstances": true,
+      "withInstance": "/clips?sceneId=5&instance=inst-a",
+      "numericIdNoInstance": "/clips?sceneId=7"
     },
     {
       "entityType": "scenes",
-      "hasMultipleInstances": false
+      "hasMultipleInstances": false,
+      "withInstance": "/clips?sceneId=5",
+      "numericIdNoInstance": "/clips?sceneId=7"
     },
     {
       "entityType": "performers",

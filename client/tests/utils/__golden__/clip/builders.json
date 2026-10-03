@@ -39,6 +39,48 @@
       }
     },
     {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
       "label": "tagIds: INCLUDES one id",
       "state": {
         "tagIds": [
@@ -72,6 +114,48 @@
             "2:inst-b"
           ],
           "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
         },
         "is_generated": true
       }
@@ -115,6 +199,48 @@
       }
     },
     {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
       "label": "tagIds: one id",
       "state": {
         "tagIds": [
@@ -146,6 +272,46 @@
             "2:inst-b"
           ],
           "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
         },
         "is_generated": true
       }
@@ -189,6 +355,48 @@
       }
     },
     {
+      "label": "sceneTagIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsDepth": -1,
+        "sceneTagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "scene_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsDepth": -1,
+        "sceneTagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "scene_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
       "label": "sceneTagIds: INCLUDES one id",
       "state": {
         "sceneTagIds": [
@@ -222,6 +430,48 @@
             "2:inst-b"
           ],
           "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: INCLUDES one id, with sub-items",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsDepth": -1,
+        "sceneTagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "scene_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsDepth": -1,
+        "sceneTagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "scene_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
         },
         "is_generated": true
       }
@@ -265,6 +515,48 @@
       }
     },
     {
+      "label": "sceneTagIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsDepth": -1,
+        "sceneTagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "scene_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsDepth": -1,
+        "sceneTagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "scene_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
       "label": "sceneTagIds: one id",
       "state": {
         "sceneTagIds": [
@@ -296,6 +588,46 @@
             "2:inst-b"
           ],
           "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: one id, with sub-items",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a"
+        ],
+        "sceneTagIdsDepth": -1
+      },
+      "request": {
+        "scene_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneTagIds: two ids, with sub-items",
+      "state": {
+        "sceneTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneTagIdsDepth": -1
+      },
+      "request": {
+        "scene_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
         },
         "is_generated": true
       }
@@ -451,14 +783,347 @@
       }
     },
     {
-      "label": "studioId: one id",
+      "label": "studioId: INCLUDES one id",
       "state": {
-        "studioId": "1:inst-a"
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "INCLUDES"
       },
       "request": {
         "studios": {
           "value": [
             "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: INCLUDES two ids",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "INCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: INCLUDES one id, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "INCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: INCLUDES two ids, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "INCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: EXCLUDES one id",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: EXCLUDES two ids",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: EXCLUDES one id, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: EXCLUDES two ids, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1,
+        "studioIdModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: one id",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: two ids",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: one id, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a"
+        ],
+        "studioIdDepth": -1
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "studioId: two ids, with sub-items",
+      "state": {
+        "studioId": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdDepth": -1
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneIds: INCLUDES one id",
+      "state": {
+        "sceneIds": [
+          "1:inst-a"
+        ],
+        "sceneIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "scenes": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneIds: INCLUDES two ids",
+      "state": {
+        "sceneIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "scenes": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneIds: EXCLUDES one id",
+      "state": {
+        "sceneIds": [
+          "1:inst-a"
+        ],
+        "sceneIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "scenes": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneIds: EXCLUDES two ids",
+      "state": {
+        "sceneIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "sceneIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "scenes": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneIds: one id",
+      "state": {
+        "sceneIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "scenes": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
+      }
+    },
+    {
+      "label": "sceneIds: two ids",
+      "state": {
+        "sceneIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "scenes": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
           ],
           "modifier": "INCLUDES"
         },
@@ -480,6 +1145,147 @@
         "isGenerated": "all"
       },
       "request": {}
+    },
+    {
+      "label": "duration: min only",
+      "state": {
+        "duration": {
+          "min": "901"
+        }
+      },
+      "request": {
+        "is_generated": true,
+        "duration": {
+          "modifier": "BETWEEN",
+          "value": 901
+        }
+      }
+    },
+    {
+      "label": "duration: max only",
+      "state": {
+        "duration": {
+          "max": "2700"
+        }
+      },
+      "request": {
+        "is_generated": true,
+        "duration": {
+          "modifier": "BETWEEN",
+          "value2": 2700
+        }
+      }
+    },
+    {
+      "label": "duration: min and max",
+      "state": {
+        "duration": {
+          "min": "901",
+          "max": "2700"
+        }
+      },
+      "request": {
+        "is_generated": true,
+        "duration": {
+          "modifier": "BETWEEN",
+          "value": 901,
+          "value2": 2700
+        }
+      }
+    },
+    {
+      "label": "createdAt: start only",
+      "state": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "is_generated": true,
+        "created_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "createdAt: end only",
+      "state": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "is_generated": true,
+        "created_at": {
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "createdAt: start and end",
+      "state": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "is_generated": true,
+        "created_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: start only",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "is_generated": true,
+        "updated_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: end only",
+      "state": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "is_generated": true,
+        "updated_at": {
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: start and end",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "is_generated": true,
+        "updated_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
     }
   ],
   "permanent": [],

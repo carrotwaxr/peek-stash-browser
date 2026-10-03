@@ -18,10 +18,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildPanelFilter } from "@/utils/filterFields";
-import {
-  CLIP_SCENES_ROW,
-  DETAILS_WITH_PRESENCE_ROW,
-} from "../../helpers/editorRows";
+import { DETAILS_WITH_PRESENCE_ROW } from "../../helpers/editorRows";
 
 interface GoldenEntry {
   label: string;
@@ -406,17 +403,11 @@ describe("buildPanelFilter: the text condition and the playlist and scene picker
   });
 
   it('a scene picker value sends its `"id:instance"`', () => {
-    const table = {
-      rows: [...(PANEL_FIELDS.clip as readonly PanelField[]), CLIP_SCENES_ROW],
-      specs: CLIP_FIELDS,
-    };
-
     expect(
-      buildPanelFilter(
-        "clip",
-        { sceneIds: ["5:a", "5:b"], sceneIdsModifier: "EXCLUDES" },
-        table
-      ).scenes
+      buildPanelFilter("clip", {
+        sceneIds: ["5:a", "5:b"],
+        sceneIdsModifier: "EXCLUDES",
+      }).scenes
     ).toEqual({ value: ["5:a", "5:b"], modifier: "EXCLUDES" });
   });
 });

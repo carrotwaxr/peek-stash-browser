@@ -32,14 +32,10 @@ vi.mock("@/api/playlists", () => ({
   getSharedPlaylists: vi.fn(),
 }));
 
-// Images' Studios offers Has none and Has any and clips have a Scenes row, as
-// F19 and F21 opt them in (the scene rows are F18's, real)
+// Images' Studios offers Has none and Has any
 vi.mock("@peek/shared-types", async (importOriginal) => {
   const { withRefPresence } = await import("@tests/helpers/refPresence");
-  const { withEditorRows } = await import("@tests/helpers/editorRows");
-  return withEditorRows(
-    withRefPresence(await importOriginal(), [["image", "studioIds"]])
-  );
+  return withRefPresence(await importOriginal(), [["image", "studioIds"]]);
 });
 
 let unit = "metric";
