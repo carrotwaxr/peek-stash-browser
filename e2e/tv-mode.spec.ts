@@ -9,6 +9,7 @@ import {
 import { ListPage } from "./pages/ListPage";
 import { mustOk } from "./support/api";
 import { requireData } from "./support/data";
+import { rowOf } from "./support/filterRows";
 import { uniqueName } from "./support/names";
 import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
@@ -826,5 +827,129 @@ test.describe("TV mode", () => {
     // The focus moved, so the scan ran
     await expect(cards.nth(1)).toBeFocused();
     expect(mean).toBeLessThan(16);
+  });
+  test("with the D-pad, open Advanced, add a group, pick a field and Apply", async ({
+    page,
+  }) => {
+    const { list } = await openScenes(page, "/scenes");
+
+    // Along the chip row from + Filter: Advanced is the next button
+    await list.addFilterButton.focus();
+    expect(
+      await reach(page, "ArrowRight", list.advancedButton, 4),
+      "Right reaches Advanced"
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    const dialog = list.advancedDialog;
+    await expect(dialog).toBeVisible();
+
+    // Down to the top level's waiting row; OK opens its field select, Down
+    // picks the first field (Title Search) and OK takes it: a row, with focus
+    // in its value
+    const waiting = dialog.getByLabel("Add a filter to top level", {
+      exact: true,
+    });
+    expect(
+      await reach(page, "ArrowDown", waiting, 6),
+      "Down reaches the field select"
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(waiting).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    const fieldId = await dialog
+      .locator('select[id$="-field"]')
+      .first()
+      .getAttribute("id");
+    const row = rowOf(dialog, requireData(fieldId, "the new row's field"));
+    await expect(row.field).toHaveValue("title");
+    await expect(row.value).toBeFocused();
+
+    // Every control of the row is reachable along it (Title Search takes no
+    // condition), and back to the value
+    expect(
+      await reach(page, "ArrowLeft", row.field, 3),
+      "Left reaches the field"
+    ).toBe(true);
+    expect(
+      await reach(page, "ArrowRight", row.actions, 6),
+      "Right reaches Row actions"
+    ).toBe(true);
+    expect(
+      await reach(page, "ArrowLeft", row.value, 3),
+      "Left returns to the value"
+    ).toBe(true);
+    await page.keyboard.type("zz");
+    await expect(row.value).toHaveValue("zz");
+
+    // Down to Add group; OK adds Group 1 with focus in its Match select
+    const addGroup = dialog.getByRole("button", { name: "Add group" });
+    expect(
+      await reach(page, "ArrowDown", addGroup, 6),
+      "Down reaches Add group"
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    const group = dialog.getByRole("group", { name: "Group 1" });
+    await expect(group).toBeVisible();
+    const match = group.getByLabel("Match for Group 1");
+    await expect(match).toBeFocused();
+
+    // Every control of the group: Match, Remove group, its waiting row
+    const removeGroup = group.getByRole("button", { name: "Remove group" });
+    expect(
+      await reach(page, "ArrowRight", removeGroup, 3),
+      "Right reaches Remove group"
+    ).toBe(true);
+    const groupWaiting = group.getByLabel("Add a filter to Group 1", {
+      exact: true,
+    });
+    expect(
+      await reach(page, "ArrowDown", groupWaiting, 3),
+      "Down reaches the group's field select"
+    ).toBe(true);
+
+    // Up to the row's Row actions: OK opens the menu, Down to "Move to group
+    // 1", OK moves the row into the group
+    expect(
+      await reach(page, "ArrowUp", row.field, 10),
+      "Up reaches the row"
+    ).toBe(true);
+    expect(
+      await reach(page, "ArrowRight", row.actions, 6),
+      "Right reaches Row actions"
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    const moveTo = page.getByRole("menuitem", { name: "Move to group 1" });
+    await expect(moveTo).toBeVisible();
+    expect(
+      await reach(page, "ArrowDown", moveTo, 3),
+      "Down reaches Move to group 1"
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(group.locator(`[id="${fieldId}"]`)).toHaveCount(1);
+    await expect(row.field).toBeFocused();
+
+    // Down to the footer: Cancel, then Right to Apply, and OK applies
+    const cancel = dialog.getByRole("button", { name: "Cancel" });
+    const apply = dialog.getByRole("button", { name: "Apply" });
+    expect(
+      await reach(page, "ArrowDown", cancel, 12),
+      "Down reaches Cancel"
+    ).toBe(true);
+    expect(
+      await reach(page, "ArrowRight", apply, 2),
+      "Right reaches Apply"
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(dialog).toHaveCount(0);
+
+    // The group is in the URL, with the row in it
+    const params = new URL(page.url()).searchParams;
+    expect(params.get("g1")).toBe("all");
+    expect(params.get("g1.title")).toBe("zz");
+    expect(params.get("title")).toBeNull();
+    await expect(
+      page.getByRole("button", { name: /^Edit filter group/ })
+    ).toBeVisible();
   });
 });
