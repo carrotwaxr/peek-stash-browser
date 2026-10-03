@@ -57,6 +57,7 @@ export function userRow(overrides: Partial<User> = {}): User {
     navPreferences: null,
     filterPresets: null,
     defaultFilterPresets: null,
+    filterPins: null,
     unitPreference: "metric",
     tableColumnDefaults: null,
     cardDisplaySettings: null,

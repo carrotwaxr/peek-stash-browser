@@ -784,6 +784,78 @@ interface SetDefaultFilterPresetResponse {
 
 ---
 
+### GET /api/user/filter-pins
+
+**Authentication:** Session
+
+**Response:**
+
+```typescript
+interface GetFilterPinsResponse {
+  pins: FilterPins;
+}
+```
+
+**Handler:** `getFilterPins` in `server/controllers/user.ts`
+
+---
+
+### PUT /api/user/filter-pins/:list
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+type PutFilterPinsBody = ListPins;
+```
+
+**URL Parameters:**
+
+```typescript
+interface FilterPinsParams extends Record<string, string> {
+  list: string;
+}
+```
+
+**Response:**
+
+```typescript
+interface FilterPinsListResponse {
+  pins: ListPins;
+}
+```
+
+**Handler:** `putFilterPins` in `server/controllers/user.ts`
+
+---
+
+### DELETE /api/user/filter-pins/:list
+
+**Authentication:** Session
+
+**Request Body:** `never`
+
+**URL Parameters:**
+
+```typescript
+interface FilterPinsParams extends Record<string, string> {
+  list: string;
+}
+```
+
+**Response:**
+
+```typescript
+interface FilterPinsListResponse {
+  pins: ListPins;
+}
+```
+
+**Handler:** `resetFilterPins` in `server/controllers/user.ts`
+
+---
+
 ### GET /api/user/permissions
 
 User's own permissions

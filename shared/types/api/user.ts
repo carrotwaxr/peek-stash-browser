@@ -374,8 +374,18 @@ export interface GetFilterPinsResponse {
   pins: FilterPins;
 }
 
+/** PUT and DELETE /api/user/filter-pins/:list */
+export interface FilterPinsParams extends Record<string, string> {
+  list: string;
+}
+
 /** PUT /api/user/filter-pins/:list */
 export type PutFilterPinsBody = ListPins;
+
+/** PUT and DELETE /api/user/filter-pins/:list: that list's pins now (DELETE: the defaults) */
+export interface FilterPinsListResponse {
+  pins: ListPins;
+}
 
 // =============================================================================
 // SYNC FROM STASH

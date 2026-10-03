@@ -23,6 +23,7 @@ model User {
   navPreferences          Json? // Array of {id, enabled, order} for navigation menu items
   filterPresets           Json? // Object with keys: scene, performer, studio, tag, group, gallery - each containing array of saved presets
   defaultFilterPresets    Json? // Object with keys: scene, performer, studio, tag, group, gallery - values are preset IDs
+  filterPins              Json? // { [list]: { fields: string[], filters: PinnedFilter[] } }; a list missing from it shows the seeded defaults (shared/types/filters/pins.ts)
   unitPreference          String? @default("metric") // "metric" or "imperial" for measurement display
   tableColumnDefaults     Json? // Object with keys: scene, performer, studio, tag, group, gallery, image - each containing {visible: string[], order: string[]}
   cardDisplaySettings     Json? // Object with per-entity-type card display toggles: {scene: {showCodeOnCard, showDescriptionOnCard, ...}, performer: {...}, ...}
