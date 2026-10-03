@@ -19,9 +19,12 @@ Peek tracks your progress automatically while you watch:
 For each scene you watch, Peek remembers:
 
 - **Current position** - Exact timestamp where you stopped
-- **Total progress** - Percentage watched (e.g., 65% complete)
+- **Progress** - Shown as a bar on the scene's thumbnail. It is worked out from your resume point and the scene's length, not stored by itself
 - **Last watched date** - When you last viewed this scene
-- **Watch count** - How many times you've watched it
+- **Watch count** - How many times you've watched it. A watch counts as a play once you have watched the **Minimum Play Percent** of the scene (20% by default). Change it in Settings → User Preferences → Playback
+- **Watch time** - How long you have spent watching it
+
+If you stop at 98% of the scene or later, Peek takes it as finished and clears the resume point, so the scene starts from the beginning next time.
 
 ## Resume Playback
 
@@ -39,9 +42,8 @@ A scene opened from anywhere else (a scene card, a search or a playlist) starts 
 
 Scene cards show your progress visually:
 
-- **Progress bar** at the bottom of the thumbnail
-- **Percentage indicator** (e.g., "65% watched")
-- **Blue progress bar** fills from left to right as you watch
+- A thin **green progress bar** along the bottom of the thumbnail fills from left to right to where you stopped
+- Hover the bar to see "Resume from" and the time you stopped at
 
 A card's progress bar shows where you stopped, but playing from the card starts at the beginning. To pick up where you left off, use Continue Watching or Watch History.
 
@@ -136,12 +138,14 @@ Watch history is stored in Peek's database:
 - **Progress position** - Timestamp (in seconds)
 - **Last watched date** - When you last viewed it
 - **Watch count** - Total number of views
+- **Watch time** - Total time you spent watching
 
 ### What's NOT Stored
 
 - **No video file access logs** - Peek doesn't log file system access
-- **No sharing with Stash** - Watch history stays in Peek only
-- **No external tracking** - History never leaves your Peek instance
+- **No analytics or tracking services** - Peek reports your viewing to no outside service
+
+Your history stays in Peek, with one exception. If an admin has turned on **Sync to Stash** for your account (see [Sync to Stash](user-management.md#sync-to-stash-export)), Peek also sends your plays, watch time, resume points and O counts to your Stash server as you watch. Stash keeps one set of these for everyone who syncs to it, so with several users syncing, their activity adds up there. Without Sync to Stash, nothing about what you watch leaves Peek.
 
 ### Privacy Controls
 
@@ -184,15 +188,14 @@ Want to rewatch a favorite scene?
 **Solution:**
 - Open the scene from **Continue Watching** or **Watch History**: a scene opened from a card, a search or a playlist starts from the beginning
 - Make sure you're logged in (watch history is per-user)
-- Check that you watched for at least 10 seconds (minimum tracking threshold)
+- Peek saves your position every 10 seconds you play, and again when you leave the scene, switch tabs or close the page, so even a short stretch is kept
 - Verify you're using the same user account
 - Try refreshing the page
 
 ### Progress bar not showing
 
 **Solution:**
-- Progress may not appear if you only watched a few seconds
-- Progress bars require at least 5% completion to display
+- The bar shows only where you have a resume point: a scene you have not started, or watched to its last 2%, has none
 - Try playing the video for longer
 - Clear browser cache if progress seems stuck
 

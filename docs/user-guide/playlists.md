@@ -63,7 +63,7 @@ On the Playlists page, each playlist shows thumbnails of the first four scenes y
 
 ### Finding Scenes by Playlist
 
-The Scenes page can list the scenes in one or more playlists: open **Filters**, pick them under **Playlists** (your own playlists first, then those shared with you, marked "by (owner name)"), and apply. **Has ANY**, **Has ALL** and **Has NONE** combine several playlists. **In any of my playlists** lists the scenes that are in one of your own playlists, or in none of them; playlists shared with you do not count for it. While exactly one playlist is chosen, **Playlist Order** appears in the sort menu and orders the scenes by their place in that playlist.
+The Scenes page can list the scenes in one or more playlists with its **Playlists** filter: pick them (your own playlists first, then those shared with you, marked "by (owner name)"), and apply. **Has ANY**, **Has ALL** and **Has NONE** combine several playlists. **In any of my playlists** lists the scenes that are in one of your own playlists, or in none of them; playlists shared with you do not count for it. While exactly one playlist is chosen, **Playlist Order** appears in the sort menu and orders the scenes by their place in that playlist.
 
 The filter shows what you may see, as the playlist page does: a scene you hid, or that your restrictions remove, is neither listed nor counted, even when the playlist holds it. A playlist shared with you counts only while its owner can still share (see [Sharing Playlists](#sharing-playlists)); one you can no longer see is treated like a playlist that does not exist, and a saved filter that names it shows "Unavailable playlist" and matches nothing. The same rules apply to a Playlists rule in a [custom carousel](custom-carousels.md), which runs as you.
 
@@ -154,8 +154,8 @@ Choose how playback repeats:
 
 While watching a playlist:
 
-- **Next Scene**: Click the next button or press N
-- **Previous Scene**: Click the previous button or press P
+- **Next Scene**: Click the next button, press `Shift+N`, or use your keyboard's media next-track key
+- **Previous Scene**: Click the previous button, press `Shift+P`, or use the media previous-track key
 - **Exit Playlist**: Click the back button to return to browsing
 
 The address follows the scene you are watching, and the queue stays with that page:
@@ -182,8 +182,8 @@ A scene in the queue that you can no longer see (hidden, restricted, deleted fro
 
 Your playlists are always accessible from:
 - The **Playlists** page (shows all playlists)
-- Any scene's **Add to Playlist** menu
-- The **+** icon on scene cards
+- The **Add to Playlist** button on a scene's page and on the player's controls
+- The **Add to Playlist** button on the bar that appears when you select scenes
 
 ### Playlist Size
 
@@ -197,7 +197,7 @@ There's no limit to how many:
 Share your playlists with other users through user groups. Shared playlists appear in recipients' "Shared with Me" tab.
 
 !!! note "Permission Required"
-    Sharing requires the **Can Share** permission. Admins can grant this per-user or per-group in Settings → User Management.
+    Sharing requires the **Can Share** permission. Admins can grant this per user or per group in Settings → Server Settings → User Management.
 
 ### How Sharing Works
 
@@ -268,7 +268,7 @@ Users a playlist is shared with can download it too. The zip leaves out any scen
 
 - Verify the playlist has scenes in it
 - Check that you can play individual scenes
-- Make sure your path mappings are configured correctly
+- Ask an admin to check that Peek can reach the Stash server (Settings → Server Settings → Server Configuration → Stash Instances)
 
 ### Changes aren't saving
 
