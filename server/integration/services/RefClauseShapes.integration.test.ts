@@ -478,10 +478,22 @@ describeWithDb("Ref clause shapes", () => {
     expect(includesPlan).toMatch(/LIST SUBQUERY/);
     expect(includesPlan).not.toContain("CORRELATED");
 
+    // A large EXCLUDES probes the refs per scene (F11b): each junction is
+    // searched by the scene's key, its rows matched against the refs CTE,
+    // materialized once and read as a list (never re-built per row); no
+    // matched set, and no junction is scanned whole
     const excludesPlan = await plan(largeExcludes);
-    expect(excludesPlan).toContain("MATERIALIZE tags_matched");
+    for (const junction of ["st", "sit"]) {
+      const table = junction === "st" ? "SceneTag" : "SceneInheritedTag";
+      expect(excludesPlan).toContain(
+        `SEARCH ${junction} USING COVERING INDEX sqlite_autoindex_${table}_1 (sceneId=? AND sceneInstanceId=?)`
+      );
+      expect(excludesPlan).not.toMatch(new RegExp(`SCAN ${junction}\\b`));
+    }
+    expect(excludesPlan.match(/MATERIALIZE tags_refs/g)).toHaveLength(1);
     expect(excludesPlan).toMatch(/LIST SUBQUERY/);
-    expect(excludesPlan).not.toContain("CORRELATED");
+    expect(excludesPlan).not.toMatch(/CORRELATED LIST SUBQUERY/);
+    expect(excludesPlan).not.toContain("tags_matched");
 
     const smallPlan = await plan(small);
     expect(smallPlan).toContain("CORRELATED SCALAR SUBQUERY");
