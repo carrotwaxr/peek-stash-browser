@@ -391,4 +391,34 @@ describe("filter panel keys", () => {
 
     expect(missing).toEqual([]);
   });
+
+  it("no contract field is named match or rules and no panel key contains a dot or matches g<digit>", () => {
+    const fieldNames = allFields().flatMap(([name]) => {
+      const field = name.slice(name.indexOf(".") + 1);
+      return field === "match" || field === "rules" ? [name] : [];
+    });
+    const keys = LIST_KINDS.flatMap((kind) =>
+      PANEL_FIELDS[kind].flatMap((row) =>
+        [
+          row.key,
+          "modifierKey" in row ? row.modifierKey : undefined,
+          "hierarchyKey" in row ? row.hierarchyKey : undefined,
+          "excludeKey" in row ? row.excludeKey : undefined,
+        ].flatMap((key) => (key === undefined ? [] : [`${kind}.${key}`]))
+      )
+    );
+    const badKeys = keys.filter((name) => {
+      const key = name.slice(name.indexOf(".") + 1);
+      return (
+        key.includes(".") ||
+        /^g\d/.test(key) ||
+        /^\d/.test(key) ||
+        key === "match" ||
+        key === "rules"
+      );
+    });
+
+    expect(fieldNames).toEqual([]);
+    expect(badKeys).toEqual([]);
+  });
 });

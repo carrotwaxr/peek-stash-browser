@@ -31,6 +31,11 @@ export type {
   CarouselPreference,
   TableColumnsConfig,
   FilterPreset,
+  SavedView,
+  OverwriteViewBody,
+  RenameViewBody,
+  GetFilterPinsResponse,
+  PutFilterPinsBody,
   FilterPresets,
   DefaultFilterPresets,
   UserRestriction,
@@ -286,6 +291,7 @@ export type {
   WithStashUrl,
   // A list's total, null when the request asked for none
   ListCount,
+  ListCountResponse,
   // Entity pickers
   MinimalRequest,
   MinimalScope,
