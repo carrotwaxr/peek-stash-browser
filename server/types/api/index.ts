@@ -300,6 +300,7 @@ export type {
   MinimalEntity,
   // Scenes
   FindScenesRequest,
+  FindRecommendedScenesRequest,
   FindScenesResponse,
   FindScenesMinimalRequest,
   FindScenesMinimalResponse,

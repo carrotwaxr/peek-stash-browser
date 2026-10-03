@@ -13,6 +13,8 @@ import {
 
 import {
   addStashUrl,
+  countRecommendedScenes,
+  findRecommendedScenes,
   findScenes,
   findSimilarScenes,
   getRecommendedScenes,
@@ -23,9 +25,11 @@ import rankingComputeService from "../../../services/RankingComputeService.js";
 import { recommendationService } from "../../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
+import type { FindRecommendedScenesRequest } from "../../../types/api/index.js";
 import { logger } from "../../../utils/logger.js";
 import { libraryHandler } from "../../../utils/routeHelpers.js";
 import {
+  type Malformed,
   malformed,
   reqFor,
   resFor,
@@ -56,6 +60,7 @@ vi.mock("../../../services/SceneQueryBuilder.js", () => ({
   sceneQueryBuilder: {
     execute: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     getByRefs: vi.fn().mockResolvedValue([]),
+    count: vi.fn().mockResolvedValue(0),
   },
 }));
 
@@ -683,9 +688,10 @@ describe("getRecommendedScenes", () => {
       refs: [ref("s1")],
       criteria: someCriteria,
     });
-    mockSceneQueryBuilder.getByRefs.mockResolvedValue([
-      createMockScene({ id: "s1", instanceId: "default" }),
-    ]);
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      items: [createMockScene({ id: "s1", instanceId: "default" })],
+      total: 1,
+    });
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "1" },
@@ -713,7 +719,7 @@ describe("getRecommendedScenes", () => {
     expect(body.count).toBe(0);
     expect(body.message).toBe("No recommendations yet");
     expect(body.criteria).toEqual(noCriteria);
-    expect(mockSceneQueryBuilder.getByRefs).not.toHaveBeenCalled();
+    expect(mockSceneQueryBuilder.execute).not.toHaveBeenCalled();
   });
 
   it("says so when the user's criteria match no scene", async () => {
@@ -751,21 +757,26 @@ describe("getRecommendedScenes", () => {
     ).toHaveBeenCalledExactlyOnceWith(1, ["inst-a", "inst-b"]);
   });
 
-  it("fetches one page by (id, instance) in ranked order and counts the whole list", async () => {
+  it("lists one page through the builder within the ranked refs, in the builder's order, and counts what it matches", async () => {
+    const refs = [
+      ref("s1", "inst-a"),
+      ref("s2", "inst-b"),
+      ref("s1", "inst-b"),
+      ref("s3", "inst-a"),
+      ref("s4", "inst-a"),
+    ];
     mockRecommendationService.getRankedRefs.mockResolvedValue({
-      refs: [
-        ref("s1", "inst-a"),
-        ref("s2", "inst-b"),
-        ref("s1", "inst-b"),
-        ref("s3", "inst-a"),
-        ref("s4", "inst-a"),
-      ],
+      refs,
       criteria: someCriteria,
     });
-    // Page 2 of 2: s1@B then s3@A, returned by the builder the other way round
-    const s3 = createMockScene({ id: "s3", instanceId: "inst-a" });
-    const s1b = createMockScene({ id: "s1", instanceId: "inst-b" });
-    mockSceneQueryBuilder.getByRefs.mockResolvedValue([s3, s1b]);
+    // Page 2 of 2 under the Recommended sort: s1@B then s3@A
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      items: [
+        createMockScene({ id: "s1", instanceId: "inst-b" }),
+        createMockScene({ id: "s3", instanceId: "inst-a" }),
+      ],
+      total: 4,
+    });
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "2", per_page: "2" },
@@ -776,47 +787,36 @@ describe("getRecommendedScenes", () => {
     await getRecommendedScenes(req, res);
 
     expect(res._getStatus()).toBe(200);
-    expect(mockSceneQueryBuilder.getByRefs).toHaveBeenCalledExactlyOnceWith({
-      userId: 1,
-      refs: [ref("s1", "inst-b"), ref("s3", "inst-a")],
-      allowedInstanceIds: ["default"],
-    });
+    expect(mockSceneQueryBuilder.execute).toHaveBeenCalledExactlyOnceWith(
+      objectContaining({
+        userId: 1,
+        allowedInstanceIds: ["default"],
+        ranked: refs,
+        request: objectContaining({
+          page: 2,
+          perPage: 2,
+          q: undefined,
+          filter: {},
+          sort: { field: "recommended", direction: "DESC", seed: undefined },
+        }),
+      })
+    );
     const body = res._getOkBody();
     expect(body.scenes.map((s) => `${s.id}:${s.instanceId}`)).toEqual([
       "s1:inst-b",
       "s3:inst-a",
     ]);
-    expect(body.count).toBe(5);
+    expect(body.count).toBe(4);
     expect(body.page).toBe(2);
     expect(body.perPage).toBe(2);
   });
 
-  it("leaves out a ranked scene the page fetch no longer returns", async () => {
-    mockRecommendationService.getRankedRefs.mockResolvedValue({
-      refs: [ref("s1"), ref("s2")],
-      criteria: someCriteria,
-    });
-    mockSceneQueryBuilder.getByRefs.mockResolvedValue([
-      createMockScene({ id: "s2", instanceId: "default" }),
-    ]);
-    const req = reqFor(getRecommendedScenes, {
-      user: testUser(),
-      query: { page: "1" },
-    });
-    const res = resFor(getRecommendedScenes);
-
-    await getRecommendedScenes(req, res);
-
-    const body = res._getOkBody();
-    expect(body.scenes.map((s) => s.id)).toEqual(["s2"]);
-    expect(body.count).toBe(2);
-  });
-
-  it("echoes per_page 1000 as 250 and asks for at most 250 scenes", async () => {
+  it("echoes per_page 1000 as 250 and asks the builder for at most 250 scenes", async () => {
     mockRecommendationService.getRankedRefs.mockResolvedValue({
       refs: Array.from({ length: 300 }, (_, i) => ref(String(i + 1))),
       criteria: someCriteria,
     });
+    mockSceneQueryBuilder.execute.mockResolvedValue({ items: [], total: 300 });
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "1", per_page: "1000" },
@@ -830,8 +830,8 @@ describe("getRecommendedScenes", () => {
     expect(body.perPage).toBe(250);
     expect(body.count).toBe(300);
     expect(
-      must(mockSceneQueryBuilder.getByRefs.mock.calls[0])[0].refs
-    ).toHaveLength(250);
+      must(mockSceneQueryBuilder.execute.mock.calls[0])[0].request.perPage
+    ).toBe(250);
   });
 
   it.each([
@@ -867,5 +867,283 @@ describe("getRecommendedScenes", () => {
     await expect(getRecommendedScenes(req, res)).rejects.toThrow("DB down");
 
     expect(res.json).not.toHaveBeenCalled();
+  });
+});
+
+describe("findRecommendedScenes", () => {
+  const noCriteria = {
+    favoritedPerformers: 0,
+    ratedPerformers: 0,
+    favoritedStudios: 0,
+    ratedStudios: 0,
+    favoritedTags: 0,
+    ratedTags: 0,
+    favoritedScenes: 0,
+    ratedScenes: 0,
+    rankedEntities: 0,
+  };
+  const someCriteria = { ...noCriteria, favoritedPerformers: 1 };
+  const refs = [
+    { id: "s1", instanceId: "A" },
+    { id: "s2", instanceId: "B" },
+  ];
+
+  beforeEach(() => {
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs,
+      criteria: someCriteria,
+    });
+    mockSceneQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
+  });
+
+  const run = async (
+    body: FindRecommendedScenesRequest | Malformed,
+    parts: { role?: "ADMIN" | "USER"; allowedInstanceIds?: string[] } = {}
+  ) => {
+    const req = reqFor(findRecommendedScenes, {
+      body,
+      user: testUser({ role: parts.role ?? "USER" }),
+      allowedInstanceIds: parts.allowedInstanceIds ?? ["A", "B"],
+      timeZone: "America/Chicago",
+    });
+    const res = resFor(findRecommendedScenes);
+    await findRecommendedScenes(req, res);
+    return res;
+  };
+
+  it("returns 401 when user is not authenticated", async () => {
+    const req = reqFor(findRecommendedScenes, { body: {} });
+    const res = resFor(findRecommendedScenes);
+
+    await libraryHandler(findRecommendedScenes)(req, res, vi.fn());
+
+    expect(res._getStatus()).toBe(401);
+    expect(mockRecommendationService.getRankedRefs).not.toHaveBeenCalled();
+  });
+
+  it("page 1 awaits ensureFresh; a later page and a count-only request do not", async () => {
+    const order: string[] = [];
+    mockRankingService.ensureFresh.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      order.push("ensureFresh");
+    });
+    mockRecommendationService.getRankedRefs.mockImplementationOnce(() => {
+      order.push("getRankedRefs");
+      return Promise.resolve({ refs, criteria: someCriteria });
+    });
+    await run({ filter: { page: 1 } });
+    expect(mockRankingService.ensureFresh).toHaveBeenCalledExactlyOnceWith(1, {
+      wait: true,
+    });
+    expect(order).toEqual(["ensureFresh", "getRankedRefs"]);
+
+    mockRankingService.ensureFresh.mockClear();
+    await run({ filter: { page: 2 } });
+    expect(mockRankingService.ensureFresh).not.toHaveBeenCalled();
+
+    // The count route is the count-only request
+    const req = reqFor(countRecommendedScenes, {
+      body: {},
+      user: testUser(),
+      allowedInstanceIds: ["A", "B"],
+    });
+    await countRecommendedScenes(req, resFor(countRecommendedScenes));
+    expect(mockRankingService.ensureFresh).not.toHaveBeenCalled();
+  });
+
+  it("passes the ranked refs and the allowed instances to the builder, with the parsed filter", async () => {
+    await run(
+      {
+        filter: { page: 3, per_page: 20, q: "beach", sort: "title" },
+        scene_filter: {
+          tags: { value: ["12:B"], modifier: "INCLUDES" },
+        },
+      },
+      { allowedInstanceIds: ["B"] }
+    );
+
+    expect(
+      mockRecommendationService.getRankedRefs
+    ).toHaveBeenCalledExactlyOnceWith(1, ["B"]);
+    expect(mockSceneQueryBuilder.execute).toHaveBeenCalledExactlyOnceWith(
+      objectContaining({
+        userId: 1,
+        allowedInstanceIds: ["B"],
+        timeZone: "America/Chicago",
+        ranked: refs,
+        request: objectContaining({
+          page: 3,
+          perPage: 20,
+          q: "beach",
+          sort: objectContaining({ field: "title" }),
+          filter: {
+            tags: objectContaining({ refs: [{ id: "12", instanceId: "B" }] }),
+          },
+        }),
+      })
+    );
+  });
+
+  it("no criteria answers the 'No recommendations yet' message without a list query", async () => {
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs: [],
+      criteria: noCriteria,
+    });
+
+    const res = await run({});
+
+    expect(res._getOkBody()).toEqual({
+      scenes: [],
+      count: 0,
+      page: 1,
+      perPage: 40,
+      message: "No recommendations yet",
+      criteria: noCriteria,
+    });
+    expect(mockSceneQueryBuilder.execute).not.toHaveBeenCalled();
+  });
+
+  it("no ranked refs answers 'No matching recommendations found' without a list query", async () => {
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs: [],
+      criteria: someCriteria,
+    });
+
+    const res = await run({});
+
+    const body = res._getOkBody();
+    expect(body.message).toBe("No matching recommendations found");
+    expect(body.count).toBe(0);
+    expect(body.criteria).toEqual(someCriteria);
+    expect(mockSceneQueryBuilder.execute).not.toHaveBeenCalled();
+  });
+
+  it("answers the builder's total, null on `count: false`", async () => {
+    mockSceneQueryBuilder.execute.mockResolvedValueOnce({
+      items: [createMockScene({ id: "s1", instanceId: "A" })],
+      total: 7,
+    });
+    const counted = await run({});
+    expect(counted._getOkBody().count).toBe(7);
+
+    mockSceneQueryBuilder.execute.mockResolvedValueOnce({
+      items: [createMockScene({ id: "s1", instanceId: "A" })],
+      total: null,
+    });
+    const uncounted = await run({ filter: { page: 2, count: false } });
+    expect(uncounted._getOkBody().count).toBeNull();
+    expect(
+      must(mockSceneQueryBuilder.execute.mock.calls[1])[0].request.count
+    ).toBe(false);
+  });
+
+  it("adds no stashUrl for a regular user, one for an admin", async () => {
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      items: [createMockScene({ id: "s1" })],
+      total: 1,
+    });
+
+    const regular = await run({});
+    expect(must(regular._getOkBody().scenes[0]).stashUrl).toBeNull();
+
+    const admin = await run({}, { role: "ADMIN" });
+    expect(must(admin._getOkBody().scenes[0]).stashUrl).toBe(
+      "http://stash/scenes/s1"
+    );
+  });
+
+  it.each([
+    ["ids", { ids: ["1:A"] }],
+    ["scene_filter.ids", { scene_filter: { ids: { value: ["1:A"] } } }],
+  ])("a body naming %s answers 400 before any read", async (path, body) => {
+    await expect(run(malformed(body))).rejects.toMatchObject({
+      statusCode: 400,
+      issues: [{ path, message: "Recommended lists its own scenes" }],
+    });
+    expect(mockRecommendationService.getRankedRefs).not.toHaveBeenCalled();
+    expect(mockRankingService.ensureFresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("countRecommendedScenes", () => {
+  const refs = [{ id: "s1", instanceId: "A" }];
+  const criteria = {
+    favoritedPerformers: 1,
+    ratedPerformers: 0,
+    favoritedStudios: 0,
+    ratedStudios: 0,
+    favoritedTags: 0,
+    ratedTags: 0,
+    favoritedScenes: 0,
+    ratedScenes: 0,
+    rankedEntities: 0,
+  };
+
+  it("the recommended count answers the builder's count within the ranked refs and never calls ensureFresh", async () => {
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs,
+      criteria,
+    });
+    mockSceneQueryBuilder.count.mockResolvedValue(9);
+    const req = reqFor(countRecommendedScenes, {
+      body: {
+        scene_filter: { tags: { value: ["12:B"], modifier: "INCLUDES" } },
+      },
+      user: testUser(),
+      allowedInstanceIds: ["A", "B"],
+      timeZone: "America/Chicago",
+    });
+    const res = resFor(countRecommendedScenes);
+
+    await countRecommendedScenes(req, res);
+
+    expect(res._getOkBody()).toEqual({ count: 9 });
+    expect(mockSceneQueryBuilder.count).toHaveBeenCalledExactlyOnceWith(
+      objectContaining({
+        userId: 1,
+        allowedInstanceIds: ["A", "B"],
+        timeZone: "America/Chicago",
+        ranked: refs,
+        request: objectContaining({
+          filter: {
+            tags: objectContaining({ refs: [{ id: "12", instanceId: "B" }] }),
+          },
+        }),
+      })
+    );
+    expect(mockRankingService.ensureFresh).not.toHaveBeenCalled();
+    expect(mockSceneQueryBuilder.execute).not.toHaveBeenCalled();
+  });
+
+  it("no ranked refs answer 0 without a count query", async () => {
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs: [],
+      criteria,
+    });
+    const req = reqFor(countRecommendedScenes, {
+      body: {},
+      user: testUser(),
+    });
+    const res = resFor(countRecommendedScenes);
+
+    await countRecommendedScenes(req, res);
+
+    expect(res._getOkBody()).toEqual({ count: 0 });
+    expect(mockSceneQueryBuilder.count).not.toHaveBeenCalled();
+  });
+
+  it("a bad body is the list parser's 400", async () => {
+    const req = reqFor(countRecommendedScenes, {
+      body: malformed({ filter: { sort: "position" } }),
+      user: testUser(),
+    });
+
+    await expect(
+      countRecommendedScenes(req, resFor(countRecommendedScenes))
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      issues: [{ path: "filter.sort" }],
+    });
+    expect(mockRecommendationService.getRankedRefs).not.toHaveBeenCalled();
   });
 });

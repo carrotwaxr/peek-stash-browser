@@ -2019,9 +2019,88 @@ interface FindSimilarScenesResponse {
 
 ---
 
+### POST /api/library/scenes/recommended
+
+Recommended: the scene list request within the user's ranked scenes
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+type FindRecommendedScenesRequest = Omit<
+  ListRequestInput<"scene">,
+  "filter" | "ids"
+> & {
+  filter?: Omit<ListPageInput<"scene">, "sort"> & {
+    sort?: RecommendedSort | RandomSortKey;
+  };
+};
+```
+
+**Response:**
+
+```typescript
+interface GetRecommendedScenesResponse {
+  scenes: WithStashUrl<NormalizedScene>[];
+  /** The scenes matching the request within the ranked list; null when it asked for none (`filter.count: false`) */
+  count: number | null;
+  page: number;
+  perPage: number;
+  message?: string;
+  criteria?: {
+    favoritedPerformers: number;
+    ratedPerformers: number;
+    favoritedStudios: number;
+    ratedStudios: number;
+    favoritedTags: number;
+    ratedTags: number;
+    favoritedScenes: number;
+    ratedScenes: number;
+    /** Performers, studios and tags the user's viewing ranks in its top half */
+    rankedEntities: number;
+  };
+}
+```
+
+**Handler:** `findRecommendedScenes` in `server/controllers/library/scenes.ts`
+
+---
+
+### POST /api/library/scenes/recommended/count
+
+How many scenes that request matches (the filter sheet's "Show N results")
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+type FindRecommendedScenesRequest = Omit<
+  ListRequestInput<"scene">,
+  "filter" | "ids"
+> & {
+  filter?: Omit<ListPageInput<"scene">, "sort"> & {
+    sort?: RecommendedSort | RandomSortKey;
+  };
+};
+```
+
+**Response:**
+
+```typescript
+interface ListCountResponse {
+  count: number;
+}
+```
+
+**Handler:** `countRecommendedScenes` in `server/controllers/library/scenes.ts`
+
+---
+
 ### GET /api/library/scenes/recommended
 
-Get recommended scenes
+Get recommended scenes: for a tab still on the beta.8 bundle; remove in the release after 3.4.0-beta.9
 
 **Authentication:** Session
 
@@ -2043,8 +2122,9 @@ interface GetRecommendedScenesQuery extends Record<
 
 ```typescript
 interface GetRecommendedScenesResponse {
-  scenes: NormalizedScene[];
-  count: number;
+  scenes: WithStashUrl<NormalizedScene>[];
+  /** The scenes matching the request within the ranked list; null when it asked for none (`filter.count: false`) */
+  count: number | null;
   page: number;
   perPage: number;
   message?: string;

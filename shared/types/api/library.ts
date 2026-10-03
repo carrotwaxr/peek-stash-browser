@@ -15,7 +15,12 @@ import type {
   NormalizedStudio,
   NormalizedTag,
 } from "../entities.js";
-import type { ListRequestInput } from "../filters/index.js";
+import type {
+  ListPageInput,
+  ListRequestInput,
+  RandomSortKey,
+  RecommendedSort,
+} from "../filters/index.js";
 import type { MinimalCountFilter } from "./common.js";
 
 /**
@@ -143,7 +148,22 @@ export interface FindSimilarScenesResponse {
 }
 
 /**
- * GET /api/library/scenes/recommended - Get recommended scenes
+ * POST /api/library/scenes/recommended: the scene list's request within the
+ * user's ranked scenes. Its sorts add `recommended`, the default (DESC is
+ * best first); it takes no top-level `ids` and no `scene_filter.ids`.
+ */
+export type FindRecommendedScenesRequest = Omit<
+  ListRequestInput<"scene">,
+  "filter" | "ids"
+> & {
+  filter?: Omit<ListPageInput<"scene">, "sort"> & {
+    sort?: RecommendedSort | RandomSortKey;
+  };
+};
+
+/**
+ * GET /api/library/scenes/recommended - Get recommended scenes. Kept for a
+ * tab still on the 3.4.0-beta.8 bundle; the POST above is the request.
  */
 export interface GetRecommendedScenesQuery extends Record<
   string,
@@ -154,8 +174,9 @@ export interface GetRecommendedScenesQuery extends Record<
 }
 
 export interface GetRecommendedScenesResponse {
-  scenes: NormalizedScene[];
-  count: number;
+  scenes: WithStashUrl<NormalizedScene>[];
+  /** The scenes matching the request within the ranked list; null when it asked for none (`filter.count: false`) */
+  count: number | null;
   page: number;
   perPage: number;
   message?: string;

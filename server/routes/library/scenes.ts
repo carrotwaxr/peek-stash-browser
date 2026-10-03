@@ -1,5 +1,7 @@
 import express from "express";
 import {
+  countRecommendedScenes,
+  findRecommendedScenes,
   findScenes,
   findScenesMinimal,
   findSimilarScenes,
@@ -34,7 +36,22 @@ router.get(
   libraryHandler(findSimilarScenes)
 );
 
-// Get recommended scenes
+// Recommended: the scene list request within the user's ranked scenes
+router.post(
+  "/scenes/recommended",
+  requireCacheReady,
+  libraryHandler(findRecommendedScenes)
+);
+
+// How many scenes that request matches (the filter sheet's "Show N results")
+router.post(
+  "/scenes/recommended/count",
+  requireCacheReady,
+  libraryHandler(countRecommendedScenes)
+);
+
+// Get recommended scenes: for a tab still on the beta.8 bundle; remove in the
+// release after 3.4.0-beta.9
 router.get(
   "/scenes/recommended",
   requireCacheReady,

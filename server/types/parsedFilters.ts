@@ -224,9 +224,17 @@ export interface ParsedWhereGroup<E extends ListKind> {
   readonly rules: readonly (ParsedWhereLeaf<E> | ParsedWhereGroup<E>)[];
 }
 
+/**
+ * A sort only a request within ranked refs carries: the scene list of
+ * Recommended sorts by `recommended`, the rank (`parseRecommendedListRequest`)
+ */
+export type RankedSortOf<K extends ListKind> = K extends "scene"
+  ? "recommended"
+  : never;
+
 export interface ParsedSort<K extends ListKind> {
   /** Whitelisted; "random_<n>" arrives as field "random", seed n % 1e8 */
-  readonly field: SortOf<K>;
+  readonly field: SortOf<K> | RankedSortOf<K>;
   readonly direction: "ASC" | "DESC";
   /** Set only for random (the daily seed unless given) */
   readonly seed: number | undefined;

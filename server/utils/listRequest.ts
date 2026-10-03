@@ -15,6 +15,7 @@
  */
 import {
   DEFAULT_PLAYLIST_ITEM_SORT,
+  DEFAULT_RECOMMENDED_SORT,
   DEFAULT_SORT,
   type DateSpec,
   type EnumSpec,
@@ -34,6 +35,7 @@ import {
   type PresenceModifier,
   Q_MAX_LENGTH,
   RANGE_MODIFIERS,
+  RECOMMENDED_SORTS,
   REF_MODIFIERS,
   type RangeModifier,
   type RefModifier,
@@ -73,6 +75,7 @@ import type {
   ParsedSort,
   ParsedWhereGroup,
   PlaylistCriterion,
+  RankedSortOf,
   RefCriterion,
   RefFieldCriterion,
   TextCriterion,
@@ -122,6 +125,18 @@ export type ParsedStoredQuery = ParsedListRequest<"scene"> & {
 
 export interface ParseOptions {
   readonly userId: number;
+  /** The sorts the list takes in place of the entity's (Recommended's) */
+  readonly sorts?: readonly string[];
+  /** The sort and direction when the request names none, in place of the entity's */
+  readonly defaultSort?: {
+    readonly field: string;
+    readonly direction: SortDirection;
+  };
+  /**
+   * Refuses top-level `ids` and `<entity>_filter.ids` with this 400
+   * message: a list that supplies its own entities (Recommended)
+   */
+  readonly refuseIds?: string;
 }
 
 export interface StoredQueryOptions {
@@ -301,7 +316,7 @@ const SORT_SETS = new Map<string, ReadonlySet<string>>(
 );
 
 interface SortField<K extends ListKind> {
-  readonly field: SortOf<K>;
+  readonly field: SortOf<K> | RankedSortOf<K>;
   readonly seed: number | undefined;
 }
 
@@ -310,7 +325,9 @@ function parseSortField<K extends ListKind>(
   kind: K,
   raw: unknown,
   path: string,
-  problems: Problems
+  problems: Problems,
+  /** The list's own sorts, when they are not the entity's */
+  sorts?: ReadonlySet<string>
 ): SortField<K> | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (typeof raw === "string") {
@@ -319,7 +336,7 @@ function parseSortField<K extends ListKind>(
       const field: SortOf<ListKind> = "random";
       return { field, seed: Number(seeded[1]) % SEED_MODULUS };
     }
-    if (SORT_SETS.get(kind)?.has(raw)) {
+    if ((sorts ?? SORT_SETS.get(kind))?.has(raw)) {
       return { field: raw as SortOf<K>, seed: undefined };
     }
   }
@@ -338,10 +355,14 @@ function resolveSort<K extends ListKind>(
   field: SortField<K> | undefined,
   direction: SortDirection | undefined,
   userId: number,
-  randomSeed?: number
+  randomSeed?: number,
+  defaultSort?: ParseOptions["defaultSort"]
 ): ParsedSort<K> {
-  const fallback = DEFAULT_SORT[kind];
-  const resolved: SortOf<K> = field?.field ?? fallback.field;
+  const fallback = (defaultSort ?? DEFAULT_SORT[kind]) as {
+    readonly field: SortField<K>["field"];
+    readonly direction: SortDirection;
+  };
+  const resolved = field?.field ?? fallback.field;
   const seed =
     resolved === "random"
       ? (field?.seed ?? randomSeed ?? generateDailySeed(userId))
@@ -1002,6 +1023,8 @@ export function parseListRequest<E extends ListKind>(
   };
   let ids: readonly FilterRef[] = [];
   let where: ParsedWhereGroup<E> | undefined;
+  const sortSet =
+    options.sorts === undefined ? undefined : new Set(options.sorts);
 
   const pageHandlers = new Map<string, (raw: unknown, path: string) => void>([
     ["page", (raw, path) => (state.page = parseInteger(raw, path, problems))],
@@ -1011,7 +1034,8 @@ export function parseListRequest<E extends ListKind>(
     ],
     [
       "sort",
-      (raw, path) => (sortField = parseSortField(entity, raw, path, problems)),
+      (raw, path) =>
+        (sortField = parseSortField(entity, raw, path, problems, sortSet)),
     ],
     [
       "direction",
@@ -1062,6 +1086,12 @@ export function parseListRequest<E extends ListKind>(
   ]);
 
   walk(input, "", handlers, problems, "Unknown request field");
+  if (options.refuseIds !== undefined) {
+    if (ids.length > 0) problems.add("ids", options.refuseIds);
+    if ("ids" in fields.criteria) {
+      problems.add(`${filterKey}.ids`, options.refuseIds);
+    }
+  }
   mergeIds(fields.criteria, ids, filterKey, problems);
   // A sort reads the filter object, then the root rows of an "all" where
   const top: Record<string, unknown> = topLevelCriteria(
@@ -1095,7 +1125,14 @@ export function parseListRequest<E extends ListKind>(
       entity === "clip" ? CLIP_PER_PAGE_DEFAULT : PER_PAGE_DEFAULT
     ),
     q: state.q,
-    sort: resolveSort(entity, sortField, state.direction, options.userId),
+    sort: resolveSort(
+      entity,
+      sortField,
+      state.direction,
+      options.userId,
+      undefined,
+      options.defaultSort
+    ),
     // The one boundary cast: each criterion was validated by its field's schema
     filter: fields.criteria as ParsedFilter<E>,
     ...(where === undefined ? {} : { where }),
@@ -1591,6 +1628,24 @@ export function parseRecommendedRequest(
     page: clampPage(page),
     perPage: clampPerPage(perPage, RECOMMENDED_PER_PAGE_DEFAULT),
   };
+}
+
+/**
+ * `POST /api/library/scenes/recommended` and its `/count`: the scene list's
+ * request (paging, search, sort, `scene_filter`, `where`), whose sorts add
+ * `recommended` (the default, best first). The list is the user's ranked
+ * scenes, so no `ids`, top-level or in `scene_filter`.
+ */
+export function parseRecommendedListRequest(
+  body: unknown,
+  options: Pick<ParseOptions, "userId">
+): ParsedListRequest<"scene"> {
+  return parseListRequest("scene", body, {
+    ...options,
+    sorts: RECOMMENDED_SORTS,
+    defaultSort: DEFAULT_RECOMMENDED_SORT,
+    refuseIds: "Recommended lists its own scenes",
+  });
 }
 
 // =============================================================================
