@@ -693,6 +693,48 @@ describe("SearchControls", () => {
       expect(list.params().get("orientation")).toBe("LANDSCAPE,SQUARE");
     });
 
+    it('the default Performers preset `{ gender: "FEMALE" }` shows Female checked and sends it as a list', async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls(
+        { artifactType: "performer" },
+        {
+          url: "/performers",
+          presets: {
+            presets: {
+              performer: [preset({ filters: { gender: "FEMALE" } })],
+            },
+            defaults: { performer: "p1" },
+          },
+        }
+      );
+      expect((await firstQuery(list.onQueryChange)).performer_filter).toEqual({
+        gender: { value: ["FEMALE"], modifier: "INCLUDES" },
+      });
+
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      const group = screen.getByRole("group", { name: "Gender" });
+      expect(
+        within(group).getByRole("checkbox", { name: "Female" })
+      ).toBeChecked();
+      expect(
+        within(group).getByRole("checkbox", { name: "Male" })
+      ).not.toBeChecked();
+      await user.click(within(group).getByRole("checkbox", { name: "Male" }));
+      await user.selectOptions(
+        screen.getByRole("combobox", { name: "Gender condition" }),
+        "Is NONE of these"
+      );
+      await user.click(
+        must(screen.getByText("Apply Filters").closest("button"))
+      );
+
+      await waitFor(() =>
+        expect(list.lastQuery().performer_filter).toEqual({
+          gender: { value: ["MALE", "FEMALE"], modifier: "EXCLUDES" },
+        })
+      );
+    });
+
     it("choosing Not rated hides the bounds and sends IS_NULL", async () => {
       const user = userEvent.setup();
       const list = renderSearchControls({}, { url: "/scenes?rating_min=40" });

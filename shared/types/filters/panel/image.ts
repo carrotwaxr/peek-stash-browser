@@ -201,6 +201,7 @@ export const IMAGE_PANEL = [
     label: "Orientation",
     group: "other",
     editor: "enum",
+    multi: true,
     placeholder: "Any orientation",
     choices: [
       { value: "LANDSCAPE", label: "Landscape" },

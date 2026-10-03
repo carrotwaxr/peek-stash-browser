@@ -20,6 +20,7 @@
     "tagFavorite_start",
     "tagFavorite_end",
     "gender",
+    "genderModifier",
     "gender_min",
     "gender_max",
     "gender_start",
@@ -516,10 +517,184 @@
       "lossless": true
     },
     {
+      "label": "gender: INCLUDES MALE",
+      "params": "gender=MALE&genderModifier=INCLUDES",
+      "parsed": {
+        "gender": [
+          "MALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: INCLUDES FEMALE",
+      "params": "gender=FEMALE&genderModifier=INCLUDES",
+      "parsed": {
+        "gender": [
+          "FEMALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: INCLUDES TRANSGENDER_MALE",
+      "params": "gender=TRANSGENDER_MALE&genderModifier=INCLUDES",
+      "parsed": {
+        "gender": [
+          "TRANSGENDER_MALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: INCLUDES TRANSGENDER_FEMALE",
+      "params": "gender=TRANSGENDER_FEMALE&genderModifier=INCLUDES",
+      "parsed": {
+        "gender": [
+          "TRANSGENDER_FEMALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: INCLUDES INTERSEX",
+      "params": "gender=INTERSEX&genderModifier=INCLUDES",
+      "parsed": {
+        "gender": [
+          "INTERSEX"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: INCLUDES NON_BINARY",
+      "params": "gender=NON_BINARY&genderModifier=INCLUDES",
+      "parsed": {
+        "gender": [
+          "NON_BINARY"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: INCLUDES two values",
+      "params": "gender=MALE%2CFEMALE&genderModifier=INCLUDES",
+      "parsed": {
+        "gender": [
+          "MALE",
+          "FEMALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: EXCLUDES MALE",
+      "params": "gender=MALE&genderModifier=EXCLUDES",
+      "parsed": {
+        "gender": [
+          "MALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: EXCLUDES FEMALE",
+      "params": "gender=FEMALE&genderModifier=EXCLUDES",
+      "parsed": {
+        "gender": [
+          "FEMALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: EXCLUDES TRANSGENDER_MALE",
+      "params": "gender=TRANSGENDER_MALE&genderModifier=EXCLUDES",
+      "parsed": {
+        "gender": [
+          "TRANSGENDER_MALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: EXCLUDES TRANSGENDER_FEMALE",
+      "params": "gender=TRANSGENDER_FEMALE&genderModifier=EXCLUDES",
+      "parsed": {
+        "gender": [
+          "TRANSGENDER_FEMALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: EXCLUDES INTERSEX",
+      "params": "gender=INTERSEX&genderModifier=EXCLUDES",
+      "parsed": {
+        "gender": [
+          "INTERSEX"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: EXCLUDES NON_BINARY",
+      "params": "gender=NON_BINARY&genderModifier=EXCLUDES",
+      "parsed": {
+        "gender": [
+          "NON_BINARY"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: EXCLUDES two values",
+      "params": "gender=MALE%2CFEMALE&genderModifier=EXCLUDES",
+      "parsed": {
+        "gender": [
+          "MALE",
+          "FEMALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: IS_NULL no value",
+      "params": "genderModifier=IS_NULL",
+      "parsed": {
+        "genderModifier": "IS_NULL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: NOT_NULL no value",
+      "params": "genderModifier=NOT_NULL",
+      "parsed": {
+        "genderModifier": "NOT_NULL"
+      },
+      "lossless": true
+    },
+    {
       "label": "gender: MALE",
       "params": "gender=MALE",
       "parsed": {
-        "gender": "MALE"
+        "gender": [
+          "MALE"
+        ]
       },
       "lossless": true
     },
@@ -527,7 +702,9 @@
       "label": "gender: FEMALE",
       "params": "gender=FEMALE",
       "parsed": {
-        "gender": "FEMALE"
+        "gender": [
+          "FEMALE"
+        ]
       },
       "lossless": true
     },
@@ -535,7 +712,9 @@
       "label": "gender: TRANSGENDER_MALE",
       "params": "gender=TRANSGENDER_MALE",
       "parsed": {
-        "gender": "TRANSGENDER_MALE"
+        "gender": [
+          "TRANSGENDER_MALE"
+        ]
       },
       "lossless": true
     },
@@ -543,7 +722,9 @@
       "label": "gender: TRANSGENDER_FEMALE",
       "params": "gender=TRANSGENDER_FEMALE",
       "parsed": {
-        "gender": "TRANSGENDER_FEMALE"
+        "gender": [
+          "TRANSGENDER_FEMALE"
+        ]
       },
       "lossless": true
     },
@@ -551,7 +732,9 @@
       "label": "gender: INTERSEX",
       "params": "gender=INTERSEX",
       "parsed": {
-        "gender": "INTERSEX"
+        "gender": [
+          "INTERSEX"
+        ]
       },
       "lossless": true
     },
@@ -559,7 +742,20 @@
       "label": "gender: NON_BINARY",
       "params": "gender=NON_BINARY",
       "parsed": {
-        "gender": "NON_BINARY"
+        "gender": [
+          "NON_BINARY"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "gender: two values",
+      "params": "gender=MALE%2CFEMALE",
+      "parsed": {
+        "gender": [
+          "MALE",
+          "FEMALE"
+        ]
       },
       "lossless": true
     },
@@ -2915,10 +3111,184 @@
       "hasFilters": true
     },
     {
+      "label": "gender: INCLUDES MALE",
+      "written": "instance=inst-a&tab=x&gender=MALE&genderModifier=INCLUDES",
+      "filters": {
+        "gender": [
+          "MALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: INCLUDES FEMALE",
+      "written": "instance=inst-a&tab=x&gender=FEMALE&genderModifier=INCLUDES",
+      "filters": {
+        "gender": [
+          "FEMALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: INCLUDES TRANSGENDER_MALE",
+      "written": "instance=inst-a&tab=x&gender=TRANSGENDER_MALE&genderModifier=INCLUDES",
+      "filters": {
+        "gender": [
+          "TRANSGENDER_MALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: INCLUDES TRANSGENDER_FEMALE",
+      "written": "instance=inst-a&tab=x&gender=TRANSGENDER_FEMALE&genderModifier=INCLUDES",
+      "filters": {
+        "gender": [
+          "TRANSGENDER_FEMALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: INCLUDES INTERSEX",
+      "written": "instance=inst-a&tab=x&gender=INTERSEX&genderModifier=INCLUDES",
+      "filters": {
+        "gender": [
+          "INTERSEX"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: INCLUDES NON_BINARY",
+      "written": "instance=inst-a&tab=x&gender=NON_BINARY&genderModifier=INCLUDES",
+      "filters": {
+        "gender": [
+          "NON_BINARY"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: INCLUDES two values",
+      "written": "instance=inst-a&tab=x&gender=MALE%2CFEMALE&genderModifier=INCLUDES",
+      "filters": {
+        "gender": [
+          "MALE",
+          "FEMALE"
+        ],
+        "genderModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: EXCLUDES MALE",
+      "written": "instance=inst-a&tab=x&gender=MALE&genderModifier=EXCLUDES",
+      "filters": {
+        "gender": [
+          "MALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: EXCLUDES FEMALE",
+      "written": "instance=inst-a&tab=x&gender=FEMALE&genderModifier=EXCLUDES",
+      "filters": {
+        "gender": [
+          "FEMALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: EXCLUDES TRANSGENDER_MALE",
+      "written": "instance=inst-a&tab=x&gender=TRANSGENDER_MALE&genderModifier=EXCLUDES",
+      "filters": {
+        "gender": [
+          "TRANSGENDER_MALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: EXCLUDES TRANSGENDER_FEMALE",
+      "written": "instance=inst-a&tab=x&gender=TRANSGENDER_FEMALE&genderModifier=EXCLUDES",
+      "filters": {
+        "gender": [
+          "TRANSGENDER_FEMALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: EXCLUDES INTERSEX",
+      "written": "instance=inst-a&tab=x&gender=INTERSEX&genderModifier=EXCLUDES",
+      "filters": {
+        "gender": [
+          "INTERSEX"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: EXCLUDES NON_BINARY",
+      "written": "instance=inst-a&tab=x&gender=NON_BINARY&genderModifier=EXCLUDES",
+      "filters": {
+        "gender": [
+          "NON_BINARY"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: EXCLUDES two values",
+      "written": "instance=inst-a&tab=x&gender=MALE%2CFEMALE&genderModifier=EXCLUDES",
+      "filters": {
+        "gender": [
+          "MALE",
+          "FEMALE"
+        ],
+        "genderModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: IS_NULL no value",
+      "written": "instance=inst-a&tab=x&genderModifier=IS_NULL",
+      "filters": {
+        "genderModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: NOT_NULL no value",
+      "written": "instance=inst-a&tab=x&genderModifier=NOT_NULL",
+      "filters": {
+        "genderModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "gender: MALE",
       "written": "instance=inst-a&tab=x&gender=MALE",
       "filters": {
-        "gender": "MALE"
+        "gender": [
+          "MALE"
+        ]
       },
       "hasFilters": true
     },
@@ -2926,7 +3296,9 @@
       "label": "gender: FEMALE",
       "written": "instance=inst-a&tab=x&gender=FEMALE",
       "filters": {
-        "gender": "FEMALE"
+        "gender": [
+          "FEMALE"
+        ]
       },
       "hasFilters": true
     },
@@ -2934,7 +3306,9 @@
       "label": "gender: TRANSGENDER_MALE",
       "written": "instance=inst-a&tab=x&gender=TRANSGENDER_MALE",
       "filters": {
-        "gender": "TRANSGENDER_MALE"
+        "gender": [
+          "TRANSGENDER_MALE"
+        ]
       },
       "hasFilters": true
     },
@@ -2942,7 +3316,9 @@
       "label": "gender: TRANSGENDER_FEMALE",
       "written": "instance=inst-a&tab=x&gender=TRANSGENDER_FEMALE",
       "filters": {
-        "gender": "TRANSGENDER_FEMALE"
+        "gender": [
+          "TRANSGENDER_FEMALE"
+        ]
       },
       "hasFilters": true
     },
@@ -2950,7 +3326,9 @@
       "label": "gender: INTERSEX",
       "written": "instance=inst-a&tab=x&gender=INTERSEX",
       "filters": {
-        "gender": "INTERSEX"
+        "gender": [
+          "INTERSEX"
+        ]
       },
       "hasFilters": true
     },
@@ -2958,7 +3336,20 @@
       "label": "gender: NON_BINARY",
       "written": "instance=inst-a&tab=x&gender=NON_BINARY",
       "filters": {
-        "gender": "NON_BINARY"
+        "gender": [
+          "NON_BINARY"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "gender: two values",
+      "written": "instance=inst-a&tab=x&gender=MALE%2CFEMALE",
+      "filters": {
+        "gender": [
+          "MALE",
+          "FEMALE"
+        ]
       },
       "hasFilters": true
     },

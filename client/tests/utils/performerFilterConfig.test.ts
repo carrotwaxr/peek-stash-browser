@@ -95,21 +95,24 @@ describe("buildPerformerFilter", () => {
   });
 
   describe("Gender Filter", () => {
-    it("should build gender filter with EQUALS modifier", () => {
+    it("a gender stored as one value sends a one-element list under INCLUDES", () => {
       const uiFilters = { gender: "FEMALE" };
       const result = buildPerformerFilter(uiFilters);
       expect(result.gender).toEqual({
-        value: "FEMALE",
-        modifier: "EQUALS",
+        value: ["FEMALE"],
+        modifier: "INCLUDES",
       });
     });
 
-    it("should build gender filter for MALE", () => {
-      const uiFilters = { gender: "MALE" };
+    it("several genders under Is NONE of these send EXCLUDES", () => {
+      const uiFilters = {
+        gender: ["MALE", "TRANSGENDER_MALE"],
+        genderModifier: "EXCLUDES",
+      };
       const result = buildPerformerFilter(uiFilters);
       expect(result.gender).toEqual({
-        value: "MALE",
-        modifier: "EQUALS",
+        value: ["MALE", "TRANSGENDER_MALE"],
+        modifier: "EXCLUDES",
       });
     });
 
@@ -735,7 +738,10 @@ describe("buildPerformerFilter", () => {
       };
       const result = buildPerformerFilter(uiFilters);
       expect(result.favorite).toBe(true);
-      expect(result.gender).toEqual({ value: "FEMALE", modifier: "EQUALS" });
+      expect(result.gender).toEqual({
+        value: ["FEMALE"],
+        modifier: "INCLUDES",
+      });
       expect(result.rating100).toEqual({
         modifier: "BETWEEN",
         value: 70,
@@ -771,7 +777,10 @@ describe("buildPerformerFilter", () => {
       const result = buildPerformerFilter(uiFilters);
 
       expect(result.favorite).toBe(true);
-      expect(result.gender).toEqual({ value: "FEMALE", modifier: "EQUALS" });
+      expect(result.gender).toEqual({
+        value: ["FEMALE"],
+        modifier: "INCLUDES",
+      });
       expect(result.tags).toEqual({
         value: ["1", "2"],
         modifier: "INCLUDES_ALL",

@@ -347,10 +347,42 @@ describe("PerformerQueryBuilder", () => {
       expect(sql).not.toContain("COALESCE(p.penisLength");
     });
 
-    it("gender and the free-text attributes compare whole, ignoring case; NOT_EQUALS keeps performers without one", async () => {
+    it("gender takes any of its values or none of them, ignoring case; none of them keeps performers without one", async () => {
       await run({
         filter: {
-          gender: { modifier: "EQUALS", value: "FEMALE" },
+          gender: { modifier: "INCLUDES", values: ["FEMALE", "MALE"] },
+        },
+      });
+      expect(pageStatement().sql).toContain("UPPER(p.gender) IN (?, ?)");
+      expect(pageStatement().params).toEqual(
+        arrayContaining(["FEMALE", "MALE"])
+      );
+
+      mockPrisma.$queryRawUnsafe.mockClear();
+      await run({
+        filter: { gender: { modifier: "EXCLUDES", values: ["MALE"] } },
+      });
+      expect(pageStatement().sql).toContain(
+        "(p.gender IS NULL OR UPPER(p.gender) NOT IN (?))"
+      );
+    });
+
+    it("gender IS_NULL is no gender or an empty one, NOT_NULL a gender", async () => {
+      await run({ filter: { gender: { modifier: "IS_NULL" } } });
+      expect(pageStatement().sql).toContain(
+        "(p.gender IS NULL OR p.gender = '')"
+      );
+
+      mockPrisma.$queryRawUnsafe.mockClear();
+      await run({ filter: { gender: { modifier: "NOT_NULL" } } });
+      expect(pageStatement().sql).toContain(
+        "(p.gender IS NOT NULL AND p.gender != '')"
+      );
+    });
+
+    it("the free-text attributes compare whole, ignoring case; NOT_EQUALS keeps performers without one", async () => {
+      await run({
+        filter: {
           ethnicity: { modifier: "NOT_EQUALS", value: "Asian" },
           hair_color: { modifier: "EQUALS", value: "Blonde" },
           eye_color: { modifier: "EQUALS", value: "Blue" },
@@ -359,7 +391,6 @@ describe("PerformerQueryBuilder", () => {
       });
 
       const { sql, params } = pageStatement();
-      expect(sql).toContain("UPPER(p.gender) = UPPER(?)");
       expect(sql).toContain(
         "(p.ethnicity IS NULL OR UPPER(p.ethnicity) != UPPER(?))"
       );
@@ -369,7 +400,7 @@ describe("PerformerQueryBuilder", () => {
         "(p.fakeTits IS NULL OR UPPER(p.fakeTits) != UPPER(?))"
       );
       expect(params).toEqual(
-        arrayContaining(["FEMALE", "Asian", "Blonde", "Blue", "Natural"])
+        arrayContaining(["Asian", "Blonde", "Blue", "Natural"])
       );
     });
 
@@ -610,7 +641,7 @@ const PERFORMER_CLAUSES: Record<
   tattoos: "p.tattoos LIKE ?",
   piercings: "p.piercings LIKE ?",
   measurements: "p.measurements LIKE ?",
-  gender: "UPPER(p.gender) = UPPER(?)",
+  gender: "UPPER(p.gender) IN (?)",
   ethnicity: "UPPER(p.ethnicity) = UPPER(?)",
   hair_color: "UPPER(p.hairColor) = UPPER(?)",
   eye_color: "UPPER(p.eyeColor) = UPPER(?)",

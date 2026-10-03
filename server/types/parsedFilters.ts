@@ -144,16 +144,23 @@ export interface EnumCriterion<V extends string> {
   readonly value: V;
 }
 
-/** Any of these values; never empty */
-export interface MultiEnumCriterion<V extends string> {
-  readonly modifier: "INCLUDES";
+/** Any of these values (INCLUDES) or, where the field offers it, none (EXCLUDES); never empty */
+export interface MultiEnumCriterion<
+  V extends string,
+  M extends MultiEnumModifier = "INCLUDES",
+> {
+  readonly modifier: M;
   readonly values: readonly V[];
 }
 
+/** The modifiers a multi-valued enum criterion carries values under */
+export type MultiEnumModifier = "INCLUDES" | "EXCLUDES";
+
 /** A multi-valued enum offering IS_NULL ("not set") and NOT_NULL ("is set") */
-export type MultiEnumFieldCriterion<V extends string> =
-  | MultiEnumCriterion<V>
-  | { readonly modifier: "IS_NULL" | "NOT_NULL" };
+export type MultiEnumFieldCriterion<
+  V extends string,
+  M extends MultiEnumModifier = "INCLUDES",
+> = MultiEnumCriterion<V, M> | { readonly modifier: "IS_NULL" | "NOT_NULL" };
 
 /** The parsed criterion of one field spec */
 export type CriterionOf<S extends FieldSpec> =
@@ -172,8 +179,8 @@ export type CriterionOf<S extends FieldSpec> =
             : S extends EnumSpec<infer V, infer M, infer Multi>
               ? Multi extends true
                 ? [Extract<M, PresenceModifier>] extends [never]
-                  ? MultiEnumCriterion<V>
-                  : MultiEnumFieldCriterion<V>
+                  ? MultiEnumCriterion<V, Extract<M, MultiEnumModifier>>
+                  : MultiEnumFieldCriterion<V, Extract<M, MultiEnumModifier>>
                 : EnumCriterion<V>
               : S extends BooleanSpec
                 ? boolean

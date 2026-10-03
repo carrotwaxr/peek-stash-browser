@@ -804,6 +804,63 @@ describe("parseListRequest: filter fields", () => {
     expect(paths(issues)).toEqual(["scene_filter.orientation.modifier"]);
   });
 
+  it("gender takes several values under INCLUDES or EXCLUDES, and IS_NULL and NOT_NULL with no value", () => {
+    const gender = (criterion: unknown) =>
+      parseListRequest(
+        "performer",
+        { performer_filter: { gender: criterion } },
+        opts()
+      ).filter.gender;
+
+    expect(gender({ value: ["FEMALE", "MALE"] })).toEqual({
+      modifier: "INCLUDES",
+      values: ["FEMALE", "MALE"],
+    });
+    expect(gender({ value: ["MALE"], modifier: "EXCLUDES" })).toEqual({
+      modifier: "EXCLUDES",
+      values: ["MALE"],
+    });
+    expect(gender({ modifier: "IS_NULL", value: ["MALE"] })).toEqual({
+      modifier: "IS_NULL",
+    });
+    expect(gender({ modifier: "NOT_NULL" })).toEqual({ modifier: "NOT_NULL" });
+  });
+
+  it("beta.7's single gender reads as one value: EQUALS as INCLUDES, NOT_EQUALS as EXCLUDES", () => {
+    const gender = (criterion: unknown) =>
+      parseListRequest(
+        "performer",
+        { performer_filter: { gender: criterion } },
+        opts()
+      ).filter.gender;
+
+    expect(gender({ value: "FEMALE", modifier: "EQUALS" })).toEqual({
+      modifier: "INCLUDES",
+      values: ["FEMALE"],
+    });
+    expect(gender({ value: "FEMALE" })).toEqual({
+      modifier: "INCLUDES",
+      values: ["FEMALE"],
+    });
+    expect(gender({ value: "MALE", modifier: "NOT_EQUALS" })).toEqual({
+      modifier: "EXCLUDES",
+      values: ["MALE"],
+    });
+    // A list field without EXCLUDES takes no NOT_EQUALS
+    const issues = issuesOf(() =>
+      parseListRequest(
+        "scene",
+        {
+          scene_filter: {
+            orientation: { value: "LANDSCAPE", modifier: "NOT_EQUALS" },
+          },
+        },
+        opts()
+      )
+    );
+    expect(paths(issues)).toEqual(["scene_filter.orientation.modifier"]);
+  });
+
   it("booleans stay boolean; a string is invalid", () => {
     const parsed = parseListRequest(
       "scene",

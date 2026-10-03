@@ -2799,7 +2799,9 @@
     {
       "label": "orientation: LANDSCAPE",
       "state": {
-        "orientation": "LANDSCAPE"
+        "orientation": [
+          "LANDSCAPE"
+        ]
       },
       "request": {
         "orientation": {
@@ -2812,7 +2814,9 @@
     {
       "label": "orientation: PORTRAIT",
       "state": {
-        "orientation": "PORTRAIT"
+        "orientation": [
+          "PORTRAIT"
+        ]
       },
       "request": {
         "orientation": {
@@ -2825,12 +2829,31 @@
     {
       "label": "orientation: SQUARE",
       "state": {
-        "orientation": "SQUARE"
+        "orientation": [
+          "SQUARE"
+        ]
       },
       "request": {
         "orientation": {
           "value": [
             "SQUARE"
+          ]
+        }
+      }
+    },
+    {
+      "label": "orientation: two values",
+      "state": {
+        "orientation": [
+          "LANDSCAPE",
+          "PORTRAIT"
+        ]
+      },
+      "request": {
+        "orientation": {
+          "value": [
+            "LANDSCAPE",
+            "PORTRAIT"
           ]
         }
       }

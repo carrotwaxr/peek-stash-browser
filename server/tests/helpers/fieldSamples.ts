@@ -182,6 +182,9 @@ export function alternatesFor(
           : make("last", { modifier: spec.defaultModifier, value: last }, [
               last,
             ]),
+        ...(spec.multi && spec.modifiers.some((m) => m === "EXCLUDES")
+          ? [make("EXCLUDES", { modifier: "EXCLUDES", values: [last] }, [last])]
+          : []),
         ...PRESENCE.filter((m) => spec.modifiers.includes(m)).map((m) =>
           make(m, { modifier: m })
         ),

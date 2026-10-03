@@ -195,7 +195,15 @@ export const PERFORMER_FIELDS = {
   tattoos: text(),
   piercings: text(),
   measurements: text(),
-  gender: enumOf(GENDERS),
+  /**
+   * Any or none of the genders, or not set (no gender or an empty one, as
+   * Stash reads it) and set; beta.7's single EQUALS and NOT_EQUALS read as
+   * INCLUDES and EXCLUDES of one value
+   */
+  gender: enumOf(GENDERS, {
+    multi: true,
+    modifiers: ["INCLUDES", "EXCLUDES", ...PRESENCE_MODIFIERS],
+  }),
   ethnicity: freeText(),
   hair_color: freeText(),
   eye_color: freeText(),

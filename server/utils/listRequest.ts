@@ -57,6 +57,7 @@ import type {
   FilterRef,
   MinimalKind,
   MultiEnumFieldCriterion,
+  MultiEnumModifier,
   ParsedClipFilter,
   ParsedFilter,
   ParsedListRequest,
@@ -648,39 +649,75 @@ function textSchema(spec: TextSpec): z.ZodType<TextCriterion> {
 }
 
 /**
- * An enum criterion. A multi-valued one matches any of its values, or with
- * IS_NULL or NOT_NULL (where the field offers them) needs no value and
- * ignores one.
+ * What a multi-valued enum read from a request sent while its field took one
+ * value (beta.7's Gender): EQUALS is INCLUDES, and NOT_EQUALS EXCLUDES where
+ * the field offers it
+ */
+function legacyEnumModifiers(spec: EnumSpec): Map<string, MultiEnumModifier> {
+  const offered: readonly string[] = spec.modifiers;
+  const legacy = new Map<string, MultiEnumModifier>();
+  if (offered.includes("INCLUDES")) legacy.set("EQUALS", "INCLUDES");
+  if (offered.includes("EXCLUDES")) legacy.set("NOT_EQUALS", "EXCLUDES");
+  return legacy;
+}
+
+/**
+ * An enum criterion. A multi-valued one matches any of its values or, where
+ * the field offers EXCLUDES, none of them; with IS_NULL or NOT_NULL (where
+ * the field offers them) it needs no value and ignores one. It also reads a
+ * lone value as a list, and EQUALS and NOT_EQUALS as `legacyEnumModifiers`
+ * says.
  */
 function enumSchema(
   spec: EnumSpec
-): z.ZodType<EnumCriterion<string> | MultiEnumFieldCriterion<string>> {
-  const modifier = z.enum(spec.modifiers).nullish();
+): z.ZodType<
+  EnumCriterion<string> | MultiEnumFieldCriterion<string, MultiEnumModifier>
+> {
   if (spec.multi) {
+    const legacy = legacyEnumModifiers(spec);
+    const value = z.enum(spec.values);
     return z
       .strictObject({
-        modifier,
-        value: z.array(z.enum(spec.values)).nullish(),
+        modifier: z.enum([...spec.modifiers, ...legacy.keys()]).nullish(),
+        value: z.union([value, z.array(value)]).nullish(),
       })
-      .transform((c, ctx): MultiEnumFieldCriterion<string> => {
-        const resolved = c.modifier ?? spec.defaultModifier;
-        if (isPresence(resolved)) return { modifier: resolved };
-        if (!c.value || c.value.length === 0) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["value"],
-            message: "Required",
-          });
-          return z.NEVER;
+      .transform(
+        (c, ctx): MultiEnumFieldCriterion<string, MultiEnumModifier> => {
+          const resolved = c.modifier ?? spec.defaultModifier;
+          if (isPresence(resolved)) return { modifier: resolved };
+          const values =
+            c.value === null || c.value === undefined
+              ? []
+              : typeof c.value === "string"
+                ? [c.value]
+                : c.value;
+          if (values.length === 0) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["value"],
+              message: "Required",
+            });
+            return z.NEVER;
+          }
+          const modifier =
+            legacy.get(resolved) ??
+            (resolved === "EXCLUDES" ? "EXCLUDES" : "INCLUDES");
+          return { modifier, values };
         }
-        return { modifier: "INCLUDES", values: c.value };
-      });
+      );
   }
   return z
-    .strictObject({ modifier, value: z.enum(spec.values) })
+    .strictObject({
+      modifier: z.enum(spec.modifiers).nullish(),
+      value: z.enum(spec.values),
+    })
     .transform((c, ctx): EnumCriterion<string> => {
       const resolved = c.modifier ?? spec.defaultModifier;
-      if (resolved === "INCLUDES" || isPresence(resolved)) {
+      if (
+        resolved === "INCLUDES" ||
+        resolved === "EXCLUDES" ||
+        isPresence(resolved)
+      ) {
         // Declared only on multi-valued enums
         ctx.addIssue({
           code: "custom",
