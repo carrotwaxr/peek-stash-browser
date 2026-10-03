@@ -83,6 +83,12 @@ class FakePlayer extends Emitter implements VrPlayer {
   vr = vi.fn((_options: VrOptions) => {
     const fork = new FakeFork();
     this.forks.push(fork);
+    // As the fork's constructor: it starts on the player's loadedmetadata
+    this.on("loadedmetadata", fork.init);
+    // Component.dispose drops the listeners the plugin added
+    fork.dispose.mockImplementation(() => {
+      this.off("loadedmetadata", fork.init);
+    });
     return fork;
   });
   readyState = () => this.state;
@@ -157,7 +163,7 @@ describe("peekVr", () => {
     expect(seen).toEqual([{ dpdb: "", wake: false }]);
   });
 
-  it("enable before metadata leaves the start to the fork's loadedmetadata", () => {
+  it("enable before metadata leaves the start to loadedmetadata", () => {
     const player = new FakePlayer();
 
     createVrController(player).enable("180_LR");
@@ -167,15 +173,6 @@ describe("peekVr", () => {
 
   it("enable before metadata asks for it, without playing, and the fork draws once it comes", () => {
     const player = new FakePlayer();
-    // As the fork: it starts on the player's loadedmetadata
-    player.vr.mockImplementationOnce((_options: VrOptions) => {
-      const fork = new FakeFork();
-      player.forks.push(fork);
-      player.on("loadedmetadata", () => {
-        fork.init();
-      });
-      return fork;
-    });
 
     createVrController(player).enable("180_LR");
 
@@ -292,6 +289,7 @@ describe("peekVr", () => {
     createVrController(player).enable("180_LR");
     // The fork's XR source-change path makes a new texture and returns before
     // triggering initialized
+    player.fork.init.mockImplementation(() => {});
     player.fork.videoTexture = texture();
 
     player.trigger("loadedmetadata");
@@ -321,6 +319,7 @@ describe("peekVr", () => {
     const player = new FakePlayer();
     createVrController(player).enable("180_LR");
     const fork = player.fork;
+    fork.init.mockImplementation(() => {});
     fork.videoTexture = { colorSpace: "srgb", needsUpdate: false };
 
     player.trigger("loadedmetadata");
@@ -369,6 +368,199 @@ describe("peekVr", () => {
       vr.disable();
     }).not.toThrow();
     expect(player.vr).not.toHaveBeenCalled();
+  });
+});
+
+describe("peekVr: a view that cannot start", () => {
+  /** What the fork does when WebGL is missing: it throws inside init */
+  const noWebGl = () =>
+    new Error("THREE.WebGLRenderer: Error creating WebGL context.");
+
+  it("the fork's own start is replaced by one that runs once per loadedmetadata", () => {
+    const player = new FakePlayer();
+    createVrController(player).enable("180_LR");
+
+    player.state = 1;
+    player.trigger("loadedmetadata");
+
+    expect(player.fork.init).toHaveBeenCalledTimes(1);
+    expect(player.count("loadedmetadata")).toBe(2);
+  });
+
+  it("a start that throws on loadedmetadata disposes the fork, puts the preload back and tells the handler", () => {
+    const player = new FakePlayer();
+    const vr = createVrController(player);
+    const failed = vi.fn();
+    vr.onFailure(failed);
+    vr.enable("180_LR");
+    const fork = player.fork;
+    const error = noWebGl();
+    fork.init.mockImplementationOnce(() => {
+      throw error;
+    });
+    // The fork only resets a view it finished: dispose must find it marked so
+    const initializedAtDispose: Array<boolean> = [];
+    fork.dispose.mockImplementation(() => {
+      initializedAtDispose.push(fork.initialized_);
+    });
+
+    player.state = 1;
+    expect(() => {
+      player.trigger("loadedmetadata");
+    }).not.toThrow();
+
+    expect(failed).toHaveBeenCalledExactlyOnceWith(error);
+    expect(fork.dispose).toHaveBeenCalledTimes(1);
+    expect(initializedAtDispose).toEqual([true]);
+    expect(vr.enabled).toBe(false);
+    expect(player.preloading).toBe("none");
+    expect(player.count("loadedmetadata")).toBe(0);
+  });
+
+  it("a start that throws inside enable (the metadata was there) fails the same way", () => {
+    const player = new FakePlayer();
+    player.state = 1;
+    const vr = createVrController(player);
+    const failed = vi.fn();
+    vr.onFailure(failed);
+    player.vr.mockImplementationOnce((_options: VrOptions) => {
+      const fork = new FakeFork();
+      fork.init.mockImplementation(() => {
+        throw noWebGl();
+      });
+      player.forks.push(fork);
+      return fork;
+    });
+
+    expect(() => {
+      vr.enable("180_LR");
+    }).not.toThrow();
+
+    expect(failed).toHaveBeenCalledTimes(1);
+    expect(player.fork.dispose).toHaveBeenCalledTimes(1);
+    expect(vr.enabled).toBe(false);
+  });
+
+  it("a re-initialise that throws on a projection pick fails the same way", () => {
+    const player = new FakePlayer();
+    player.state = 4;
+    const vr = createVrController(player);
+    const failed = vi.fn();
+    vr.onFailure(failed);
+    vr.enable("180_LR");
+    player.fork.init.mockImplementationOnce(() => {
+      throw noWebGl();
+    });
+
+    expect(() => {
+      vr.setProjection("360_TB");
+    }).not.toThrow();
+
+    expect(failed).toHaveBeenCalledTimes(1);
+    expect(vr.enabled).toBe(false);
+  });
+
+  it("a fork that cannot be disposed after a failed start still ends VR", () => {
+    const player = new FakePlayer();
+    const vr = createVrController(player);
+    vr.enable("180_LR");
+    player.fork.init.mockImplementationOnce(() => {
+      throw noWebGl();
+    });
+    // reset() reaches the half-built canvas that is not in the page
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    player.fork.dispose.mockImplementation(() => {
+      throw new TypeError("Cannot read properties of null");
+    });
+
+    player.state = 1;
+    expect(() => {
+      player.trigger("loadedmetadata");
+    }).not.toThrow();
+
+    expect(vr.enabled).toBe(false);
+    expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
+  });
+
+  it("after a failure the next enable starts a new fork", () => {
+    const player = new FakePlayer();
+    player.state = 1;
+    const vr = createVrController(player);
+    player.vr.mockImplementationOnce((_options: VrOptions) => {
+      const fork = new FakeFork();
+      fork.init.mockImplementation(() => {
+        throw noWebGl();
+      });
+      player.forks.push(fork);
+      return fork;
+    });
+    vr.enable("180_LR");
+
+    vr.enable("180_LR");
+
+    expect(player.vr).toHaveBeenCalledTimes(2);
+    expect(vr.enabled).toBe(true);
+  });
+
+  it("a failure with no handler set does not throw", () => {
+    const player = new FakePlayer();
+    player.state = 1;
+    player.vr.mockImplementationOnce((_options: VrOptions) => {
+      const fork = new FakeFork();
+      fork.init.mockImplementation(() => {
+        throw noWebGl();
+      });
+      player.forks.push(fork);
+      return fork;
+    });
+
+    expect(() => {
+      createVrController(player).enable("180_LR");
+    }).not.toThrow();
+  });
+
+  it("video.js removes a plugin's own start by the function it registered", () => {
+    // The fork registers `this.on(player, "loadedmetadata", this.init)`; the
+    // controller takes it off with `player.off("loadedmetadata", fork.init)`
+    const Plugin = videojs.getPlugin("plugin") as unknown as new (
+      player: object
+    ) => object;
+    const started = vi.fn();
+    class Fork extends Plugin {
+      init = () => {
+        started();
+      };
+
+      constructor(player: object) {
+        super(player);
+        (
+          this as unknown as {
+            on(target: object, type: string, fn: () => void): void;
+          }
+        ).on(player, "loadedmetadata", this.init);
+      }
+    }
+    videojs.registerPlugin("peekTestFork", Fork);
+    const video = document.createElement("video");
+    document.body.appendChild(video);
+    const player = untrusted<{
+      peekTestFork(): { init: () => void };
+      off(type: string, fn: () => void): void;
+      trigger(type: string): void;
+      dispose(): void;
+    }>(videojs(video));
+    const fork = player.peekTestFork();
+
+    // Registered: the event reaches it
+    player.trigger("loadedmetadata");
+    expect(started).toHaveBeenCalledTimes(1);
+
+    player.off("loadedmetadata", fork.init);
+    player.trigger("loadedmetadata");
+
+    expect(started).toHaveBeenCalledTimes(1);
+    player.dispose();
   });
 });
 

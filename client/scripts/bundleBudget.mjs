@@ -28,13 +28,14 @@ export const budgets = {
     // and webvr-polyfill. Loaded only on VR scenes (vr/loadVr.ts); named in
     // vite.config.js's chunkFileNames.
     vr: 787,
-    // 5.0 kB measured on 2026-10-03 (2.3 gzip), with the headset HUD's
-    // wiring, VR giving way to casting and wireless targets, and the menu
-    // kept inside the player: the VR button, its menu and their logic
+    // 5.7 kB measured on 2026-10-03 (2.6 gzip), with the headset HUD's
+    // wiring, VR giving way to casting and wireless targets, the menu kept
+    // inside the player, and the WebGL check with its notice: the VR
+    // button, its menu and their logic
     // (vr/vrUi.ts with vr/VrControls.ts), loaded by useVrMode on VR scenes
     // only, so the Scene chunk keeps none of it. Named in vite.config.js's
     // chunkFileNames.
-    "vr-ui": 5.2,
+    "vr-ui": 6,
   },
   // The entry chunk (the script index.html loads): the app shell, login and the
   // layout; every page, the setup wizard and the help dialog load on demand.

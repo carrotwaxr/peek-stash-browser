@@ -34,14 +34,36 @@ const hud: VrHud = {
 };
 
 function fakeVr() {
-  return {
-    enable: vi.fn(),
-    disable: vi.fn(),
+  const vr = {
+    enabled: false,
+    enable: vi.fn((_projection: VrProjection) => {
+      vr.enabled = true;
+    }),
+    disable: vi.fn(() => {
+      vr.enabled = false;
+    }),
     setProjection: vi.fn(),
     setHud: vi.fn(),
     setFavorite: vi.fn(),
+    onFailure: vi.fn<(handler: (error: unknown) => void) => void>(),
   };
+  return vr;
 }
+
+/** What happy-dom lacks: a canvas that makes a WebGL context, or none */
+const loseContext = vi.fn();
+function stubWebGl(available: boolean) {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((
+    type: string
+  ) =>
+    available && (type === "webgl2" || type === "webgl")
+      ? { getExtension: () => ({ loseContext }) }
+      : null) as never);
+}
+
+/** The notice VR puts on the player, if any */
+const notice = (player: TestPlayer) =>
+  player.el().querySelector(".vjs-vr-notice")?.textContent ?? null;
 
 interface TestPlayer extends VrModePlayer {
   controlBar: VrModePlayer["controlBar"] & {
@@ -114,6 +136,7 @@ beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
   vi.mocked(loadVr).mockImplementation(() => Promise.resolve());
+  stubWebGl(true);
 });
 
 afterEach(() => {
@@ -241,6 +264,130 @@ describe("attachVrMode: turning VR on", () => {
 
     expect(loadVr).toHaveBeenCalledTimes(2);
     expect(vr.enable).toHaveBeenCalledWith("180_LR");
+    expect(isOn(player)).toBe(true);
+  });
+});
+
+describe("attachVrMode: a browser without WebGL", () => {
+  it("says so and stays flat, without fetching the VR code", async () => {
+    stubWebGl(false);
+    const { player, vr } = makePlayer();
+    attach(player);
+
+    await press(toggle(player));
+
+    expect(isOn(player)).toBe(false);
+    expect(loadVr).not.toHaveBeenCalled();
+    expect(vr.enable).not.toHaveBeenCalled();
+    expect(notice(player)).toBe(
+      "This browser can't show VR video: WebGL is unavailable"
+    );
+  });
+
+  it("a probe that throws counts as no WebGL", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      () => {
+        throw new Error("blocked");
+      }
+    );
+    const { player, vr } = makePlayer();
+    attach(player);
+
+    await press(toggle(player));
+
+    expect(vr.enable).not.toHaveBeenCalled();
+    expect(notice(player)).toContain("WebGL is unavailable");
+  });
+
+  it("the notice is an alert on the player that goes after a few seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      stubWebGl(false);
+      const { player } = makePlayer();
+      attach(player);
+
+      await press(toggle(player));
+
+      expect(
+        player.el().querySelector(".vjs-vr-notice")?.getAttribute("role")
+      ).toBe("alert");
+      vi.advanceTimersByTime(6_999);
+      expect(notice(player)).not.toBeNull();
+      vi.advanceTimersByTime(1);
+      expect(notice(player)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a second failure replaces the notice rather than stacking another", async () => {
+    stubWebGl(false);
+    const { player } = makePlayer();
+    attach(player);
+
+    await press(toggle(player));
+    await press(toggle(player));
+
+    expect(player.el().querySelectorAll(".vjs-vr-notice")).toHaveLength(1);
+  });
+
+  it("detaching takes the notice off", async () => {
+    stubWebGl(false);
+    const { player } = makePlayer();
+    const mode = attach(player);
+    await press(toggle(player));
+
+    mode.detach();
+
+    expect(notice(player)).toBeNull();
+  });
+
+  it("the probe's context is released", async () => {
+    const { player } = makePlayer();
+    attach(player);
+
+    await press(toggle(player));
+
+    expect(loseContext).toHaveBeenCalledTimes(1);
+  });
+
+  it("a start that fails after the plugin loaded unticks VR and says so", async () => {
+    const { player, vr } = makePlayer();
+    attach(player);
+    await press(toggle(player));
+    expect(isOn(player)).toBe(true);
+    const failed = must(vr.onFailure.mock.lastCall, "the failure handler")[0];
+
+    failed(new Error("THREE.WebGLRenderer: Error creating WebGL context."));
+
+    expect(isOn(player)).toBe(false);
+    expect(notice(player)).toContain("WebGL");
+  });
+
+  it("a start that fails inside enable leaves VR off", async () => {
+    const { player, vr } = makePlayer();
+    attach(player);
+    // As the plugin: the start fails inside enable() and VR goes down again
+    vr.enable.mockImplementation(() => {
+      const failed = must(vr.onFailure.mock.lastCall, "the handler")[0];
+      failed(new Error("no context"));
+    });
+
+    await press(toggle(player));
+
+    expect(isOn(player)).toBe(false);
+    expect(notice(player)).not.toBeNull();
+  });
+
+  it("after a failure the next click tries again", async () => {
+    const { player, vr } = makePlayer();
+    attach(player);
+    await press(toggle(player));
+    must(vr.onFailure.mock.lastCall, "the handler")[0](new Error("x"));
+
+    await press(toggle(player));
+
+    expect(vr.enable).toHaveBeenCalledTimes(2);
     expect(isOn(player)).toBe(true);
   });
 });

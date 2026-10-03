@@ -255,6 +255,83 @@ test.describe("a VR scene", () => {
     await expect(radio(other)).toHaveAttribute("aria-checked", "false");
   });
 
+  test("a browser with no WebGL says so at the click, loads no VR code and stays flat", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const real = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (
+        this: HTMLCanvasElement,
+        type: string,
+        ...rest: unknown[]
+      ) {
+        if (type === "webgl" || type === "webgl2") return null;
+        return (real as (...args: unknown[]) => unknown).call(
+          this,
+          type,
+          ...rest
+        );
+      } as typeof real;
+    });
+    const urls = recordRequests(page);
+    await page.goto(sceneUrl(scene));
+    await controlBarReady(page);
+
+    const menu = await openMenu(page);
+    await menu.getByRole("menuitemcheckbox", { name: "VR view" }).click();
+
+    await expect(
+      page.getByRole("alert").filter({ hasText: "WebGL is unavailable" })
+    ).toBeVisible();
+    await expect(
+      vrButton(page).locator('[role="menuitemcheckbox"]')
+    ).toHaveAttribute("aria-checked", "false");
+    expect(urls.filter((url) => VR_CODE.test(url))).toEqual([]);
+    await expect(vrCanvas(page)).toHaveCount(0);
+  });
+
+  test("a renderer the fork cannot create after the check passed unticks VR, says so and leaves the video playable", async ({
+    page,
+  }) => {
+    // The page's first WebGL context (Peek's own check) is real; the next one,
+    // three.js's, is refused: the fork throws while it builds its renderer
+    await page.addInitScript(() => {
+      const real = HTMLCanvasElement.prototype.getContext;
+      let calls = 0;
+      HTMLCanvasElement.prototype.getContext = function (
+        this: HTMLCanvasElement,
+        type: string,
+        ...rest: unknown[]
+      ) {
+        if ((type === "webgl" || type === "webgl2") && calls++ > 0) {
+          return null;
+        }
+        return (real as (...args: unknown[]) => unknown).call(
+          this,
+          type,
+          ...rest
+        );
+      } as typeof real;
+    });
+    await page.goto(sceneUrl(scene));
+    await controlBarReady(page);
+
+    const menu = await openMenu(page);
+    await menu.getByRole("menuitemcheckbox", { name: "VR view" }).click();
+
+    await expect(
+      page.getByRole("alert").filter({ hasText: "WebGL is unavailable" })
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      vrButton(page).locator('[role="menuitemcheckbox"]')
+    ).toHaveAttribute("aria-checked", "false");
+    await expect(vrCanvas(page)).toHaveCount(0);
+
+    // The fork's VR play button is gone and the player's own plays the video
+    await expect(page.locator(".vjs-big-vr-play-button")).toHaveCount(0);
+    await startPlaying(page);
+  });
+
   test("shows no VR button in TV mode and loads no VR code", async ({
     page,
   }) => {

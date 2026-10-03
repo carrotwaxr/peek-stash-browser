@@ -79,6 +79,7 @@ interface FakeVr {
   disable: ReturnType<typeof vi.fn>;
   setHud: ReturnType<typeof vi.fn>;
   setFavorite: ReturnType<typeof vi.fn>;
+  onFailure: ReturnType<typeof vi.fn>;
   /** The handlers the HUD's buttons call, as given to `setHud` */
   hud: VrHud | null;
 }
@@ -91,6 +92,7 @@ function fakeVr(): FakeVr {
       vr.hud = hud;
     }),
     setFavorite: vi.fn(),
+    onFailure: vi.fn(),
     enable: vi.fn(() => {
       vr.enabled = true;
     }),
@@ -307,6 +309,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal("isSecureContext", true);
   stubXr(undefined);
+  // happy-dom makes no WebGL context; the VR button probes for one
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((
+    type: string
+  ) =>
+    type === "webgl2" || type === "webgl"
+      ? { getExtension: () => null }
+      : null) as never);
 });
 
 afterEach(() => {
@@ -317,6 +326,7 @@ afterEach(() => {
   players.splice(0).forEach((p) => p.isDisposed() || p.dispose());
   document.body.innerHTML = "";
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("useVrMode: the button", () => {

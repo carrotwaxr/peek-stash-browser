@@ -60,9 +60,11 @@ declare module "@blaineam/videojs-vr" {
     /**
      * Builds the renderer for the current video. The fork runs it on each
      * `loadedmetadata`; inside a headset session it only swaps the texture and
-     * returns before `initialized`.
+     * returns before `initialized`. A property, not a method: video.js binds
+     * it as the `loadedmetadata` handler, and Peek takes that handler off by
+     * this function (`player.off`) to run its own.
      */
-    init(): void;
+    init: () => void;
     /** Removes the canvas and restores the flat video. */
     reset(): void;
     /** Ends the plugin: `reset()`, and `player.vr` creates a new one again. */
@@ -73,8 +75,8 @@ declare module "@blaineam/videojs-vr" {
     /** Plugin events: `initialized`, `vr-next`, `vr-previous`, `vr-favorite`. */
     on(type: string, listener: () => void): void;
     off(type: string, listener: () => void): void;
-    /** Set by `init()`, cleared by `reset()`. */
-    readonly initialized_?: boolean;
+    /** Set by `init()`, cleared by `reset()`, which does nothing while unset. */
+    initialized_?: boolean;
     videoTexture?: VrTexture | undefined;
     posterTexture?: VrTexture | null;
   }

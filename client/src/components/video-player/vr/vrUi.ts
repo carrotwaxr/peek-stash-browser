@@ -18,6 +18,11 @@
  * In Safari, turning VR on while native HLS plays moves to the Direct source
  * (`preferDirect`).
  *
+ * A browser that cannot make a WebGL context cannot show the 3D view: the
+ * click is answered with a notice on the player (and VR stays off) before
+ * the big chunk is fetched, and a start that still fails there, which the
+ * plugin reports, ends the same way.
+ *
  * VR and casting take turns on the one player: while a Cast session is
  * connected, or Safari plays to a wireless (AirPlay) target, VR is off and
  * its button hidden. The two features share only the player: the cast code
@@ -53,6 +58,11 @@ export interface VrModePlayer {
   };
   isDisposed(): boolean;
   currentSrc(): string;
+  /** The player's element, which holds the notice */
+  el(): HTMLElement;
+  /** Cleared when the player is disposed */
+  setTimeout(callback: () => void, delay: number): number;
+  clearTimeout(id: number): void;
   /** The Cast state while a cast session exists (`castSession`) */
   peekCastState?: string;
   on(event: string, handler: () => void): void;
@@ -98,6 +108,29 @@ interface WirelessElement extends HTMLElement {
 
 interface XrNavigator {
   xr?: { isSessionSupported(mode: string): Promise<boolean> };
+}
+
+/** How long a notice stays on the player */
+const NOTICE_MS = 7000;
+
+export const WEBGL_MESSAGE =
+  "This browser can't show VR video: WebGL is unavailable";
+const START_MESSAGE = "VR view could not start in this browser";
+
+/**
+ * Whether the browser makes a WebGL context, which three.js needs. The probe's
+ * own context is let go at once: browsers cap how many a page holds.
+ */
+function webglAvailable(): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    if (!gl) return false;
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function readChoice(key: string | null): VrProjection | null {
@@ -228,6 +261,36 @@ export function attachVrMode(
     onWireless();
   });
 
+  // A line over the top of the player (inside it, so fullscreen shows it),
+  // announced as an alert; the flat video plays on under it and the controls
+  // stay usable. One at a time, gone after a few seconds.
+  let notice: { el: HTMLElement; timer: number } | null = null;
+  const clearNotice = () => {
+    if (!notice) return;
+    player.clearTimeout(notice.timer);
+    notice.el.remove();
+    notice = null;
+  };
+  const tell = (message: string) => {
+    if (!alive || player.isDisposed()) return;
+    clearNotice();
+    const el = document.createElement("div");
+    el.className = "vjs-vr-notice";
+    el.setAttribute("role", "alert");
+    el.textContent = message;
+    player.el().appendChild(el);
+    notice = { el, timer: player.setTimeout(clearNotice, NOTICE_MS) };
+  };
+
+  // The plugin took VR down after a start failed (it may call this from
+  // inside `enable()`)
+  const onStartFailed = (error: unknown) => {
+    console.error("[VR] could not start", error);
+    view.enabled = false;
+    refresh();
+    tell(/webgl/i.test(String(error)) ? WEBGL_MESSAGE : START_MESSAGE);
+  };
+
   const toggle = async () => {
     if (view.enabled) {
       player.peekVr?.().disable();
@@ -236,6 +299,10 @@ export function attachVrMode(
       return;
     }
     if (loading) return;
+    if (!webglAvailable()) {
+      tell(WEBGL_MESSAGE);
+      return;
+    }
     loading = true;
     try {
       await loadVr();
@@ -244,9 +311,11 @@ export function attachVrMode(
       if (!vr) return;
       vr.setHud(hud);
       vr.setFavorite(favorite);
+      vr.onFailure(onStartFailed);
       vr.enable(view.projection);
-      view.enabled = true;
-      preferDirect(player, inputs.decodes);
+      // Off already when the start failed inside `enable()`
+      view.enabled = vr.enabled;
+      if (view.enabled) preferDirect(player, inputs.decodes);
     } catch (error) {
       // Stays flat; the next click tries again
       console.error("[VR] could not start", error);
@@ -294,6 +363,7 @@ export function attachVrMode(
     detach() {
       alive = false;
       run.cancelled = true;
+      clearNotice();
       video?.removeEventListener(
         "webkitcurrentplaybacktargetiswirelesschanged",
         onWireless

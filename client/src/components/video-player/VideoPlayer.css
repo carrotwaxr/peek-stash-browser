@@ -887,3 +887,24 @@ section.video-container {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The VR button's notice (WebGL missing, a start that failed): a line over the
+   top of the player, in the cast status line's style. It sits above the
+   control bar's auto-hide and ignores the pointer, so the video's controls
+   stay usable under it. */
+.video-js .vjs-vr-notice {
+  position: absolute;
+  top: 0.75em;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  max-width: calc(100% - 1.5em);
+  padding: 0.35em 0.75em;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 1.2em;
+  text-align: center;
+  pointer-events: none;
+}
