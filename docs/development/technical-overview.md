@@ -8,25 +8,17 @@ This document covers Peek's architecture, content filtering system, and implemen
 
 Peek communicates with Stash in several ways. Understanding these patterns is important for performance and consistency.
 
-### Expected Patterns
+### Patterns
 
 | Pattern | Purpose | Examples |
 |---------|---------|----------|
 | **Sync** | Fetch entities to cache locally | `StashSyncService` fetching scenes, performers, etc. |
-| **Write-back** | Sync user data to Stash | Ratings, favorites, watch history, O-counter |
-| **Media proxy** | Stream video/captions through Peek | `video.ts` proxying HLS streams |
-| **Metadata edit** | User edits entity metadata | Scene/performer/studio/tag updates |
+| **Sync to Stash** | Write a user's own data back, when an admin has switched it on for that user | Ratings, favorites (`controllers/ratings.ts`), plays, watch time, resume points and O counts (`controllers/watchHistory.ts`, `controllers/imageViewHistory.ts`); see [Sync to Stash](../user-guide/user-management.md#sync-to-stash-export) |
+| **Media proxy** | Stream video, captions and images through Peek | `video.ts` and the `/api/proxy/*` routes |
 
-### Known Issues: Direct Stash Queries
+Peek never edits Stash metadata: Sync to Stash is the only write, and it sends only the user's own ratings, favorites and play data. Users never receive Stash's address or API key.
 
-These locations query Stash directly for UI display, bypassing the cache. This causes bugs and performance issues.
-
-| Location | Issue | Impact | Fix |
-|----------|-------|--------|-----|
-| `playlist.ts:76,165` | Fetches scene data from Stash for playlist display | Shows Stash's O-counter/favorite instead of user's Peek values | Query from `StashScene` cache |
-| `watchHistory.ts:61` | Fetches scene duration from Stash on every 10-second ping | Unnecessary network calls during playback | Store duration in cache (available in `files[0].duration`) |
-
-**Principle:** All UI data should come from Peek's cache. Stash should only be queried for sync operations and media streaming.
+**Principle:** All UI data comes from Peek's cache. Stash is queried to sync, to proxy media and, for a user with Sync to Stash on, to write that user's data. Rating, favorite, O-count and play fields in responses are the requesting user's, never Stash's.
 
 ---
 
@@ -63,7 +55,7 @@ Unique per `(userId, entityType, mode)`: a type can have a Show-only and an Alwa
 |--------|---------|
 | Performer | Scenes (`ScenePerformer`), galleries (`GalleryPerformer`), images (`ImagePerformer`) |
 | Studio | Scenes, galleries, images (`studioId` columns) |
-| Tag | Scenes (`SceneTag` and `inheritedTagIds`), performers, studios, groups, galleries, images, clips (`ClipTag` and `primaryTagId`) |
+| Tag | Scenes (`SceneTag` and `SceneInheritedTag`), performers, studios, groups, galleries, images, clips (`ClipTag` and `primaryTagId`) |
 | Group | Scenes (`SceneGroup`) |
 | Gallery | Scenes (`SceneGallery`), images (`ImageGallery`) |
 
@@ -157,100 +149,82 @@ This defeated the purpose of pagination for large collections.
 
 ---
 
-## Proposed Architecture: Pre-Computed Exclusions
+## Pre-Computed Exclusions
 
 ### Core Concept
 
-Instead of filtering at query time, pre-compute and store excluded entity IDs per user. Queries become simple JOINs:
+Instead of filtering at query time, Peek computes and stores each user's excluded entities. Every list, count and by-id lookup is an anti-join against that table:
 
 ```sql
--- Get visible scenes for user 5, page 1
+-- Visible scenes for user 5, page 1 (the shape; the real statement is built by EntityQueryBuilder)
 SELECT s.* FROM StashScene s
 LEFT JOIN UserExcludedEntity e
   ON e.userId = 5
   AND e.entityType = 'scene'
   AND e.entityId = s.id
+  AND (e.instanceId = '' OR e.instanceId = s.stashInstanceId)
 WHERE e.id IS NULL  -- Not in exclusion list
   AND s.deletedAt IS NULL
 ORDER BY s.stashCreatedAt DESC
 LIMIT 25 OFFSET 0
 ```
 
-### Proposed Schema
+### Schema
 
 ```prisma
-// Pre-computed exclusions (refreshed on sync/restriction changes)
 model UserExcludedEntity {
   id         Int      @id @default(autoincrement())
   userId     Int
-  entityType String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image'
+  entityType String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image', 'clip'
   entityId   String   // Stash entity ID
+  instanceId String   @default("") // Stash instance ID for multi-instance scoping
 
-  // Why is this excluded? (for debugging, not query logic)
-  reason     String   // 'restricted', 'hidden', 'cascade', 'empty'
-  sourceType String?  // If cascade: which entity type caused it
-  sourceId   String?  // If cascade: which entity ID caused it
-
+  reason     String   // 'restricted', 'hidden', 'cascade', 'empty' (and 'pending' while a sync waits)
   computedAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, entityType, entityId])
-  @@index([userId, entityType])      // Primary query index
-  @@index([entityType, entityId])    // For cascade lookups ("what users exclude this?")
+  @@unique([userId, entityType, entityId, instanceId])
+  @@index([userId, entityType])
+  @@index([entityType, entityId])
+  @@index([userId, entityType, reason])
 }
 ```
 
-Visible counts per type are not stored: they are counted per request (see [Processing Order](#processing-order)). A `UserEntityStats` table once held them; 3.4 dropped it.
+`UserExcludedContentCount` holds, per user and card entity, how many of its linked items the user cannot see, so a card's count equals its tab's total (the swap rewrites it with the rows). Visible counts per type are not stored: they are counted per request (see [Processing Order](#processing-order)). A `UserEntityStats` table once held them; 3.4 dropped it.
 
 ### Key Design Decisions
 
-**1. Single table vs separate tables?**
+**1. One table.** A single `UserExcludedEntity` table gives one anti-join for every query. The `reason` column says why a row exists, for the Hidden Items page and for debugging, never for query logic.
 
-Single `UserExcludedEntity` table is preferred:
-- Simpler schema
-- Single JOIN pattern for all queries
-- `reason` column distinguishes restriction vs hidden
-- `sourceType`/`sourceId` enable cascade debugging
+**2. How are IDs unique?** Stash entity IDs are integers per entity type, and two Stash servers can reuse the same ID. The unique key `(userId, entityType, entityId, instanceId)` holds one row per user, type, ID and server. A row with `instanceId = ''` covers that ID on every server.
 
-**2. How are IDs unique?**
+**3. Store exclusions, not inclusions.** Most users see most content, so exclusions are the smaller set, and the join is a plain "no row" test.
 
-Stash entity IDs are integers per entity type, NOT globally unique. Scene #1 and Performer #1 can coexist.
+**4. How to distinguish restricted and hidden?** The `reason` column, in the precedence order of [Processing Order](#processing-order):
+- `'restricted'`: an admin's restriction hits this entity
+- `'hidden'`: the user hid this entity (or a descendant or per-server copy of what they hid)
+- `'cascade'`: hidden because a related entity is restricted or hidden
+- `'empty'`: an organizational entity with no visible content
+- `'pending'`: held out by a sync until that user's recompute decides (see below)
 
-The composite unique constraint `@@unique([userId, entityType, entityId])` handles this:
-- User 5 + scene + "1" = one record
-- User 5 + performer + "1" = different record
+The Hidden Items page lists the stored `UserHiddenEntity` rows, and a `'hidden'` row marks an entity the user would see had they hidden nothing.
 
-**3. Store exclusions vs inclusions?**
+**5. When to recompute.**
 
-Store exclusions (what to hide):
-- Most users see most content (exclusions are smaller set)
-- Simpler query pattern (LEFT JOIN + WHERE NULL)
-- Easier to reason about
+| Event | Scope | Action |
+|-------|-------|--------|
+| Full sync | All users | `recomputeAllUsers` |
+| Incremental or smart sync | Users whose instance scope holds a changed instance, plus users with `pending` rows | `recomputeUsersForInstances` |
+| Admin changes a user's restrictions | One user | `saveRestrictions`: computes from the proposed rows and writes both tables in one swap |
+| A user's role or instance selection changes, an instance is enabled, disabled or deleted | The users it touches | `recomputeForUser` or `recomputeUsers` |
+| User hides an entity | One user | `addHiddenEntities`: computes the rows and merges them in, never overwriting a row already there |
+| User unhides an entity | One user | `recomputeForUser`: the unhide can release cascades that other hides do not cover |
+| Admin, manual | One user or all | `POST /api/exclusions/recompute/:userId`, `POST /api/exclusions/recompute-all`, `GET /api/exclusions/stats` |
 
-**4. How to distinguish restricted vs hidden?**
+Recomputes of one user coalesce: a request that arrives while one runs waits for a queued recompute that reads the newest state.
 
-The `reason` column:
-- `'restricted'` — Admin set a restriction rule matching this entity
-- `'hidden'` — User explicitly hid this entity
-- `'cascade'` — Hidden due to a related entity being restricted/hidden
-- `'empty'` — Organizational entity with no visible content
-
-Users can query their hidden items for the unhide UI:
-```sql
-SELECT * FROM UserExcludedEntity
-WHERE userId = ? AND reason = 'hidden'
-```
-
-**5. When to recompute?**
-
-Recompute exclusions when:
-- Stash sync completes (new/updated entities)
-- Admin changes restrictions for a user
-- User hides/unhides an entity
-- Entity relationships change (rare, usually via Stash)
-
-Recomputation is per-user and can be done incrementally for hide/unhide operations.
+**Pending holds.** While a sync writes a batch, it adds a `pending` row for each changed entity of the batch, and for the content a changed tag, studio, group, gallery or tag set reaches, for every user who has restrictions or hidden items (`holdForRecompute`). It writes them in the batch's own transaction. The row excludes like any other until the user's recompute swaps it out, so a changed entity never shows to a user it may be restricted for in the seconds between the write and the recompute.
 
 ---
 
@@ -275,82 +249,26 @@ Some Stash users have 100TB+ collections with millions of images and scenes. The
 ### Performance Characteristics
 
 **Query performance (with proper indexes):**
-- Index lookup: O(log n) — ~20 comparisons for 1M rows
-- JOIN is efficient because all join columns are indexed
-- SQLite page cache keeps hot indexes in memory
+- Index lookup: O(log n), about 20 comparisons for 1M rows
+- The join is efficient because all join columns are indexed
+- SQLite's page cache keeps hot indexes in memory
 
 **Potential bottlenecks:**
 
 | Concern | Mitigation |
 |---------|------------|
-| Full recomputation time | Never do full recompute except initial setup; use incremental updates |
+| Recompute time | One user at a time on the compute client; TEMP tables hold the sets, and the write is one short swap (see [Processing Order](#processing-order)) |
 | COUNT queries | Count per request in SQL with the exclusion anti-join (`getLibraryStats`); nothing stored to keep current |
 | Index memory | ~250MB for 5M rows is acceptable for modern servers |
-| Cascade complexity | Track `sourceType`/`sourceId` to enable targeted updates |
-
-### Incremental Update Strategy
-
-**Hide entity (fast, ~10-100 inserts):**
-1. Insert exclusion with `reason='hidden'`
-2. Find cascading entities via junction tables
-3. Insert cascade exclusions with `sourceType`/`sourceId`
-
-**Unhide entity (medium, may need partial recompute):**
-1. Delete exclusion where `reason='hidden'` AND entity matches
-2. Delete cascade exclusions where `sourceId` matches
-3. Re-check if any cascades should remain (other hidden entities may still exclude them)
-
-**Stash sync (diff-based):**
-1. Compare new entity list with cached list
-2. For new entities: check if any restriction rules apply
-3. For deleted entities: remove from exclusion table
-4. For modified entities: recompute if relationships changed
+| Many hides at once | A merge of more than 200,000 rows is written in several `exclusions.hide` units, so none holds the write lock past 1 s |
 
 ### Future Optimization: Table Splitting
 
 If performance issues arise at 10M+ exclusion rows, consider splitting:
-- `UserExcludedScene` — highest volume
-- `UserExcludedImage` — highest volume
-- `UserExcludedEntity` — for performers, studios, tags, groups, galleries (lower volume)
+- `UserExcludedScene` and `UserExcludedImage`, the highest volume
+- `UserExcludedEntity` for performers, studios, tags, groups, galleries and clips (lower volume)
 
-Start with single table; split only if actual performance issues occur.
-
----
-
-## Update Triggers
-
-Pre-computed exclusions need updating when:
-
-| Event | Scope | Action |
-|-------|-------|--------|
-| Stash sync (full) | All users | Diff-based recompute |
-| Stash sync (incremental) | All users | Recompute affected entities only |
-| Admin changes restriction | One user | Recompute that user |
-| User hides entity | One user | Incremental add |
-| User unhides entity | One user | Incremental remove + cascade check |
-
----
-
-## Migration Strategy
-
-1. Keep existing `UserContentRestriction` and `UserHiddenEntity` tables as source of truth
-2. Add new `UserExcludedEntity` table (a `UserEntityStats` table of visible counts came with it; 3.4 dropped it for counts per request)
-3. Implement `ExclusionComputationService` with incremental update logic
-4. Add trigger points for recomputation (sync complete, restriction change, hide/unhide)
-5. Migrate query patterns to use exclusion JOINs
-6. Add admin endpoints for manual recomputation
-7. Remove in-memory filtering code once stable (done in 3.4)
-
-### API Changes
-
-Minimal external API changes needed. Internal query implementation changes.
-
-New admin endpoints:
-```
-POST /api/admin/recompute-exclusions/:userId
-POST /api/admin/recompute-exclusions/all
-GET  /api/admin/exclusion-stats
-```
+Start with the single table; split only if actual performance issues occur.
 
 ---
 
@@ -371,7 +289,15 @@ The backend uses SQL-based query builders with pre-computed exclusions for effic
 
 #### Query Builders
 
-Each entity type has a dedicated query builder that handles filtering, sorting, pagination, and exclusion JOINs. They extend one base, `services/query/EntityQueryBuilder.ts`, which builds the list and count statements from an entity spec (table, per-user joins, columns, tiebreak) and owns what every list shares: the `deletedAt` filter, the exclusion join with the instance, the allowed-instances filter (an empty list matches nothing), the `ids` filter as (id, instance) pairs, the random sort with its seed bound, and the joined `COUNT(*)`. The clause helpers in `utils/sqlClauses.ts` (`refClause`, `idClause`, `viaSceneClause`, `instanceClause`, `randomOrder`, `combine`) match every ref as an (id, instance) pair, inline up to `PAIR_INLINE_LIMIT` refs and through a materialized set above it; the same module holds the exclusion join and the per-field number, date, text and favorite clauses. Every builder is on the base. A clip lists only while its scene does: the clip builder joins the scene, and the viewer's exclusions apply to the clip and to its scene.
+Each entity type has a dedicated query builder that handles filtering, sorting, pagination, and exclusion JOINs. They extend one base, `services/query/EntityQueryBuilder.ts`, which builds the list and count statements from an entity spec (table, per-user joins, columns, tiebreak) and owns what every list shares: the `deletedAt` filter, the exclusion join with the instance, the allowed-instances filter (an empty list matches nothing), the `ids` filter as (id, instance) pairs, the random sort with its seed bound, and the joined `COUNT(*)`. The clause helpers in `utils/sqlClauses.ts` (`refClause`, `idClause`, `viaSceneClause`, `instanceClause`, `randomOrder`, `combine`) match every ref as an (id, instance) pair, inline up to `PAIR_INLINE_LIMIT` refs and through a materialized set above it; the same module holds the exclusion join and the per-field number, date, text and favorite clauses. Every builder is on the base.
+
+**The request and its clauses.** A list request carries the page's flat `<entity>_filter` and, beside it, a `where` tree: the user's rows as a root of rows and groups, each group "all" or "any", one level deep, up to 20 rows and 5 groups (`shared/types/filters/tree.ts`, `server/utils/whereTree.ts`). A row names one field of the list's contract in `shared/types/filters`, and its criterion is parsed by that field's own schema, so the filter and the tree reach the builder as the same parsed criteria, refs as (id, instance) pairs. Each builder declares one function per field (`fieldClauses`) and a `searchClause`; the base builds one clause per field the filter carries, in the table's order, then the tree's clauses, then the search: `<base> AND <filter> AND <where> AND <search>`. The base conditions (the exclusion join, the allowed instances, `deletedAt`) are never inside the tree, so an "any" group can never OR with them. In an "any" group, rows on one field that each read "has any of" merge into one clause over all their values; in an "all" group a field may repeat, and each row is its own clause. A ref criterion's `excludes` become a clause of their own (EXCLUDES, to the same depth). Every CTE a clause adds is named from its row (`w<n>_<field>` in the tree), so two never collide.
+
+**Hierarchy and inheritance.** `hierarchicalRefClause` expands a tag or studio filter to its descendants to the criterion's depth (the whole subtree for `-1`), per instance, and for scenes matches both the scene's own tag rows (`SceneTag`) and its inherited ones (`SceneInheritedTag`); INCLUDES_ALL is one clause per picked tag, each with that tag's own descendants. The favorite filters (`tag_favorite`, `studio_favorite`, `performer_favorite`) resolve the viewer's favorites, minus what the viewer's exclusions hide, and run through the same clauses with every sub-tag or sub-studio. See [Query behavior](../reference/entity-relationships.md#scene-tag-inheritance) for what a user sees.
+
+**Dates.** Stash's created and updated times are stored as epoch milliseconds, as Prisma stores a date, and so is the viewer's last played time. A date filter on one of them (`buildInstantFilter`) reads a `YYYY-MM-DD` value as that day in the viewer's time zone (`X-Peek-Time-Zone`, "UTC" without one). Dates Stash holds as a day (a scene's date, a birthdate) are stored as `YYYY-MM-DD` text and compared as plain days.
+
+A clip lists only while its scene does: the clip builder joins the scene, and the viewer's exclusions apply to the clip and to its scene.
 
 | Query Builder | Entity |
 |---------------|--------|
@@ -404,11 +330,13 @@ Library controllers use query builders for efficient SQL-based filtering:
 const result = await sceneQueryBuilder.execute({
   userId,
   allowedInstanceIds,
-  request, // ParsedListRequest<"scene">
+  request, // ParsedListRequest<"scene">: filter, where tree, search, sort, page
+  timeZone, // the viewer's zone, for date filters on instants
 });
 
-// Returns { items: Scene[], total: number }
-// Already filtered by user exclusions, already paginated
+// Returns { items: Scene[], total: number | null }
+// Already filtered by user exclusions, already paginated; total is null
+// when the request says count: false (a page change)
 ```
 
 This replaces the old pattern of loading all entities into memory and filtering in JavaScript.
@@ -445,4 +373,4 @@ Why not let SQLite's busy timeout order the writers: Prisma's SQLite driver wait
 ---
 
 *Document Version: 3.4*
-*Last Updated: 2026-09-25*
+*Last Updated: 2026-10-03*
