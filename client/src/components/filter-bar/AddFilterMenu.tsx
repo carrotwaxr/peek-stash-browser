@@ -7,8 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { WHERE_LIMITS } from "@peek/shared-types";
-import { LucidePlus } from "lucide-react";
+import { PIN_LIMIT, WHERE_LIMITS } from "@peek/shared-types";
+import { LucidePin, LucidePinOff, LucidePlus } from "lucide-react";
 import type { ListFilters } from "../../hooks/useListFilters";
 import { useRovingFocus } from "../../hooks/useRovingFocus";
 import {
@@ -16,14 +16,19 @@ import {
   treeCounts,
   withRefValue,
 } from "../../utils/filterFields";
+import { isPinnable } from "../../utils/filterFields/pins";
 import Button from "../ui/Button";
 import Popover from "../ui/Popover";
 import { type ValueResult, useValueSearch } from "./useValueSearch";
 
 interface AddFilterMenuProps {
   filters: ListFilters;
-  /** The user's pinned fields, by key: listed first (B6 fills them) */
+  /** The user's pinned fields, by key: listed first */
   pinnedFields?: readonly string[];
+  /** The list holds as many pins as it keeps: an unpinned field's icon does nothing */
+  pinCapped?: boolean;
+  /** A field's pin icon was clicked: pin it, or unpin it */
+  onTogglePin?: (key: string) => void;
   /** A field was picked: the bar opens its editor */
   onPick: (option: FilterOption) => void;
   /** "+ Filter" itself, for the bar to move focus to */
@@ -98,10 +103,17 @@ function sectionsOf(
  *
  * At the row limit (`WHERE_LIMITS.rows`) the menu says so, and only fields
  * already in use at the root stay pickable: picking one opens its chip.
+ *
+ * Each field option carries a pin icon that pins or unpins the field
+ * without picking it. It is a mouse affordance (`aria-hidden`, not
+ * focusable): an option holds no control of its own, so keyboard and TV
+ * users pin from the field's editor header.
  */
 const AddFilterMenu = ({
   filters,
   pinnedFields = NO_PINS,
+  pinCapped = false,
+  onTogglePin,
   onPick,
   triggerRef,
 }: AddFilterMenuProps) => {
@@ -149,6 +161,9 @@ const AddFilterMenu = ({
   const isDisabled = (option: FilterOption) =>
     atLimit && !inUse.has(option.key);
   const isValueDisabled = (value: ValueOption) => isDisabled(value.field);
+  const pinned = new Set(pinnedFields);
+  const canPin = (key: string) =>
+    onTogglePin !== undefined && isPinnable(filters.kind, key);
 
   const toggle = () => {
     if (!open) setQuery("");
@@ -311,7 +326,16 @@ const AddFilterMenu = ({
                         }`}
                         style={{ color: "var(--text-primary)" }}
                       >
-                        {labelOf(option)}
+                        <span className="flex items-center justify-between gap-2">
+                          <span>{labelOf(option)}</span>
+                          {canPin(option.key) && (
+                            <PinIcon
+                              pinned={pinned.has(option.key)}
+                              capped={pinCapped}
+                              onClick={() => onTogglePin?.(option.key)}
+                            />
+                          )}
+                        </span>
                       </div>
                     );
                   })}
@@ -358,6 +382,47 @@ const AddFilterMenu = ({
         )}
       </Popover>
     </div>
+  );
+};
+
+interface PinIconProps {
+  pinned: boolean;
+  capped: boolean;
+  onClick: () => void;
+}
+
+/**
+ * An option's pin icon: a click pins (or unpins) its field and does not
+ * pick the option. Hidden from assistive technology and never focused.
+ */
+const PinIcon = ({ pinned, capped, onClick }: PinIconProps) => {
+  const inert = capped && !pinned;
+  return (
+    <span
+      data-pin-toggle=""
+      aria-hidden="true"
+      title={
+        pinned ? "Unpin" : inert ? `Up to ${PIN_LIMIT} pins` : "Pin to the bar"
+      }
+      onClick={(event) => {
+        event.stopPropagation();
+        if (!inert) onClick();
+      }}
+      className={`p-0.5 rounded ${
+        inert
+          ? "opacity-30 cursor-not-allowed"
+          : "cursor-pointer hover:opacity-70"
+      }`}
+      style={{
+        color: pinned ? "var(--accent-primary)" : "var(--text-muted)",
+      }}
+    >
+      {pinned ? (
+        <LucidePinOff className="w-3.5 h-3.5" />
+      ) : (
+        <LucidePin className="w-3.5 h-3.5" />
+      )}
+    </span>
   );
 };
 

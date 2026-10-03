@@ -1,5 +1,12 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { PANEL_FIELDS, type RowKey, rowKeyOf } from "@peek/shared-types";
+import {
+  type ListPins,
+  PANEL_FIELDS,
+  type PinnedFilter,
+  type RowKey,
+  rowKeyOf,
+} from "@peek/shared-types";
+import { useFilterPins, useSetPins } from "../../api/hooks/useFilterPins";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import type { ListFilters } from "../../hooks/useListFilters";
 import {
@@ -7,10 +14,27 @@ import {
   type FilterOption,
   rowChip,
 } from "../../utils/filterFields";
+import {
+  atCap,
+  isPinnable,
+  isPinnedFilterOn,
+  pinField,
+  pinFilter,
+  pinnedFilterOf,
+  pinsOf,
+  togglePinnedFilter,
+  unpinField,
+  unpinFilter,
+  visiblePins,
+} from "../../utils/filterFields/pins";
 import Button from "../ui/Button";
 import AddFilterMenu from "./AddFilterMenu";
-import ChipEditor, { type ChipEditorClose } from "./ChipEditor";
+import ChipEditor, {
+  type ChipEditorClose,
+  type ChipPinning,
+} from "./ChipEditor";
 import FilterChip from "./FilterChip";
+import PinnedFilterToggle from "./PinnedFilterToggle";
 
 interface PermanentFiltersMetadata {
   performers?: Array<{ id: string; name: string }>;
@@ -56,12 +80,20 @@ const sameAt = (a: RowKey, b: RowKey): boolean =>
 
 /**
  * The list's filter chips: the page's permanent filters as dimmed labels,
- * then one chip per root row of the filters (a field twice is two chips),
+ * the user's pinned filters as one-tap toggles, the pinned fields (an empty
+ * chip, `Tags`, until set, then that field's chips in the same place), then
+ * one chip per other root row of the filters (a field twice is two chips),
  * in the panel's order, then "+ Filter" and, while a filter is set,
  * "Clear all". A chip's body opens its editor in a popover under it
- * (`ChipEditor`), whose changes apply as they are made; its button removes
- * the row. A field picked in "+ Filter" opens its chip's editor, or, when
- * it is not in use, a pending chip's that leaves nothing if closed empty.
+ * (`ChipEditor`), whose changes apply as they are made, and whose header
+ * pins the field or its value; its button removes the row. A field picked
+ * in "+ Filter" opens its chip's editor, or, when it is not in use, a
+ * pending chip's that leaves nothing if closed empty.
+ *
+ * A pinned filter acts on its key's first root row: pressed while that row
+ * holds its value (the row then draws no chip of its own), a tap sets or
+ * removes the row, one history entry each. Pins are per list kind
+ * (`useFilterPins`), saved as they change (`useSetPins`).
  */
 const FilterBar = ({
   filters,
@@ -75,6 +107,29 @@ const FilterBar = ({
   const addRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<(() => void) | null>(null);
   const [editor, setEditor] = useState<OpenEditor | null>(null);
+
+  const stored = useFilterPins(kind);
+  const { mutate: savePins } = useSetPins();
+  const pins = useMemo(() => pinsOf(kind, stored), [kind, stored]);
+  const shownPins = useMemo(
+    () => visiblePins(kind, pins, options),
+    [kind, pins, options]
+  );
+  // The bar's pins, and the server's cap over every stored one
+  const capped = atCap(shownPins) || atCap(pins);
+  const save = (next: ListPins | undefined) => {
+    if (next !== undefined && next !== pins) savePins({ kind, pins: next });
+  };
+
+  // Each pinned filter, pressed while its key's first root row holds it
+  const pinnedFilters = useMemo(
+    () =>
+      shownPins.filters.map((pin) => ({
+        pin,
+        on: isPinnedFilterOn(kind, filters.filters, pin),
+      })),
+    [kind, shownPins, filters.filters]
+  );
 
   // One chip per root row the page leaves free, each naming its own row
   const chips = useMemo(() => {
@@ -103,11 +158,47 @@ const FilterBar = ({
     });
   }, [kind, tree, options, permanentFilters, unitPreference]);
 
+  // The pinned fields first, each its rows' chips or an empty chip, then
+  // the other rows; a row a pressed pinned filter stands for draws no chip,
+  // unless its editor is open
+  const drawn = useMemo(() => {
+    const pinnedKeys = new Set(shownPins.fields);
+    const covered = new Set(
+      pinnedFilters.filter(({ on }) => on).map(({ pin }) => pin.key)
+    );
+    const fieldItems = shownPins.fields.flatMap((key): ChipItem[] => {
+      const rows = chips.filter((chip) => chip.at.key === key);
+      if (rows.length > 0) return rows;
+      const option = options.find((each) => each.key === key);
+      if (option === undefined || permanentFilters[key] !== undefined) {
+        return [];
+      }
+      return [
+        {
+          at: { group: 0, occurrence: 1, key },
+          parts: null,
+          label: option.label ?? key,
+          entityType: option.entityType,
+        },
+      ];
+    });
+    const rest = chips.filter(
+      (chip) =>
+        !pinnedKeys.has(chip.at.key) &&
+        !(
+          covered.has(chip.at.key) &&
+          chip.at.occurrence === 1 &&
+          !(editor !== null && sameAt(editor.at, chip.at))
+        )
+    );
+    return [...fieldItems, ...rest];
+  }, [chips, shownPins, pinnedFilters, options, permanentFilters, editor]);
+
   // The open editor's row the list does not hold (it emptied): a chip of
   // its own after the field's last, else where the field sits in the panel
   const items = useMemo(() => {
-    if (editor === null || chips.some((chip) => sameAt(chip.at, editor.at))) {
-      return chips;
+    if (editor === null || drawn.some((chip) => sameAt(chip.at, editor.at))) {
+      return drawn;
     }
     const option = options.find((each) => each.key === editor.at.key);
     const adding: ChipItem = {
@@ -119,26 +210,40 @@ const FilterBar = ({
     const placeOf = (key: string) =>
       PANEL_FIELDS[kind].findIndex((row) => row.key === key);
     let at = -1;
-    chips.forEach((chip, index) => {
+    drawn.forEach((chip, index) => {
       if (chip.at.key === editor.at.key) at = index + 1;
     });
     if (at < 0) {
-      at = chips.findIndex(
+      at = drawn.findIndex(
         (chip) => placeOf(chip.at.key) > placeOf(editor.at.key)
       );
     }
-    if (at < 0) at = chips.length;
-    return [...chips.slice(0, at), adding, ...chips.slice(at)];
-  }, [chips, editor, options, kind]);
+    if (at < 0) at = drawn.length;
+    return [...drawn.slice(0, at), adding, ...drawn.slice(at)];
+  }, [drawn, editor, options, kind]);
 
   /**
    * Focus leaves a chip that goes: to the next chip's remove button, else
    * the previous one's, else out of the bar. A removed row's next row of
    * the same field takes its number, and with it this chip, whose button
-   * then keeps focus.
+   * then keeps focus. A pinned field's last row leaves its empty chip in
+   * the same place (the same element), whose body takes focus.
    */
   const focusNeighbour = useCallback(
     (at: RowKey, removed: boolean) => {
+      if (
+        removed &&
+        at.group === 0 &&
+        shownPins.fields.includes(at.key) &&
+        items.filter((item) => item.at.key === at.key).length === 1
+      ) {
+        barRef.current
+          ?.querySelector<HTMLElement>(
+            `[data-chip-row="${keyOf(at)}"] [data-chip-edit]`
+          )
+          ?.focus();
+        return;
+      }
       const index = items.findIndex((item) => sameAt(item.at, at));
       const next = index < 0 ? undefined : items[index + 1];
       const target =
@@ -160,7 +265,7 @@ const FilterBar = ({
       if (button) button.focus();
       else addRef.current?.focus();
     },
-    [items]
+    [items, shownPins]
   );
 
   const removeChip = (at: RowKey) => {
@@ -200,7 +305,7 @@ const FilterBar = ({
         (anchor?.closest("[data-chip]")?.contains(active) ?? false);
       // The editor's own word: the list may still draw the URL before its
       // last commit
-      const stays = held || chips.some((chip) => sameAt(chip.at, editor.at));
+      const stays = held || drawn.some((chip) => sameAt(chip.at, editor.at));
       if (hadFocus && !stays && reason !== "removed" && editor.fromMenu) {
         addRef.current?.focus();
       } else if (reason === "removed" || (hadFocus && !stays)) {
@@ -211,7 +316,7 @@ const FilterBar = ({
       }
       setEditor(null);
     },
-    [editor, chips, focusNeighbour]
+    [editor, drawn, focusNeighbour]
   );
 
   const toggle = (at: RowKey) => {
@@ -226,7 +331,7 @@ const FilterBar = ({
   // chip's for a new row of the field
   const pick = (option: FilterOption) => {
     if (editor !== null) closeRef.current?.();
-    const chip = chips.find((each) => each.at.key === option.key);
+    const chip = drawn.find((each) => each.at.key === option.key);
     const at = chip?.at ?? {
       group: 0,
       occurrence:
@@ -240,6 +345,38 @@ const FilterBar = ({
     if (editor !== null) setEditor(null);
     filters.clear();
     addRef.current?.focus();
+  };
+
+  // One tap: on sets its key's first root row, off removes it
+  const togglePin = (pin: PinnedFilter) => {
+    if (editor !== null) closeRef.current?.();
+    filters.commit(togglePinnedFilter(kind, filters.filters, pin));
+  };
+
+  const toggleFieldPin = (key: string) =>
+    save(
+      pins.fields.includes(key)
+        ? unpinField(pins, key)
+        : pinField(kind, pins, key)
+    );
+
+  const pinningOf = (key: string): ChipPinning | undefined => {
+    if (!isPinnable(kind, key)) return undefined;
+    return {
+      fieldPinned: pins.fields.includes(key),
+      capped,
+      isFilterPinned: (state) =>
+        pinnedFilterOf(kind, pins, state, key) !== undefined,
+      toggleField: () => toggleFieldPin(key),
+      toggleFilter: (state) => {
+        const pinned = pinnedFilterOf(kind, pins, state, key);
+        save(
+          pinned === undefined
+            ? pinFilter(kind, pins, state, key)
+            : unpinFilter(pins, pinned.id)
+        );
+      },
+    };
   };
 
   const moveEditor = useCallback((at: RowKey) => {
@@ -280,6 +417,19 @@ const FilterBar = ({
           <span>{label}</span>
         </div>
       ))}
+      {pinnedFilters.map(({ pin, on }) => (
+        <PinnedFilterToggle
+          key={pin.id}
+          kind={kind}
+          pin={pin}
+          on={on}
+          entityType={
+            options.find((option) => option.key === pin.key)?.entityType
+          }
+          onToggle={() => togglePin(pin)}
+          onUnpin={() => save(unpinFilter(pins, pin.id))}
+        />
+      ))}
       {items.map((item) => {
         const open = editor !== null && sameAt(editor.at, item.at);
         const key = keyOf(item.at);
@@ -305,6 +455,7 @@ const FilterBar = ({
             {open && (
               <ChipEditor
                 filters={filters}
+                pinning={pinningOf(item.at.key)}
                 rowKey={item.at}
                 anchorRef={anchorRef}
                 closeRef={closeRef}
@@ -315,7 +466,14 @@ const FilterBar = ({
           </FilterChip>
         );
       })}
-      <AddFilterMenu filters={filters} onPick={pick} triggerRef={addRef} />
+      <AddFilterMenu
+        filters={filters}
+        pinnedFields={shownPins.fields}
+        pinCapped={capped}
+        onTogglePin={toggleFieldPin}
+        onPick={pick}
+        triggerRef={addRef}
+      />
       {hasFilters && (
         <Button variant="tertiary" size="sm" onClick={clearAll}>
           Clear all

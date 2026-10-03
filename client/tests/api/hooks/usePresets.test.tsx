@@ -2,6 +2,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { ListControls } from "@tests/helpers/ListControls";
+import { pinsAnswer } from "@tests/helpers/filterPins";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type ApiMock = (...args: unknown[]) => Promise<unknown>;
@@ -61,6 +62,7 @@ describe("presets share one query", () => {
       if (url === "/user/default-presets") {
         return Promise.resolve({ defaults: {} });
       }
+      if (url === "/user/filter-pins") return Promise.resolve(pinsAnswer());
       return Promise.resolve({});
     });
   });

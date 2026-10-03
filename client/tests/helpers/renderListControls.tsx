@@ -2,7 +2,8 @@
  * A list's controls as a page holds them (`ListControls`), at a URL, with
  * the presets seeded in the query cache: what the page is asked for, the
  * URL and each navigation's history action. The filter-bar tests drive the
- * chips and their editors through it; the calling file mocks `@/api`.
+ * chips and their editors through it; the calling file mocks `@/api`. The
+ * user's pins are seeded too: none unless `pins` names a list's.
  */
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import type { FilterPreset } from "@peek/shared-types";
@@ -12,12 +13,14 @@ import {
   ListControls,
   type ListControlsProps,
 } from "@tests/helpers/ListControls";
+import { type PinsByList, pinsAnswer } from "@tests/helpers/filterPins";
 import { must } from "@tests/testUtils";
 import { expect, vi } from "vitest";
 import {
   defaultPresetsQueryOptions,
   presetsQueryOptions,
 } from "@/api/hooks/usePresets";
+import { queryKeys } from "@/api/queryKeys";
 
 type OnQueryChange = (query: Record<string, unknown>) => void;
 
@@ -25,17 +28,25 @@ export interface RenderListOptions {
   url?: string;
   presets?: Record<string, FilterPreset[]>;
   defaults?: Record<string, string>;
+  /** The user's pins per list; a list not named has none */
+  pins?: PinsByList;
 }
 
 export function renderListControls(
   props: Partial<ListControlsProps> = {},
-  { url = "/scenes", presets = {}, defaults = {} }: RenderListOptions = {}
+  {
+    url = "/scenes",
+    presets = {},
+    defaults = {},
+    pins = {},
+  }: RenderListOptions = {}
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   queryClient.setQueryData(presetsQueryOptions.queryKey, { presets });
   queryClient.setQueryData(defaultPresetsQueryOptions.queryKey, { defaults });
+  queryClient.setQueryData(queryKeys.user.filterPins(), pinsAnswer(pins));
   const onQueryChange = vi.fn<OnQueryChange>();
   const router = createMemoryRouter(
     [

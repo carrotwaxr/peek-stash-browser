@@ -27,6 +27,7 @@ import {
   type ListControlsProps,
 } from "@tests/helpers/ListControls";
 import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
+import { pinsAnswer } from "@tests/helpers/filterPins";
 import { sentFilter } from "@tests/helpers/sentFilter";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
 import { must } from "@tests/testUtils";
@@ -36,6 +37,7 @@ import {
   defaultPresetsQueryOptions,
   presetsQueryOptions,
 } from "../../../src/api/hooks/usePresets";
+import { queryKeys } from "../../../src/api/queryKeys";
 import type { ListView } from "../../../src/hooks/useListUrlState";
 import {
   WALL_VIEW_SETTINGS,
@@ -156,6 +158,7 @@ function renderSearchControls(
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  queryClient.setQueryData(queryKeys.user.filterPins(), pinsAnswer());
   if (presets !== "pending") {
     queryClient.setQueryData(presetsQueryOptions.queryKey, {
       presets: presets.presets,
@@ -1303,7 +1306,9 @@ describe("SearchControls", () => {
         Promise.resolve(
           path === "/user/settings"
             ? userSettingsResponse({ wallPlayback: "static" })
-            : { presets: {}, defaults: {} }
+            : path === "/user/filter-pins"
+              ? pinsAnswer()
+              : { presets: {}, defaults: {} }
         )
       );
       render(

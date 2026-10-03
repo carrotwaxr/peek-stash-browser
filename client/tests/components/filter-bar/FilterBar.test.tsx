@@ -7,7 +7,12 @@
  * key, one history entry per open popover. The remove button clears the
  * row. The page's permanent filters show as dimmed labels.
  */
-import type { ListKind, RowKey } from "@peek/shared-types";
+import {
+  type ListKind,
+  type PinnedFilter,
+  type RowKey,
+  defaultPinsOf,
+} from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -18,11 +23,13 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { type PinsByList, pinsAnswer } from "@tests/helpers/filterPins";
 import { renderListControls } from "@tests/helpers/renderListControls";
 import { sentFilter } from "@tests/helpers/sentFilter";
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/api/queryKeys";
 import FilterBar from "@/components/filter-bar/FilterBar";
 import type { ListFilters } from "@/hooks/useListFilters";
 import {
@@ -144,17 +151,20 @@ function renderBar(
     options,
     permanentFilters,
     permanentFiltersMetadata,
+    pins = {},
   }: {
     kind?: ListKind;
     options?: readonly FilterOption[];
     permanentFilters?: Record<string, unknown>;
     permanentFiltersMetadata?: Record<string, unknown>;
+    pins?: PinsByList;
   } = {}
 ) {
   const { filters, removeRow } = staticFilters(kind, state, options);
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  client.setQueryData(queryKeys.user.filterPins(), pinsAnswer(pins));
   render(
     <QueryClientProvider client={client}>
       <FilterBar
@@ -546,8 +556,10 @@ describe("chips and rows", () => {
   });
 
   it("no filters and no permanent ones draw only + Filter", () => {
+    const client = new QueryClient();
+    client.setQueryData(queryKeys.user.filterPins(), pinsAnswer());
     render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={client}>
         <FilterBar filters={staticFilters("scene", {}).filters} />
       </QueryClientProvider>
     );
@@ -815,5 +827,105 @@ describe("in the list's controls", () => {
     const chip = screen.getByText("Performer: Ada");
     expect(chip.closest("button")).toBeNull();
     expect(must(chip.parentElement).style.opacity).toBe("0.7");
+  });
+});
+
+describe("pins", () => {
+  const UNWATCHED: PinnedFilter = {
+    id: "default-unwatched",
+    key: "watched",
+    state: { watched: "false" },
+    label: "Unwatched",
+  };
+  const BLONDE: PinnedFilter = {
+    id: "0123456789abcdef0123456789abcdef",
+    key: "tagIds",
+    state: { tagIds: ["1:a"], tagIdsModifier: "INCLUDES" },
+  };
+  const toggle = (name: string) => screen.findByRole("button", { name });
+  const dialog = () => screen.getByRole("dialog");
+
+  it("pinned filters lead the bar as toggle buttons with `aria-pressed`, labelled by their label or chip text", async () => {
+    renderBar(
+      { watched: "false", organized: "true" },
+      { pins: { scene: { fields: [], filters: [UNWATCHED, BLONDE] } } }
+    );
+
+    const unwatched = await toggle("Unwatched");
+    const blonde = await toggle("Tags: any of Blonde");
+    expect(unwatched).toHaveAttribute("aria-pressed", "true");
+    expect(blonde).toHaveAttribute("aria-pressed", "false");
+    // The row the pressed toggle stands for draws no chip of its own
+    expect(
+      screen.queryByRole("button", { name: /^Edit filter: Watched/ })
+    ).not.toBeInTheDocument();
+    const organized = await edit("Organized: Yes");
+    const before = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(before(unwatched, blonde)).toBe(true);
+    expect(before(blonde, organized)).toBe(true);
+  });
+
+  it("a pinned field is an empty chip `Tags` that opens its editor; once set it shows its value in the same place, with no second chip", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls(
+      {},
+      {
+        url: "/scenes?organized=true",
+        pins: { scene: { fields: ["tagIds"], filters: [] } },
+      }
+    );
+    await list.firstQuery();
+    const chipNames = () =>
+      screen
+        .getAllByRole("button", { name: /^Edit filter:/ })
+        .map((chip) => chip.getAttribute("aria-label"));
+
+    expect(chipNames()).toEqual([
+      "Edit filter: Tags",
+      "Edit filter: Organized: Yes",
+    ]);
+    expect(
+      screen.queryByRole("button", { name: /^Remove filter: Tags/ })
+    ).not.toBeInTheDocument();
+
+    await user.click(await edit("Tags"));
+    await user.click(
+      await within(dialog()).findByRole("button", { name: /^Blonde/ })
+    );
+    await waitFor(() => expect(list.params().get("tagIds")).toBe("1:a"));
+    await user.keyboard("{Escape}");
+
+    await waitFor(() =>
+      expect(must(chipNames()[0])).toMatch(/^Edit filter: Tags: .*Blonde$/)
+    );
+    expect(chipNames()).toHaveLength(2);
+    expect(chipNames()[1]).toBe("Edit filter: Organized: Yes");
+  });
+
+  it("one tap on a pinned filter applies at once with one history entry", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls(
+      {},
+      { pins: { scene: defaultPinsOf("scene") } }
+    );
+    await list.firstQuery();
+
+    const unwatched = await toggle("Unwatched");
+    expect(unwatched).toHaveAttribute("aria-pressed", "false");
+    await user.click(unwatched);
+
+    await waitFor(() => expect(list.params().get("watched")).toBe("false"));
+    expect(list.actions).toEqual(["PUSH"]);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Unwatched" })).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      )
+    );
+
+    await user.click(screen.getByRole("button", { name: "Unwatched" }));
+    await waitFor(() => expect(list.params().has("watched")).toBe(false));
+    expect(list.actions).toEqual(["PUSH", "PUSH"]);
   });
 });
