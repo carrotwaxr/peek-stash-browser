@@ -19,6 +19,8 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import type { SceneVr } from "@peek/shared-types";
 import { useAuth } from "../../../hooks/useAuth";
 import { useTVMode } from "../../../hooks/useTVMode";
+import { canDecode } from "../../../utils/browserPlayback";
+import type { DecodableFile } from "../playerSources";
 import {
   type FavoriteScene,
   type SetSceneFavoriteAction,
@@ -33,6 +35,7 @@ type VrUi = typeof VrUiModule;
 /** The part of the scene this hook reads. */
 export interface VrModeScene extends FavoriteScene {
   vr?: SceneVr | null;
+  files?: DecodableFile[] | null;
 }
 
 /** Where a user's pick for one scene on one instance is kept. */
@@ -68,8 +71,11 @@ export function useVrMode({
   const showButton = detected !== null && !isTVMode;
   const storageKey =
     userId !== undefined && sceneKey ? choiceKey(userId, sceneKey) : null;
+  // Whether the browser decodes the file (null without one): in Safari, VR
+  // moves to Direct only then
+  const decodes = canDecode(scene?.files?.[0] ?? {});
   const inputs: VrModeInputs | null = detected
-    ? { detected, storageKey }
+    ? { detected, storageKey, decodes }
     : null;
 
   const { favorite, toggleFavorite } = useSceneFavorite(scene, dispatch);
@@ -87,6 +93,9 @@ export function useVrMode({
   useEffect(() => {
     latest.current = inputs;
     handlers.current = { nextScene, prevScene, queueLength, toggleFavorite };
+    // Another VR scene: its projection (or the user's pick for it), kept in
+    // VR, and its file; the same inputs again change nothing
+    if (inputs) mode.current?.update(inputs);
   });
 
   // The HUD's buttons: one object for the player's life, calling the latest
@@ -135,11 +144,6 @@ export function useVrMode({
       attached.detach();
     };
   }, [ui, showButton, playerRef, hud]);
-
-  // Another VR scene: its projection (or the user's pick for it), kept in VR
-  useEffect(() => {
-    if (detected) mode.current?.update({ detected, storageKey });
-  }, [detected, storageKey]);
 
   // What the HUD shows: the scene's favourite, after each change and on the
   // VR UI's arrival

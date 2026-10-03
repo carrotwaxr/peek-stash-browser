@@ -14,16 +14,31 @@
  * In a headset the fork's HUD steps the queue and toggles the viewer's
  * favourite through the handlers `useVrMode` gives here, and shows the
  * favourite it is told.
+ *
+ * In Safari, turning VR on while native HLS plays moves to the Direct source
+ * (`preferDirect`).
  */
 import { VR_PROJECTIONS, type VrProjection } from "@peek/shared-types";
+import videojs from "video.js";
 import {
   type BarControl,
   type ControlBarPlayer,
   addOrderedControl,
 } from "../controlBarOrder";
+import type { PlayerSource } from "../playerSources";
 import { VR_BUTTON_NAME, VrMenuButton } from "./VrControls";
 import { loadVr, prefetchVr } from "./loadVr";
 import type { PeekVr, VrHud } from "./vrPlugin";
+
+/** The parts of the source selector plugin VR mode reads. */
+interface SourceSelector {
+  /** The source menu: one item per player source, in the player's order */
+  menu: {
+    items: Array<{ source: PlayerSource; hasClass(name: string): boolean }>;
+  };
+  /** The user's pick: loads at the current time, playing on if it was */
+  fallback: { select(source: PlayerSource): void };
+}
 
 /** The part of the player VR mode uses (video.js types it `any`). */
 export interface VrModePlayer {
@@ -31,6 +46,9 @@ export interface VrModePlayer {
     removeChild(child: unknown): void;
   };
   isDisposed(): boolean;
+  currentSrc(): string;
+  /** The `sourceSelector` plugin, absent on a player without it */
+  sourceSelector?: () => SourceSelector;
   /** Registered by `vrPlugin`, so present only after `loadVr()`. */
   peekVr?: () => PeekVr;
 }
@@ -41,10 +59,16 @@ export interface VrModeInputs {
   detected: VrProjection;
   /** Where the user's pick for this scene is kept; null with no user */
   storageKey: string | null;
+  /** `canDecode` on the scene's file: true, false, or null (cannot tell) */
+  decodes: boolean | null;
 }
 
 export interface VrMode {
-  /** Another scene, or another user key: its projection, kept in VR. */
+  /**
+   * The page's inputs, given after each render: another scene or user key
+   * applies its projection, kept in VR; the file's decode check is kept for
+   * the next time VR turns on.
+   */
   update(inputs: VrModeInputs): void;
   /** The viewer's favourite on the scene, for the HUD to show. */
   setFavorite(favorite: boolean): void;
@@ -75,6 +99,32 @@ function writeChoice(key: string | null, projection: VrProjection) {
   } catch {
     // Storage is blocked: the pick lasts until the page closes
   }
+}
+
+/** The path of a source address, absolute (signed) or not (session). */
+const pathOf = (src: string) => new URL(src, window.location.href).pathname;
+
+/**
+ * Safari plays HLS natively, and a native HLS video drawn into WebGL can
+ * show black frames (Vision Pro), so entering VR there moves from HLS to the
+ * Direct source, the file itself, at the same time, when `canDecode` says
+ * the browser decodes the file. Direct is whatever entry the player was
+ * given: C6's signed one from the media link, or the session path when the
+ * link failed; nothing is built here. A Direct that has already failed is
+ * not tried again. Leaving VR keeps Direct. Same rule as `isDirectSource`
+ * (which lives in the Scene chunk), without MKV, which Safari does not play.
+ */
+function preferDirect(player: VrModePlayer, decodes: boolean | null) {
+  if (!videojs.browser.IS_SAFARI || decodes !== true) return;
+  if (!pathOf(player.currentSrc()).endsWith("/stream.m3u8")) return;
+  const selector = player.sourceSelector?.();
+  const direct = selector?.menu.items.find(({ source }) =>
+    pathOf(source.src).endsWith("/proxy-stream/stream")
+  );
+  if (!selector || !direct || direct.hasClass("vjs-source-menu-item-error")) {
+    return;
+  }
+  selector.fallback.select(direct.source);
 }
 
 /** Fetches the VR chunk ahead where a headset can run. */
@@ -135,6 +185,7 @@ export function attachVrMode(
       vr.setFavorite(favorite);
       vr.enable(view.projection);
       view.enabled = true;
+      preferDirect(player, inputs.decodes);
     } catch (error) {
       // Stays flat; the next click tries again
       console.error("[VR] could not start", error);
@@ -164,13 +215,11 @@ export function attachVrMode(
 
   return {
     update(next) {
-      if (
+      const same =
         next.detected === inputs.detected &&
-        next.storageKey === inputs.storageKey
-      ) {
-        return;
-      }
+        next.storageKey === inputs.storageKey;
       inputs = next;
+      if (same) return;
       view.projection = readChoice(next.storageKey) ?? next.detected;
       if (view.enabled) player.peekVr?.().setProjection(view.projection);
       refresh();

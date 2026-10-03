@@ -14,6 +14,10 @@ import { untrusted } from "@tests/helpers/untrusted";
 import { createAuthValue, must } from "@tests/testUtils";
 import videojs from "video.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  type PlayerSource,
+  buildPlayerSources,
+} from "@/components/video-player/playerSources";
 import type { VrMenuButton } from "@/components/video-player/vr/VrControls";
 import { loadVr, prefetchVr } from "@/components/video-player/vr/loadVr";
 import { useVrMode } from "@/components/video-player/vr/useVrMode";
@@ -26,6 +30,7 @@ import {
   initialState,
   scenePlayerReducer,
 } from "@/contexts/scenePlayerReducer";
+import type * as browserPlayback from "@/utils/browserPlayback";
 
 vi.mock("@/components/video-player/vr/loadVr", () => ({
   loadVr: vi.fn(() => Promise.resolve()),
@@ -36,6 +41,18 @@ vi.mock("@/components/video-player/vr/loadVr", () => ({
 vi.mock("@/components/video-player/vr/vrUi", async (importOriginal) => {
   const real = await importOriginal<typeof vrUi>();
   return { ...real, attachVrMode: vi.fn(real.attachVrMode) };
+});
+
+// The file's decode check: H.264 decodes, HEVC does not, anything else
+// cannot be told
+vi.mock("@/utils/browserPlayback", async (importOriginal) => {
+  const real = await importOriginal<typeof browserPlayback>();
+  return {
+    ...real,
+    canDecode: vi.fn(({ video_codec }: { video_codec?: string | null }) =>
+      video_codec === "h264" ? true : video_codec === "hevc" ? false : null
+    ),
+  };
 });
 
 // The favourite write (useUpdateFavorite), answered by each test
@@ -109,6 +126,7 @@ interface TestScene {
   instanceId: string;
   favorite?: boolean;
   vr?: SceneVr | null;
+  files?: Array<{ video_codec: string; audio_codec: string }>;
 }
 
 interface HookProps {
@@ -634,5 +652,208 @@ describe("useVrMode: the headset HUD", () => {
     expect(player.vr.enable).toHaveBeenCalledTimes(1);
     expect(player.vr.setProjection).toHaveBeenLastCalledWith("360");
     expect(player.vr.setFavorite).toHaveBeenLastCalledWith(true);
+  });
+});
+
+describe("useVrMode: the source VR plays on Safari", () => {
+  const realBrowser = videojs.browser;
+  const setSafari = (safari: boolean) => {
+    videojs.browser = { ...realBrowser, IS_SAFARI: safari };
+  };
+
+  beforeEach(() => {
+    setSafari(true);
+  });
+
+  afterEach(() => {
+    videojs.browser = realBrowser;
+  });
+
+  const base = "/api/scene/123/proxy-stream";
+  const sessionStreams = [
+    {
+      url: `${base}/stream?instanceId=inst-a`,
+      mime_type: "video/mp4",
+      label: "Direct stream",
+    },
+    {
+      url: `${base}/stream.mp4?instanceId=inst-a`,
+      mime_type: "video/mp4",
+      label: "MP4",
+    },
+    {
+      url: `${base}/stream.m3u8?instanceId=inst-a`,
+      mime_type: "application/vnd.apple.mpegurl",
+      label: "HLS",
+    },
+  ];
+  // C6's media link: Direct and HLS, signed
+  const signedStreams = [
+    {
+      url: `${base}/stream?instanceId=inst-a&uid=7&exp=9&scope=media&sig=d`,
+      label: "Direct stream",
+    },
+    {
+      url: `${base}/stream.m3u8?instanceId=inst-a&uid=7&exp=9&scope=media&sig=h`,
+      label: "HLS",
+    },
+  ];
+
+  /** The player's sources, as useVideoPlayer builds them */
+  const sourcesFor = (
+    decodes: boolean,
+    signed?: Array<{ url: string; label: string }>
+  ) =>
+    buildPlayerSources(
+      { id: "123", instanceId: "inst-a", sceneStreams: sessionStreams },
+      () => decodes,
+      signed
+    );
+
+  const labelled = (sources: PlayerSource[], label: string) =>
+    must(
+      sources.find((s) => s.label === label),
+      label
+    );
+
+  /**
+   * The player's source selector as VR reaches it: the menu's sources, and
+   * `select`, the user's pick, which loads at the current time and plays on
+   * (sourceSelector.test). `playing` is the source loaded now.
+   */
+  function giveSources(
+    player: Player,
+    sources: PlayerSource[],
+    playing: PlayerSource,
+    errored: PlayerSource[] = []
+  ) {
+    let current = playing.src;
+    const select = vi.fn((source: PlayerSource) => {
+      current = source.src;
+    });
+    Object.assign(player, {
+      currentSrc: () => current,
+      sourceSelector: () => ({
+        menu: {
+          items: sources.map((source) => ({
+            source,
+            hasClass: (name: string) =>
+              name === "vjs-source-menu-item-error" && errored.includes(source),
+          })),
+        },
+        fallback: { select },
+      }),
+    });
+    return select;
+  }
+
+  const sceneWith = (videoCodec: string, id = "123") => ({
+    ...vrScene("180_LR", id),
+    files: [{ video_codec: videoCodec, audio_codec: "aac" }],
+  });
+
+  it("entering VR while HLS plays moves to the Direct source", async () => {
+    const { player } = await setup(sceneWith("h264"));
+    const sources = sourcesFor(true);
+    const select = giveSources(player, sources, labelled(sources, "HLS"));
+
+    await click(toggleOf(player));
+
+    expect(player.vr.enable).toHaveBeenCalledTimes(1);
+    expect(select).toHaveBeenCalledTimes(1);
+    expect(select).toHaveBeenCalledWith(labelled(sources, "Direct stream"));
+  });
+
+  it("with C6's signed sources, the Direct source it moves to is the signed one", async () => {
+    const { player } = await setup(sceneWith("h264"));
+    const sources = sourcesFor(true, signedStreams);
+    const select = giveSources(player, sources, labelled(sources, "HLS"));
+
+    await click(toggleOf(player));
+
+    const [chosen] = must(select.mock.calls[0], "the source chosen");
+    const url = new URL(chosen.src);
+    expect(url.pathname).toBe(`${base}/stream`);
+    expect(url.searchParams.get("sig")).toBe("d");
+    expect(url.searchParams.get("scope")).toBe("media");
+  });
+
+  it("outside Safari the source is unchanged", async () => {
+    setSafari(false);
+    const { player } = await setup(sceneWith("h264"));
+    const sources = sourcesFor(true);
+    const select = giveSources(player, sources, labelled(sources, "HLS"));
+
+    await click(toggleOf(player));
+
+    expect(player.vr.enable).toHaveBeenCalledTimes(1);
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("leaving VR does not move back", async () => {
+    const { player } = await setup(sceneWith("h264"));
+    const sources = sourcesFor(true);
+    const select = giveSources(player, sources, labelled(sources, "HLS"));
+
+    await click(toggleOf(player));
+    await click(toggleOf(player));
+
+    expect(player.vr.disable).toHaveBeenCalledTimes(1);
+    expect(select).toHaveBeenCalledTimes(1);
+    expect(select).toHaveBeenLastCalledWith(labelled(sources, "Direct stream"));
+  });
+
+  it("a file canDecode refuses stays on HLS", async () => {
+    const { player } = await setup(sceneWith("hevc"));
+    const sources = sourcesFor(false);
+    const select = giveSources(player, sources, labelled(sources, "HLS"));
+
+    await click(toggleOf(player));
+
+    expect(player.vr.enable).toHaveBeenCalledTimes(1);
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("a file canDecode cannot tell about stays on HLS", async () => {
+    const { player } = await setup(sceneWith("vp9"));
+    const sources = sourcesFor(true);
+    const select = giveSources(player, sources, labelled(sources, "HLS"));
+
+    await click(toggleOf(player));
+
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("a Direct source that has already failed is not tried again", async () => {
+    const { player } = await setup(sceneWith("h264"));
+    const sources = sourcesFor(true);
+    const select = giveSources(player, sources, labelled(sources, "HLS"), [
+      labelled(sources, "Direct stream"),
+    ]);
+
+    await click(toggleOf(player));
+
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("while a source other than HLS plays, it stays", async () => {
+    const { player } = await setup(sceneWith("h264"));
+    const sources = sourcesFor(true);
+    const select = giveSources(player, sources, labelled(sources, "MP4"));
+
+    await click(toggleOf(player));
+
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("checks the file of the scene showing, after a scene change", async () => {
+    const { player, rerender } = await setup(sceneWith("hevc", "123"));
+    rerender({ scene: sceneWith("h264", "125") });
+    const sources = sourcesFor(true);
+    const select = giveSources(player, sources, labelled(sources, "HLS"));
+
+    await click(toggleOf(player));
+
+    expect(select).toHaveBeenCalledWith(labelled(sources, "Direct stream"));
   });
 });
