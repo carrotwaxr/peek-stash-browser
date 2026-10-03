@@ -1,9 +1,23 @@
 import videojs from "video.js";
 
+/** A control bar button, as this plugin shows and hides it */
+interface Shown {
+  show(): void;
+  hide(): void;
+}
+
+/**
+ * The playlist's Previous and Next buttons. Each shows only while the queue
+ * gives it a handler. Hidden, a button carries video.js's `vjs-hidden`, so
+ * the control bar's container queries (VideoPlayer.css) count only the
+ * buttons that show.
+ */
 class SkipButtonPlugin extends videojs.getPlugin("plugin") {
   onNext: (() => void) | undefined;
   onPrevious: (() => void) | undefined;
   declare player: any;
+  private nextButton: Shown | undefined;
+  private previousButton: Shown | undefined;
 
   constructor(player: any) {
     super(player);
@@ -20,12 +34,24 @@ class SkipButtonPlugin extends videojs.getPlugin("plugin") {
     this.onNext = handler;
     if (handler !== undefined) this.player.addClass("vjs-skip-buttons-next");
     else this.player.removeClass("vjs-skip-buttons-next");
+    this.showButtons();
   }
 
   setBackwardHandler(handler: (() => void) | undefined) {
     this.onPrevious = handler;
     if (handler !== undefined) this.player.addClass("vjs-skip-buttons-prev");
     else this.player.removeClass("vjs-skip-buttons-prev");
+    this.showButtons();
+  }
+
+  /** Each button shows while it has a handler (before ready, none exist) */
+  private showButtons() {
+    const toggle = (button: Shown | undefined, shown: boolean) => {
+      if (shown) button?.show();
+      else button?.hide();
+    };
+    toggle(this.nextButton, this.onNext !== undefined);
+    toggle(this.previousButton, this.onPrevious !== undefined);
   }
 
   handleForward() {
@@ -39,23 +65,24 @@ class SkipButtonPlugin extends videojs.getPlugin("plugin") {
   ready() {
     this.player.addClass("vjs-skip-buttons");
 
-    this.player.controlBar.addChild(
+    this.nextButton = this.player.controlBar.addChild(
       "skipButton",
       {
         direction: "forward",
         parent: this,
       },
       1
-    );
+    ) as Shown;
 
-    this.player.controlBar.addChild(
+    this.previousButton = this.player.controlBar.addChild(
       "skipButton",
       {
         direction: "back",
         parent: this,
       },
       0
-    );
+    ) as Shown;
+    this.showButtons();
   }
 }
 

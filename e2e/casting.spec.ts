@@ -374,6 +374,64 @@ test.describe("Casting", () => {
     expect(display.every((value) => value === "none")).toBe(true);
   });
 
+  /**
+   * Every control the bar shows lies inside the player's box, the fullscreen
+   * toggle shows, and the `kept` buttons stay
+   */
+  async function expectBarInsidePlayer(page: Page, kept: string[]) {
+    // The bar shows while the pointer is over the player
+    await page.locator(".video-js").first().hover();
+
+    const bounds = requireData(
+      await page.locator(".video-js").first().boundingBox(),
+      "the player's box"
+    );
+    const controls = await page
+      .locator(".video-js .vjs-control-bar > *")
+      .evaluateAll((children) =>
+        children
+          .filter((child) => {
+            const box = child.getBoundingClientRect();
+            // The progress bar floats above the bar and spans the player
+            return (
+              !child.classList.contains("vjs-progress-control") &&
+              box.width > 0 &&
+              box.height > 0 &&
+              getComputedStyle(child).display !== "none" &&
+              getComputedStyle(child).visibility !== "hidden"
+            );
+          })
+          .map((child) => {
+            const box = child.getBoundingClientRect();
+            return {
+              name: child.className.split(" ").slice(0, 2).join(" "),
+              left: box.left,
+              right: box.right,
+            };
+          })
+      );
+    expect(controls.length).toBeGreaterThan(0);
+    const outside = controls.filter(
+      (control) =>
+        control.left < bounds.x - 0.5 ||
+        control.right > bounds.x + bounds.width + 0.5
+    );
+    expect(outside, `controls outside the player's box`).toEqual([]);
+
+    const fullscreen = page.locator(".vjs-fullscreen-control");
+    await expect(fullscreen).toBeVisible();
+    const toggle = requireData(
+      await fullscreen.boundingBox(),
+      "the fullscreen toggle's box"
+    );
+    expect(toggle.x + toggle.width).toBeLessThanOrEqual(
+      bounds.x + bounds.width + 0.5
+    );
+    for (const selector of kept) {
+      await expect(page.locator(selector).first()).toBeVisible();
+    }
+  }
+
   // The Scene page's player is 552 px wide at 1280 px (the Recommended
   // sidebar has the rest), so the bar answers the player's width, not the
   // viewport's
@@ -388,63 +446,49 @@ test.describe("Casting", () => {
     }) => {
       const { context, page } = await castingPage(browser, baseURL, admin);
       await openVrScene(context, page, viewport);
-      // The bar shows while the pointer is over the player
-      await page.locator(".video-js").first().hover();
 
-      const bounds = requireData(
-        await page.locator(".video-js").first().boundingBox(),
-        "the player's box"
-      );
-      const controls = await page
-        .locator(".video-js .vjs-control-bar > *")
-        .evaluateAll((children) =>
-          children
-            .filter((child) => {
-              const box = child.getBoundingClientRect();
-              // The progress bar floats above the bar and spans the player
-              return (
-                !child.classList.contains("vjs-progress-control") &&
-                box.width > 0 &&
-                box.height > 0 &&
-                getComputedStyle(child).display !== "none" &&
-                getComputedStyle(child).visibility !== "hidden"
-              );
-            })
-            .map((child) => {
-              const box = child.getBoundingClientRect();
-              return {
-                name: child.className.split(" ").slice(0, 2).join(" "),
-                left: box.left,
-                right: box.right,
-              };
-            })
-        );
-      expect(controls.length).toBeGreaterThan(0);
-      const outside = controls.filter(
-        (control) =>
-          control.left < bounds.x - 0.5 ||
-          control.right > bounds.x + bounds.width + 0.5
-      );
-      expect(outside, `controls outside the player's box`).toEqual([]);
-
-      const fullscreen = page.locator(".vjs-fullscreen-control");
-      await expect(fullscreen).toBeVisible();
-      const toggle = requireData(
-        await fullscreen.boundingBox(),
-        "the fullscreen toggle's box"
-      );
-      expect(toggle.x + toggle.width).toBeLessThanOrEqual(
-        bounds.x + bounds.width + 0.5
-      );
       // The buttons that matter stay
-      for (const kept of [
+      await expectBarInsidePlayer(page, [
         ".vjs-play-control",
         ".vjs-volume-panel",
         ".vjs-vr-button",
         ".vjs-cast-button",
-      ]) {
-        await expect(page.locator(kept).first()).toBeVisible();
-      }
+      ]);
     });
   }
+
+  test("at 1280 px on a queue's middle scene, with Previous, Next and Cast, every control lies inside the player", async ({
+    browser,
+    baseURL,
+    request: admin,
+  }) => {
+    const { page } = await castingPage(browser, baseURL, admin);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    // The grid's second scene, with the grid as its queue: both skip
+    // buttons show
+    const list = new ListPage(page);
+    await list.goto("/scenes");
+    await list.waitForResults("Scene");
+    requireData(
+      (await list.cards("Scene").count()) >= 3 ? true : undefined,
+      "three scenes in the grid"
+    );
+    await list.cards("Scene").nth(1).locator("a:has(.card-title)").click();
+    await expect(page).toHaveURL(/\/scene\//);
+    const skip = (icon: string) =>
+      page.locator(`.vjs-control-bar > .vjs-skip-button.${icon}`);
+    await expect(skip("vjs-icon-previous-item")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(skip("vjs-icon-next-item")).toBeVisible();
+    await expect(castButton(page)).toBeVisible({ timeout: 15_000 });
+
+    await expectBarInsidePlayer(page, [
+      ".vjs-play-control",
+      ".vjs-volume-panel",
+      ".vjs-cast-button",
+      ".vjs-skip-button.vjs-icon-previous-item",
+      ".vjs-skip-button.vjs-icon-next-item",
+    ]);
+  });
 });
