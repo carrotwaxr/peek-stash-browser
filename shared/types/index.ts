@@ -30,6 +30,10 @@ export {
   assertEntityRef,
 } from "./instanceAwareId.js";
 
+// VR projections
+export { VR_PROJECTIONS } from "./vr.js";
+export type { VrProjection, VrSource, SceneVr } from "./vr.js";
+
 // Theme keys
 export {
   BUILT_IN_THEME_KEYS,

@@ -11,6 +11,7 @@
  * - Fields present in only one path → optional
  * - Nested relations use Ref types (lightweight relation references)
  */
+import type { SceneVr } from "./vr.js";
 
 // ─── Lightweight Relation References ─────────────────────────────────────────
 //
@@ -165,6 +166,9 @@ export interface NormalizedScene {
   // Transient field: set by QueryBuilder transformRow() but not part of the GraphQL type.
   // Used internally by populateRelations to look up studios without re-parsing.
   studioId?: string | null;
+
+  // Set on the single-scene lookup only, and only for a VR scene; lists carry none.
+  vr?: SceneVr | null;
 
   // Timestamps
   created_at: string | null;
