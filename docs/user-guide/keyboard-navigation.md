@@ -71,7 +71,7 @@ In [TV Mode](#tv-mode) the arrow keys move focus to the nearest item in that dir
 - With the lightbox or a dialog open, the arrows stay inside it. In the lightbox, `←` and `→` still show the previous and next image.
 - Drop-down lists (sort, page, per page) are reached like anything else, and the arrow keys move on from them without changing their value; press `Enter` (or `Space`) to open one, then pick with the arrow keys and `Enter`.
 - On a slider, `←` and `→` change its value and `↑` or `↓` moves on.
-- An open menu keeps the arrow keys until you close it.
+- An open menu keeps the arrow keys until you close it. In the menus that open from a button, such as the view-mode menu (Grid, Wall, ...), `Enter` on the button opens the menu on the current choice, `↑` and `↓` move through the choices (`Home` and `End` jump to the first and last), `Enter` picks one and `Esc` closes the menu and puts focus back on the button.
 - When a page opens, its first card takes focus.
 
 Outside TV Mode the arrow keys scroll the page, and `Tab` moves through the page's links and buttons and the sidebar.

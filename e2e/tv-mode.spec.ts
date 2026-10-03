@@ -355,6 +355,24 @@ test.describe("TV mode", () => {
     expect(page.url()).toBe(url);
   });
 
+  test("the view-mode menu opens with OK and the D-pad picks Wall", async ({
+    page,
+  }) => {
+    const { list } = await openScenes(page, "/scenes");
+
+    await list.viewModeButton.focus();
+    await page.keyboard.press("Enter");
+    // Focus is on the current mode (Grid), inside the menu
+    await expect(page.getByRole("option", { name: "Grid view" })).toBeFocused();
+
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("option", { name: "Wall view" })).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(page).toHaveURL(/[?&]view=wall(&|$)/);
+    await expect(list.viewModeButton).toBeFocused();
+  });
+
   test("with the D-pad, open Filters, open Tags, pick a tag and apply", async ({
     page,
   }) => {
