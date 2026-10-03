@@ -1,7 +1,8 @@
 /**
  * Popover: a non-modal panel under its anchor. It closes on Escape (its own
  * key handler), on a press outside (heard in the capture phase, so it also
- * closes inside a Modal) and returns focus to the anchor.
+ * closes inside a Modal), on focus moving on to a control outside it, and
+ * returns focus to the anchor.
  */
 import { type ReactNode, useRef, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -219,6 +220,37 @@ describe("Popover", () => {
       key: "Escape",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("focus moving on to a control outside (Tab) closes it; into the anchor, or into a Modal opened over it, keeps it", () => {
+    const onClose = vi.fn();
+    render(
+      <ShortcutScopeProvider>
+        <Harness onClose={onClose}>
+          <button>Inside</button>
+        </Harness>
+        <button>After</button>
+        <div role="dialog" aria-modal="true" aria-label="Over it">
+          <button>In a Modal</button>
+        </div>
+      </ShortcutScopeProvider>
+    );
+    fireEvent.click(anchor());
+    const inside = screen.getByRole("button", { name: "Inside" });
+
+    fireEvent.blur(inside, { relatedTarget: anchor() });
+    fireEvent.blur(inside, {
+      relatedTarget: screen.getByRole("button", { name: "In a Modal" }),
+    });
+    // Focus lost to nothing (a press on the page) is the press's to judge
+    fireEvent.blur(inside, { relatedTarget: null });
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.blur(inside, {
+      relatedTarget: screen.getByRole("button", { name: "After" }),
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog", { name: "Things" })).toBeNull();
   });
 
   it("is not modal: no overlay scope, page keys still run", () => {

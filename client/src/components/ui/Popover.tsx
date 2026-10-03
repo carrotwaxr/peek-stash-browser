@@ -1,4 +1,5 @@
 import {
+  type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
@@ -42,7 +43,8 @@ const FOCUSABLE =
  * through its own `onKeyDown`, unless a child (a `SearchableSelect` closing
  * its list) handled it first. A press outside closes it, heard on the
  * document in the capture phase: a `Modal`'s backdrop stops the press
- * bubbling.
+ * bubbling. So does focus moving on to a control outside it (Tab), but for
+ * its anchor and a Modal opened over it.
  */
 const Popover = ({
   anchorRef,
@@ -131,6 +133,19 @@ const Popover = ({
     onClose();
   };
 
+  // Focus moving on to a control outside (Tab) closes it, as a press
+  // outside does. Into the anchor, or into a Modal opened over it (one it
+  // does not sit in), it stays; focus lost to nothing is a press's to judge.
+  const handleBlur = (event: FocusEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget;
+    if (!(next instanceof Element)) return;
+    if (event.currentTarget.contains(next)) return;
+    if (anchorRef.current?.contains(next)) return;
+    const modal = next.closest('[aria-modal="true"]');
+    if (modal !== null && !modal.contains(event.currentTarget)) return;
+    onClose();
+  };
+
   return (
     <div
       ref={popoverRef}
@@ -138,6 +153,7 @@ const Popover = ({
       aria-label={label}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
+      onBlur={handleBlur}
       className={`absolute z-50 rounded-lg shadow-lg focus:outline-none ${className}`}
       style={{
         top: position.top,
