@@ -777,8 +777,13 @@ export function stateOfWhere(
 
 // ── Comparing ─────────────────────────────────────────────────────────────
 
+/** A number as an editor writes it and the string the URL reads back */
+const sameScalar = (a: unknown, b: unknown): boolean =>
+  (typeof a === "number" && typeof b === "string" && String(a) === b) ||
+  (typeof b === "number" && typeof a === "string" && String(b) === a);
+
 const sameValue = (a: unknown, b: unknown): boolean => {
-  if (Object.is(a, b)) return true;
+  if (Object.is(a, b) || sameScalar(a, b)) return true;
   if (Array.isArray(a) || Array.isArray(b)) {
     return (
       Array.isArray(a) &&
@@ -827,7 +832,8 @@ function comparable(kind: ListKind, state: unknown): PanelState {
 
 /**
  * Two states filter the same: compared in canonical form (inactive rows
- * dropped, groups and repeats renumbered), each ref row's ids in any order
+ * dropped, groups and repeats renumbered), each ref row's ids in any order,
+ * a number equal to the string the URL reads back for it
  */
 export const filtersEqual = (
   kind: ListKind,

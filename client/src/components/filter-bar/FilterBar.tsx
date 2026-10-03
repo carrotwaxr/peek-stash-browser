@@ -19,6 +19,7 @@ import type { ListFilters } from "../../hooks/useListFilters";
 import {
   type ChipParts,
   type FilterOption,
+  type PanelState,
   rowChip,
 } from "../../utils/filterFields";
 import {
@@ -87,6 +88,8 @@ const NONE: Record<string, unknown> = {};
 /** The Advanced view's opening: at a group (1 to 5), else at the root */
 interface AdvancedOpen {
   readonly focusGroup: number | undefined;
+  /** The filters an editor's flush just wrote, which the list draws a render later */
+  readonly over: PanelState | undefined;
 }
 
 const keyOf = (at: RowKey): string => rowKeyOf(at.group, at.occurrence, at.key);
@@ -133,7 +136,7 @@ const FilterBar = ({
   const anchorRef = useRef<HTMLButtonElement>(null);
   const ownAddRef = useRef<HTMLButtonElement>(null);
   const addRef = addFilterRef ?? ownAddRef;
-  const closeRef = useRef<(() => void) | null>(null);
+  const closeRef = useRef<(() => PanelState | undefined) | null>(null);
   const [editor, setEditor] = useState<OpenEditor | null>(null);
   const [advanced, setAdvanced] = useState<AdvancedOpen | null>(null);
 
@@ -384,9 +387,13 @@ const FilterBar = ({
     setEditor({ session: keyOf(at), at, fromMenu: chip === undefined });
   };
 
+  // The open editor closed, applying what waits: the list's filters after
+  // it, for a write in the same handler (the list draws the flush later)
+  const closeOpenEditor = (): PanelState | undefined =>
+    editor === null ? undefined : closeRef.current?.();
+
   const openAdvanced = (focusGroup?: number) => {
-    if (editor !== null) closeRef.current?.();
-    setAdvanced({ focusGroup });
+    setAdvanced({ focusGroup, over: closeOpenEditor() });
   };
 
   // Focus leaves a removed group's chip for the next group's, which takes
@@ -410,8 +417,8 @@ const FilterBar = ({
 
   // One tap: on sets its key's first root row, off removes it
   const togglePin = (pin: PinnedFilter) => {
-    if (editor !== null) closeRef.current?.();
-    filters.commit(togglePinnedFilter(kind, filters.filters, pin));
+    const current = closeOpenEditor() ?? filters.filters;
+    filters.commit(togglePinnedFilter(kind, current, pin));
   };
 
   const moveEditor = useCallback((at: RowKey) => {
@@ -559,6 +566,7 @@ const FilterBar = ({
         onClose={() => setAdvanced(null)}
         kind={kind}
         value={filters.filters}
+        {...(advanced?.over === undefined ? {} : { openedOver: advanced.over })}
         onApply={(next) => filters.commit(next)}
         permanentChips={permanentChips}
         {...(advanced?.focusGroup === undefined

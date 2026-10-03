@@ -61,8 +61,13 @@ interface ChipEditorProps {
   rowKey: RowKey;
   /** The chip it sits under, which takes focus back on close */
   anchorRef: RefObject<HTMLElement | null>;
-  /** Set to this editor's close (a flush, then `onClose`), for the chip that toggles it */
-  closeRef: RefObject<(() => void) | null>;
+  /**
+   * Set to this editor's close (a flush, then `onClose`), for the chip that
+   * toggles it. It returns the list's filters as the flush wrote them (the
+   * list draws them a render later), else undefined when nothing waited,
+   * so a write right after it builds on the edit
+   */
+  closeRef: RefObject<(() => PanelState | undefined) | null>;
   /** Its row emptied: the editor now adds a new row of its field, here */
   onRowKeyChange: (at: RowKey) => void;
   /**
@@ -121,6 +126,8 @@ const ChipEditor = ({
   // The row edited now: it moves when its row empties
   const atRef = useRef(rowKey);
   const pushedRef = useRef(false);
+  // The filters the last commit wrote, for `close` to hand on
+  const wroteRef = useRef<PanelState | undefined>(undefined);
   // The commits not yet seen in the list, the row as it opened first
   const committedRef = useRef<Committed[]>([
     { at: rowKey, value: rowAt(filters.tree, rowKey) },
@@ -135,6 +142,7 @@ const ChipEditor = ({
       const nextTree = treeOf(kind, nextFilters);
       const history = pushedRef.current ? "replace" : "push";
       pushedRef.current = true;
+      wroteRef.current = nextFilters;
       current.setRow(at, next, { history });
       const left = rowsOf(nextTree, at).length;
       if (left < rowsOf(current.tree, at).length) {
@@ -181,12 +189,14 @@ const ChipEditor = ({
     );
   }, [kind, filters.tree, typing]);
 
-  const close = useCallback(() => {
+  const close = useCallback((): PanelState | undefined => {
+    wroteRef.current = undefined;
     typing.flush();
     onCloseRef.current(
       "closed",
       committedRef.current.at(-1)?.value !== undefined
     );
+    return wroteRef.current;
   }, [typing]);
 
   useLayoutEffect(() => {
