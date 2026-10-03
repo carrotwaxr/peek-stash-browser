@@ -11,14 +11,22 @@ import {
   type EditorKind,
   type ListKind,
   PANEL_FIELDS,
+  PIN_LIMIT,
   type RowKey,
 } from "@peek/shared-types";
+import {
+  LucideBookmarkMinus,
+  LucideBookmarkPlus,
+  LucidePin,
+  LucidePinOff,
+} from "lucide-react";
 import { useFlushableDebounce } from "../../hooks/useDebounce";
 import type { ListFilters } from "../../hooks/useListFilters";
 import {
   type PanelState,
   type PanelTree,
   filtersEqual,
+  isRowActive,
   removeRow,
   rowState,
   sameRowState,
@@ -61,8 +69,23 @@ const rowAt = (tree: PanelTree, at: RowKey): RowValue =>
 const sameValue = (kind: ListKind, a: RowValue, b: RowValue): boolean =>
   a === undefined || b === undefined ? a === b : sameRowState(kind, a, b);
 
+/** What the editor's header offers for pinning, from the bar's pins */
+export interface ChipPinning {
+  /** The field is pinned to the bar */
+  readonly fieldPinned: boolean;
+  /** The list holds as many pins as it keeps: nothing more pins */
+  readonly capped: boolean;
+  /** Whether a row's value is a pinned filter */
+  isFilterPinned(state: PanelState): boolean;
+  toggleField(): void;
+  /** Pins the row's value as a one-tap filter, or unpins it */
+  toggleFilter(state: PanelState): void;
+}
+
 interface ChipEditorProps {
   filters: ListFilters;
+  /** Pin and unpin from the header; none drawn without it */
+  pinning?: ChipPinning | undefined;
   /** The row it edits; a row past the field's last is one it adds */
   rowKey: RowKey;
   /** The chip it sits under, which takes focus back on close */
@@ -94,9 +117,17 @@ interface ChipEditorProps {
  * move up a number), and the editor stays open as a new row of that field
  * after its last, so a later pick adds that row and never edits the row
  * that took the old number.
+ *
+ * With `pinning`, the header also pins the field to the bar ("Pin <field>")
+ * and the row's value as a one-tap filter ("Pin as quick filter"), or
+ * unpins them: two icon buttons beside Remove, so the field's controls sit
+ * where they would without them. At the cap the pin actions are disabled
+ * and say so ("Up to 10 pins"). This is
+ * where keyboard and TV users pin (the "+ Filter" pin icon is mouse-only).
  */
 const ChipEditor = ({
   filters,
+  pinning,
   rowKey,
   anchorRef,
   closeRef,
@@ -104,7 +135,9 @@ const ChipEditor = ({
   onClose,
 }: ChipEditorProps) => {
   const { kind } = filters;
-  const controlId = `chip-editor${useId().replace(/:/g, "-")}field`;
+  const editorId = `chip-editor${useId().replace(/:/g, "-")}`;
+  const controlId = `${editorId}field`;
+  const capId = `${editorId}cap`;
   const field = PANEL_FIELDS[kind].find((row) => row.key === rowKey.key);
   const option = filters.options.find((each) => each.key === rowKey.key);
   const [draft, setDraft] = useState<PanelState>(() =>
@@ -218,6 +251,16 @@ const ChipEditor = ({
   if (field === undefined || option === undefined) return null;
   const label = option.label ?? option.key;
 
+  const pinFilter = () => {
+    typing.flush();
+    pinning?.toggleFilter(draft);
+  };
+  const filterPinned = pinning?.isFilterPinned(draft) ?? false;
+  const fieldCapped =
+    pinning !== undefined && pinning.capped && !pinning.fieldPinned;
+  const capText = `Up to ${PIN_LIMIT} pins`;
+  const filterCapped = pinning !== undefined && pinning.capped && !filterPinned;
+
   return (
     <Popover
       anchorRef={anchorRef}
@@ -226,13 +269,70 @@ const ChipEditor = ({
       label={`${label} filter`}
       className="w-80 max-w-[calc(100vw-2rem)] p-3"
     >
-      <div className="flex items-center justify-between gap-3 mb-2">
+      <div className="flex items-center gap-1 mb-2">
         <h3
-          className="text-sm font-semibold"
+          className="text-sm font-semibold mr-auto"
           style={{ color: "var(--text-primary)" }}
         >
           {label}
         </h3>
+        {pinning !== undefined && (
+          <>
+            <Button
+              variant="tertiary"
+              size="sm"
+              onClick={() => pinning.toggleField()}
+              disabled={fieldCapped}
+              aria-label={`${pinning.fieldPinned ? "Unpin" : "Pin"} ${label}`}
+              aria-describedby={fieldCapped ? capId : undefined}
+              title={
+                fieldCapped
+                  ? capText
+                  : pinning.fieldPinned
+                    ? "Unpin this field from the bar"
+                    : "Pin this field to the bar"
+              }
+              icon={
+                pinning.fieldPinned ? (
+                  <LucidePinOff className="w-4 h-4" aria-hidden="true" />
+                ) : (
+                  <LucidePin className="w-4 h-4" aria-hidden="true" />
+                )
+              }
+            />
+            <Button
+              variant="tertiary"
+              size="sm"
+              onClick={pinFilter}
+              disabled={
+                filterCapped || (!filterPinned && !isRowActive(field, draft))
+              }
+              aria-label={
+                filterPinned ? "Unpin quick filter" : "Pin as quick filter"
+              }
+              aria-describedby={filterCapped ? capId : undefined}
+              title={
+                filterCapped
+                  ? capText
+                  : filterPinned
+                    ? "Unpin this value's one-tap filter"
+                    : "Pin this value as a one-tap filter"
+              }
+              icon={
+                filterPinned ? (
+                  <LucideBookmarkMinus className="w-4 h-4" aria-hidden="true" />
+                ) : (
+                  <LucideBookmarkPlus className="w-4 h-4" aria-hidden="true" />
+                )
+              }
+            />
+            {pinning.capped && (
+              <span id={capId} className="sr-only">
+                {capText}
+              </span>
+            )}
+          </>
+        )}
         <Button
           variant="tertiary"
           size="sm"

@@ -6,11 +6,13 @@
  * and the editor stays open as a new row of that field, so a later pick
  * adds that row and never edits a renumbered neighbour.
  */
+import { PANEL_FIELDS, PIN_LIMIT } from "@peek/shared-types";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderListControls } from "@tests/helpers/renderListControls";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { apiPut } from "@/api";
 
 interface Known {
   id: string;
@@ -217,5 +219,62 @@ describe("ChipEditor", () => {
     expect(list.params().get("2.tagIdsModifier")).toBe("INCLUDES");
     expect(await edit("Tags: any of Anal")).toBeInTheDocument();
     expect(await edit("Tags: any of Outdoor")).toBeInTheDocument();
+  });
+
+  it("the header offers Pin or Unpin for the field and Pin as quick filter for its value", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls({}, { url: "/scenes?organized=true" });
+    await list.firstQuery();
+
+    await user.click(await edit("Organized: Yes"));
+    await user.click(
+      within(dialog()).getByRole("button", { name: "Pin Organized" })
+    );
+    expect(apiPut).toHaveBeenLastCalledWith("/user/filter-pins/scene", {
+      fields: ["organized"],
+      filters: [],
+    });
+    expect(
+      await within(dialog()).findByRole("button", { name: "Unpin Organized" })
+    ).toBeEnabled();
+
+    await user.click(
+      within(dialog()).getByRole("button", { name: "Pin as quick filter" })
+    );
+    const [path, body] = must(vi.mocked(apiPut).mock.lastCall, "a save");
+    expect(path).toBe("/user/filter-pins/scene");
+    expect(body).toMatchObject({
+      fields: ["organized"],
+      filters: [{ key: "organized", state: { organized: "true" } }],
+    });
+    expect(JSON.stringify(body)).toMatch(/"id":"[0-9a-f]{32}"/);
+    expect(
+      await within(dialog()).findByRole("button", {
+        name: "Unpin quick filter",
+      })
+    ).toBeEnabled();
+  });
+
+  it("at the cap both say `Up to 10 pins` and are disabled", async () => {
+    const user = userEvent.setup();
+    const fields = PANEL_FIELDS.scene
+      .filter((row) => row.key !== "organized")
+      .slice(0, PIN_LIMIT)
+      .map((row) => row.key);
+    const list = renderListControls(
+      {},
+      {
+        url: "/scenes?organized=true",
+        pins: { scene: { fields, filters: [] } },
+      }
+    );
+    await list.firstQuery();
+
+    await user.click(await edit("Organized: Yes"));
+    for (const name of ["Pin Organized", "Pin as quick filter"]) {
+      const button = within(dialog()).getByRole("button", { name });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription("Up to 10 pins");
+    }
   });
 });

@@ -22,6 +22,7 @@ import {
 } from "@/contexts/AuthContextProvider";
 import { CardDisplaySettingsContext } from "@/contexts/CardDisplaySettingsContext";
 import { TVModeProvider } from "@/contexts/TVModeProvider";
+import { type PinsByList, pinsAnswer } from "./helpers/filterPins";
 import { userSettingsResponse } from "./helpers/userSettings";
 
 // ============================================================================
@@ -148,12 +149,15 @@ interface ListPageOptions {
   staleTime?: number;
   /** Leave the preset queries unseeded: the test's `apiGet` answers them */
   presetsPending?: boolean;
+  /** The user's filter pins per list; a list not named has none */
+  pins?: PinsByList;
 }
 
 /**
  * Renders a list page as the app does: a data router (so a test can step
- * Back with `router.navigate(-1)`), a fresh QueryClient with the presets and
- * user settings in its cache, a signed-in user, `TVModeProvider` and a card
+ * Back with `router.navigate(-1)`), a fresh QueryClient with the presets,
+ * filter pins (none unless `pins` names a list's) and user settings in its
+ * cache, a signed-in user, `TVModeProvider` and a card
  * display settings stub. `ConfigContext`'s default is one Stash instance.
  * Page tests mock the list hooks (`@/api/hooks`) or `@/api/library`, and
  * render the real controls and pagination.
@@ -168,6 +172,7 @@ export const renderListPage = (
     userSettings = {},
     staleTime = 0,
     presetsPending = false,
+    pins = {},
   }: ListPageOptions = {}
 ) => {
   const queryClient = new QueryClient({
@@ -181,6 +186,7 @@ export const renderListPage = (
       defaults: defaultPresets,
     });
   }
+  queryClient.setQueryData(queryKeys.user.filterPins(), pinsAnswer(pins));
   queryClient.setQueryData(
     queryKeys.user.settings(),
     userSettingsResponse(userSettings)

@@ -15,6 +15,7 @@ import { renderListControls } from "@tests/helpers/renderListControls";
 import { sentFilter } from "@tests/helpers/sentFilter";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { apiPut } from "@/api";
 import type { ListView } from "@/hooks/useListUrlState";
 import { filterOptionsOf } from "@/utils/filterFields";
 
@@ -550,5 +551,60 @@ describe("values", () => {
     expect(
       await screen.findByRole("option", { name: "Tags: Outdoor" })
     ).toHaveAttribute("aria-disabled", "true");
+  });
+});
+
+describe("pins", () => {
+  it("pinned fields come first under Pinned", async () => {
+    const list = renderListControls(
+      {},
+      { pins: { scene: { fields: ["rating", "tagIds"], filters: [] } } }
+    );
+    await list.firstQuery();
+
+    await openMenu();
+
+    const listbox = screen.getByRole("listbox");
+    const [first] = within(listbox).getAllByRole("group");
+    expect(must(first, "the first group")).toHaveAccessibleName("Pinned");
+    expect(
+      within(must(first))
+        .getAllByRole("option")
+        .map((each) => each.textContent)
+    ).toEqual(["Rating (0-100)", "Tags"]);
+    // Listed once: not again under their sections
+    expect(optionNames().filter((name) => name === "Tags")).toHaveLength(1);
+  });
+
+  it("the pin icon in an option pins on click without picking the field, and is `aria-hidden`", async () => {
+    const list = renderListControls();
+    await list.firstQuery();
+    const user = await openMenu();
+
+    const icon = must(
+      option("Organized").querySelector("[data-pin-toggle]"),
+      "the pin icon"
+    );
+    expect(icon).toHaveAttribute("aria-hidden", "true");
+    await user.click(icon);
+
+    expect(apiPut).toHaveBeenLastCalledWith("/user/filter-pins/scene", {
+      fields: ["organized"],
+      filters: [],
+    });
+    // The menu stays open, no editor opened, and the field now leads it
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Organized filter" })
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("group", { name: "Pinned" })).getByRole(
+          "option",
+          { name: "Organized" }
+        )
+      ).toBeInTheDocument()
+    );
+    expect(list.params().has("organized")).toBe(false);
   });
 });

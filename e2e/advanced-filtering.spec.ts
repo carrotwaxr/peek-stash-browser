@@ -19,10 +19,16 @@ test.describe("Advanced Filtering", () => {
       page.getByRole("combobox", { name: "Find a filter" })
     ).toBeFocused();
     const fields = page.getByRole("listbox", { name: "Filters" });
+    // A new account's pinned fields lead the list; the rest keep their sections
+    await expect(
+      fields
+        .getByRole("group", { name: "Pinned" })
+        .getByRole("option", { name: "Tags", exact: true })
+    ).toBeVisible();
     await expect(
       fields
         .getByRole("group", { name: "Common Filters" })
-        .getByRole("option", { name: "Tags", exact: true })
+        .getByRole("option", { name: "Studios", exact: true })
     ).toBeVisible();
 
     await page.keyboard.press("Escape");

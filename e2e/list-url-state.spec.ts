@@ -135,8 +135,11 @@ test.describe("List state in the URL", () => {
   }) => {
     const list = new ListPage(page);
     await list.goto("/scenes?favorite=true");
+    // A new account pins Favorites: the filter shows as that pressed toggle
     const chip = page.getByRole("button", {
-      name: /^Remove filter: Favorite/,
+      name: "Favorites",
+      exact: true,
+      pressed: true,
     });
     await expect(chip).toBeVisible();
 
