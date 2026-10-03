@@ -21,15 +21,20 @@ The more you rate, favorite and watch, the better your recommendations become!
 
 ### Recommended Page
 
-Click **Recommended** in the navigation menu to see a full page of personalized suggestions.
+Click **Recommended** in the navigation menu to see your top 500 scenes, best matches first. It works like the other lists (see [Browse and Display](browse-and-display.md)):
 
-The page shows:
-
-- Scenes matching your preferences
-- Pagination for browsing more results
-- Your current activity stats
+- **Grid, Wall and Table** views, with the same density and zoom controls (there is no Timeline or Folder view here)
+- **Page size** above and below the scenes, and pagination for browsing more results
+- A **search box**, the **filter bar** with its chips, **+ Filter**, **Advanced** and your pins, and **Views**
+- **Sorts**: every scene sort, with **Recommended** (the rank) first and chosen to start with
 
 The list stays the same while you page through it, so a scene never appears on two pages. It is scored again when your ratings, favorites, plays or hidden items change, when the library syncs, and each new day (the order within a score band is shuffled daily). Hidden and restricted scenes are never listed or counted, and every page is full.
+
+#### Filters, Search and Views on Recommended
+
+Filters and search work **within your top 500 recommendations**. The page lists your best 500 scenes; a filter or a search narrows that list, it does not look through the rest of your library. While a filter or a search is on, the page says so ("Filtering within your top 500 recommendations"), and the total is how many of the 500 match. A filter that matches none of them says "No recommendations match these filters". Finding the matches beyond the 500 is not there yet: use the [Scenes](browse-and-display.md#filters) page for that.
+
+Recommended has its own **Views** and its own default View, apart from the Scenes page: save the filters, the sort (including Recommended), the view mode, the density and the page size you like here as a View, and set it as the default for the **Recommended page** to open the page that way. Pins are the ones you keep for Scenes. On a phone, **Filters** opens the filter sheet, and its **Show N results** button counts the matches within your top 500.
 
 ### Recommended Sidebar
 
@@ -56,7 +61,7 @@ If you're new to Peek, you'll see a message explaining how to get recommendation
 
 ### Activity Indicators
 
-The Recommended page shows your current activity:
+When the Recommended page has nothing to list, it shows your current activity so you can see what to build on:
 
 ```
 Your current activity:
@@ -67,7 +72,7 @@ Your current activity:
 • 12 performers, studios and tags from your viewing
 ```
 
-This helps you understand what's driving your recommendations.
+This helps you understand what's driving your recommendations. A page that is empty only because of a filter or a search says "No recommendations match these filters" instead; clear the filter to see the list again.
 
 ## Tips for Better Recommendations
 
@@ -149,6 +154,10 @@ This appears when you haven't rated, favorited or watched enough content (watchi
 1. Browse scenes and rate some 4.0 or higher
 2. Favorite a few performers you enjoy
 3. Return to Recommendations
+
+### A filter or search finds fewer scenes than the library holds
+
+Recommended filters and searches within your top 500 recommendations, not the whole library, and says so while one is on. A scene that is not among your 500 best matches is not found here. Use the [Scenes](browse-and-display.md#filters) page to filter the whole library; finding matches beyond the 500 on Recommended is not there yet.
 
 ### Recommendations seem repetitive
 
