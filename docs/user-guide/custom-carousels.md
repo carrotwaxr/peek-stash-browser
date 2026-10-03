@@ -25,8 +25,12 @@ Each rule consists of a filter type, comparison operator, and value. All rules m
 |--------|-------------|
 | Performers | Scenes featuring specific performers |
 | Tags | Scenes with specific tags |
-| Studio | Scenes from a specific studio |
-| Collections | Scenes in specific groups/collections |
+| Performer Tags | Scenes with a performer who has the tag |
+| Studios | Scenes from specific studios |
+| Collections | Scenes in specific groups/collections, with sub-collections |
+| Galleries | Scenes linked to specific galleries |
+| Playlists | Scenes in specific playlists: your own and those shared with you |
+| In any of my playlists | Scenes in one of your own playlists, or in none of them |
 | Rating (0-100) | Scenes within a rating range |
 | Duration (minutes) | Scene length in minutes |
 | Resolution | Video quality, from 144p to 8K and Huge |
@@ -38,10 +42,12 @@ Each rule consists of a filter type, comparison operator, and value. All rules m
 | Play Count | Number of times you've watched |
 | Play Duration (minutes) | How long you've watched the scene |
 | O Count | Your O count for the scene |
-| Favorite Scenes | Only your favorited scenes |
-| Favorite Performers | Scenes with your favorite performers |
-| Favorite Studios | Scenes from your favorite studios and their sub-studios |
-| Favorite Tags | Scenes with your favorite tags, their sub-tags, or a favorite tag inherited from a performer, studio or collection |
+| Favorite Scenes | Your favorited scenes, or the ones that are not |
+| Favorite Performers | Scenes with your favorite performers, or with none |
+| Favorite Studios | Scenes from your favorite studios and their sub-studios, or not |
+| Favorite Tags | Scenes with your favorite tags, their sub-tags, or a favorite tag inherited from a performer, studio or collection; or with none |
+| Organized, Has Markers, Duplicated | Yes or No |
+| Watched, In Progress | Yes or No, by the [Watch History](watch-history.md) rules |
 | Created Date | When the scene was added |
 | Updated Date | When the scene was last changed |
 | Scene Date | The scene's release date |
@@ -52,6 +58,9 @@ Each rule consists of a filter type, comparison operator, and value. All rules m
 | Title Search | Text search in scene title |
 | Details Search | Text search in scene description |
 | Director Search | Text search in the scene's director |
+| Path | The scene's primary file path: contains, excludes, equals or starts with |
+| URL, Code | Text search in the scene's links or code |
+| Captions | Scenes with captions in a language, or with none |
 
 The rules are the Scenes page's filters, with the same names, choices and conditions.
 
@@ -59,12 +68,12 @@ The rules are the Scenes page's filters, with the same names, choices and condit
 
 Different filter types support different operators:
 
-- **Entity filters** (Performers, Tags): Has ANY of these, Has ALL of these, Has NONE of these. Collections: In ANY of these, NOT in these.
+- **Entity filters** (Performers, Tags, Studios, Galleries, Playlists): Has ANY of these, Has ALL of these, Has NONE of these. Collections: In ANY of these, NOT in these. Where the Scenes page offers them, a pick can be excluded instead of included, and **Has none** / **Has any** match scenes with no such relation at all; both are saved with the rule.
 - **Numeric filters** (Rating, Duration, etc.): a minimum, a maximum, or both
 - **Resolution**: Equals, Not Equals, Greater Than, Less Than. A new Resolution rule starts at Equals, as on the Scenes page; a saved rule keeps its condition.
 - **Date filters** (Created Date, Updated Date, Scene Date, Last Played Date): pick a start date, an end date, or both. A start alone matches later dates, an end alone earlier dates, and both the dates in between. Date rules are saved with the carousel and shown again when you edit it.
-- **Boolean filters** (Favorites): is true
-- **Text filters**: contains
+- **Yes / No filters** (Favorites, Organized, Has Markers, Duplicated, Watched, In Progress, In any of my playlists): Yes or No
+- **Text filters**: contains, and for Path also excludes, equals and starts with
 
 ## Managing Carousels
 

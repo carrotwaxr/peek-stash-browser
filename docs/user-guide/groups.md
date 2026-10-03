@@ -20,21 +20,26 @@ Groups support two view modes:
 | **Name** | Text search on group name |
 | **Synopsis** | Text search on group synopsis |
 | **Director** | Text search on director name |
-| **Performers** | Performers in any scene within the group. Supports ANY / ALL / NONE modifiers |
-| **Studio** | Filter by studio |
-| **Tags** | Filter by tags. Supports ANY / ALL / NONE modifiers, with "Include sub-tags": "all of" then matches a collection tagged with any sub-tag of each chosen tag |
+| **Aliases**, **URL** | Text search. A collection's aliases are matched as one text; Has none / Has any |
+| **Performers** | Performers in any scene within the group you can see. Supports ANY / ALL / NONE modifiers |
+| **Studio** | Filter by studio: ANY or NONE, with **Include sub-studios**, and Has none / Has any |
+| **Tags** | Filter by tags. Supports ANY / ALL / NONE modifiers, with "Include sub-tags": "all of" then matches a collection tagged with any sub-tag of each chosen tag; Has none / Has any |
 | **Rating** | 0-100 range slider |
-| **Scene Count** | Range filter for number of scenes |
-| **Duration** | Range filter for total duration in minutes |
+| **Scene Count**, **Tag Count** | Range filters for the number of scenes and tags you can see |
+| **Duration** | Range filter for total duration in minutes; **Not set** lists collections with no duration |
+| **O Count**, **Play Count** | Your own O count and plays, summed over the collection's scenes you can see |
 | **Favorites** | Show only favorited groups |
-| **Parent collection** | The sub-collections of the collections you pick (direct children only) |
+| **Has a Favorite Performer** | Yes / No / Any: a favorite performer in one of its scenes you can see |
+| **Parent collection** | The sub-collections of the collections you pick; **Include sub-collections** goes deeper than direct children |
+| **Sub-collections** | The collections that contain the ones you pick; **Include all parent collections** goes further up |
+| **Sub-collection Count**, **Parent Collection Count** | Range filters for how many sub-collections or parent collections a collection has |
 | **Release Date** | Date range filter |
 | **Created Date** | Date range filter |
 | **Updated Date** | Date range filter |
 
 ### Sorting
 
-Sort by Created At, Date, Duration, Name (default), Random, Rating, Scene Count, or Updated At.
+Sort by Created At, Date, Duration, Name (default), O Count, Performer Count, Random, Rating, Scene Count, Tag Count, or Updated At. **Collection Order** (the position within a collection) is offered while exactly one parent collection is chosen.
 
 ## Group Detail Page
 
