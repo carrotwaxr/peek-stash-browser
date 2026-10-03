@@ -151,6 +151,12 @@ interface ListPageOptions {
   presetsPending?: boolean;
   /** The user's filter pins per list; a list not named has none */
   pins?: PinsByList;
+  /**
+   * The test's own client (`createQueryClient()`: the app's retries and its
+   * library-initializing handling), seeded as the default one; `staleTime`
+   * is then the client's own
+   */
+  queryClient?: QueryClient;
 }
 
 /**
@@ -173,11 +179,11 @@ export const renderListPage = (
     staleTime = 0,
     presetsPending = false,
     pins = {},
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime } },
+    }),
   }: ListPageOptions = {}
 ) => {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime } },
-  });
   // The preset queries' keys (`usePresets`), read here so importing this
   // file evaluates no query options a test's mocks could break
   if (!presetsPending) {

@@ -5,7 +5,11 @@
  * one a page calls never changes the hook order.
  */
 import { useCallback } from "react";
-import type { FindClipsRequest, ListPageInput } from "@peek/shared-types";
+import type {
+  FindClipsRequest,
+  FindRecommendedScenesRequest,
+  ListPageInput,
+} from "@peek/shared-types";
 import { type UseQueryResult, useQueryClient } from "@tanstack/react-query";
 import type { LibrarySearchParams } from "../../api";
 import {
@@ -14,6 +18,7 @@ import {
   useGroupList,
   useImageList,
   usePerformerList,
+  useRecommendedList,
   useSceneList,
   useStudioList,
   useTagList,
@@ -150,6 +155,21 @@ export const LIST_SOURCES: Record<ListSourceEntity, ListSource> = {
     count: "total",
     toRequest: (query) => clipRequestOf(query) as Record<string, unknown>,
   },
+};
+
+/**
+ * Recommended: the scene list's request within the user's top 500, its
+ * rows and total at the top level (`{ scenes, count }`), cached and counted
+ * apart from the Scenes list. Not an entity: the page lists scenes.
+ */
+export const RECOMMENDED_SOURCE: ListSource = {
+  useList: (request) =>
+    useRecommendedList(request as FindRecommendedScenesRequest | null),
+  listKey: (params) => queryKeys.scenes.recommended(params),
+  result: null,
+  items: "scenes",
+  count: "count",
+  countPath: "/library/scenes/recommended/count",
 };
 
 type ListResult = Record<string, unknown>;

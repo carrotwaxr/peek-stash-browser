@@ -30,8 +30,11 @@ export const queryKeys = {
       ["scenes", instanceId, "externalPlayerLink", id] as const,
     similar: (instanceId: string, id: string, page: number) =>
       ["scenes", instanceId, "similar", id, page] as const,
-    recommended: (page: number, perPage: number) =>
-      ["scenes", undefined, "recommended", { page, perPage }] as const,
+    // Recommended's list: its own segment before "list", so its total
+    // (`listCountKey`: `[..., "recommended", "listCount", ...]`) never meets
+    // the Scenes list's for the same request
+    recommended: (params: Record<string, unknown>) =>
+      ["scenes", undefined, "recommended", "list", params] as const,
     // The names of the ids a filter chip shows (`useRefNames`)
     names: (ids: readonly string[]) =>
       ["scenes", undefined, "names", ids] as const,

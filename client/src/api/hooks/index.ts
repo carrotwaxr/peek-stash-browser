@@ -1,4 +1,8 @@
-export { useSceneList, useExternalPlayerLink } from "./useScenes";
+export {
+  useSceneList,
+  useRecommendedList,
+  useExternalPlayerLink,
+} from "./useScenes";
 export { usePerformerList } from "./usePerformers";
 export { useStudioList } from "./useStudios";
 export { useTagList, useTagTree } from "./useTags";

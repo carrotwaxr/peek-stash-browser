@@ -387,6 +387,22 @@ export const clipListTotal: ListTotalShape<Record<string, unknown>> = {
   },
 };
 
+/** Recommended (`POST /api/library/scenes/recommended`): the total in a top-level `count`, asked off by `filter.count: false` */
+export const recommendedListTotal: ListTotalShape<Record<string, unknown>> = {
+  uncounted: (request) => ({
+    ...request,
+    filter: {
+      ...(request.filter as Record<string, unknown> | undefined),
+      count: false,
+    },
+  }),
+  total: (data) => {
+    const count = (data as ListData | undefined)?.count;
+    return typeof count === "number" ? count : null;
+  },
+  withTotal: (data, total) => ({ ...(data as ListData), count: total }),
+};
+
 /** The cache's stale time as a number of milliseconds; 0 when it is not one */
 const staleTimeOf = (client: QueryClient): number => {
   const staleTime = client.getDefaultOptions().queries?.staleTime;

@@ -9,7 +9,10 @@ import { must, renderListPage } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet } from "@/api";
 import EntityListPage from "@/components/list/EntityListPage";
-import { PERFORMER_LIST } from "@/components/list/listPageConfigs";
+import {
+  type ListPageConfig,
+  PERFORMER_LIST,
+} from "@/components/list/listPageConfigs";
 import Groups from "@/components/pages/Groups";
 import Performers from "@/components/pages/Performers";
 import Studios from "@/components/pages/Studios";
@@ -486,5 +489,94 @@ describe("EntityListPage", () => {
 
     await screen.findByTestId("hierarchy-view");
     expect(screen.queryByText(/Filters don't apply/)).not.toBeInTheDocument();
+  });
+});
+
+describe("EntityListPage: a page's own parts", () => {
+  it("a config's `sortOptions` replace the entity's in the toolbar and the URL state", async () => {
+    const config: ListPageConfig = {
+      ...PERFORMER_LIST,
+      defaultSort: "name",
+      sortOptions: () => [
+        { value: "name", label: "Name" },
+        { value: "random", label: "Random" },
+      ],
+    };
+
+    // Birthdate is a performer sort, but not one this page offers
+    renderListPage(<EntityListPage config={config} />, {
+      initialEntries: ["/performers?sort=birthdate"],
+    });
+
+    const sortBy = await screen.findByRole("combobox", { name: "Sort by" });
+    expect(
+      Array.from((sortBy as HTMLSelectElement).options).map((o) => o.value)
+    ).toEqual(["name", "random"]);
+    await waitFor(() => expect(api.findPerformers).toHaveBeenCalled());
+    const sentRequest = must(api.findPerformers.mock.calls.at(-1))[0];
+    expect(sentRequest.filter).toMatchObject({ sort: "name" });
+  });
+
+  it("a page's `notice` renders between the header and the toolbar", async () => {
+    const config: ListPageConfig = {
+      ...PERFORMER_LIST,
+      headerAside: <button>About this page</button>,
+      usePage: () => ({ notice: <p role="status">Within your top 10</p> }),
+    };
+
+    renderListPage(<EntityListPage config={config} />, {
+      initialEntries: ["/performers"],
+    });
+
+    const notice = await screen.findByRole("status");
+    expect(notice).toHaveTextContent("Within your top 10");
+    const heading = screen.getByRole("heading", { name: "Performers" });
+    const sortBy = screen.getByRole("combobox", { name: "Sort by" });
+    const follows = (a: Node, b: Node) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(follows(heading, notice)).toBe(true);
+    expect(follows(notice, sortBy)).toBe(true);
+    // The header's aside sits beside the heading, before the notice
+    const aside = screen.getByRole("button", { name: "About this page" });
+    expect(follows(heading, aside)).toBe(true);
+    expect(follows(aside, notice)).toBe(true);
+  });
+
+  it("a page's `empty` message and description replace the config's", async () => {
+    const config: ListPageConfig = {
+      ...PERFORMER_LIST,
+      usePage: () => ({
+        empty: { message: "Nothing to suggest", description: "Rate more" },
+      }),
+    };
+
+    renderListPage(<EntityListPage config={config} />, {
+      initialEntries: ["/performers"],
+    });
+
+    expect(await screen.findByText("Nothing to suggest")).toBeInTheDocument();
+    expect(screen.getByText("Rate more")).toBeInTheDocument();
+    expect(screen.queryByText("No performers found")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Try adjusting your search filters")
+    ).not.toBeInTheDocument();
+  });
+
+  it("a config's `context` reaches the Views menu, and the document title is the config's title", async () => {
+    const config: ListPageConfig = {
+      ...PERFORMER_LIST,
+      title: "Top performers",
+      context: "image_performer",
+    };
+
+    renderListPage(<EntityListPage config={config} />, {
+      initialEntries: ["/performers"],
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /^Views/ }));
+    expect(
+      screen.getByText("Set as default for Performer pages (Images tab)")
+    ).toBeInTheDocument();
+    await waitFor(() => expect(document.title).toBe("Top performers - Peek"));
   });
 });

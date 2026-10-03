@@ -45,7 +45,9 @@ describe("invalidateExclusionDependents", () => {
   });
 
   it("invalidates what invalidateLibraryQueries does, plus recommended and user stats", async () => {
-    const recommended = queryKeys.scenes.recommended(1, 24);
+    const recommended = queryKeys.scenes.recommended({
+      filter: { page: 1, per_page: 24 },
+    });
     const stats = queryKeys.user.stats();
     const hidden = queryKeys.user.hiddenItems("scene", 2);
     seed(client, [...LIBRARY_KEYS, recommended, stats, hidden]);
@@ -108,7 +110,7 @@ describe("invalidateInstanceQueries", () => {
     const client = createQueryClient();
     const keys = [
       queryKeys.setup.status(),
-      queryKeys.scenes.recommended(1, 24),
+      queryKeys.scenes.recommended({ filter: { page: 1, per_page: 24 } }),
       queryKeys.user.stats(),
       queryKeys.scenes.list("a", {}),
     ];

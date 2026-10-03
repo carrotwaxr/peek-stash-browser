@@ -90,11 +90,6 @@
       "count": 1
     }
   },
-  "src/components/pages/Recommended.tsx": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "src/components/pages/Scene.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1

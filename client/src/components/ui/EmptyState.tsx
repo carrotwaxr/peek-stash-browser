@@ -3,7 +3,8 @@ import { type ReactNode } from "react";
 interface Props {
   icon?: ReactNode;
   title: string;
-  description?: string;
+  /** A line of text, or a block (Recommended's list of the user's activity) */
+  description?: ReactNode;
   action?: ReactNode;
   className?: string;
 }
@@ -51,11 +52,17 @@ const EmptyState = ({
         >
           {title}
         </h3>
-        {description && (
-          <p className="mb-4" style={{ color: "var(--text-muted)" }}>
-            {description}
-          </p>
-        )}
+        {description ? (
+          typeof description === "string" ? (
+            <p className="mb-4" style={{ color: "var(--text-muted)" }}>
+              {description}
+            </p>
+          ) : (
+            <div className="mb-4" style={{ color: "var(--text-muted)" }}>
+              {description}
+            </div>
+          )
+        ) : null}
         {action}
       </div>
     </div>

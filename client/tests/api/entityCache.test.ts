@@ -86,7 +86,10 @@ describe("patchEntityInCache", () => {
         { findScenes: { scenes: [row()] } },
       ],
       [queryKeys.scenes.similar("a", "1", 1), { scenes: [row()] }],
-      [queryKeys.scenes.recommended(1, 24), { scenes: [row()] }],
+      [
+        queryKeys.scenes.recommended({ filter: { page: 1, per_page: 24 } }),
+        { scenes: [row()] },
+      ],
       [queryKeys.homeCarousels.byKey("recentlyAdded"), [row()]],
       [queryKeys.carousels.execute("7"), { scenes: [row()] }],
       [

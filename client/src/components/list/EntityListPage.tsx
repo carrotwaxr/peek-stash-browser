@@ -156,7 +156,7 @@ const EntityListPage = ({
   const title = embed ? (embed.title ?? "") : config.title;
   const subtitle = embed ? embed.subtitle : config.subtitle;
   const fromPageTitle = embed ? embed.fromPageTitle : config.title;
-  const context = embed?.context;
+  const context = embed?.context ?? config.context;
   const pagePermanentFilters = useFiltersByContent(embed?.permanentFilters);
   const lockedFields = useLockedFields(entityType, pagePermanentFilters);
   const scope = useMemo(
@@ -164,7 +164,6 @@ const EntityListPage = ({
     [pagePermanentFilters]
   );
   const filterOptions = useFilterOptions(entityType);
-  const emptyMessage = embed?.emptyMessage ?? config.emptyMessage;
   const entityDefaults = useListDefaults(
     entityType,
     embed?.defaultSort ?? config.defaultSort
@@ -191,9 +190,14 @@ const EntityListPage = ({
     () => viewModes.map((mode) => mode.id),
     [viewModes]
   );
+  // The page's own sorts (Recommended's rank first), else the entity's
+  const pageSortOptions = config.sortOptions;
   const sortOptions = useCallback(
-    (filters: Record<string, unknown>) => sortOptionsFor(entityType, filters),
-    [entityType]
+    (filters: Record<string, unknown>) =>
+      pageSortOptions
+        ? pageSortOptions(filters)
+        : sortOptionsFor(entityType, filters),
+    [pageSortOptions, entityType]
   );
 
   // The folder view's Untagged lists the page's type in no tag's folder
@@ -342,10 +346,11 @@ const EntityListPage = ({
 
   // The page's own handlers and parts (the Images lightbox, a scene's queue)
   const usePage = config.usePage ?? useNoExtras;
-  const { cardHandlers, after, holdsPage } = usePage({
+  const { cardHandlers, after, holdsPage, notice, empty } = usePage({
     listState,
     items,
     count,
+    response: data,
     request,
     error,
     // Placeholder rows are the previous request's, not this one's answer
@@ -355,6 +360,12 @@ const EntityListPage = ({
     ...(embed?.lightboxRef ? { lightboxRef: embed.lightboxRef } : {}),
     ...(embed?.permanentFilters ? { lockedFilters: pagePermanentFilters } : {}),
   });
+
+  // What an empty list says: the page's own (the server's message), else
+  // the embed's, else the config's
+  const emptyMessage =
+    empty?.message ?? embed?.emptyMessage ?? config.emptyMessage;
+  const emptyDescription = empty?.description;
 
   // One hide handler and one context for every card, so memoised cards keep
   const onHideSuccess = useHideFromList(source, request);
@@ -508,6 +519,7 @@ const EntityListPage = ({
         gridDensity,
         ctx: cardContext,
         emptyMessage,
+        ...(emptyDescription === undefined ? {} : { emptyDescription }),
         selectionScope: listState.listKey,
       });
     }
@@ -527,7 +539,7 @@ const EntityListPage = ({
       return (
         <EmptyState
           title={emptyMessage}
-          description="Try adjusting your search filters"
+          description={emptyDescription ?? "Try adjusting your search filters"}
         />
       );
     }
@@ -542,24 +554,37 @@ const EntityListPage = ({
   // The error page, unless the page's own part covers the list (the open
   // lightbox, which reports a failed page itself and must not remount)
   const failed = !!error && !initializing && paged && !holdsPage;
+  // The heading, and the page's own part beside it (Recommended's "How
+  // recommendations work")
+  const header = config.headerAside ? (
+    <div className="flex items-start gap-2">
+      <PageHeader title={title} subtitle={subtitle} />
+      {config.headerAside}
+    </div>
+  ) : (
+    <PageHeader title={title} subtitle={subtitle} />
+  );
   const body = failed ? (
     <PageLayout>
       {documentTitle}
-      <PageHeader title={title} subtitle={subtitle} />
+      {header}
       <StatusMessage variant="error" message={error} />
     </PageLayout>
   ) : (
     <PageLayout>
       {documentTitle}
       <div>
-        <PageHeader title={title} subtitle={subtitle} />
+        {header}
 
         <LibraryInitializingBanner />
+
+        {notice}
 
         <SearchControls
           artifactType={entityType}
           {...(context ? { context } : {})}
           listState={listState}
+          sortOptions={sortOptions}
           isRefreshing={isPlaceholderData}
           filterable={extraView?.filterable ?? true}
           totalPages={totalPages}
