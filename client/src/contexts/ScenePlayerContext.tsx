@@ -544,7 +544,11 @@ export function ScenePlayerProvider({
       if (!urlIsEntry) {
         dispatch({
           type: "GOTO_SCENE_INDEX",
-          payload: { index: stateQueue.currentIndex, shouldAutoplay: false },
+          payload: {
+            index: stateQueue.currentIndex,
+            shouldAutoplay: false,
+            fromHistory: true,
+          },
         });
       }
       return;

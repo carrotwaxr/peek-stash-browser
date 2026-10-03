@@ -70,6 +70,7 @@ export function useVideoPlayer({
   autoplayNext,
   repeat,
   restartCount,
+  queueSteps = 0,
   dispatch,
   nextScene,
   prevScene,
@@ -94,6 +95,8 @@ export function useVideoPlayer({
   repeat: string;
   /** Bumped by a queue step to an entry of the scene already loaded */
   restartCount: number;
+  /** Bumped by each queue step, never by a route change (a cast follows steps) */
+  queueSteps?: number;
   dispatch: (action: any) => void;
   /** The queue's steps (`useQueueNavigation`), which know what is playing */
   nextScene: () => void;
@@ -344,6 +347,7 @@ export function useVideoPlayer({
     autoplayNext,
     repeat,
     restartCount,
+    queueSteps,
     playlist,
     // The user's resume point for the scene, where a cast starts when the
     // local player has not played (not the Continue Watching resume)

@@ -46,6 +46,11 @@ export interface UseCastOptions {
   autoplayNext: boolean;
   repeat: string;
   restartCount: number;
+  /**
+   * Bumped by each queue step (Next, Previous, a pick, the end of a scene),
+   * never by a route change: only a step moves the TV to the page's scene
+   */
+  queueSteps: number;
   playlist: unknown;
   /** The user's resume point for the scene (watch history), if any */
   resumeTime: number | null | undefined;

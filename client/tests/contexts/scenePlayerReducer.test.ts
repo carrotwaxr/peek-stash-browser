@@ -153,6 +153,7 @@ describe("scenePlayerReducer", () => {
         repeat: "none",
         shuffleHistory: [],
         restartCount: 0,
+        queueSteps: 0,
 
         requested: null,
         unavailable: [],
@@ -1166,6 +1167,70 @@ describe("scenePlayerReducer", () => {
   // -------------------------------------------------------------------------
   // GOTO_SCENE_INDEX
   // -------------------------------------------------------------------------
+  // A cast follows the page only on a queue step, never on a route change
+  describe("queueSteps", () => {
+    const queued = {
+      ...initialState,
+      playlist: makePlaylist(5),
+      currentIndex: 2,
+    };
+
+    it("NEXT_SCENE, PREV_SCENE and a GOTO_SCENE_INDEX pick each count one step", () => {
+      const next = scenePlayerReducer(queued, { type: "NEXT_SCENE" });
+      const prev = scenePlayerReducer(next, { type: "PREV_SCENE" });
+      const pick = scenePlayerReducer(prev, {
+        type: "GOTO_SCENE_INDEX",
+        payload: { index: 4 },
+      });
+
+      expect([next, prev, pick].map((state) => state.queueSteps)).toEqual([
+        1, 2, 3,
+      ]);
+    });
+
+    it("a step to an entry of the scene already loaded counts too", () => {
+      const state = {
+        ...initialState,
+        playlist: {
+          scenes: [
+            { sceneId: "7", instanceId: "a" },
+            { sceneId: "7", instanceId: "a" },
+          ],
+        },
+      };
+
+      const result = scenePlayerReducer(state, { type: "NEXT_SCENE" });
+
+      expect(result.restartCount).toBe(1);
+      expect(result.queueSteps).toBe(1);
+    });
+
+    it("Back or Forward to an entry of the queue (fromHistory), leaving the queue and a new queue count none", () => {
+      const back = scenePlayerReducer(queued, {
+        type: "GOTO_SCENE_INDEX",
+        payload: { index: 1, shouldAutoplay: false, fromHistory: true },
+      });
+      const leave = scenePlayerReducer(queued, { type: "LEAVE_QUEUE" });
+      const started = scenePlayerReducer(queued, {
+        type: "INITIALIZE",
+        payload: { playlist: makePlaylist(3), currentIndex: 1 },
+      });
+
+      expect(back.currentIndex).toBe(1);
+      expect(back.queueSteps).toBe(0);
+      expect(leave.queueSteps).toBe(0);
+      expect(started.queueSteps).toBe(0);
+    });
+
+    it("a step with nowhere to go counts none", () => {
+      const atEnd = { ...queued, currentIndex: 4 };
+
+      expect(scenePlayerReducer(atEnd, { type: "NEXT_SCENE" }).queueSteps).toBe(
+        0
+      );
+    });
+  });
+
   describe("GOTO_SCENE_INDEX", () => {
     it("sets currentIndex to the given index", () => {
       const state = {

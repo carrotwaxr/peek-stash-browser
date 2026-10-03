@@ -9,10 +9,11 @@
  * receiver (through `castMiddleware`), and a session end hands the scene back
  * to the local player where the TV left it.
  *
- * The cast follows the page (C10): while attached, every scene change on the
- * page (a queue step, a restart) loads that scene on the TV; a page on
- * another scene than the session's does not attach, and its Cast button or
- * play loads its scene into the session. Each load names this tab
+ * The cast follows the page's queue (C10): while attached, a queue step
+ * (Next, Previous, a pick, the end of a scene) or a restart loads the new
+ * scene on the TV. A route change to another scene (a link, Back or Forward)
+ * does not: the page lets go, as a page opened on another scene than the
+ * session's, and its Cast button or play loads its scene into the session. Each load names this tab
  * (`castSenderId`), and only the tab named by the playing media records it.
  * The page's captions menu drives the receiver's text tracks. When the TV
  * fails mid-scene (a link past its expiry, a scene hidden meanwhile) the page
@@ -252,6 +253,8 @@ export interface CastSessionOptions {
   page(): {
     scene: CastScene | null;
     restartCount?: number;
+    /** Bumped by each queue step, never by a route change */
+    queueSteps?: number;
     resumeTime: number | null | undefined;
     viewing: { readonly current: Viewing | null };
     minimumPlayPercent: number;
@@ -341,6 +344,8 @@ export class CastSessionController {
   private errored = false;
   /** The page's scene and restart count when last seen */
   private seen = "";
+  /** The page's queue steps when its scene or restart count last changed */
+  private seenSteps = 0;
   /** The receiver's text tracks as last set, so a repeat is not sent */
   private sentTracks = "";
   private lastRemoteTime = 0;
@@ -399,6 +404,7 @@ export class CastSessionController {
     this.button = addCastButton(player, this.onPress);
     this.status = addCastStatus(player);
     this.seen = this.pageMark();
+    this.seenSteps = this.options.page().queueSteps ?? 0;
     this.castState = this.context.getCastState();
 
     // A session already live (joined after a reload, or this page opened
@@ -442,21 +448,34 @@ export class CastSessionController {
   }
 
   /**
-   * The page rendered. While attached, a new scene or a restart (a queue
-   * step, the playlist, the media keys, the VR HUD) loads that scene on the
-   * TV at its start; a page that moves to the scene the TV plays follows it.
+   * The page rendered. While attached, a new scene or a restart that a queue
+   * step brought (the queue's controls, the playlist, the end of a scene, the
+   * media keys, the VR HUD) loads that scene on the TV at its start; one a
+   * route change brought (a link, Back or Forward) lets the page go, so the
+   * Cast button or play casts it. A page that moves to the scene the TV
+   * plays follows it. A step's scene lands renders after the step itself,
+   * so the steps are compared at the scene change.
    */
   update() {
-    if (!this.button || !this.options.page().scene) return;
+    const page = this.options.page();
+    if (!this.button || !page.scene) return;
     const mark = this.pageMark();
     if (mark === this.seen) return;
     this.seen = mark;
+    const steps = page.queueSteps ?? 0;
+    const stepped = steps !== this.seenSteps;
+    this.seenSteps = steps;
     // After the render's effects, which give the new scene its viewing
     queueMicrotask(() => {
       if (!this.button) return;
       const session = this.attachedTo;
       if (!session) {
         this.sync();
+        return;
+      }
+      if (!stepped) {
+        // The TV plays on; this page offers its own scene to it
+        this.release();
         return;
       }
       // The TV goes on as it was: playing (or just finished), or paused

@@ -41,6 +41,12 @@ export interface ScenePlayerReducerState {
    */
   restartCount: number;
   /**
+   * Bumped by each queue step the user or the queue takes (Next, Previous,
+   * a pick, the end of a scene), never by a route change (a link, Back or
+   * Forward): a cast follows the page's scene only on a step
+   */
+  queueSteps: number;
+  /**
    * The scene the latest load asked for: an answer (or failure) for any
    * other is stale and changes nothing
    */
@@ -307,6 +313,11 @@ export function stepPastUnavailable(
     : nextIndex(state, random);
 }
 
+/** The state after a step, with the step counted (`queueSteps`) */
+function counted(state: ScenePlayerReducerState): ScenePlayerReducerState {
+  return { ...state, queueSteps: state.queueSteps + 1 };
+}
+
 /** NEXT_SCENE's and PREV_SCENE's optional payload */
 function stepAutoplay(payload: unknown): boolean | undefined {
   return (payload as { autoplay?: boolean } | undefined)?.autoplay;
@@ -373,6 +384,7 @@ export const initialState: ScenePlayerReducerState = {
   repeat: "none", // "none" | "all" | "one"
   shuffleHistory: [], // Track played scenes to avoid immediate repeats
   restartCount: 0,
+  queueSteps: 0,
 
   // Scene loads and unavailable queue entries
   requested: null,
@@ -454,20 +466,22 @@ export function scenePlayerReducer(
     case "NEXT_SCENE": {
       const step = nextIndex(state);
       return step
-        ? stepTo(state, step, stepAutoplay(action.payload), "next")
+        ? counted(stepTo(state, step, stepAutoplay(action.payload), "next"))
         : state;
     }
 
     case "PREV_SCENE": {
       const step = prevIndex(state);
       return step
-        ? stepTo(state, step, stepAutoplay(action.payload), "prev")
+        ? counted(stepTo(state, step, stepAutoplay(action.payload), "prev"))
         : state;
     }
 
     case "GOTO_SCENE_INDEX": {
+      // `fromHistory`: Back or Forward to an entry of the queue, a route
+      // change rather than a step
       const gotoPayload = action.payload as
-        | { index?: number; shouldAutoplay?: boolean }
+        | { index?: number; shouldAutoplay?: boolean; fromHistory?: boolean }
         | number;
       const index =
         typeof gotoPayload === "object" && gotoPayload !== null
@@ -487,12 +501,15 @@ export function scenePlayerReducer(
         return state;
       }
 
-      return stepTo(
+      const stepped = stepTo(
         state,
         { index, history: state.shuffleHistory },
         shouldAutoplay,
         "next"
       );
+      const fromHistory =
+        typeof gotoPayload === "object" && gotoPayload.fromHistory === true;
+      return fromHistory ? stepped : counted(stepped);
     }
 
     // Player state

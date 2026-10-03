@@ -190,6 +190,7 @@ async function renderCast(options: RenderOptions = {}) {
     autoplayNext: options.autoplayNext ?? true,
     repeat: options.repeat ?? "none",
     restartCount: 0,
+    queueSteps: 0,
     playlist: null,
     resumeTime: options.resumeTime ?? null,
     minimumPlayPercent: 20,
@@ -213,13 +214,16 @@ async function renderCast(options: RenderOptions = {}) {
 
   let current = props;
   /**
-   * The page changes scene (a queue step) or restarts it; `next.viewing` is
-   * the new scene's viewing, set as useVideoPlayer's tracker effect sets it
+   * The page changes scene through a queue step (Next, Previous, a pick, the
+   * end of a scene) or restarts it; with `route`, it follows a link to
+   * another scene instead, which is no queue step. `next.viewing` is the new
+   * scene's viewing, set as useVideoPlayer's tracker effect sets it.
    */
   const step = (next: {
     scene?: typeof NEXT;
     restartCount?: number;
     viewing?: Viewing;
+    route?: boolean;
   }) => {
     const nextScene = next.scene ?? current.scene ?? SCENE;
     if (next.viewing) viewing.current = next.viewing;
@@ -228,6 +232,7 @@ async function renderCast(options: RenderOptions = {}) {
       scene: nextScene,
       sceneKey: `${nextScene.id}:${nextScene.instanceId}`,
       restartCount: next.restartCount ?? current.restartCount,
+      queueSteps: current.queueSteps + (next.route ? 0 : 1),
     };
     rendered.rerender(current);
   };
@@ -977,6 +982,82 @@ describe("useCast", () => {
       expect(request.autoplay).toBe(true);
       expect(player.peekCastConnected).toBe(true);
       expect(media.play).not.toHaveBeenCalled();
+    });
+
+    describe("a link to another scene while casting (no queue step)", () => {
+      it("does not load it on the TV: the page lets go, and the Cast button offers 'Cast this scene'", async () => {
+        const { player, step } = await renderCast();
+        const { session } = await startCasting(player);
+
+        step({ scene: NEXT, route: true });
+        await settle();
+
+        expect(session.loadMedia).toHaveBeenCalledTimes(1);
+        expect(player.peekCastConnected).toBe(false);
+        const button = must(castButton(player), "the Cast button");
+        expect(button.hasClass("vjs-cast-connected")).toBe(true);
+        expect(untrusted<{ controlText(): string }>(button).controlText()).toBe(
+          "Cast this scene (Living Room TV)"
+        );
+        // As on a page opened while the TV plays another scene
+        expect(statusLine(player)).toBe("");
+        expect(media.play).not.toHaveBeenCalled();
+        // The TV plays on
+        expect(fake.context.getCurrentSession()).toBe(session);
+      });
+
+      it("Cast on that page then loads its scene into the session", async () => {
+        const { player, step } = await renderCast();
+        const { session } = await startCasting(player);
+        step({ scene: NEXT, route: true });
+        await settle();
+
+        untrusted<{ trigger(event: string): void }>(
+          must(castButton(player), "the Cast button")
+        ).trigger("click");
+
+        await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+        expect(fake.context.requestSession).not.toHaveBeenCalled();
+        expect(loadRequestOf(session, 1).media.customData).toEqual({
+          scene: "13:inst-a",
+          sender: "tab-a",
+        });
+        expect(player.peekCastConnected).toBe(true);
+      });
+
+      it("play on that page loads its scene into the session", async () => {
+        const { player, step } = await renderCast();
+        const { session } = await startCasting(player);
+        step({ scene: NEXT, route: true });
+        await settle();
+
+        void player.play();
+
+        await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+        expect(loadRequestOf(session, 1).media.customData).toEqual({
+          scene: "13:inst-a",
+          sender: "tab-a",
+        });
+        expect(media.play).not.toHaveBeenCalled();
+      });
+
+      it("a queue step taken before the scene lands still moves the TV", async () => {
+        const { player, step } = await renderCast();
+        const { session } = await startCasting(player);
+
+        // The step's render: the count moves, the next scene has not landed
+        step({});
+        await settle();
+        expect(session.loadMedia).toHaveBeenCalledTimes(1);
+        // It lands, with no further step
+        step({ scene: NEXT, route: true });
+
+        await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+        expect(loadRequestOf(session, 1).media.customData).toEqual({
+          scene: "13:inst-a",
+          sender: "tab-a",
+        });
+      });
     });
 
     it("a restartCount bump while connected reloads the same scene at 0", async () => {

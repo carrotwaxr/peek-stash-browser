@@ -913,6 +913,40 @@ describe("ScenePlayerContext", () => {
       expect(entryQueue()?.currentIndex).toBe(1);
     });
 
+    it("Back to an earlier entry of the queue goes to it without counting a queue step (a cast does not follow a route change)", async () => {
+      const entries = [
+        { pathname: "/scenes" },
+        {
+          pathname: "/scene/1",
+          state: { playlist: queueOf("q1", ["1", "2", "3"], 0) },
+        },
+        {
+          pathname: "/scene/2",
+          state: { playlist: queueOf("q1", ["1", "2", "3"], 1) },
+        },
+      ];
+      const { result } = renderHook(() => useScenePlayer(), {
+        wrapper: routerWrapper(entries),
+      });
+      await waitFor(() => {
+        expect(result.current.scene?.id).toBe("2");
+      });
+
+      await go(-1);
+
+      await waitFor(() => {
+        expect(result.current.scene?.id).toBe("1");
+      });
+      expect(result.current.currentIndex).toBe(0);
+      expect(result.current.queueSteps).toBe(0);
+
+      // A step the user takes counts
+      act(() => {
+        result.current.dispatch({ type: "NEXT_SCENE" });
+      });
+      expect(result.current.queueSteps).toBe(1);
+    });
+
     it("advancing replaces the router location: the path is the entry's scene, state.playlist.currentIndex is the new index, and history length is unchanged", async () => {
       const replaceState = vi.spyOn(window.history, "replaceState");
       const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]), {

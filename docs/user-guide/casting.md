@@ -54,8 +54,9 @@ Peek gives the TV the scene's title, its performers, its poster and a personal s
 
 A cast session plays one scene at a time, and the page and the TV follow each other:
 
-- A scene change on the page while casting moves the TV to the new scene: Next, Previous, the playlist sidebar and the queue all do.
-- On another scene's page, pressing **Cast** or **play** while a session is live loads that scene onto the TV.
+- A step through the queue while casting moves the TV to the new scene: Next, Previous, a pick in the playlist sidebar, and a scene that finishes with Autoplay on all do.
+- Following a link to another scene (Scenes Like This, Recommended, a performer's page) or going Back or Forward does not: the TV plays on, and the page offers its own scene.
+- On another scene's page, pressing **Cast** ("Cast this scene") or **play** while a session is live loads that scene onto the TV.
 - Leaving the page leaves the TV playing. Peek does not stop the cast when you close the tab or move on; stop it with the Cast button (or from the TV). Opening a scene page again attaches to the live session if the TV is still playing that scene.
 
 ### Playlists
