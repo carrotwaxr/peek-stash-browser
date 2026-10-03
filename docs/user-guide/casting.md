@@ -8,11 +8,11 @@ Location: Scene page, in the player's control bar.
 
 | | Chromecast | AirPlay |
 |---|---|---|
-| Browser | Chrome, Edge or Chrome on Android | Safari on a Mac, iPhone or iPad |
+| Browser | Chrome, Edge or Chrome on Android | Safari on a Mac, or any browser on an iPhone or iPad |
 | Peek's address | HTTPS, with a certificate the device trusts | Any address the Apple TV can reach |
 | Where | The Scene page (not [TV mode](keyboard-navigation.md#tv-mode)) | The Scene page (not TV mode) |
 
-The Cast button shows in the control bar when the browser can cast and a Cast device is on your network. It reads "Cast this scene" while idle and "Stop casting" while a scene plays on the TV. The AirPlay button appears the same way in Safari when an Apple TV is in range.
+The Cast button shows in the control bar when the browser can cast and a Cast device is on your network. It reads "Cast this scene" while idle and "Stop casting" while a scene plays on the TV. The AirPlay button appears the same way in Safari, or any browser on an iPhone or iPad, when an Apple TV is in range.
 
 ### Chromecast needs HTTPS
 
@@ -83,7 +83,7 @@ Casting leaves VR first: starting a cast switches the VR view off, and the VR bu
 
 ## AirPlay
 
-In Safari, the player's **AirPlay** button appears when an Apple TV or another AirPlay device is in range. Pick the device and the video plays there. Safari plays the scene from a signed link (the source Peek asks for on every playback in Safari), which the Apple TV can fetch by itself. The same address rule as Chromecast applies: the Apple TV must reach Peek at the address Safari uses. Leave the tab open while it plays.
+In Safari, and in any browser on an iPhone or iPad (Chrome and Edge there are built on Safari's engine), the player's **AirPlay** button appears when an Apple TV or another AirPlay device is in range. Pick the device and the video plays there. These browsers play the scene from a signed link (the source Peek asks for on every playback where AirPlay is possible), which the Apple TV can fetch by itself. The same address rule as Chromecast applies: the Apple TV must reach Peek at the address the browser uses. Leave the tab open while it plays.
 
 ## Troubleshooting
 

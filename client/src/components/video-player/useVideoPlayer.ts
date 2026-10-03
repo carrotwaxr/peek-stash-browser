@@ -17,6 +17,7 @@ import { type Viewing, createViewing } from "./activitySenders";
 import type { CastAwarePlayer } from "./cast/castMiddleware";
 import type { CastScene } from "./cast/castSession";
 import { useCast } from "./cast/useCast";
+import { canPlayToAirPlay } from "./playbackTarget";
 import { buildPlayerSources } from "./playerSources";
 import type { AirPlayPlayer } from "./plugins/airplay";
 import { startAirPlay } from "./plugins/loadAirPlay";
@@ -128,16 +129,17 @@ export function useVideoPlayer({
   // The scene's one viewing, shared by the local and the cast tracker
   const viewingRef = useRef<Viewing | null>(null);
 
-  // Safari plays the signed media link's Direct and HLS (so AirPlay can take
-  // the stream over); the sources wait for the link, or its error. The flag,
-  // not the data, drives the sources effect: the hourly renewal reloads
-  // nothing.
+  // A browser that can AirPlay (Safari, and every browser on iOS) plays the
+  // signed media link's Direct and HLS, so the AirPlay device, which has no
+  // cookie, can take the stream over; the sources wait for the link, or its
+  // error. The flag, not the data, drives the sources effect: the hourly
+  // renewal reloads nothing.
   const queryClient = useQueryClient();
-  const safari = videojs.browser.IS_SAFARI;
+  const signed = canPlayToAirPlay();
   const link = useSceneMediaLink(sceneId ?? "", sceneInstanceId ?? "", {
-    enabled: safari,
+    enabled: signed,
   });
-  const linkSettled = !safari || link.isSuccess || link.isError;
+  const linkSettled = !signed || link.isSuccess || link.isError;
   // What the loaded sources were built from, for the expired-link refetch
   const loadedLinkRef = useRef<LoadedLink | null>(null);
 
@@ -289,8 +291,8 @@ export function useVideoPlayer({
       focusAtStartRef.current
     );
 
-    // Safari's AirPlay button (and the attribute on the tech's <video>),
-    // whose code loads only in Safari
+    // The AirPlay button (and the attribute on the tech's <video>), whose
+    // code loads only where the browser can AirPlay
     const stopAirPlay = startAirPlay(player as AirPlayPlayer);
 
     // Volume persistence is now handled by persistVolume plugin
@@ -506,7 +508,7 @@ export function useVideoPlayer({
       return;
     }
 
-    // Safari waits for the link (or its error) before the sources are set;
+    // A browser that can AirPlay waits for the link (or its error) before the sources are set;
     // until then the last scene's ready flag must not autoplay
     if (!linkSettled) {
       dispatch({ type: "SET_READY", payload: false });
@@ -534,7 +536,7 @@ export function useVideoPlayer({
     const streams = link.data?.streams;
     const sources = buildPlayerSources(scene, canDecode, streams);
     loadedLinkRef.current =
-      safari && link.data ? { scene, expiresAt: link.data.expiresAt } : null;
+      signed && link.data ? { scene, expiresAt: link.data.expiresAt } : null;
 
     // The plugin loads the first, falls back through the rest and shows the
     // rate menu only on Direct and MKV
@@ -562,7 +564,7 @@ export function useVideoPlayer({
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneKey, linkSettled]); // Only the scene, and a Safari link settling
+  }, [sceneKey, linkSettled]); // Only the scene, and a signed link settling
 
   // ============================================================================
   // RESTART (a queue step to an entry of the same scene)

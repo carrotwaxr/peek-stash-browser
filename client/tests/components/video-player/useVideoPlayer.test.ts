@@ -714,12 +714,19 @@ describe("useVideoPlayer", () => {
     /** What the hook's source selector was asked to load */
     const built = [{ src: "built", offset: false }];
 
+    // A browser that can AirPlay (WebKit: Safari, every browser on iOS)
+    const proto = HTMLVideoElement.prototype as unknown as Record<
+      string,
+      unknown
+    >;
     beforeEach(() => {
       Object.assign(videojs.browser, { IS_SAFARI: true });
+      proto.webkitShowPlaybackTargetPicker = vi.fn();
       vi.mocked(buildPlayerSources).mockReturnValue(built);
     });
     afterEach(() => {
       Object.assign(videojs.browser, { IS_SAFARI: false });
+      delete proto.webkitShowPlaybackTargetPicker;
       vi.mocked(buildPlayerSources).mockReturnValue([]);
     });
 
@@ -776,6 +783,7 @@ describe("useVideoPlayer", () => {
 
     it("in Chrome the sources never carry sig: no link is asked for", () => {
       Object.assign(videojs.browser, { IS_SAFARI: false });
+      delete proto.webkitShowPlaybackTargetPicker;
       answerLinks(mediaLink("a"));
       const player = fakePlayer();
       renderPlayer(player, onA);
@@ -787,6 +795,22 @@ describe("useVideoPlayer", () => {
         undefined
       );
       expect(linkRequests()).toEqual([]);
+    });
+
+    it("Chrome or Edge on iOS (WebKit, which can AirPlay, though not Safari) plays the link's streams too", async () => {
+      Object.assign(videojs.browser, { IS_SAFARI: false });
+      const link = mediaLink("a");
+      answerLinks(link);
+      const player = fakePlayer();
+      renderPlayer(player, onA);
+
+      await waitFor(() => expect(player.setSources).toHaveBeenCalledTimes(1));
+
+      expect(vi.mocked(buildPlayerSources)).toHaveBeenCalledWith(
+        onA,
+        canDecode,
+        link.streams
+      );
     });
 
     it("the scene is not marked loaded until the link settles", async () => {
