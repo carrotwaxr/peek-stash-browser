@@ -249,6 +249,7 @@ describe("wallConfig", () => {
 
     it("builds subtitle from scene title and primary tag", () => {
       const clip = {
+        title: "Clip",
         scene: { title: "Scene 1" },
         primaryTag: { name: "Action" },
       };
@@ -261,8 +262,18 @@ describe("wallConfig", () => {
     });
 
     it("builds subtitle with primary tag only", () => {
-      const clip = { primaryTag: { name: "Action" } };
+      const clip = { title: "Clip", primaryTag: { name: "Action" } };
       expect(config.getSubtitle(clip)).toBe("Action");
+    });
+
+    it("an untitled clip, named by its tag, does not repeat the tag below", () => {
+      const clip = {
+        scene: { title: "Scene 1" },
+        primaryTag: { name: "Action" },
+      };
+      expect(config.getTitle(clip)).toBe("Action");
+      expect(config.getSubtitle(clip)).toBe("Scene 1");
+      expect(config.getSubtitle({ primaryTag: { name: "Action" } })).toBe("");
     });
 
     it("returns empty subtitle when no scene or tag", () => {
