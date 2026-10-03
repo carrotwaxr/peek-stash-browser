@@ -16,6 +16,7 @@ import {
 } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
 import {
   type SavedPreset,
@@ -1342,6 +1343,58 @@ describe("include or exclude per value (F22a)", () => {
     expect(codec.fromCriterion(row, spec, { modifier: "NOT_NULL" })).toEqual({
       tagIdsModifier: "NOT_NULL",
     });
+  });
+
+  it("a cleared picker writes none of its keys, its condition and depth included", () => {
+    const row = must(
+      (PANEL_FIELDS.scene as readonly PanelField[]).find(
+        (each) => each.key === "tagIds"
+      ),
+      "the Tags row"
+    );
+    const params = new URLSearchParams();
+    codecOf(row).writeUrl(
+      row,
+      { tagIds: [], tagIdsModifier: "INCLUDES_ALL", tagIdsDepth: -1 },
+      params
+    );
+    expect(params.toString()).toBe("");
+    // The list then reads no filter: the default preset may apply
+    const cleared = viaUrl("scene", {
+      tagIds: [],
+      tagIdsModifier: "INCLUDES_ALL",
+      tagIdsDepth: -1,
+    });
+    expect(cleared.read).toEqual({});
+  });
+
+  it("excludes with no included value write no condition, and keep their depth", () => {
+    const { query, read } = viaUrl("scene", {
+      tagIds: [],
+      tagIdsModifier: "INCLUDES_ALL",
+      tagIdsDepth: -1,
+      tagIdsExclude: ["2:b"],
+    });
+
+    expect(new URLSearchParams(query).has("tagIdsModifier")).toBe(false);
+    expect(read).toEqual({ tagIdsDepth: -1, tagIdsExclude: ["2:b"] });
+    expect(buildSceneFilter(read).tags).toEqual({
+      value: [],
+      excludes: ["2:b"],
+      modifier: "INCLUDES_ALL",
+      depth: -1,
+    });
+  });
+
+  it("an old link holding a condition and depth without ids still reads", () => {
+    const read = readListParams(
+      new URLSearchParams("tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1"),
+      "scene",
+      SCENE_FILTER_OPTIONS
+    ).filters;
+
+    expect(read).toEqual({ tagIdsModifier: "INCLUDES_ALL", tagIdsDepth: -1 });
+    expect(buildSceneFilter(read).tags).toBeUndefined();
   });
 
   it("an old URL with only `tagIds` reads as includes", () => {

@@ -1213,11 +1213,29 @@ function writeCompanions(
   state: PanelState,
   params: URLSearchParams
 ) {
+  writeModifier(field, state, params);
+  writeDepth(field, state, params);
+}
+
+/** Writes the row's modifier companion when the state holds one */
+function writeModifier(
+  field: PanelField,
+  state: PanelState,
+  params: URLSearchParams
+) {
   const modifier =
     field.modifierKey === undefined ? undefined : state[field.modifierKey];
   if (field.modifierKey !== undefined && modifier) {
     setParam(params, field.modifierKey, modifier);
   }
+}
+
+/** Writes the row's depth companion when the state holds one */
+function writeDepth(
+  field: PanelField,
+  state: PanelState,
+  params: URLSearchParams
+) {
   const depth =
     field.hierarchyKey === undefined ? undefined : state[field.hierarchyKey];
   if (field.hierarchyKey !== undefined && depth !== undefined) {
@@ -1300,8 +1318,9 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
           : undefined,
     // A presence choice writes its modifier alone. Else a list of ids
     // joined with commas (a lone string is a one-element list), or one id;
-    // the excluded ids the same way under the exclude companion; then the
-    // modifier and depth when either list has an id or the key is set
+    // the excluded ids the same way under the exclude companion. The
+    // condition goes with included ids only (excludes alone take none), the
+    // depth with any id: a cleared picker writes no key at all
     writeUrl: (field, state, params) => {
       const presence = refPresenceOf(field, state);
       if (presence !== undefined && field.modifierKey !== undefined) {
@@ -1310,17 +1329,18 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
       }
       const value = state[field.key];
       const excluded = excludedOf(field, state);
-      if (isUnset(value) && excluded.length === 0) return;
-      if (field.multi) {
-        const ids = valuesOf(value);
-        if (ids.length > 0) params.set(field.key, ids.join(","));
-      } else if (value) {
-        setParam(params, field.key, value);
+      const ids = field.multi ? valuesOf(value) : [];
+      const included = field.multi ? ids.length > 0 : Boolean(value);
+      if (!included && excluded.length === 0) return;
+      if (included) {
+        if (field.multi) params.set(field.key, ids.join(","));
+        else setParam(params, field.key, value);
+        writeModifier(field, state, params);
       }
       if (field.excludeKey !== undefined && excluded.length > 0) {
         params.set(field.excludeKey, excluded.join(","));
       }
-      writeCompanions(field, state, params);
+      writeDepth(field, state, params);
     },
     // A card's count links with one entity and its instance
     // (/scenes?performerId=82&instance=abc-123 reads performerIds:
