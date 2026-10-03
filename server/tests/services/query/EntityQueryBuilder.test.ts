@@ -41,6 +41,7 @@ import type {
   ParsedListRequest,
   ParsedWhereGroup,
 } from "../../../types/parsedFilters.js";
+import { pairsJson } from "../../../utils/entityRef.js";
 import {
   type FilterClause,
   combine,
@@ -53,6 +54,7 @@ import {
 } from "../../helpers/fixtures.js";
 import { must } from "../../helpers/must.js";
 import { partialRow } from "../../helpers/prismaMock.js";
+import { untrusted } from "../../helpers/untrusted.js";
 
 vi.mock(
   "../../../prisma/singleton.js",
@@ -815,6 +817,107 @@ describe("EntityQueryBuilder", () => {
     });
   });
 
+  describe("ranked refs (Recommended)", () => {
+    it("a ranked request with no refs reads no rows and counts 0", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ total: 0n }]);
+
+      const result = await builder.execute({
+        userId: 1,
+        allowedInstanceIds: ["inst-a"],
+        request: request(),
+        ranked: [],
+      });
+
+      expect(result).toEqual({ items: [], total: 0 });
+      const [page, count] = statements();
+      for (const statement of [must(page), must(count)]) {
+        // An empty ranked list never means "every row"
+        expect(statement.sql).toContain(
+          "WHERE s.deletedAt IS NULL AND e.id IS NULL AND s.stashInstanceId IN (?) AND 0"
+        );
+        expect(statement.sql).not.toContain("ranked_refs");
+      }
+    });
+
+    it("a ranked request keeps the exclusion join and the allowed instances", async () => {
+      const ranked = [
+        { id: "7", instanceId: "inst-a" },
+        { id: "3", instanceId: "inst-a" },
+      ];
+
+      await builder.execute({
+        userId: 4,
+        allowedInstanceIds: ["inst-a"],
+        request: request(),
+        ranked,
+      });
+
+      const [page, count] = statements();
+      for (const statement of [must(page), must(count)]) {
+        positions(statement.sql, [
+          "WITH ranked_refs(id, inst, pos) AS MATERIALIZED",
+          "LEFT JOIN UserExcludedEntity e",
+          "JOIN ranked_refs k ON k.id = s.id AND k.inst = s.stashInstanceId",
+          "WHERE s.deletedAt IS NULL AND e.id IS NULL AND s.stashInstanceId IN (?)",
+        ]);
+        expect(statement.params[0]).toBe(pairsJson(ranked));
+      }
+      expect(must(page).params).toEqual([
+        pairsJson(ranked),
+        "select:4",
+        4,
+        4,
+        "inst-a",
+        10,
+        0,
+      ]);
+    });
+
+    it("the Recommended sort reads the rank only within ranked refs: best first on DESC, and the default sort without them", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+      const recommended = (direction: "ASC" | "DESC") =>
+        request({
+          sort: {
+            field:
+              untrusted<ParsedListRequest<"scene">["sort"]["field"]>(
+                "recommended"
+              ),
+            direction,
+            seed: undefined,
+          },
+        });
+      const ranked = [{ id: "7", instanceId: "inst-a" }];
+      const orderOf = async (
+        direction: "ASC" | "DESC",
+        refs: typeof ranked | undefined
+      ) => {
+        mockPrisma.$queryRawUnsafe.mockClear();
+        await sceneQueryBuilder.execute({
+          userId: 1,
+          allowedInstanceIds: ["inst-a"],
+          request: recommended(direction),
+          ...(refs === undefined ? {} : { ranked: refs }),
+        });
+        const sql = must(statements()[0]).sql;
+        return sql.slice(sql.indexOf("ORDER BY"), sql.indexOf("\nLIMIT"));
+      };
+
+      expect(await orderOf("DESC", ranked)).toBe(
+        "ORDER BY k.pos ASC, s.id DESC, s.stashInstanceId DESC"
+      );
+      expect(await orderOf("ASC", ranked)).toBe(
+        "ORDER BY k.pos DESC, s.id ASC, s.stashInstanceId ASC"
+      );
+      expect(await orderOf("DESC", undefined)).toBe(
+        "ORDER BY s.stashCreatedAt DESC, s.id DESC, s.stashInstanceId DESC"
+      );
+    });
+  });
+
   /**
    * Rows equal on every other ORDER BY term (one name twice, one id on two
    * servers, one random value, NULLs) come back in whatever order SQLite
@@ -1134,6 +1237,7 @@ describe("the field clause table", () => {
       allowedInstanceIds: ["inst-a"],
       specificInstanceId: undefined,
       sortField: "rating",
+      ranked: false,
       timeZone: "UTC",
       hasExclusionsOf: () => Promise.resolve(false),
       name,
@@ -1487,6 +1591,33 @@ describe("the where tree", () => {
     ]);
   });
 
+  it("the ranked clause stays outside an any group", async () => {
+    const tree = new TreeBuilder();
+    await tree.execute({
+      userId: 5,
+      allowedInstanceIds: ["a"],
+      request: request({
+        where: {
+          match: "any",
+          rules: [favorite(true), tags("INCLUDES", ["1"])],
+        },
+      }),
+      ranked: [{ id: "1", instanceId: "a" }],
+    });
+    const page = must(statements()[0]).sql;
+
+    // The ranked join restricts the FROM and the group ORs only its rows
+    positions(page, [
+      "WITH ranked_refs(id, inst, pos)",
+      "JOIN ranked_refs k ON k.id = s.id AND k.inst = s.stashInstanceId",
+      `WHERE ${BASE} AND (r.favorite = 1 OR tags_INCLUDES(?))`,
+    ]);
+    expect(whereText(page)).toBe(
+      `${BASE} AND (r.favorite = 1 OR tags_INCLUDES(?))`
+    );
+    expect(cteNames(page)).toEqual(["ranked_refs", "w0_favorite", "w1_tags"]);
+  });
+
   it("a leaf's excludes stay one disjunct under any", async () => {
     const tree = new TreeBuilder();
     const page = await pageOf(tree, {
@@ -1586,6 +1717,7 @@ describe("the where tree", () => {
       allowedInstanceIds: ["a"],
       specificInstanceId: undefined,
       sortField: "created_at",
+      ranked: false,
       timeZone: "UTC",
       hasExclusionsOf: () => Promise.resolve(false),
       name: "w0_tags",
@@ -1685,6 +1817,7 @@ describe("no field clause joins", () => {
             allowedInstanceIds: ["inst-a"],
             specificInstanceId: undefined,
             sortField: "created_at",
+            ranked: false,
             timeZone: "UTC",
             hasExclusionsOf: () => Promise.resolve(true),
             name: `w0_${sample.field}`,

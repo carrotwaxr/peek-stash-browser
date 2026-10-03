@@ -12,6 +12,7 @@ import { RESOLUTIONS } from "@peek/shared-types/filters/index.js";
 import { afterAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import type { DateCriterion, FilterRef } from "../../types/parsedFilters.js";
+import { pairsJson } from "../../utils/entityRef.js";
 import {
   type JunctionTarget,
   NEGATIVE_INLINE_LIMIT,
@@ -44,6 +45,7 @@ import {
   performerTagsClause,
   performerTagsFieldClause,
   randomOrder,
+  rankedClause,
   refClause,
   refPresenceClause,
   resolutionClause,
@@ -2625,5 +2627,53 @@ SELECT s.id || ':' || s.stashInstanceId AS k FROM sc s WHERE ${clause.sql} ORDER
     const probe = await listed(STUDIO, NEGATIVE_INLINE_LIMIT);
     expect(probe).toEqual(await listed(STUDIO, Number.POSITIVE_INFINITY));
     expect(probe).toEqual([`1:${B}`, `3:${A}`, `5:${A}`, `6:${A}`]);
+  });
+});
+
+describe("rankedClause", () => {
+  it("rankedClause binds the refs as one JSON array with their positions and joins on id and instance", () => {
+    const refs = [
+      { id: "9", instanceId: "inst-b" },
+      { id: "1", instanceId: "inst-a" },
+      { id: "9", instanceId: "inst-a" },
+    ];
+
+    const clause = rankedClause("s", refs);
+
+    expect(clause.ctes).toEqual([
+      {
+        name: "ranked_refs",
+        sql: "ranked_refs(id, inst, pos) AS MATERIALIZED (SELECT json_extract(j.value, '$[0]'), json_extract(j.value, '$[1]'), j.key FROM json_each(?) j)",
+        params: [pairsJson(refs)],
+      },
+    ]);
+    expect(clause.joins).toEqual([
+      {
+        sql: "JOIN ranked_refs k ON k.id = s.id AND k.inst = s.stashInstanceId",
+        params: [],
+      },
+    ]);
+    // The join restricts the rows; the WHERE gains nothing
+    expect(clause.sql).toBe("");
+    expect(clause.params).toEqual([]);
+  });
+
+  it("rankedClause keeps a ref named twice once, at its best position", () => {
+    const clause = rankedClause("s", [
+      { id: "1", instanceId: "a" },
+      { id: "2", instanceId: "a" },
+      { id: "1", instanceId: "a" },
+    ]);
+
+    expect(must(clause.ctes?.[0]).params).toEqual([
+      pairsJson([
+        { id: "1", instanceId: "a" },
+        { id: "2", instanceId: "a" },
+      ]),
+    ]);
+  });
+
+  it("rankedClause of no refs matches nothing", () => {
+    expect(rankedClause("s", [])).toEqual({ sql: "0", params: [] });
   });
 });

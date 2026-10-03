@@ -303,6 +303,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       allowedInstanceIds: [],
       specificInstanceId: undefined,
       sortField: sort.field,
+      ranked: false,
       // No sort reads it, nor the lookup, which asks only when called
       timeZone: "UTC",
       hasExclusionsOf: exclusionLookup(userId, true),
@@ -335,7 +336,8 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * scene_index is the scene's number in the collection the request filters
    * by, and has an expression only with one (INCLUDES or INCLUDES_ALL):
    * without it the key falls back to the default sort. playlist_position is
-   * the same for the one playlist the request filters by.
+   * the same for the one playlist the request filters by. recommended is the
+   * rank, only for a list within ranked refs (`QueryContext.ranked`).
    */
   protected sortMap(
     dir: SortDirection,
@@ -381,6 +383,16 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       },
       ...this.sceneIndexSort(dir, filter),
       ...this.playlistPositionSort(dir, filter),
+      // Recommended's rank, only within ranked refs (`ranked_refs k`): best
+      // (position 0) first on DESC
+      ...(ctx.ranked
+        ? {
+            recommended: {
+              sql: `k.pos ${dir === "DESC" ? "ASC" : "DESC"}`,
+              params: [],
+            },
+          }
+        : {}),
     };
   }
 
