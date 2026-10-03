@@ -141,6 +141,9 @@ interface RenderOptions {
   viewing?: Viewing | null;
   /** The page has no player yet (the ref is empty) */
   noPlayer?: boolean;
+  /** The tab's autoplay-next setting (on by default) and repeat mode */
+  autoplayNext?: boolean;
+  repeat?: string;
 }
 
 /** Real time passes (the cast code's timers and awaits run) until `check` */
@@ -177,13 +180,14 @@ async function renderCast(options: RenderOptions = {}) {
   // One ref for the page's life, as useVideoPlayer keeps it; by default no
   // viewing (the cast tracker's own tests are in castActivity.test.ts)
   const viewing = { current: options.viewing ?? null };
+  const dispatch = vi.fn<(action: unknown) => void>();
   const props: UseCastOptions = {
     playerRef: { current: options.noPlayer ? null : player },
     scene,
     sceneKey: `${scene.id}:${scene.instanceId}`,
-    dispatch: vi.fn(),
-    autoplayNext: true,
-    repeat: "none",
+    dispatch,
+    autoplayNext: options.autoplayNext ?? true,
+    repeat: options.repeat ?? "none",
     restartCount: 0,
     playlist: null,
     resumeTime: options.resumeTime ?? null,
@@ -226,7 +230,7 @@ async function renderCast(options: RenderOptions = {}) {
     };
     rendered.rerender(current);
   };
-  return { player, rendered, step, viewing };
+  return { player, rendered, step, viewing, dispatch };
 }
 
 const castButton = (player: TestPlayer) =>
@@ -1053,6 +1057,120 @@ describe("useCast", () => {
       await settle();
 
       expect(lastTrackEdit(session).activeTrackIds).toEqual([1]);
+    });
+    describe("a scene that finishes on the TV", () => {
+      /** The receiver reports `reason` as the media's idle reason */
+      function receiverIdles(
+        session: FakeSession,
+        remote: ReturnType<typeof fake.remote>,
+        controller: ReturnType<typeof fake.controller>,
+        reason: string
+      ) {
+        session.mediaSession = { ...session.mediaSession, idleReason: reason };
+        remote.playerState = "IDLE";
+        controller.emit(REMOTE_EVENT.PLAYER_STATE_CHANGED);
+      }
+
+      it("a finished remote scene steps the queue and loads the next scene's link", async () => {
+        const { player, step, dispatch } = await renderCast();
+        // The reducer's step: the page moves to the next entry
+        dispatch.mockImplementation(() => step({ scene: NEXT }));
+        const { session, remote, controller } = await startCasting(player);
+
+        await act(() => {
+          receiverIdles(session, remote, controller, "FINISHED");
+          return Promise.resolve();
+        });
+
+        expect(dispatch).toHaveBeenCalledTimes(1);
+        expect(dispatch).toHaveBeenCalledWith({
+          type: "NEXT_SCENE",
+          payload: { autoplay: true },
+        });
+        await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+        expect(vi.mocked(apiPost)).toHaveBeenCalledWith(
+          "/scene/13/media-link",
+          {
+            instanceId: "inst-a",
+          }
+        );
+        const request = loadRequestOf(session, 1);
+        expect(request.media.customData).toEqual({
+          scene: "13:inst-a",
+          sender: "tab-a",
+        });
+        expect(request.currentTime).toBe(0);
+        // The scene that just finished was playing: the next one plays on
+        expect(request.autoplay).toBe(true);
+        expect(media.play).not.toHaveBeenCalled();
+      });
+
+      it("repeat one reloads the same scene", async () => {
+        const { player, dispatch } = await renderCast({ repeat: "one" });
+        const { session, remote, controller } = await startCasting(player);
+
+        await act(() => {
+          receiverIdles(session, remote, controller, "FINISHED");
+          return Promise.resolve();
+        });
+
+        await waitFor(() => expect(session.loadMedia).toHaveBeenCalledTimes(2));
+        expect(dispatch).not.toHaveBeenCalled();
+        const request = loadRequestOf(session, 1);
+        expect(request.media.customData).toEqual({
+          scene: "12:inst-a",
+          sender: "tab-a",
+        });
+        expect(request.currentTime).toBe(0);
+        expect(request.autoplay).toBe(true);
+      });
+
+      it("no advance when the tab's autoplay is off", async () => {
+        const { player, dispatch } = await renderCast({ autoplayNext: false });
+        const { session, remote, controller } = await startCasting(player);
+
+        await act(() => {
+          receiverIdles(session, remote, controller, "FINISHED");
+          return Promise.resolve();
+        });
+        await settle();
+
+        expect(dispatch).not.toHaveBeenCalled();
+        expect(session.loadMedia).toHaveBeenCalledTimes(1);
+      });
+
+      it("an idle reason other than FINISHED does not step", async () => {
+        const { player, dispatch } = await renderCast();
+        const { session, remote, controller } = await startCasting(player);
+
+        for (const reason of ["CANCELLED", "INTERRUPTED"]) {
+          await act(() => {
+            receiverIdles(session, remote, controller, reason);
+            return Promise.resolve();
+          });
+        }
+        await settle();
+
+        expect(dispatch).not.toHaveBeenCalled();
+        expect(session.loadMedia).toHaveBeenCalledTimes(1);
+      });
+
+      it("a tab mirroring media another tab loaded does not step the queue", async () => {
+        vi.mocked(castSenderId).mockReturnValue("tab-b");
+        const session = liveSession("12:inst-a", "tab-a");
+        const { dispatch } = await renderCast();
+        const remote = fake.remote();
+        Object.assign(remote, { isMediaLoaded: true, duration: 600 });
+
+        await act(() => {
+          receiverIdles(session, remote, fake.controller(), "FINISHED");
+          return Promise.resolve();
+        });
+        await settle();
+
+        expect(dispatch).not.toHaveBeenCalled();
+        expect(session.loadMedia).not.toHaveBeenCalled();
+      });
     });
   });
 

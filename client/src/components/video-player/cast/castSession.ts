@@ -248,6 +248,11 @@ export interface CastSessionOptions {
     resumeTime: number | null | undefined;
     viewing: { readonly current: Viewing | null };
     minimumPlayPercent: number;
+    /** What the end of a scene does: this tab's autoplay and repeat settings */
+    autoplayNext: boolean;
+    repeat: string;
+    /** The queue's reducer (`NEXT_SCENE` steps it) */
+    dispatch: (action: never) => void;
   };
   /** The scene's signed media link (C2's query) */
   fetchLink(scene: CastScene): Promise<SceneMediaLinkResponse>;
@@ -513,13 +518,33 @@ export class CastSessionController {
     const session = this.attachedTo;
     if (!session) return;
     const { media } = this;
-    if (
-      this.remote.playerState === media.PlayerState.IDLE &&
-      session.getMediaSession()?.idleReason === media.IdleReason.ERROR
-    ) {
+    if (this.remote.playerState !== media.PlayerState.IDLE) return;
+    // The idle reason is on the media session: the RemotePlayer has none
+    const reason = session.getMediaSession()?.idleReason;
+    if (reason === media.IdleReason.ERROR) {
       this.options.notify(this.failureMessage(session));
+    } else if (reason === media.IdleReason.FINISHED) {
+      this.finished(session);
     }
   };
+
+  /**
+   * The TV finished the scene. The local player never plays while attached,
+   * so its `ended` never fires: repeat one loads the scene again, else with
+   * autoplay the queue steps on (the reducer owns shuffle and repeat all) and
+   * the page's scene change loads the next scene on the TV, which plays on
+   * as the finished one was. Only the tab that loaded the media steps, so two
+   * tabs on one scene do not step twice.
+   */
+  private finished(session: cast.framework.CastSession) {
+    if (this.loading || !this.loadedHere) return;
+    const { repeat, autoplayNext, dispatch } = this.options.page();
+    if (repeat === "one") {
+      void this.load(session, 0, true);
+    } else if (autoplayNext) {
+      dispatch({ type: "NEXT_SCENE", payload: { autoplay: true } } as never);
+    }
+  }
 
   /** Other media on the receiver (perhaps loaded from another tab) */
   private readonly onMediaInfo = () => {

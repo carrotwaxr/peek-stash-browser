@@ -341,6 +341,9 @@ describe("the session controller", () => {
         resumeTime: null,
         viewing: { current: viewing },
         minimumPlayPercent: 20,
+        autoplayNext: true,
+        repeat: "none",
+        dispatch: () => {},
       }),
       fetchLink: () =>
         Promise.resolve({

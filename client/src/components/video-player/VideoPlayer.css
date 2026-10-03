@@ -650,6 +650,22 @@ section.video-container {
     center / contain no-repeat;
 }
 
+/* A phone's control bar has room for so many buttons: the Cast and VR buttons
+   come beside skip, seek, rate, captions, source and fullscreen (and the
+   headset button while VR runs), and the bar would push fullscreen out of the
+   player. While either shows, the bar's seek buttons go (the big buttons in
+   the middle keep seeking). */
+@media (max-width: 576px) {
+  .video-js
+    .vjs-control-bar:has(
+      .vjs-cast-button:not(.vjs-hidden),
+      .vjs-vr-button:not(.vjs-hidden)
+    )
+    .vjs-seek-button {
+    display: none;
+  }
+}
+
 /* Cast button (Chromium on HTTPS): the icon is a mask, so it takes the
    control's colour; connected, it shows the filled cast icon in the accent */
 .video-js .vjs-cast-button .vjs-icon-placeholder::before {
