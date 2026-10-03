@@ -9,7 +9,14 @@ import {
   Q_MAX_LENGTH,
 } from "@peek/shared-types";
 import type { FilterOption } from "./filterConfig";
-import { codecOf, entityParamFor, urlKeysOf } from "./filterFields";
+import {
+  codecOf,
+  entityParamFor,
+  isFilterUrlKey,
+  readTreeUrl,
+  urlKeysOf,
+  writeTreeUrl,
+} from "./filterFields";
 
 export { entityParamFor };
 
@@ -107,13 +114,24 @@ function fieldsOf(
   return fields;
 }
 
+/**
+ * The filters' URL parameters. A list's go through its tree codec: groups,
+ * repeated rows and the root's match under their prefixes (`g1.`, `2.`,
+ * `match`), in canonical order. Without a list (a carousel's link) each
+ * option's row writes its keys as they are.
+ */
 const filtersToUrlParams = (
   filters: Record<string, unknown>,
   filterOptions: readonly FilterOption[],
   entity?: ListKind
 ) => {
   const params = new URLSearchParams();
-  for (const field of fieldsOf(filterOptions, entity)) {
+  const fields = fieldsOf(filterOptions, entity);
+  if (entity !== undefined) {
+    writeTreeUrl(entity, fields, filters, params);
+    return params;
+  }
+  for (const field of fields) {
     codecOf(field).writeUrl(field, filters, params);
   }
   return params;
@@ -125,6 +143,8 @@ export const IMAGE_PARAM = "image";
 /**
  * Deserialize URL query parameters to filter state. Only the page's own
  * options are read: a param for a filter the page does not have is ignored.
+ * A list's filters are read through its tree codec (groups and repeated rows
+ * under their prefixes, canonical, at most 20 rows).
  *
  * @param {URLSearchParams} searchParams - URL search params
  * @param {Array} filterOptions - Filter configuration from filterConfig.js
@@ -135,8 +155,12 @@ const urlParamsToFilters = (
   filterOptions: readonly FilterOption[],
   entity?: ListKind
 ) => {
+  const fields = fieldsOf(filterOptions, entity);
+  // A list's filters may hold groups and repeated rows (`readTreeUrl`)
+  if (entity !== undefined)
+    return { ...readTreeUrl(entity, fields, searchParams) };
   const filters: Record<string, unknown> = {};
-  for (const field of fieldsOf(filterOptions, entity)) {
+  for (const field of fields) {
     Object.assign(filters, codecOf(field).readUrl(field, searchParams));
   }
   return filters;
@@ -249,10 +273,11 @@ const LIST_STATE_KEYS = [
 const filterKeysCache = new Map<ListEntity, readonly string[]>();
 
 /**
- * The URL keys a list's filters take: each panel row's key and its modifier,
- * depth and exclude companions (what its editor's codec holds), the singular form a
- * card count links with (`tagId`) and the range and date forms
- * (`rating_min`).
+ * The URL keys a list's filters take at the root: each panel row's key and
+ * its modifier, depth and exclude companions (what its editor's codec
+ * holds), the singular form a card count links with (`tagId`) and the range
+ * and date forms (`rating_min`). The same keys under a row prefix (`g1.`,
+ * `2.`), `match` and `gN` are filter keys too (`isFilterUrlKey`).
  */
 const listFilterKeys = (entity: ListEntity): readonly string[] => {
   const cached = filterKeysCache.get(entity);
@@ -265,31 +290,42 @@ const listFilterKeys = (entity: ListEntity): readonly string[] => {
 };
 
 /**
- * Every URL key a list writes: its filter keys, `q`, sort, paging and
- * presentation, the timeline period and the folder path. A list rewrites
- * only these and keeps every other key (`tab`, `instance`,
- * `includeSubTags`, `includeSubStudios`, `image`).
+ * Every URL key a list writes at the root: its filter keys, `q`, sort,
+ * paging and presentation, the timeline period and the folder path. A list
+ * rewrites only these, the prefixed filter keys, `match` and `gN`
+ * (`isListOwnedKey`), and keeps every other key (`tab`, `instance`,
+ * `includeSubTags`, `includeSubStudios`, `image`, `savedView`).
  */
 export const listOwnedKeys = (entity: ListEntity): readonly string[] => [
   ...listFilterKeys(entity),
   ...LIST_STATE_KEYS,
 ];
 
-/** The keys any list owns: what a detail page's tab switch clears */
+const LIST_STATE_KEY_SET: ReadonlySet<string> = new Set(LIST_STATE_KEYS);
+
+/**
+ * A URL key the list owns: a filter key (prefixed ones, `match` and `gN`
+ * included) or one of the list's own state keys
+ */
+export const isListOwnedKey = (entity: ListEntity, key: string): boolean =>
+  LIST_STATE_KEY_SET.has(key) || isFilterUrlKey(entity, key);
+
+const LIST_ENTITIES = Object.keys(PANEL_FIELDS) as ListEntity[];
+
+/**
+ * The root keys any list owns (the static list); `isListOwnedKey` also
+ * names the prefixed ones
+ */
 export const LIST_OWNED_KEYS: readonly string[] = [
-  ...new Set(
-    (Object.keys(PANEL_FIELDS) as ListEntity[]).flatMap((entity) =>
-      listOwnedKeys(entity)
-    )
-  ),
+  ...new Set(LIST_ENTITIES.flatMap((entity) => listOwnedKeys(entity))),
 ];
 
 /**
  * The URL a detail page's tab switch goes to: every key a list owns
- * (filters, search, sort, paging, presentation, folder path) and the open
- * image go, since each tab is its own list; `tab` is set, or removed for
- * the default tab; every other key (`instance`, `includeSubTags`,
- * `includeSubStudios`) stays. Returns a new object.
+ * (filters, prefixed ones included, search, sort, paging, presentation,
+ * folder path) and the open image go, since each tab is its own list; `tab`
+ * is set, or removed for the default tab; every other key (`instance`,
+ * `includeSubTags`, `includeSubStudios`) stays. Returns a new object.
  */
 export const switchTabParams = (
   params: URLSearchParams,
@@ -297,7 +333,11 @@ export const switchTabParams = (
   defaultTab: string
 ): URLSearchParams => {
   const next = new URLSearchParams(params);
-  for (const key of LIST_OWNED_KEYS) next.delete(key);
+  for (const key of [...new Set(next.keys())]) {
+    if (LIST_ENTITIES.some((entity) => isListOwnedKey(entity, key))) {
+      next.delete(key);
+    }
+  }
   next.delete(IMAGE_PARAM);
   if (tabId === defaultTab) {
     next.delete("tab");
@@ -334,8 +374,8 @@ export interface ListUrlParams {
 /**
  * Reads a list's state from the URL, each field with its presence. The
  * filters go through the one parser (`urlParamsToFilters`); "the URL has
- * filters" means it holds one of the entity's filter keys, `q` or
- * `filters=none`.
+ * filters" means it holds one of the entity's filter keys (a prefixed one,
+ * `match` or `gN` included), `q` or `filters=none`.
  */
 export const readListParams = (
   searchParams: URLSearchParams,
@@ -355,7 +395,7 @@ export const readListParams = (
     hasFilters:
       q !== null ||
       searchParams.get(NO_FILTERS_KEY) === NO_FILTERS_VALUE ||
-      listFilterKeys(entity).some((key) => searchParams.has(key)),
+      [...searchParams.keys()].some((key) => isFilterUrlKey(entity, key)),
     q,
     sort: param("sort"),
     dir: param("dir"),
@@ -428,7 +468,9 @@ export const writeListParams = (
 ): URLSearchParams => {
   const next = new URLSearchParams(prev);
   if (patch.filters !== undefined) {
-    for (const key of listFilterKeys(entity)) next.delete(key);
+    for (const key of [...new Set(next.keys())]) {
+      if (isFilterUrlKey(entity, key)) next.delete(key);
+    }
     next.delete(NO_FILTERS_KEY);
     const written = filtersToUrlParams(patch.filters, filterOptions, entity);
     written.forEach((value, key) => {

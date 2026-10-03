@@ -65,6 +65,12 @@ import {
 export type PanelState = Readonly<Record<string, unknown>>;
 
 /**
+ * What a codec reads and writes the URL through: the parameters, or a view
+ * of them under a row's prefix (`prefixedParams`, `tree.ts`)
+ */
+export type UrlParams = Pick<URLSearchParams, "get" | "has" | "set">;
+
+/**
  * An active filter's chip, in parts: "Tags: any of A, B, with sub-tags" is
  * the label `Tags`, the condition `any of`, the ids' names and the suffix
  * `, with sub-tags`
@@ -99,9 +105,9 @@ export interface FieldCodec<F extends PanelField> {
    */
   fromCriterion(field: F, spec: FieldSpec, criterion: unknown): PanelState;
   /** Sets the row's key and companions in the URL's parameters */
-  writeUrl(field: F, state: PanelState, params: URLSearchParams): void;
+  writeUrl(field: F, state: PanelState, params: UrlParams): void;
   /** The row's state the URL names; nothing for a key it lacks */
-  readUrl(field: F, params: URLSearchParams): PanelState;
+  readUrl(field: F, params: UrlParams): PanelState;
   /**
    * The row's chip, or null when it does not filter. Body measures read in
    * `unitPreference` (the state is metric either way).
@@ -1173,7 +1179,7 @@ function textFromCriterion(
  * Sets a value that has a URL form (a string, number or boolean). Any other
  * value would be written as "[object Object]" or "null", so it is left out.
  */
-const setParam = (params: URLSearchParams, key: string, value: unknown) => {
+const setParam = (params: UrlParams, key: string, value: unknown) => {
   if (
     typeof value === "string" ||
     typeof value === "number" ||
@@ -1230,7 +1236,7 @@ const isUnset = (value: unknown) =>
 function writeCompanions(
   field: PanelField,
   state: PanelState,
-  params: URLSearchParams
+  params: UrlParams
 ) {
   writeModifier(field, state, params);
   writeDepth(field, state, params);
@@ -1240,7 +1246,7 @@ function writeCompanions(
 function writeModifier(
   field: PanelField,
   state: PanelState,
-  params: URLSearchParams
+  params: UrlParams
 ) {
   const modifier =
     field.modifierKey === undefined ? undefined : state[field.modifierKey];
@@ -1250,11 +1256,7 @@ function writeModifier(
 }
 
 /** Writes the row's depth companion when the state holds one */
-function writeDepth(
-  field: PanelField,
-  state: PanelState,
-  params: URLSearchParams
-) {
+function writeDepth(field: PanelField, state: PanelState, params: UrlParams) {
   const depth =
     field.hierarchyKey === undefined ? undefined : state[field.hierarchyKey];
   if (field.hierarchyKey !== undefined && depth !== undefined) {
@@ -1263,7 +1265,7 @@ function writeDepth(
 }
 
 /** Reads the row's modifier and depth companions, whenever the URL names them */
-function readCompanions(field: PanelField, params: URLSearchParams) {
+function readCompanions(field: PanelField, params: UrlParams) {
   const read: Record<string, unknown> = {};
   const modifier =
     field.modifierKey === undefined ? null : params.get(field.modifierKey);
@@ -1283,7 +1285,7 @@ function readCompanions(field: PanelField, params: URLSearchParams) {
  * row has a value at all (a blank, an unset box or nothing writes nothing)
  */
 function urlWriter<F extends PanelField>(
-  writeValue: (field: F, value: unknown, params: URLSearchParams) => void
+  writeValue: (field: F, value: unknown, params: UrlParams) => void
 ): FieldCodec<F>["writeUrl"] {
   return (field, state, params) => {
     const value = state[field.key];
@@ -1295,7 +1297,7 @@ function urlWriter<F extends PanelField>(
 
 /** A row's URL reader: the value's own form, then the companions */
 function urlReader<F extends PanelField>(
-  readValue: (field: F, params: URLSearchParams) => PanelState
+  readValue: (field: F, params: UrlParams) => PanelState
 ): FieldCodec<F>["readUrl"] {
   return (field, params) => ({
     ...readValue(field, params),
@@ -1308,7 +1310,7 @@ const boundParam = (value: unknown): string | undefined =>
   isBound(value) ? String(value) : undefined;
 
 /** A key's value text when the URL has some */
-const textParam = (params: URLSearchParams, key: string) => {
+const textParam = (params: UrlParams, key: string) => {
   const value = params.get(key);
   return value === null || value === "" ? undefined : value;
 };

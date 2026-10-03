@@ -48,9 +48,11 @@ import {
 import {
   LIST_OWNED_KEYS,
   buildSearchParams as _buildSearchParams,
+  isListOwnedKey,
   listOwnedKeys,
   parseSearchParams,
   readListParams,
+  switchTabParams,
   writeListParams,
 } from "@/utils/urlParams";
 import { DETAILS_WITH_PRESENCE_ROW } from "../helpers/editorRows";
@@ -1391,14 +1393,15 @@ describe("include or exclude per value (F22a)", () => {
     });
   });
 
-  it("an old link holding a condition and depth without ids still reads", () => {
+  it("an old link holding a condition and depth without ids still reads, as no filter", () => {
     const read = readListParams(
       new URLSearchParams("tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1"),
       "scene",
       SCENE_FILTER_OPTIONS
     ).filters;
 
-    expect(read).toEqual({ tagIdsModifier: "INCLUDES_ALL", tagIdsDepth: -1 });
+    // A row with no ids filters nothing, so the canonical read drops it
+    expect(read).toEqual({});
     expect(buildSceneFilter(read).tags).toBeUndefined();
   });
 
@@ -1508,5 +1511,99 @@ describe("the text condition and playlist ids in the URL (F22b)", () => {
         },
       ]).filters
     ).toEqual({ playlistIds: ["12"] });
+  });
+});
+
+describe("prefixed filter keys (groups and repeated rows)", () => {
+  const ctx = {
+    entity: "scene" as const,
+    filterOptions: SCENE_FILTER_OPTIONS,
+    shown: {
+      perPage: 24,
+      viewMode: "grid",
+      zoomLevel: "medium",
+      gridDensity: "medium",
+    },
+  };
+
+  it("writeListParams deletes every prefixed filter key and keeps unrelated keys (tab, instance, image)", () => {
+    const prev = new URLSearchParams(
+      "tab=scenes&instance=abc&image=5:abc&match=any&tagIds=1:abc&2.tagIds=2:abc&g1=any&g1.favorite=true&g2.3.rating_min=60&savedView=v1"
+    );
+    const next = writeListParams(prev, { filters: { title: "x" } }, ctx);
+
+    expect([...next.keys()]).toEqual([
+      "tab",
+      "instance",
+      "image",
+      "savedView",
+      "title",
+    ]);
+  });
+
+  it("writeListParams writes groups and repeats under their prefixes", () => {
+    const next = writeListParams(
+      new URLSearchParams("tab=scenes"),
+      {
+        filters: {
+          tagIds: ["1:abc"],
+          "2.tagIds": ["2:abc"],
+          g1: "any",
+          "g1.favorite": "true",
+          "g1.watched": "false",
+        },
+      },
+      ctx
+    );
+
+    expect(next.toString()).toBe(
+      "tab=scenes&g1=any&g1.favorite=true&g1.watched=false&tagIds=1%3Aabc&2.tagIds=2%3Aabc"
+    );
+    expect(readListParams(next, "scene", SCENE_FILTER_OPTIONS).filters).toEqual(
+      {
+        tagIds: ["1:abc"],
+        "2.tagIds": ["2:abc"],
+        g1: "any",
+        "g1.favorite": "true",
+        "g1.watched": "false",
+      }
+    );
+  });
+
+  it("switchTabParams drops prefixed keys", () => {
+    const next = switchTabParams(
+      new URLSearchParams(
+        "tab=scenes&instance=abc&match=any&2.tagIds=1:abc&g1=any&g1.favorite=true&g5.20.rating_min=60&g1.2.studioId=3:abc"
+      ),
+      "images",
+      "scenes"
+    );
+    expect(next.toString()).toBe("tab=images&instance=abc");
+  });
+
+  it("a URL with only g1.tagIds has filters, so the default preset stays off", () => {
+    const read = readListParams(
+      new URLSearchParams("g1.tagIds=1:abc"),
+      "scene",
+      SCENE_FILTER_OPTIONS
+    );
+    expect(read.hasFilters).toBe(true);
+    expect(read.filters).toEqual({ g1: "all", "g1.tagIds": ["1:abc"] });
+    expect(
+      readListParams(
+        new URLSearchParams("savedView=v1&g6.tagIds=1:abc"),
+        "scene",
+        SCENE_FILTER_OPTIONS
+      ).hasFilters
+    ).toBe(false);
+  });
+
+  it("isListOwnedKey names prefixed filter keys and the list's own keys, not the page's", () => {
+    for (const key of ["g1.tagIds", "2.rating_min", "match", "g3", "sort"]) {
+      expect(isListOwnedKey("scene", key), key).toBe(true);
+    }
+    for (const key of ["tab", "instance", "image", "savedView", "g6.tagIds"]) {
+      expect(isListOwnedKey("scene", key), key).toBe(false);
+    }
   });
 });
