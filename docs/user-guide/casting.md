@@ -43,7 +43,7 @@ A reverse proxy that puts its own login in front of Peek (Authelia, Authentik, `
 
 1. Open the scene in Chrome or Edge.
 2. Press **Cast** in the control bar and pick the device in the browser's own dialog.
-3. The scene starts on the TV. The player shows "Casting to <device>", and its controls (play, pause, seek, volume, captions) steer the TV.
+3. The scene starts on the TV. The player shows "Casting to <device>", and its controls (play, pause, seek, captions) steer the TV. The player's volume does not: set the volume with the TV's own remote.
 4. Press **Cast** again, and choose to stop, to end the session.
 
 The scene starts at your **resume point** if you have not played it on this page, and where the page's player was otherwise. Peek picks the file's own stream when the Cast device can play it directly (MP4 with H.264 up to 1080p, or WebM), and an HLS stream from Stash otherwise. This is automatic.
