@@ -7,6 +7,7 @@
  * and controllers/setup.ts.
  */
 import { ENTITY_KINDS } from "../filters/criteria.js";
+import type { FilterPins, ListPins } from "../filters/pins.js";
 
 // Dates are ISO 8601 strings: that is what JSON carries.
 
@@ -48,6 +49,27 @@ export interface FilterPreset {
   tableColumns?: TableColumnsConfig | null;
   createdAt?: string;
   [key: string]: unknown;
+}
+
+/**
+ * A View as a validated write stores it (the lenient `FilterPreset` stays the
+ * type for reading stored rows)
+ */
+export interface SavedView {
+  id: string;
+  /** 1 to 100 characters, trimmed, unique per list (case-insensitive) */
+  name: string;
+  /** The flat prefixed filter state */
+  filters: Record<string, unknown>;
+  sort: string;
+  direction: "ASC" | "DESC";
+  viewMode?: string;
+  zoomLevel?: string;
+  gridDensity?: string;
+  tableColumns?: TableColumnsConfig | null;
+  perPage?: number | null;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 /**
@@ -301,6 +323,17 @@ export interface SaveFilterPresetBody {
   setAsDefault?: boolean;
 }
 
+/** PUT /api/user/filter-presets/:artifactType/:presetId: save changes to a View */
+export type OverwriteViewBody = Omit<
+  SaveFilterPresetBody,
+  "artifactType" | "context" | "name" | "setAsDefault"
+>;
+
+/** PATCH /api/user/filter-presets/:artifactType/:presetId: rename a View */
+export interface RenameViewBody {
+  name: string;
+}
+
 export interface SaveFilterPresetResponse {
   success: true;
   preset: FilterPreset;
@@ -331,6 +364,18 @@ export interface SetDefaultFilterPresetResponse {
   success: true;
   defaults: DefaultFilterPresets;
 }
+
+// =============================================================================
+// FILTER PINS
+// =============================================================================
+
+/** GET /api/user/filter-pins: every list's pins, the defaults filled in */
+export interface GetFilterPinsResponse {
+  pins: FilterPins;
+}
+
+/** PUT /api/user/filter-pins/:list */
+export type PutFilterPinsBody = ListPins;
 
 // =============================================================================
 // SYNC FROM STASH

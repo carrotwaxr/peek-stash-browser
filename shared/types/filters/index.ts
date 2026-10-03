@@ -156,3 +156,26 @@ export type {
   TagFilterInput,
   TextInput,
 } from "./wire.js";
+
+export {
+  MATCHES,
+  ROOT_MATCH_KEY,
+  WHERE_LIMITS,
+  anyMergeCap,
+  anyMergeKey,
+  groupKeyOf,
+  isWhereGroup,
+  parseRowKey,
+  rowKeyOf,
+} from "./tree.js";
+export type {
+  Match,
+  RowKey,
+  WhereField,
+  WhereGroup,
+  WhereLeaf,
+  WhereNode,
+} from "./tree.js";
+
+export { DEFAULT_PINNED_FILTERS, PIN_LIMIT, defaultPinsOf } from "./pins.js";
+export type { FilterPins, ListPins, PinnedFilter } from "./pins.js";

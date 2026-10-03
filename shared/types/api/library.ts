@@ -107,6 +107,11 @@ export interface FindScenesMinimalResponse {
  */
 export type ListCount = number | null;
 
+/** POST /api/library/<entities>/count: how many rows the list's request matches */
+export interface ListCountResponse {
+  count: number;
+}
+
 export interface FindScenesResponse<Count extends ListCount = number> {
   findScenes: {
     count: Count;

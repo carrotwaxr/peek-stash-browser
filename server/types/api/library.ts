@@ -10,6 +10,7 @@ export type {
   WithStashUrl,
   // A list's total, null when the request asked for none
   ListCount,
+  ListCountResponse,
   // Entity pickers
   MinimalRequest,
   MinimalEntity,

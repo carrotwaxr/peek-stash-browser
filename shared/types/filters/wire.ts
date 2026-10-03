@@ -38,6 +38,7 @@ import type {
   SortOf,
   TAG_FIELDS,
 } from "./fields.js";
+import type { WhereGroup } from "./tree.js";
 
 // =============================================================================
 // CRITERIA
@@ -240,6 +241,11 @@ export type ListRequestInput<E extends ListKind> = {
   filter?: ListPageInput<E>;
   /** Only these, as `"id:instanceId"` */
   ids?: string[];
+  /**
+   * The user's rows as AND/OR groups. A request is `<base> AND
+   * <entity>_filter AND where AND <search>`; the base is never inside it.
+   */
+  where?: WhereGroup<E>;
 } & { [K in FilterBodyKey<E>]?: FilterInput<FieldSpecOf<E>> };
 
 /**
