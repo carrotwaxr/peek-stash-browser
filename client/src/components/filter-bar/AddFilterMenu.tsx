@@ -13,6 +13,7 @@ import type { ListFilters } from "../../hooks/useListFilters";
 import { useRovingFocus } from "../../hooks/useRovingFocus";
 import {
   type FilterOption,
+  refValueTarget,
   treeCounts,
   withRefValue,
 } from "../../utils/filterFields";
@@ -103,10 +104,12 @@ function sectionsOf(
  * Two characters or more also search the names of the entities the list's
  * ref fields take (tags, performers, studios, collections, galleries), under
  * a Values heading after the fields ("Tags: Outdoor"): picking one adds it
- * to that field's first root row and applies it at once (`useValueSearch`).
+ * to that field's first root row that does not exclude, else a new row,
+ * and applies it at once (`useValueSearch`, `withRefValue`).
  *
  * At the row limit (`WHERE_LIMITS.rows`) the menu says so, and only fields
- * already in use at the root stay pickable: picking one opens its chip.
+ * already in use at the root stay pickable: picking one opens its chip. A
+ * value that would need a new row is disabled there.
  *
  * `inline` draws the search box and the list in place, always open (the
  * filter sheet's field list, over the sheet's draft): a pick clears the
@@ -174,7 +177,12 @@ const AddFilterMenu = ({
   const shown = [...sections.flatMap((section) => section.options), ...values];
   const isDisabled = (option: FilterOption) =>
     atLimit && !inUse.has(option.key);
-  const isValueDisabled = (value: ValueOption) => isDisabled(value.field);
+  // A value that needs a new row (its field unused, or every row of it
+  // "none of") cannot add one at the limit
+  const isValueDisabled = (value: ValueOption) =>
+    atLimit &&
+    refValueTarget(filters.kind, filters.filters, value.field.key).occurrence >
+      tree.rows.filter((row) => row.field.key === value.field.key).length;
   const pinned = new Set(pinnedFields);
   const canPin = (key: string) =>
     onTogglePin !== undefined && isPinnable(filters.kind, key);

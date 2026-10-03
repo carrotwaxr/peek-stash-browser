@@ -9,6 +9,7 @@ import {
   type PanelState,
   clearFilters,
   isRowActive,
+  refValueTarget,
   removeGroup,
   removeRow,
   rowState,
@@ -214,14 +215,74 @@ describe("withRefValue", () => {
     expect(
       withRefValue(
         "group",
-        { studioId: "1:a", studioIdModifier: "EXCLUDES", studioIdDepth: 1 },
+        { studioId: "1:a", studioIdModifier: "INCLUDES", studioIdDepth: 1 },
         "studioId",
         "2:a"
       )
     ).toEqual({
       studioId: "2:a",
-      studioIdModifier: "EXCLUDES",
+      studioIdModifier: "INCLUDES",
       studioIdDepth: 1,
+    });
+  });
+
+  it("never adds to a row that excludes: the field's first including row takes it, else a new row after its last", () => {
+    // "none of A": the pick is a new row, so the list does not also exclude it
+    expect(
+      withRefValue(
+        "scene",
+        { tagIds: ["1:a"], tagIdsModifier: "EXCLUDES" },
+        "tagIds",
+        "2:a"
+      )
+    ).toEqual({
+      tagIds: ["1:a"],
+      tagIdsModifier: "EXCLUDES",
+      "2.tagIds": ["2:a"],
+    });
+    // The second row includes: it takes the pick
+    expect(
+      withRefValue(
+        "scene",
+        {
+          tagIds: ["1:a"],
+          tagIdsModifier: "EXCLUDES",
+          "2.tagIds": ["3:a"],
+          "2.tagIdsModifier": "INCLUDES_ALL",
+        },
+        "tagIds",
+        "2:a"
+      )
+    ).toEqual({
+      tagIds: ["1:a"],
+      tagIdsModifier: "EXCLUDES",
+      "2.tagIds": ["3:a", "2:a"],
+      "2.tagIdsModifier": "INCLUDES_ALL",
+    });
+    // A single pick that excludes is left as it is too
+    expect(
+      withRefValue(
+        "group",
+        { studioId: "1:a", studioIdModifier: "EXCLUDES" },
+        "studioId",
+        "2:a"
+      )
+    ).toEqual({
+      studioId: "1:a",
+      studioIdModifier: "EXCLUDES",
+      "2.studioId": "2:a",
+    });
+    expect(
+      refValueTarget(
+        "scene",
+        { tagIds: ["1:a"], tagIdsModifier: "EXCLUDES" },
+        "tagIds"
+      )
+    ).toEqual({ group: 0, occurrence: 2, key: "tagIds" });
+    expect(refValueTarget("scene", {}, "tagIds")).toEqual({
+      group: 0,
+      occurrence: 1,
+      key: "tagIds",
     });
   });
 
