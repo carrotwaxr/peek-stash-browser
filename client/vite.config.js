@@ -51,12 +51,19 @@ export default defineConfig(({ mode }) => ({
       },
       output: {
         // A dynamic chunk is named after its entry module: the VR code
-        // (vr/vrPlugin.ts with the fork and three.js) is the `vr` chunk, the
-        // name its line in scripts/bundleBudget.mjs uses
-        chunkFileNames: (chunk) =>
-          chunk.facadeModuleId?.endsWith("/video-player/vr/vrPlugin.ts")
-            ? "assets/vr-[hash].js"
-            : "assets/[name]-[hash].js",
+        // (vr/vrPlugin.ts with the fork and three.js) is the `vr` chunk, and
+        // the VR button with its logic (vr/vrUi.ts) the `vr-ui` chunk, the
+        // names their lines in scripts/bundleBudget.mjs use
+        chunkFileNames: (chunk) => {
+          const entry = chunk.facadeModuleId ?? "";
+          if (entry.endsWith("/video-player/vr/vrPlugin.ts")) {
+            return "assets/vr-[hash].js";
+          }
+          if (entry.endsWith("/video-player/vr/vrUi.ts")) {
+            return "assets/vr-ui-[hash].js";
+          }
+          return "assets/[name]-[hash].js";
+        },
         manualChunks: {
           // Separate vendor chunks for better caching
           "react-vendor": [

@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VrMenuButton } from "@/components/video-player/vr/VrControls";
 import { loadVr, prefetchVr } from "@/components/video-player/vr/loadVr";
 import { useVrMode } from "@/components/video-player/vr/useVrMode";
+import * as vrUi from "@/components/video-player/vr/vrUi";
 import { AuthContext } from "@/contexts/AuthContextProvider";
 import { TVModeContext } from "@/contexts/TVModeContext";
 
@@ -23,6 +24,12 @@ vi.mock("@/components/video-player/vr/loadVr", () => ({
   loadVr: vi.fn(() => Promise.resolve()),
   prefetchVr: vi.fn(),
 }));
+
+// The real VR UI, its attach watched
+vi.mock("@/components/video-player/vr/vrUi", async (importOriginal) => {
+  const real = await importOriginal<typeof vrUi>();
+  return { ...real, attachVrMode: vi.fn(real.attachVrMode) };
+});
 
 const USER_ID = 7;
 
@@ -108,7 +115,13 @@ function wrapperOf(strict: boolean) {
   };
 }
 
-function setup(scene: SceneProps["scene"], { strict = false } = {}) {
+/** Lets the VR UI chunk's import and the effects it starts finish */
+const settle = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+async function setup(scene: SceneProps["scene"], { strict = false } = {}) {
   const player = makePlayer();
   players.push(player);
   const playerRef = { current: player };
@@ -121,6 +134,13 @@ function setup(scene: SceneProps["scene"], { strict = false } = {}) {
       }),
     { initialProps: { scene }, wrapper: wrapperOf(strict) }
   );
+  // The button comes with the vr-ui chunk, a moment after the render
+  if (scene?.vr && !tvMode) {
+    await waitFor(() => {
+      expect(buttons(player)).toHaveLength(1);
+    });
+  }
+  await settle();
   return { player, playerRef, ...rendered };
 }
 
@@ -182,29 +202,34 @@ afterEach(() => {
 });
 
 describe("useVrMode: the button", () => {
-  it("adds one VR button for a VR scene", () => {
-    const { player } = setup(vrScene());
+  it("adds one VR button for a VR scene", async () => {
+    const { player } = await setup(vrScene());
     expect(buttons(player)).toHaveLength(1);
   });
 
-  it("adds none for a scene without vr", () => {
-    const { player } = setup(flatScene);
+  it("adds none for a scene without vr", async () => {
+    const { player } = await setup(flatScene);
     expect(buttons(player)).toHaveLength(0);
   });
 
-  it("adds none in TV mode", () => {
+  it("attaches no VR controls for a scene without vr", async () => {
+    await setup(flatScene);
+    expect(vrUi.attachVrMode).not.toHaveBeenCalled();
+  });
+
+  it("adds none in TV mode", async () => {
     tvMode = true;
-    const { player } = setup(vrScene());
+    const { player } = await setup(vrScene());
     expect(buttons(player)).toHaveLength(0);
   });
 
-  it("keeps one button after a StrictMode remount", () => {
-    const { player } = setup(vrScene(), { strict: true });
+  it("keeps one button after a StrictMode remount", async () => {
+    const { player } = await setup(vrScene(), { strict: true });
     expect(buttons(player)).toHaveLength(1);
   });
 
-  it("is placed before the fullscreen toggle", () => {
-    const { player } = setup(vrScene());
+  it("is placed before the fullscreen toggle", async () => {
+    const { player } = await setup(vrScene());
     const names = player.controlBar.children().map((c) => c.name());
     const vr = names.indexOf("peekVrButton");
     const fullscreen = names.indexOf("FullscreenToggle");
@@ -212,8 +237,8 @@ describe("useVrMode: the button", () => {
     expect(fullscreen).toBeGreaterThan(vr);
   });
 
-  it("names the toggle and the projections with their checked states", () => {
-    const { player } = setup(vrScene("360"));
+  it("names the toggle and the projections with their checked states", async () => {
+    const { player } = await setup(vrScene("360"));
     const toggle = toggleOf(player).el;
     expect(toggle.getAttribute("role")).toBe("menuitemcheckbox");
     expect(toggle.getAttribute("aria-checked")).toBe("false");
@@ -226,7 +251,7 @@ describe("useVrMode: the button", () => {
   });
 
   it("removes the button and turns VR off when the scene is not VR", async () => {
-    const { player, rerender } = setup(vrScene());
+    const { player, rerender } = await setup(vrScene());
     await click(toggleOf(player));
     expect(player.vr.enabled).toBe(true);
 
@@ -236,7 +261,7 @@ describe("useVrMode: the button", () => {
   });
 
   it("keeps VR on across VR scenes and follows the next scene's projection", async () => {
-    const { player, rerender } = setup(vrScene("180_LR", "123"));
+    const { player, rerender } = await setup(vrScene("180_LR", "123"));
     await click(toggleOf(player));
 
     rerender({ scene: vrScene("360", "125") });
@@ -252,14 +277,14 @@ describe("useVrMode: the button", () => {
     ).toBe("true");
   });
 
-  it("shows the HTTPS note only without a secure context", () => {
+  it("shows the HTTPS note only without a secure context", async () => {
     vi.stubGlobal("isSecureContext", false);
-    const { player } = setup(vrScene());
+    const { player } = await setup(vrScene());
     expect(buttonEl(player).textContent).toContain("Headset mode needs HTTPS");
   });
 
-  it("has no HTTPS note in a secure context", () => {
-    const { player } = setup(vrScene());
+  it("has no HTTPS note in a secure context", async () => {
+    const { player } = await setup(vrScene());
     expect(buttonEl(player).textContent).not.toContain(
       "Headset mode needs HTTPS"
     );
@@ -270,7 +295,7 @@ describe("useVrMode: the prefetch", () => {
   it("runs when immersive-vr is supported", async () => {
     const supported = vi.fn(() => Promise.resolve(true));
     stubXr(supported);
-    setup(vrScene());
+    await setup(vrScene());
     await waitFor(() => expect(prefetchVr).toHaveBeenCalledTimes(1));
     expect(supported).toHaveBeenCalledWith("immersive-vr");
   });
@@ -287,7 +312,7 @@ describe("useVrMode: the prefetch", () => {
   ])("never runs when isSessionSupported %s", async (_name, impl) => {
     const supported = vi.fn(impl);
     stubXr(supported as (mode: string) => Promise<boolean>);
-    setup(vrScene());
+    await setup(vrScene());
     await waitFor(() => expect(supported).toHaveBeenCalled());
     await act(async () => {
       await Promise.resolve();
@@ -297,7 +322,7 @@ describe("useVrMode: the prefetch", () => {
 
   it("never runs without navigator.xr", async () => {
     stubXr(undefined);
-    setup(vrScene());
+    await setup(vrScene());
     await act(async () => {
       await Promise.resolve();
     });
@@ -307,7 +332,7 @@ describe("useVrMode: the prefetch", () => {
   it("never runs for a scene without vr", async () => {
     const supported = vi.fn(() => Promise.resolve(true));
     stubXr(supported);
-    setup(flatScene);
+    await setup(flatScene);
     await act(async () => {
       await Promise.resolve();
     });
@@ -318,7 +343,7 @@ describe("useVrMode: the prefetch", () => {
 
 describe("useVrMode: turning VR on", () => {
   it("loads the plugin and enables it with the scene's projection", async () => {
-    const { player } = setup(vrScene("360_TB"));
+    const { player } = await setup(vrScene("360_TB"));
     await click(toggleOf(player));
     expect(loadVr).toHaveBeenCalledTimes(1);
     expect(player.vr.enable).toHaveBeenCalledWith("360_TB");
@@ -327,14 +352,14 @@ describe("useVrMode: turning VR on", () => {
 
   it("enables with the remembered projection", async () => {
     localStorage.setItem(`peek.vr.${USER_ID}.123:inst-a`, "FISHEYE_200_LR");
-    const { player } = setup(vrScene("180_LR"));
+    const { player } = await setup(vrScene("180_LR"));
     await click(toggleOf(player));
     expect(player.vr.enable).toHaveBeenCalledWith("FISHEYE_200_LR");
   });
 
   it("ignores a remembered value that is not a projection", async () => {
     localStorage.setItem(`peek.vr.${USER_ID}.123:inst-a`, "SIDEWAYS");
-    const { player } = setup(vrScene("180_MONO"));
+    const { player } = await setup(vrScene("180_MONO"));
     await click(toggleOf(player));
     expect(player.vr.enable).toHaveBeenCalledWith("180_MONO");
   });
@@ -343,13 +368,13 @@ describe("useVrMode: turning VR on", () => {
     localStorage.setItem(`peek.vr.${USER_ID}.123:inst-b`, "360");
     localStorage.setItem(`peek.vr.${USER_ID + 1}.123:inst-a`, "360");
     localStorage.setItem(`peek.vr.${USER_ID}.999:inst-a`, "360");
-    const { player } = setup(vrScene("180_LR"));
+    const { player } = await setup(vrScene("180_LR"));
     await click(toggleOf(player));
     expect(player.vr.enable).toHaveBeenCalledWith("180_LR");
   });
 
   it("a second click turns it off", async () => {
-    const { player } = setup(vrScene());
+    const { player } = await setup(vrScene());
     await click(toggleOf(player));
     await click(toggleOf(player));
     expect(player.vr.disable).toHaveBeenCalledTimes(1);
@@ -359,7 +384,7 @@ describe("useVrMode: turning VR on", () => {
   it("stays off, and can try again, when the plugin fails to load", async () => {
     vi.mocked(loadVr).mockRejectedValueOnce(new Error("offline"));
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
-    const { player } = setup(vrScene());
+    const { player } = await setup(vrScene());
     await click(toggleOf(player));
     expect(player.vr.enable).not.toHaveBeenCalled();
     expect(toggleOf(player).el.getAttribute("aria-checked")).toBe("false");
@@ -372,7 +397,7 @@ describe("useVrMode: turning VR on", () => {
 
 describe("useVrMode: the projection menu", () => {
   it("stores a pick under the user's key for this scene", async () => {
-    const { player } = setup(vrScene("180_LR"));
+    const { player } = await setup(vrScene("180_LR"));
     await click(radioOf(player, 2));
     expect(localStorage.getItem(`peek.vr.${USER_ID}.123:inst-a`)).toBe(
       VR_PROJECTIONS[2]
@@ -380,7 +405,7 @@ describe("useVrMode: the projection menu", () => {
   });
 
   it("changes the live projection when VR is on", async () => {
-    const { player } = setup(vrScene("180_LR"));
+    const { player } = await setup(vrScene("180_LR"));
     await click(toggleOf(player));
     await click(radioOf(player, 3));
     expect(player.vr.setProjection).toHaveBeenCalledWith("360_LR");
@@ -388,7 +413,7 @@ describe("useVrMode: the projection menu", () => {
   });
 
   it("only remembers the pick while VR is off", async () => {
-    const { player } = setup(vrScene("180_LR"));
+    const { player } = await setup(vrScene("180_LR"));
     await click(radioOf(player, 3));
     expect(player.vr.setProjection).not.toHaveBeenCalled();
     expect(player.vr.enable).not.toHaveBeenCalled();

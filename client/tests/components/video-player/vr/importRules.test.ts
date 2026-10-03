@@ -2,7 +2,10 @@
  * The VR code (the fork and three.js, about 750 kB) loads only through
  * loadVr's dynamic import. A static import of the fork, or of vrPlugin, from
  * any other source file would pull it into that file's chunk (the Scene page),
- * so the lint config refuses one. Type imports stay allowed.
+ * so the lint config refuses one. The VR button and its logic (vrUi with
+ * VrControls) are the small vr-ui chunk, which useVrMode reaches only by
+ * import(): a static import of either is refused too, except VrControls from
+ * vrUi. Type imports stay allowed.
  */
 import { ESLint, Linter } from "eslint";
 import path from "node:path";
@@ -108,5 +111,53 @@ describe("the VR import rules", () => {
         'import { loadVr } from "./vr/loadVr";\nvoid loadVr;\n'
       )
     ).resolves.toEqual([]);
+  });
+
+  it("refuse a static vrUi import from useVrMode and from outside the folder", async () => {
+    const messages = await refusals(
+      `${VR}/useVrMode.ts`,
+      'import { attachVrMode } from "./vrUi";\nvoid attachVrMode;\n'
+    );
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("vr-ui");
+    await expect(
+      refusals(
+        "src/components/video-player/useVideoPlayer.ts",
+        'import "./vr/vrUi";\n'
+      )
+    ).resolves.toHaveLength(1);
+  });
+
+  it("refuse VrControls anywhere but vrUi", async () => {
+    await expect(
+      refusals(`${VR}/useVrMode.ts`, 'import "./VrControls";\n')
+    ).resolves.toHaveLength(1);
+    await expect(
+      refusals(
+        "src/components/video-player/useVideoPlayer.ts",
+        'import "@/components/video-player/vr/VrControls";\n'
+      )
+    ).resolves.toHaveLength(1);
+    await expect(
+      refusals(`${VR}/vrUi.ts`, 'import "./VrControls";\n')
+    ).resolves.toEqual([]);
+  });
+
+  it("allow useVrMode's import() of vrUi and type imports of it", async () => {
+    await expect(
+      refusals(
+        `${VR}/useVrMode.ts`,
+        'import type { VrMode } from "./vrUi";\nexport type T = VrMode;\nexport const load = () => import("./vrUi");\n'
+      )
+    ).resolves.toEqual([]);
+  });
+
+  it("refuse the fork and vrPlugin in vrUi", async () => {
+    await expect(
+      refusals(`${VR}/vrUi.ts`, 'import "./vrPlugin";\n')
+    ).resolves.toHaveLength(1);
+    await expect(
+      refusals(`${VR}/vrUi.ts`, 'import "@blaineam/videojs-vr";\n')
+    ).resolves.toHaveLength(1);
   });
 });

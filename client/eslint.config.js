@@ -8,9 +8,31 @@ import tseslint from "typescript-eslint";
 const RESTRICTED_IMPORTS = "@typescript-eslint/no-restricted-imports";
 const VR_PLUGIN = "src/components/video-player/vr/vrPlugin.ts";
 const VR_LOADER = "src/components/video-player/vr/loadVr.ts";
+const VR_UI = "src/components/video-player/vr/vrUi.ts";
 
-/** The VR import rules: the fork, vrPlugin, or both. */
-const restrictVr = (fork, plugin) => ({
+/** One refused module: its import path, and why. Type imports are free. */
+const refuse = (regex, message) => ({ regex, message, allowTypeImports: true });
+
+const VR_REFUSALS = {
+  plugin: refuse(
+    "(^|/)vrPlugin(\\.[jt]s)?$",
+    "vrPlugin loads only through loadVr() (vr/loadVr.ts): a static import puts the VR chunk in this one."
+  ),
+  ui: refuse(
+    "(^|/)vrUi(\\.[jt]s)?$",
+    "vrUi is the lazy vr-ui chunk: only useVrMode reaches it, through import()."
+  ),
+  controls: refuse(
+    "(^|/)VrControls(\\.[jt]s)?$",
+    "VrControls loads with the vr-ui chunk: only vr/vrUi.ts imports it."
+  ),
+};
+
+/**
+ * The VR import rules: the fork (`fork`) and the modules named in `refused`
+ * (keys of VR_REFUSALS) may not be imported statically.
+ */
+const restrictVr = (fork, refused) => ({
   paths: fork
     ? [
         {
@@ -21,16 +43,7 @@ const restrictVr = (fork, plugin) => ({
         },
       ]
     : [],
-  patterns: plugin
-    ? [
-        {
-          regex: "(^|/)vrPlugin(\\.[jt]s)?$",
-          message:
-            "vrPlugin loads only through loadVr() (vr/loadVr.ts): a static import puts the VR chunk in this one.",
-          allowTypeImports: true,
-        },
-      ]
-    : [],
+  patterns: refused.map((key) => VR_REFUSALS[key]),
 });
 
 export default defineConfig([
@@ -138,20 +151,40 @@ export default defineConfig([
   },
   // The VR code (the fork and three.js, about 750 kB) is the lazy `vr` chunk:
   // only vr/loadVr.ts reaches vr/vrPlugin.ts, by import(), and only
-  // vrPlugin.ts imports the fork. A static import anywhere else pulls it into
-  // that file's chunk (the Scene page). Type imports are free.
+  // vrPlugin.ts imports the fork. The VR button and its logic (vrUi.ts with
+  // VrControls.ts) are the small `vr-ui` chunk, which useVrMode reaches by
+  // import() on VR scenes only. A static import anywhere else pulls a chunk
+  // into that file's own (the Scene page). Type imports are free.
   {
     files: ["src/**/*.{ts,tsx}"],
-    ignores: [VR_PLUGIN, VR_LOADER],
-    rules: { [RESTRICTED_IMPORTS]: ["error", restrictVr(true, true)] },
+    ignores: [VR_PLUGIN, VR_LOADER, VR_UI],
+    rules: {
+      [RESTRICTED_IMPORTS]: [
+        "error",
+        restrictVr(true, ["plugin", "ui", "controls"]),
+      ],
+    },
   },
   {
     files: [VR_LOADER],
-    rules: { [RESTRICTED_IMPORTS]: ["error", restrictVr(true, false)] },
+    rules: {
+      [RESTRICTED_IMPORTS]: ["error", restrictVr(true, ["ui", "controls"])],
+    },
+  },
+  {
+    files: [VR_UI],
+    rules: {
+      [RESTRICTED_IMPORTS]: ["error", restrictVr(true, ["plugin"])],
+    },
   },
   {
     files: [VR_PLUGIN],
-    rules: { [RESTRICTED_IMPORTS]: ["error", restrictVr(false, true)] },
+    rules: {
+      [RESTRICTED_IMPORTS]: [
+        "error",
+        restrictVr(false, ["plugin", "ui", "controls"]),
+      ],
+    },
   },
   // Build scripts run in Node
   {

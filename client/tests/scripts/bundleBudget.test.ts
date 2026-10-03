@@ -132,6 +132,25 @@ describe("the budgets", () => {
   });
 });
 
+describe("the vr-ui budget", () => {
+  it("names a small vr-ui chunk, the VR button and its logic", () => {
+    const ui = realBudgets.chunkKB["vr-ui"];
+
+    expect(ui).toBeDefined();
+    expect(ui).toBeLessThan(10);
+    expect(
+      checkBudget(
+        {
+          chunks: [{ name: "vr-ui", size: (ui ?? 0) * 1000 + 1, gzip: 0 }],
+          entry: { name: "index", size: 100_000, gzip: 30_000 },
+          firstLoad: [],
+        },
+        realBudgets
+      )
+    ).toHaveLength(1);
+  });
+});
+
 describe("circularChunkWarnings", () => {
   it("returns each build-log line that warns of a circular dependency between chunks", () => {
     const log = [
