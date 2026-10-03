@@ -2009,6 +2009,14 @@
           "modifier": "EQUALS",
           "value": 0
         }
+      },
+      "listRequest": {
+        "gallery_filter": {
+          "tag_count": {
+            "modifier": "EQUALS",
+            "value": 0
+          }
+        }
       }
     },
     {
@@ -2026,6 +2034,26 @@
         "tag_count": {
           "modifier": "EQUALS",
           "value": 0
+        }
+      },
+      "listRequest": {
+        "gallery_filter": {
+          "tag_count": {
+            "modifier": "EQUALS",
+            "value": 0
+          }
+        },
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "tag_count",
+              "criterion": {
+                "modifier": "BETWEEN",
+                "value": 2
+              }
+            }
+          ]
         }
       }
     },
@@ -2047,6 +2075,17 @@
           ],
           "modifier": "INCLUDES",
           "depth": -1
+        }
+      },
+      "listRequest": {
+        "gallery_filter": {
+          "tags": {
+            "value": [
+              "12:inst-a"
+            ],
+            "modifier": "INCLUDES",
+            "depth": -1
+          }
         }
       }
     },
@@ -2072,6 +2111,30 @@
           ],
           "modifier": "EXCLUDES"
         }
+      },
+      "listRequest": {
+        "gallery_filter": {
+          "tags": {
+            "value": [
+              "12:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
+        },
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "tags",
+              "criterion": {
+                "value": [
+                  "3:inst-a"
+                ],
+                "modifier": "EXCLUDES"
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -2088,6 +2151,15 @@
           "value": "2020-01-01",
           "value2": "2024-12-31"
         }
+      },
+      "listRequest": {
+        "gallery_filter": {
+          "date": {
+            "modifier": "BETWEEN",
+            "value": "2020-01-01",
+            "value2": "2024-12-31"
+          }
+        }
       }
     },
     {
@@ -2102,6 +2174,14 @@
           "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
+      },
+      "listRequest": {
+        "gallery_filter": {
+          "date": {
+            "modifier": "BETWEEN",
+            "value": "2020-01-01"
+          }
+        }
       }
     },
     {
@@ -2115,6 +2195,14 @@
         "date": {
           "modifier": "BETWEEN",
           "value2": "2024-12-31"
+        }
+      },
+      "listRequest": {
+        "gallery_filter": {
+          "date": {
+            "modifier": "BETWEEN",
+            "value2": "2024-12-31"
+          }
         }
       }
     }

@@ -56,6 +56,7 @@ import {
   writeListParams,
 } from "@/utils/urlParams";
 import { DETAILS_WITH_PRESENCE_ROW } from "../helpers/editorRows";
+import { sentFilter } from "../helpers/sentFilter";
 import { untrusted } from "../helpers/untrusted";
 
 // Wrapper with defaults for optional params to avoid repeating them in every test
@@ -1072,8 +1073,10 @@ describe("body measures are metric in the URL (owner answer 12)", () => {
       // Not a number: dropped; far outside the editor's bounds: kept
       expect(state.filters.weight).toEqual({ max: "9999" });
       expect(
-        untrusted<{ performer_filter: unknown }>(JSON.parse(state.listKey))
-          .performer_filter
+        sentFilter(
+          untrusted<Record<string, unknown>>(JSON.parse(state.listKey)),
+          "performer_filter"
+        )
       ).toMatchObject({
         height: { modifier: "BETWEEN", value: 177.8 },
         weight: { modifier: "BETWEEN", value2: 9999 },

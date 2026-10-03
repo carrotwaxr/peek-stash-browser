@@ -4536,6 +4536,16 @@
           ],
           "modifier": "INCLUDES"
         }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "performers": {
+            "value": [
+              "10:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
+        }
       }
     },
     {
@@ -4561,6 +4571,31 @@
           ],
           "modifier": "EXCLUDES"
         }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "performers": {
+            "value": [
+              "10:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
+        },
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "performers",
+              "criterion": {
+                "value": [
+                  "1:inst-a",
+                  "10:inst-a"
+                ],
+                "modifier": "EXCLUDES"
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -4581,6 +4616,17 @@
           ],
           "modifier": "INCLUDES",
           "depth": -1
+        }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "studios": {
+            "value": [
+              "11:inst-a"
+            ],
+            "modifier": "INCLUDES",
+            "depth": -1
+          }
         }
       }
     },
@@ -4605,6 +4651,31 @@
           "modifier": "INCLUDES",
           "depth": -1
         }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "studios": {
+            "value": [
+              "11:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
+        },
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "studios",
+              "criterion": {
+                "value": [
+                  "2:inst-b"
+                ],
+                "modifier": "INCLUDES",
+                "depth": -1
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -4625,6 +4696,17 @@
           ],
           "modifier": "INCLUDES",
           "depth": -1
+        }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "tags": {
+            "value": [
+              "12:inst-a"
+            ],
+            "modifier": "INCLUDES",
+            "depth": -1
+          }
         }
       }
     },
@@ -4653,6 +4735,32 @@
           "modifier": "EXCLUDES",
           "depth": 0
         }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "tags": {
+            "value": [
+              "12:inst-a"
+            ],
+            "modifier": "INCLUDES_ALL",
+            "depth": 0
+          }
+        },
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "tags",
+              "criterion": {
+                "value": [
+                  "3:inst-a"
+                ],
+                "modifier": "EXCLUDES",
+                "depth": -1
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -4671,6 +4779,16 @@
             "13:inst-a"
           ],
           "modifier": "INCLUDES"
+        }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "groups": {
+            "value": [
+              "13:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
         }
       }
     },
@@ -4696,6 +4814,30 @@
           ],
           "modifier": "EXCLUDES"
         }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "groups": {
+            "value": [
+              "13:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
+        },
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "groups",
+              "criterion": {
+                "value": [
+                  "4:inst-a"
+                ],
+                "modifier": "EXCLUDES"
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -4715,6 +4857,16 @@
           ],
           "modifier": "INCLUDES"
         }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "galleries": {
+            "value": [
+              "14:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
+        }
       }
     },
     {
@@ -4724,6 +4876,11 @@
       },
       "request": {
         "tagged": false
+      },
+      "listRequest": {
+        "scene_filter": {
+          "tagged": false
+        }
       }
     },
     {
@@ -4733,6 +4890,11 @@
       },
       "request": {
         "tagged": true
+      },
+      "listRequest": {
+        "scene_filter": {
+          "tagged": true
+        }
       }
     },
     {
@@ -4749,6 +4911,15 @@
           "value": "2020-01-01",
           "value2": "2024-12-31"
         }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "date": {
+            "modifier": "BETWEEN",
+            "value": "2020-01-01",
+            "value2": "2024-12-31"
+          }
+        }
       }
     },
     {
@@ -4763,6 +4934,14 @@
           "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "date": {
+            "modifier": "BETWEEN",
+            "value": "2020-01-01"
+          }
+        }
       }
     },
     {
@@ -4776,6 +4955,14 @@
         "date": {
           "modifier": "BETWEEN",
           "value2": "2024-12-31"
+        }
+      },
+      "listRequest": {
+        "scene_filter": {
+          "date": {
+            "modifier": "BETWEEN",
+            "value2": "2024-12-31"
+          }
         }
       }
     }

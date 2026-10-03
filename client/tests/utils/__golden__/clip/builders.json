@@ -1327,13 +1327,21 @@
             "direction": "DESC"
           },
           "clip_filter": {
-            "scene_tags": {
-              "value": [
-                "280"
-              ],
-              "modifier": "INCLUDES"
-            },
             "is_generated": true
+          },
+          "where": {
+            "match": "all",
+            "rules": [
+              {
+                "field": "scene_tags",
+                "criterion": {
+                  "value": [
+                    "280"
+                  ],
+                  "modifier": "INCLUDES"
+                }
+              }
+            ]
           }
         }
       },
@@ -1353,13 +1361,21 @@
             "direction": "DESC"
           },
           "clip_filter": {
-            "scene_tags": {
-              "value": [
-                "280"
-              ],
-              "modifier": "INCLUDES"
-            },
             "is_generated": true
+          },
+          "where": {
+            "match": "all",
+            "rules": [
+              {
+                "field": "scene_tags",
+                "criterion": {
+                  "value": [
+                    "280"
+                  ],
+                  "modifier": "INCLUDES"
+                }
+              }
+            ]
           }
         }
       },
@@ -1372,13 +1388,21 @@
           "direction": "DESC"
         },
         "clip_filter": {
-          "scene_tags": {
-            "value": [
-              "280"
-            ],
-            "modifier": "INCLUDES"
-          },
           "is_generated": true
+        },
+        "where": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "scene_tags",
+              "criterion": {
+                "value": [
+                  "280"
+                ],
+                "modifier": "INCLUDES"
+              }
+            }
+          ]
         }
       }
     }

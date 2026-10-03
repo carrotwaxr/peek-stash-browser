@@ -3,6 +3,7 @@ import { ListPage } from "./pages/ListPage";
 import { mustOk } from "./support/api";
 import { requireData } from "./support/data";
 import { uniqueName } from "./support/names";
+import { sentCriterion } from "./support/sentFilter";
 import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
 /**
@@ -67,13 +68,12 @@ test.describe("Filters in step with Stash", () => {
       new RegExp(`/scenes\\?galleryId=${gallery.id}(&|$)`)
     );
     const response = await scenesRequest;
-    const sent = response.request().postDataJSON() as {
-      scene_filter?: { galleries?: { value?: string[]; modifier?: string } };
-    };
-    expect(sent.scene_filter?.galleries?.value).toHaveLength(1);
-    expect(sent.scene_filter?.galleries?.value?.[0]).toMatch(
-      new RegExp(`^${gallery.id}(:|$)`)
+    const galleries = sentCriterion<{ value?: string[]; modifier?: string }>(
+      response.request().postDataJSON(),
+      "galleries"
     );
+    expect(galleries?.value).toHaveLength(1);
+    expect(galleries?.value?.[0]).toMatch(new RegExp(`^${gallery.id}(:|$)`));
     const body = (await response.json()) as { findScenes: { count: number } };
     expect(body.findScenes.count).toBe(sceneCount);
     await expect(
@@ -147,11 +147,12 @@ test.describe("Filters in step with Stash", () => {
       await page.getByRole("button", { name: "Apply Filters" }).click();
 
       // 1. The request says include X, exclude Y
-      const sent = (await applied).request().postDataJSON() as {
-        scene_filter?: { tags?: { value?: string[]; excludes?: string[] } };
-      };
-      expect(sent.scene_filter?.tags?.value).toEqual([includedRef]);
-      expect(sent.scene_filter?.tags?.excludes).toEqual([excludedRef]);
+      const sent = sentCriterion<{ value?: string[]; excludes?: string[] }>(
+        (await applied).request().postDataJSON(),
+        "tags"
+      );
+      expect(sent?.value).toEqual([includedRef]);
+      expect(sent?.excludes).toEqual([excludedRef]);
 
       // 2. The URL carries both, the chip and the badge show the filter
       const params = new URL(page.url()).searchParams;
@@ -169,10 +170,11 @@ test.describe("Filters in step with Stash", () => {
           (r.request().postData() ?? "").includes('"excludes"')
       );
       await page.reload();
-      const again = (await reloaded).request().postDataJSON() as {
-        scene_filter?: { tags?: { value?: string[]; excludes?: string[] } };
-      };
-      expect(again.scene_filter?.tags).toMatchObject({
+      const again = sentCriterion(
+        (await reloaded).request().postDataJSON(),
+        "tags"
+      );
+      expect(again).toMatchObject({
         value: [includedRef],
         excludes: [excludedRef],
       });
@@ -205,10 +207,11 @@ test.describe("Filters in step with Stash", () => {
           (r.request().postData() ?? "").includes('"excludes"')
       );
       await page.goto("/scenes");
-      const loaded = (await fromPreset).request().postDataJSON() as {
-        scene_filter?: { tags?: { value?: string[]; excludes?: string[] } };
-      };
-      expect(loaded.scene_filter?.tags).toMatchObject({
+      const loaded = sentCriterion(
+        (await fromPreset).request().postDataJSON(),
+        "tags"
+      );
+      expect(loaded).toMatchObject({
         value: [includedRef],
         excludes: [excludedRef],
       });

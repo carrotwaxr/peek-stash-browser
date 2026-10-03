@@ -143,14 +143,22 @@ describe("SearchableGrid lockedFilters", () => {
     api.findGroups.mockResolvedValue({ findGroups: { count: 0, groups: [] } });
   });
 
-  /** The filter the grid's list request carried */
-  async function sentFilter(
-    find: keyof typeof api,
-    filterKey: string
-  ): Promise<unknown> {
+  /** The grid's last list request */
+  async function sentBody(
+    find: keyof typeof api
+  ): Promise<Record<string, unknown>> {
     await waitFor(() => expect(api[find]).toHaveBeenCalled());
-    return must(api[find].mock.lastCall, `the ${find} request`)[0][filterKey];
+    return must(api[find].mock.lastCall, `the ${find} request`)[0];
   }
+
+  /** The panel's rows as the request's `where` sends them */
+  const whereOfRows = (rows: Readonly<Record<string, unknown>>) => ({
+    match: "all",
+    rules: Object.entries(rows).map(([field, criterion]) => ({
+      field,
+      criterion,
+    })),
+  });
 
   it.each(TABS)(
     "$tab: a panel filter and the lock both reach the request",
@@ -166,10 +174,10 @@ describe("SearchableGrid lockedFilters", () => {
         </MemoryRouter>
       );
 
-      expect(await sentFilter(find, filterKey)).toEqual({
-        ...fromPanel,
-        ...locked,
-      });
+      // The lock is the filter object; the panel's row goes in where
+      const body = await sentBody(find);
+      expect(body[filterKey]).toEqual(locked);
+      expect(body.where).toEqual(whereOfRows(fromPanel));
     }
   );
 
@@ -232,7 +240,7 @@ describe("SearchableGrid lockedFilters", () => {
     expect(api.findPerformers).toHaveBeenCalledTimes(1);
   });
 
-  it("the lock wins over the panel's criterion of the same field", async () => {
+  it("the lock stays the filter object's; the panel's row of its field goes in where (FILTERS-12)", async () => {
     render(
       <MemoryRouter initialEntries={["/tab?tagIds=9:inst-b"]}>
         <SearchableGrid
@@ -244,8 +252,11 @@ describe("SearchableGrid lockedFilters", () => {
       </MemoryRouter>
     );
 
-    expect(await sentFilter("findPerformers", "performer_filter")).toEqual({
-      tags: LOCK,
+    const body = await sentBody("findPerformers");
+    expect(body.performer_filter).toEqual({ tags: LOCK });
+    expect(body.where).toMatchObject({
+      match: "all",
+      rules: [{ field: "tags", criterion: { value: ["9:inst-b"] } }],
     });
   });
 });

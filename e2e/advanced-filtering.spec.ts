@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { ListPage } from "./pages/ListPage";
+import { sentCriterion } from "./support/sentFilter";
 
 /**
  * E2E tests for the filter panel and for combining search with sort and view
@@ -83,11 +84,7 @@ test.describe("Advanced Filtering", () => {
       (r) =>
         new URL(r.url()).pathname === "/api/library/performers" &&
         r.request().method() === "POST" &&
-        !!(
-          r.request().postDataJSON() as {
-            performer_filter?: { penis_length?: unknown };
-          } | null
-        )?.performer_filter?.penis_length
+        !!sentCriterion(r.request().postDataJSON(), "penis_length")
     );
     await page.getByRole("button", { name: "Apply Filters" }).click();
     const response = await filtered;

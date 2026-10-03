@@ -96,7 +96,11 @@ const rowsOf = (prefix: string, n = 2): Row[] =>
   }));
 
 type SceneFilter = Record<string, unknown>;
-type Sent = { filter: Record<string, unknown>; scene_filter?: SceneFilter };
+type Sent = {
+  filter: Record<string, unknown>;
+  scene_filter?: SceneFilter;
+  where?: { match: string; rules: readonly Record<string, unknown>[] };
+};
 
 /** The requests the API was sent, oldest first */
 const sent = () => api.findScenes.mock.calls.map((call) => call[0] as Sent);
@@ -515,7 +519,9 @@ describe("SceneSearch", () => {
       // The grid asks for the period's scenes
       await waitFor(() => expect(lastSent().scene_filter?.date).toBeDefined());
       const listed = lastSent();
-      expect(listed.scene_filter?.rating100).toBeDefined();
+      // The user's Rating row goes in where, the page's tag and the period
+      // in the filter object
+      expect(listed.where?.rules).toMatchObject([{ field: "rating100" }]);
 
       await waitFor(() => expect(distributionBodies()).not.toEqual([]));
       const bars = must(distributionBodies().at(-1), "the bars' request");
@@ -523,6 +529,7 @@ describe("SceneSearch", () => {
       expect(bars).toEqual({
         filter: { q: "beach" },
         scene_filter: withoutDate,
+        where: listed.where,
         granularity: "months",
       });
       expect(bars.scene_filter).toMatchObject({
@@ -588,12 +595,19 @@ describe("SceneSearch", () => {
       expect(distributionBodies()).toEqual([
         {
           filter: { q: "" },
-          scene_filter: {
-            date: {
-              modifier: "BETWEEN",
-              value: "2024-01-01",
-              value2: "2024-12-31",
-            },
+          scene_filter: {},
+          where: {
+            match: "all",
+            rules: [
+              {
+                field: "date",
+                criterion: {
+                  modifier: "BETWEEN",
+                  value: "2024-01-01",
+                  value2: "2024-12-31",
+                },
+              },
+            ],
           },
           granularity: "months",
         },

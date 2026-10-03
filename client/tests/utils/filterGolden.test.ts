@@ -392,6 +392,7 @@ describe.each(LISTS)("%s", (list) => {
           label,
           state,
           request: build(state),
+          listRequest: requestOf(list, state),
         })),
         imperial: {
           imperialOptions: imperialSamples,
@@ -496,7 +497,38 @@ describe.each(LISTS)("%s", (list) => {
   });
 });
 
-// ── Permanent criteria the builders merge today ───────────────────────────
+// ── Permanent criteria beside the panel's rows ────────────────────────────
+
+/**
+ * A page's criteria beside the panel's rows as a list request sends them
+ * (W10): the state's contract fields are the page's permanent filters (the
+ * timeline's `date` too, which a panel key also names), in the filter
+ * object; the rest are the panel's rows, in `where`
+ */
+function requestOf(list: ListKind, state: State) {
+  const fields = new Set(fieldsOf(list));
+  const page = Object.fromEntries(
+    Object.entries(state).filter(([key]) => fields.has(key))
+  );
+  const rows = Object.fromEntries(
+    Object.entries(state).filter(([key]) => !fields.has(key))
+  );
+  const query = buildListQuery(
+    list,
+    {
+      ready: true,
+      filters: rows,
+      sort: { field: DEFAULT_SORT[list].field, direction: "DESC", seed: null },
+      page: 1,
+      perPage: 24,
+      q: "",
+    },
+    page
+  );
+  if (query === null) throw new Error("a ready state builds a request");
+  const { filter: _page, ...parts } = query;
+  return parts;
+}
 
 const ref = (id: string, modifier = "INCLUDES", depth?: number) => ({
   value: [`${id}:inst-a`],

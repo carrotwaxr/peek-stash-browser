@@ -3,8 +3,8 @@
  *
  * For each of the eight lists the count of a request with one filter equals
  * the `count` of the list's own request with the same body, and a scene the
- * user hid is never counted. The `where` group case waits for W3's tree
- * (enabled with W10 on main).
+ * user hid is never counted. A request whose rows sit in an "any" group
+ * counts each scene that matches either row once.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
@@ -119,7 +119,54 @@ describe("list count (integration)", () => {
     expect(response.status).toBe(400);
   });
 
-  it.todo("counts a request with a where group (enabled with W10)");
+  it("counts a request with an any group as the list's own request does", async () => {
+    const performer = {
+      value: [TEST_ENTITIES.performerWithScenes],
+      modifier: "INCLUDES",
+    };
+    const anyGroup = {
+      where: {
+        match: "all",
+        rules: [
+          {
+            match: "any",
+            rules: [
+              { field: "tags", criterion: tag },
+              { field: "performers", criterion: performer },
+            ],
+          },
+        ],
+      },
+    };
+    const count = async (body: Record<string, unknown>) => {
+      const response = await adminClient.post<{ count: number }>(
+        "/api/library/scenes/count",
+        body
+      );
+      expect(response.status).toBe(200);
+      return response.data.count;
+    };
+
+    const page = await adminClient.post<{ findScenes: { count: number } }>(
+      "/api/library/scenes",
+      { ...anyGroup, filter: { page: 1, per_page: 1 } }
+    );
+    expect(page.status).toBe(200);
+    const either = await count(anyGroup);
+    expect(either).toBe(page.data.findScenes.count);
+
+    // Either one: the tag's scenes and the performer's, each scene once
+    const tagged = await count({ scene_filter: { tags: tag } });
+    const withPerformer = await count({
+      scene_filter: { performers: performer },
+    });
+    const both = await count({
+      scene_filter: { tags: tag, performers: performer },
+    });
+    expect(tagged).toBeGreaterThan(0);
+    expect(withPerformer).toBeGreaterThan(0);
+    expect(either).toBe(tagged + withPerformer - both);
+  });
 
   it("a hidden scene is never counted", async () => {
     viewer = await createApiUser("list_count_it_user", "list_count_it_pass_1");

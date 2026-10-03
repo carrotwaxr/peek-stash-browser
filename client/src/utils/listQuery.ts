@@ -1,9 +1,18 @@
 /**
  * A list's request, built from its state: the page, sort and search in
- * `filter`, the panel's filters with the page's permanent filters in the
- * entity's `<entity>_filter`. Also the sort rules a list reads its state by.
+ * `filter`, the page's permanent filters in the entity's `<entity>_filter`
+ * and the user's rows in `where` (FILTERS-12: a tag page's tag and the
+ * user's Tags row both apply). Also the sort rules a list reads its state by.
  */
-import { DEFAULT_SORT, PANEL_FIELDS } from "@peek/shared-types";
+import {
+  DEFAULT_SORT,
+  type ListKind,
+  PANEL_FIELDS,
+  type WhereGroup,
+  groupKeyOf,
+  isWhereGroup,
+  parseRowKey,
+} from "@peek/shared-types";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import {
   CLIP_SORT_OPTIONS,
@@ -15,76 +24,54 @@ import {
   SCENE_SORT_OPTIONS,
   STUDIO_SORT_OPTIONS,
   TAG_SORT_OPTIONS,
-  buildClipFilter,
-  buildGalleryFilter,
-  buildGroupFilter,
-  buildImageFilter,
-  buildPerformerFilter,
-  buildSceneFilter,
-  buildStudioFilter,
-  buildTagFilter,
 } from "./filterConfig";
-import { urlKeysOf } from "./filterFields";
+import { filterObjectOf, urlKeysOf, whereOf } from "./filterFields";
 import type { ListEntity } from "./urlParams";
 
 type Filters = Readonly<Record<string, unknown>>;
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 /**
- * The values a filter state names with an including modifier: the page's
- * permanent criterion in the request's shape (`{ value, modifier }` under the
- * contract field), or the panel's key with its modifier companion. An
- * EXCLUDES, "has none" or "has any" criterion names none.
+ * The values a criterion names for a sort to read: those of an INCLUDES or
+ * INCLUDES_ALL criterion (a page's list of ids too); none for EXCLUDES, "has
+ * none" or "has any"
  */
-function includedValues(
-  filters: Filters,
-  field: string,
-  panelKey?: string,
-  modifierKey?: string
-): unknown[] {
-  const named: unknown[] = [];
-  const take = (value: unknown, modifier: unknown) => {
-    if (!Array.isArray(value) || value.length === 0) return;
-    if (
-      modifier === undefined ||
-      modifier === "INCLUDES" ||
-      modifier === "INCLUDES_ALL"
-    ) {
-      named.push(...(value as unknown[]));
-    }
-  };
-  const permanent = filters[field];
-  if (Array.isArray(permanent)) take(permanent, undefined);
-  else if (typeof permanent === "object" && permanent !== null) {
-    const { value, modifier } = permanent as {
-      value?: unknown;
-      modifier?: unknown;
-    };
-    take(value, modifier);
-  }
-  if (panelKey) {
-    take(filters[panelKey], modifierKey ? filters[modifierKey] : undefined);
-  }
-  return named;
+function namedValues(criterion: unknown): readonly unknown[] {
+  if (Array.isArray(criterion)) return criterion as unknown[];
+  if (!isObject(criterion)) return [];
+  const { value, modifier } = criterion;
+  if (!Array.isArray(value)) return [];
+  return modifier === undefined ||
+    modifier === "INCLUDES" ||
+    modifier === "INCLUDES_ALL"
+    ? (value as unknown[])
+    : [];
 }
 
 /**
- * The scene panel's row for the Playlists field: its key and modifier
- * companion, which the panel's table names
+ * The values a sort reads of a field, as the server's `topLevelCriteria`
+ * reads them: the page's criterion of the field (the filter object's) when
+ * it has one, as the page gives it, else the first root row of the field
+ * that names something, under an "all" root only. A row inside a group, or
+ * under "match any", never decides a sort.
  */
-const playlistRow = () =>
-  (
-    PANEL_FIELDS.scene as readonly {
-      field: string;
-      key: string;
-      modifierKey?: string;
-    }[]
-  ).find((row) => row.field === "playlists");
+function sortReads(kind: ListKind, filters: Filters, field: string) {
+  if (filters[field] !== undefined) return namedValues(filters[field]);
+  const where = whereOf(kind, filters);
+  if (where?.match !== "all") return [];
+  for (const node of where.rules) {
+    if (isWhereGroup(node) || node.field !== field) continue;
+    const values = namedValues(node.criterion);
+    if (values.length > 0) return values;
+  }
+  return [];
+}
 
 /** Whether a filter state, the page's permanent criteria merged in, offers the Scene Number sort */
 export function offersSceneIndex(filters: Filters): boolean {
-  return (
-    includedValues(filters, "groups", "groupIds", "groupIdsModifier").length > 0
-  );
+  return sortReads("scene", filters, "groups").length > 0;
 }
 
 /**
@@ -92,11 +79,7 @@ export function offersSceneIndex(filters: Filters): boolean {
  * order needs one to read the position from (a 400 otherwise)
  */
 export function offersPlaylistOrder(filters: Filters): boolean {
-  const row = playlistRow();
-  return (
-    includedValues(filters, "playlists", row?.key, row?.modifierKey).length ===
-    1
-  );
+  return sortReads("scene", filters, "playlists").length === 1;
 }
 
 /**
@@ -104,10 +87,7 @@ export function offersPlaylistOrder(filters: Filters): boolean {
  * order is the index within it (a 400 otherwise)
  */
 export function offersCollectionOrder(filters: Filters): boolean {
-  return (
-    includedValues(filters, "containing_groups", "groupIds", "groupIdsModifier")
-      .length > 0
-  );
+  return sortReads("group", filters, "containing_groups").length > 0;
 }
 
 /** Whether a list offers a sort that reads a filter, given these filters */
@@ -140,26 +120,50 @@ export function sortOffered(
   return DEFAULT_SORT[artifactType as keyof typeof DEFAULT_SORT].field;
 }
 
-/** An entity's `<entity>_filter` from the panel's filters (permanent filters merged in) */
-export const buildFilter = (artifactType: string, filters: Filters) => {
+/**
+ * An entity's `<entity>_filter` beside the request's `where`: the page's
+ * permanent filters over the state's own contract-field keys, and a list's
+ * default criterion no row decides (`filterObjectOf`); never the user's rows
+ */
+export const buildFilter = (
+  artifactType: string,
+  filters: Filters,
+  permanentFilters: Filters = {}
+) => {
   switch (artifactType) {
     case "performer":
-      return { performer_filter: buildPerformerFilter(filters) };
+      return {
+        performer_filter: filterObjectOf(
+          "performer",
+          filters,
+          permanentFilters
+        ),
+      };
     case "studio":
-      return { studio_filter: buildStudioFilter(filters) };
+      return {
+        studio_filter: filterObjectOf("studio", filters, permanentFilters),
+      };
     case "tag":
-      return { tag_filter: buildTagFilter(filters) };
+      return { tag_filter: filterObjectOf("tag", filters, permanentFilters) };
     case "group":
-      return { group_filter: buildGroupFilter(filters) };
+      return {
+        group_filter: filterObjectOf("group", filters, permanentFilters),
+      };
     case "gallery":
-      return { gallery_filter: buildGalleryFilter(filters) };
+      return {
+        gallery_filter: filterObjectOf("gallery", filters, permanentFilters),
+      };
     case "image":
-      return { image_filter: buildImageFilter(filters) };
+      return {
+        image_filter: filterObjectOf("image", filters, permanentFilters),
+      };
     case "clip":
-      return { clip_filter: buildClipFilter(filters) };
+      return { clip_filter: filterObjectOf("clip", filters, permanentFilters) };
     case "scene":
     default:
-      return { scene_filter: buildSceneFilter(filters) };
+      return {
+        scene_filter: filterObjectOf("scene", filters, permanentFilters),
+      };
   }
 };
 
@@ -237,15 +241,20 @@ export interface ListQueryPage {
   direction: "ASC" | "DESC";
 }
 
-/** A list's request body: paging, sort and search, and the entity's filter */
-export type ListQuery = { filter: ListQueryPage } & ReturnType<
-  typeof buildFilter
->;
+/**
+ * A list's request body: paging, sort and search, the entity's filter (what
+ * the page fixes) and, when the user has rows, `where`
+ */
+export type ListQuery = {
+  filter: ListQueryPage;
+  where?: WhereGroup<ListKind>;
+} & ReturnType<typeof buildFilter>;
 
 /**
  * A list's request from its state, or null while the presets load. The
- * page's permanent filters go last on every path, so a permanent field wins
- * over the panel's or a preset's value of the same key.
+ * page's permanent filters go in the entity's filter, winning over a
+ * contract-field key the state saved; the state's rows go in `where`, so a
+ * row on the field the page fixes narrows the page's own criterion.
  */
 export const buildListQuery = (
   entity: ListEntity,
@@ -253,19 +262,25 @@ export const buildListQuery = (
   permanentFilters: Filters
 ): ListQuery | null => {
   if (!state.ready) return null;
-  const filters = { ...state.filters, ...permanentFilters };
+  const where = whereOf(entity, state.filters);
   return {
     filter: {
       page: state.page,
       per_page: state.perPage,
       q: state.q,
       sort: sortValue(
-        sortOffered(entity, state.sort.field, filters),
+        sortOffered(
+          entity,
+          state.sort.field,
+          // A sort reads the filter object and the root rows together
+          { ...state.filters, ...permanentFilters }
+        ),
         state.sort.seed
       ),
       direction: state.sort.direction,
     },
-    ...buildFilter(entity, filters),
+    ...buildFilter(entity, state.filters, permanentFilters),
+    ...(where === undefined ? {} : { where }),
   };
 };
 
@@ -459,10 +474,11 @@ const lockedPanelKeys = (
 };
 
 /**
- * The filters without those on a field the page fixes (a performer's Scenes
- * tab has its performer, so the URL's or a preset's `performerIds`, its
- * modifier and its `performerIdsExclude` go). Returns the same object when
- * nothing goes.
+ * The filters without those on a field a lock names (a View loaded on a
+ * performer's Scenes tab, which has its performer, loses `performerIds`,
+ * its modifier and its `performerIdsExclude`, in every row: `2.performerIds`
+ * and `g1.performerIds` too), and without a group's declaration (`g1`) left
+ * with no row. Returns the same object when nothing goes.
  */
 export const withoutLockedFilters = (
   entity: ListEntity,
@@ -470,10 +486,22 @@ export const withoutLockedFilters = (
   lockedFields: readonly string[]
 ): Record<string, unknown> => {
   const locked = lockedPanelKeys(entity, lockedFields);
-  const kept = Object.entries(filters).filter(([key]) => !locked.has(key));
-  return kept.length === Object.keys(filters).length
-    ? (filters as Record<string, unknown>)
-    : Object.fromEntries(kept);
+  const kept = Object.entries(filters).filter(
+    ([key]) => !locked.has(parseRowKey(key)?.key ?? key)
+  );
+  if (kept.length === Object.keys(filters).length) {
+    return filters as Record<string, unknown>;
+  }
+  const groupsWithRows = new Set(
+    kept.flatMap(([key]) => {
+      const group = parseRowKey(key)?.group ?? 0;
+      return group === 0 ? [] : [groupKeyOf(group)];
+    })
+  );
+  const isGroupKey = (key: string) => /^g\d+$/.test(key);
+  return Object.fromEntries(
+    kept.filter(([key]) => !isGroupKey(key) || groupsWithRows.has(key))
+  );
 };
 
 /**

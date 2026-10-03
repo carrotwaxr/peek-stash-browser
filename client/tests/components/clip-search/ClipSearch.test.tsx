@@ -118,13 +118,58 @@ describe("ClipSearch", () => {
         sort: "title",
         direction: "ASC",
       },
+      // The page's scene in the filter object, the user's rows in where
       clip_filter: {
-        tags: { value: ["1:server-a"], modifier: "INCLUDES_ALL" },
-        scene_tags: { value: ["2:server-a"], modifier: "EXCLUDES" },
-        performers: { value: ["3:server-a"], modifier: "EXCLUDES" },
-        studios: { value: ["4:server-a"], modifier: "INCLUDES" },
-        is_generated: false,
         scenes: { value: ["9:server-a"], modifier: "INCLUDES" },
+      },
+      where: {
+        match: "all",
+        rules: [
+          {
+            field: "tags",
+            criterion: { value: ["1:server-a"], modifier: "INCLUDES_ALL" },
+          },
+          {
+            field: "scene_tags",
+            criterion: { value: ["2:server-a"], modifier: "EXCLUDES" },
+          },
+          {
+            field: "performers",
+            criterion: { value: ["3:server-a"], modifier: "EXCLUDES" },
+          },
+          {
+            field: "studios",
+            criterion: { value: ["4:server-a"], modifier: "INCLUDES" },
+          },
+          { field: "is_generated", criterion: false },
+        ],
+      },
+    });
+  });
+
+  it("a Tags row on Clips is sent in where, beside the default preview filter", async () => {
+    renderClips("/clips?tagIds=1:server-a&tagIdsModifier=INCLUDES");
+
+    await waitFor(() => {
+      expect(mockFindClips).toHaveBeenCalled();
+    });
+    expect(must(mockFindClips.mock.calls[0])[0]).toEqual({
+      filter: {
+        page: 1,
+        per_page: 24,
+        q: "",
+        sort: "stashCreatedAt",
+        direction: "DESC",
+      },
+      clip_filter: { is_generated: true },
+      where: {
+        match: "all",
+        rules: [
+          {
+            field: "tags",
+            criterion: { value: ["1:server-a"], modifier: "INCLUDES" },
+          },
+        ],
       },
     });
   });

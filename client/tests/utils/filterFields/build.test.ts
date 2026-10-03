@@ -19,6 +19,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildPanelFilter } from "@/utils/filterFields";
 import { DETAILS_WITH_PRESENCE_ROW } from "../../helpers/editorRows";
+import { sentFilter } from "../../helpers/sentFilter";
 
 interface GoldenEntry {
   label: string;
@@ -275,20 +276,25 @@ describe("buildPanelFilter", () => {
       prodPresets: {
         name: string;
         stored: { filters: Record<string, unknown> };
-        buildListQueryFromItsFilters: { image_filter: unknown };
+        buildListQueryFromItsFilters: Record<string, unknown>;
       }[];
     };
     const toReview = golden.prodPresets.find(
       (preset) => preset.name === "To Review"
     );
+    // The rows go in where since W10: the same criteria, flat
+    const sent = sentFilter(
+      toReview?.buildListQueryFromItsFilters,
+      "image_filter"
+    );
 
-    expect(toReview?.buildListQueryFromItsFilters.image_filter).toEqual({
+    expect(sent).toEqual({
       studios: { value: ["772", "971"], modifier: "EXCLUDES" },
       tags: { value: ["466"], modifier: "EXCLUDES" },
     });
     expect(
       text(buildPanelFilter("image", toReview?.stored.filters ?? {}))
-    ).toBe(text(toReview?.buildListQueryFromItsFilters.image_filter));
+    ).toBe(text(sent));
   });
 
   it("a new field needs only its table row", () => {

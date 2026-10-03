@@ -13,8 +13,9 @@
  * it in the URL through each row's codec on a prefixed view of the
  * parameters, builds the request's `where` tree (`whereOf`, same-field rows
  * of an "any" container merged by the shared rule) and reads a stored one
- * back (`stateOfWhere`, for carousels), and compares two states as a View
- * does (`filtersEqual`, `viewModified`).
+ * back (`stateOfWhere`, for carousels), builds the filter object a list
+ * request sends beside `where` (`filterObjectOf`), and compares two states
+ * as a View does (`filtersEqual`, `viewModified`).
  *
  * Imports only relative modules and `@peek/shared-types` (see `options.ts`).
  */
@@ -37,7 +38,11 @@ import {
   parseRowKey,
   rowKeyOf,
 } from "@peek/shared-types";
-import { normalizePanelState } from "./build";
+import {
+  type PanelFilters,
+  buildPanelFilter,
+  normalizePanelState,
+} from "./build";
 import {
   type PanelState,
   type UrlParams,
@@ -675,6 +680,36 @@ export function whereOf<K extends ListKind>(
     if (groupRules.length > 0) rules.push({ match, rules: groupRules });
   }
   return rules.length === 0 ? undefined : { match: parsed.match, rules };
+}
+
+/**
+ * The request's filter object beside `whereOf`'s tree (FILTERS-12): the
+ * state's permanent contract keys (a View that saved a page's criterion)
+ * with the page's own criteria (`permanent`, winning on a clash), and the
+ * list's default criteria no row of the state decides (Clips' "With
+ * preview only", which a Has Preview row in any container replaces, "All
+ * clips" included). The user's rows are never here: a page's Tags and the
+ * user's Tags row both apply, AND-ed, not merged into one criterion.
+ */
+export function filterObjectOf<K extends ListKind>(
+  kind: K,
+  state: PanelState,
+  permanent: PanelState = {}
+): PanelFilters[K] {
+  const parsed = parseState(PANEL_FIELDS[kind], SPECS[kind], state);
+  const fixed = { ...parsed.permanent, ...permanent };
+  const decided = new Set(
+    [...parsed.containers.values()].flatMap((container) =>
+      container.rows.map((row) => row.field.field)
+    )
+  );
+  // Built with no row's keys, the filter holds the page's criteria and the
+  // rows' defaults only
+  return Object.fromEntries(
+    Object.entries(buildPanelFilter(kind, fixed)).filter(
+      ([field]) => field in fixed || !decided.has(field)
+    )
+  ) as PanelFilters[K];
 }
 
 /** The first row of the leaf's field that reads its criterion, else undefined */
