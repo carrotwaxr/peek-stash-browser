@@ -28,6 +28,8 @@ export const queryKeys = {
       ["scenes", instanceId, "detail", id] as const,
     externalPlayerLink: (instanceId: string | undefined, id: string) =>
       ["scenes", instanceId, "externalPlayerLink", id] as const,
+    mediaLink: (instanceId: string | undefined, id: string) =>
+      ["scenes", instanceId, "mediaLink", id] as const,
     similar: (instanceId: string, id: string, page: number) =>
       ["scenes", instanceId, "similar", id, page] as const,
     // Recommended's list: its own segment before "list", so its total

@@ -44,7 +44,10 @@ const LIBRARY_ENTITY_ROOTS = new Set([
 function isLibraryQuery(queryKey: QueryKey): boolean {
   const [root, , kind] = queryKey;
   if (typeof root !== "string") return false;
-  if (LIBRARY_ENTITY_ROOTS.has(root)) return kind !== "externalPlayerLink";
+  if (LIBRARY_ENTITY_ROOTS.has(root)) {
+    // A refetch of either mints a link (and reloads a Safari video)
+    return kind !== "externalPlayerLink" && kind !== "mediaLink";
+  }
   return (
     root === "clips" ||
     root === "homeCarousel" ||

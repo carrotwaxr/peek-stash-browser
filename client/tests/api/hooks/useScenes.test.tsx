@@ -4,13 +4,15 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ApiClient from "../../../src/api/client";
-import { apiGet } from "../../../src/api/client";
+import { apiGet, apiPost } from "../../../src/api/client";
 import {
   type SimilarScenesResponse,
   useSceneList,
+  useSceneMediaLink,
   useSimilarScenes,
 } from "../../../src/api/hooks/useScenes";
 import { libraryApi } from "../../../src/api/library";
+import { queryKeys } from "../../../src/api/queryKeys";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
@@ -21,6 +23,7 @@ vi.mock("../../../src/api/library", () => ({
 vi.mock("../../../src/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof ApiClient>()),
   apiGet: vi.fn(),
+  apiPost: vi.fn(),
 }));
 
 function createWrapper() {
@@ -184,5 +187,83 @@ describe("useSimilarScenes", () => {
     await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
 
     expect(result.current.data).toBeUndefined();
+  });
+});
+
+describe("useSceneMediaLink", () => {
+  const link = {
+    expiresAt: "2026-10-04T00:00:00.000Z",
+    streams: [],
+    cast: null,
+    captions: [],
+    poster: null,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (apiPost as ReturnType<typeof vi.fn>).mockResolvedValue(link);
+  });
+
+  it("posts {instanceId} to /scene/:id/media-link", async () => {
+    const { result } = renderHook(() => useSceneMediaLink("5", "A"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(link);
+    expect(apiPost).toHaveBeenCalledWith("/scene/5/media-link", {
+      instanceId: "A",
+    });
+  });
+
+  it("keys by instance and scene, so A:5 and B:5 differ", () => {
+    expect(queryKeys.scenes.mediaLink("A", "5")).toEqual([
+      "scenes",
+      "A",
+      "mediaLink",
+      "5",
+    ]);
+    expect(queryKeys.scenes.mediaLink("A", "5")).not.toEqual(
+      queryKeys.scenes.mediaLink("B", "5")
+    );
+  });
+
+  it("is disabled without an id, and when the caller's enabled is false", () => {
+    const wrapper = createWrapper();
+    const noId = renderHook(() => useSceneMediaLink("", "A"), { wrapper });
+    const noInstance = renderHook(() => useSceneMediaLink("5", ""), {
+      wrapper,
+    });
+    const off = renderHook(
+      () => useSceneMediaLink("5", "A", { enabled: false }),
+      { wrapper }
+    );
+
+    for (const r of [noId, noInstance, off]) {
+      expect(r.result.current.fetchStatus).toBe("idle");
+    }
+    expect(apiPost).not.toHaveBeenCalled();
+  });
+
+  it("refetches hourly", async () => {
+    vi.useFakeTimers();
+    try {
+      const queryClient = new QueryClient();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      );
+      renderHook(() => useSceneMediaLink("5", "A"), { wrapper });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(apiPost).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(60 * 60 * 1000 - 1000);
+      expect(apiPost).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(apiPost).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

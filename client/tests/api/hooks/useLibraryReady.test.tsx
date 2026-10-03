@@ -226,6 +226,35 @@ describe("useLibraryReady", () => {
     expect(other).toHaveBeenCalledOnce();
   });
 
+  it("a library invalidation leaves the media link alone", async () => {
+    stubApi({ "/library/ready": () => jsonResponse(200, { ready: true }) });
+    const link = vi.fn().mockResolvedValue({ streams: [] });
+    const sceneList = vi.fn().mockResolvedValue({ findScenes: { scenes: [] } });
+
+    renderHook(
+      () => {
+        useQuery({
+          queryKey: queryKeys.scenes.mediaLink("a", "7"),
+          queryFn: link,
+        });
+        useQuery({
+          queryKey: queryKeys.scenes.list(undefined, { page: 1 }),
+          queryFn: sceneList,
+        });
+        return useLibraryReady();
+      },
+      { wrapper: wrapperFor(client) }
+    );
+    await settle();
+    await actAsync(() => {
+      void invalidateLibraryQueries(client);
+    });
+    await settle();
+
+    expect(sceneList).toHaveBeenCalledTimes(2);
+    expect(link).toHaveBeenCalledOnce();
+  });
+
   it("marking it not ready twice does not push the next check back", async () => {
     const fetchMock = stubApi({
       "/library/ready": () => jsonResponse(200, { ready: true }),

@@ -2,6 +2,7 @@ export {
   useSceneList,
   useRecommendedList,
   useExternalPlayerLink,
+  useSceneMediaLink,
 } from "./useScenes";
 export { usePerformerList } from "./usePerformers";
 export { useStudioList } from "./useStudios";

@@ -2,6 +2,7 @@ import type {
   ExternalPlayerLinkResponse,
   FindRecommendedScenesRequest,
   NormalizedScene,
+  SceneMediaLinkResponse,
 } from "@peek/shared-types";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "..";
@@ -80,6 +81,31 @@ export function useExternalPlayerLink(sceneId: string, instanceId: string) {
         { instanceId }
       ),
     enabled: !!sceneId && !!instanceId,
+    staleTime: 60 * 60 * 1000,
+    refetchInterval: 60 * 60 * 1000,
+    retry: false,
+  });
+}
+
+/**
+ * The scene's signed media link: every playable source, the one a Cast
+ * receiver is given, captions and poster, all on the user's personal link.
+ * `enabled` is the caller's flag, so only a tab that needs it (Safari, or a
+ * cast in progress) mints one. Renewed hourly like the external-player link,
+ * and never refetched by a library invalidation (`isLibraryQuery`).
+ */
+export function useSceneMediaLink(
+  sceneId: string,
+  instanceId: string,
+  { enabled = true }: { enabled?: boolean } = {}
+) {
+  return useQuery({
+    queryKey: queryKeys.scenes.mediaLink(instanceId, sceneId),
+    queryFn: () =>
+      apiPost<SceneMediaLinkResponse>(`/scene/${sceneId}/media-link`, {
+        instanceId,
+      }),
+    enabled: enabled && !!sceneId && !!instanceId,
     staleTime: 60 * 60 * 1000,
     refetchInterval: 60 * 60 * 1000,
     retry: false,
