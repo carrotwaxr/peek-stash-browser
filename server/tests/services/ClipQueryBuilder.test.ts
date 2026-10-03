@@ -121,7 +121,7 @@ describe("ClipQueryBuilder", () => {
       ["stashUpdatedAt", "c.stashUpdatedAt"],
       [
         "title",
-        "COALESCE(NULLIF(c.title, ''), (SELECT ptg.name FROM StashTag ptg WHERE ptg.id = c.primaryTagId AND ptg.stashInstanceId = c.primaryTagInstanceId AND ptg.deletedAt IS NULL AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity ptx WHERE ptx.userId = ? AND ptx.entityType = 'tag' AND ptx.entityId = ptg.id AND (ptx.instanceId = '' OR ptx.instanceId = ptg.stashInstanceId)))) COLLATE NOCASE",
+        "NULLIF(c.title, '') IS NULL, NULLIF(c.title, '') COLLATE NOCASE",
       ],
       ["seconds", "c.seconds"],
       ["sceneTitle", "s.title"],
@@ -142,31 +142,25 @@ describe("ClipQueryBuilder", () => {
       }
     );
 
-    it("the title sort falls back to the primary tag's name, leaving out a tag the viewer hid, and joins nothing", async () => {
+    it("the title sort reads the clip's own title, case-insensitive, untitled clips last in both directions, and binds nothing", async () => {
       await run({
         sort: { field: "title", direction: "ASC", seed: undefined },
       });
-
       const page = statement(0);
       expect(page.sql).toContain(
-        "ORDER BY COALESCE(NULLIF(c.title, ''), (SELECT ptg.name FROM StashTag ptg WHERE ptg.id = c.primaryTagId AND ptg.stashInstanceId = c.primaryTagInstanceId AND ptg.deletedAt IS NULL AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity ptx WHERE ptx.userId = ? AND ptx.entityType = 'tag' AND ptx.entityId = ptg.id AND (ptx.instanceId = '' OR ptx.instanceId = ptg.stashInstanceId)))) COLLATE NOCASE ASC, c.id ASC"
+        "ORDER BY NULLIF(c.title, '') IS NULL, NULLIF(c.title, '') COLLATE NOCASE ASC, c.id ASC"
       );
-      // The clip's own exclusion join, its scene's and the sort's each bind
-      // the viewer; the count has no sort
-      expect(page.params.filter((p) => p === 7)).toHaveLength(3);
-      expect(statement(1).sql).not.toContain("ptg");
-    });
+      expect(page.sql).not.toContain("ptg");
+      // The clip's own exclusion join and its scene's bind the viewer
+      expect(page.params.filter((p) => p === 7)).toHaveLength(2);
 
-    it("the title sort without the viewer's exclusions reads the tag by its key alone", async () => {
-      await run(
-        { sort: { field: "title", direction: "DESC", seed: undefined } },
-        { applyExclusions: false }
+      vi.clearAllMocks();
+      await run({
+        sort: { field: "title", direction: "DESC", seed: undefined },
+      });
+      expect(statement(0).sql).toContain(
+        "ORDER BY NULLIF(c.title, '') IS NULL, NULLIF(c.title, '') COLLATE NOCASE DESC, c.id DESC"
       );
-
-      const { sql, params } = statement(0);
-      expect(sql).toContain("AND ptg.deletedAt IS NULL)) COLLATE NOCASE DESC");
-      expect(sql).not.toContain("ptx");
-      expect(params).not.toContain(7);
     });
 
     it("sorts newest first by default", async () => {

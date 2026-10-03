@@ -330,7 +330,7 @@ class ClipQueryBuilder extends EntityQueryBuilder<
   protected sortMap(
     direction: SortDirection,
     _filter: ClipListRequest["filter"],
-    ctx: QueryContext
+    _ctx: QueryContext
   ): Record<string, SortExpr> {
     const by = (sql: string): SortExpr => ({
       sql: `${sql} ${direction}`,
@@ -339,7 +339,7 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     return {
       stashCreatedAt: by("c.stashCreatedAt"),
       stashUpdatedAt: by("c.stashUpdatedAt"),
-      title: this.titleSort(direction, ctx),
+      title: this.titleSort(direction),
       seconds: by("c.seconds"),
       sceneTitle: by("s.title"),
       duration: by("(c.endSeconds - c.seconds)"),
@@ -347,20 +347,16 @@ class ClipQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The title as the clip shows it: its own, else its primary tag's name,
-   * case-insensitive; a clip with neither lists first ascending (last
-   * descending), as a NULL does. The tag is a scalar subquery on its key, so
-   * no join reaches the count; a tag that is deleted or that the viewer
-   * cannot see (`UserExcludedEntity`, the every-instance arm too) lends no
-   * name, as the clip's tag chips do not show it.
+   * The clip's own title, as every clip surface shows it (an untitled clip
+   * reads "Untitled"), case-insensitive; untitled clips (no title or an
+   * empty one) last in both directions. Naming an untitled clip by its
+   * primary tag is a 9b idea; the search and the Title filter read the same
+   * column.
    */
-  private titleSort(direction: SortDirection, ctx: QueryContext): SortExpr {
-    const hidden = ctx.applyExclusions
-      ? " AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity ptx WHERE ptx.userId = ? AND ptx.entityType = 'tag' AND ptx.entityId = ptg.id AND (ptx.instanceId = '' OR ptx.instanceId = ptg.stashInstanceId))"
-      : "";
+  private titleSort(direction: SortDirection): SortExpr {
     return {
-      sql: `COALESCE(NULLIF(c.title, ''), (SELECT ptg.name FROM StashTag ptg WHERE ptg.id = c.primaryTagId AND ptg.stashInstanceId = c.primaryTagInstanceId AND ptg.deletedAt IS NULL${hidden})) COLLATE NOCASE ${direction}`,
-      params: ctx.applyExclusions ? [ctx.userId] : [],
+      sql: `NULLIF(c.title, '') IS NULL, NULLIF(c.title, '') COLLATE NOCASE ${direction}`,
+      params: [],
     };
   }
 
