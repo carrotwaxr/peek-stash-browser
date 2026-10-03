@@ -11,6 +11,7 @@ import "@blaineam/videojs-vr";
 import type { VrOptions, VrPlugin, VrTexture } from "@blaineam/videojs-vr";
 import type { VrProjection } from "@peek/shared-types";
 import videojs from "video.js";
+import polyfillConfig from "webvr-polyfill/src/config";
 
 /** The part of a video.js player the plugin uses (video.js types it `any`). */
 export interface VrPlayer {
@@ -32,6 +33,19 @@ export interface PeekVr {
   /** Disposes the fork: the canvas goes and the flat video shows again. */
   disable(): void;
   readonly enabled: boolean;
+}
+
+/**
+ * The fork builds a `webvr-polyfill` in its constructor, which on a phone
+ * without WebXR makes a Cardboard display. By default that fetches Google's
+ * device database from dpdb.webvr.rocks (a dead third-party host) and plays a
+ * `data:` video as a screen wake lock. Peek's CSP allows neither, and neither
+ * is wanted: the polyfill reads these defaults when it is constructed, so
+ * they are set before `player.vr()`.
+ */
+function silencePolyfill() {
+  polyfillConfig.DPDB_URL = "";
+  polyfillConfig.MOBILE_WAKE_LOCK = false;
 }
 
 /**
@@ -87,6 +101,7 @@ export function createVrController(player: VrPlayer): PeekVr {
         setProjection(projection);
         return;
       }
+      silencePolyfill();
       fork = player.vr({ projection, enableVRGallery: false });
       tagPosterOnAssignment(fork);
       fork.on("initialized", fixVideoTexture);

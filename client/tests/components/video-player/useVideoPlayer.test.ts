@@ -17,6 +17,7 @@ import { apiFetch, apiGet, apiPost, redirectToLogin } from "@/api";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
 import { isSessionExpired } from "@/components/video-player/sessionCheck";
 import { useVideoPlayer } from "@/components/video-player/useVideoPlayer";
+import { useVrMode } from "@/components/video-player/vr/useVrMode";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
 import { canDecode } from "@/utils/browserPlayback";
 import { type PlaybackQueue, buildPlaybackQueue } from "@/utils/playbackQueue";
@@ -38,6 +39,10 @@ vi.mock("@/components/video-player/videoPlayerUtils", () => ({
   setupSubtitles: vi.fn(),
   togglePlaybackRateControl: vi.fn(),
 }));
+vi.mock("@/components/video-player/vr/useVrMode", () => ({
+  useVrMode: vi.fn(),
+}));
+vi.mock("@/components/video-player/vr/VrControls", () => ({}));
 vi.mock("videojs-seek-buttons", () => ({}));
 vi.mock("@/components/video-player/vtt-thumbnails", () => ({}));
 vi.mock("@/components/video-player/plugins/big-buttons", () => ({}));
@@ -234,6 +239,17 @@ const onA2 = { id: "124", instanceId: "inst-a" };
 describe("useVideoPlayer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("hands the player, the scene and its composite key to useVrMode", () => {
+    const player = fakePlayer();
+    renderPlayer(player, onA);
+
+    expect(vi.mocked(useVrMode)).toHaveBeenLastCalledWith({
+      playerRef: { current: player },
+      scene: onA,
+      sceneKey: "123:inst-a",
+    });
   });
 
   it("save-activity and increment-play-count carry the scene's instance", async () => {

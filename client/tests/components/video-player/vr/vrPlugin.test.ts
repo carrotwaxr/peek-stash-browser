@@ -21,6 +21,15 @@ import {
 
 vi.mock("@blaineam/videojs-vr", () => ({ default: {} }));
 
+// The module the fork's webvr-polyfill reads its defaults from; the polyfill
+// copies it at construction, which is inside `player.vr()`
+const polyfillConfig = vi.hoisted(() => ({
+  DPDB_URL: "https://dpdb.webvr.rocks/dpdb.json",
+  MOBILE_WAKE_LOCK: true,
+  ROTATE_INSTRUCTIONS_DISABLED: false,
+}));
+vi.mock("webvr-polyfill/src/config", () => ({ default: polyfillConfig }));
+
 class Emitter {
   private readonly listeners = new Map<string, Set<() => void>>();
 
@@ -112,6 +121,27 @@ describe("peekVr", () => {
     });
     expect(player.fork.setProjection).toHaveBeenCalledWith("360_TB");
     expect(vr.enabled).toBe(true);
+  });
+
+  it("turns off the polyfill's device database and wake lock before the fork is created", () => {
+    const player = new FakePlayer();
+    const seen: Array<{ dpdb: unknown; wake: unknown }> = [];
+    player.vr.mockImplementationOnce((_options: VrOptions) => {
+      // What the polyfill's constructor would copy at this moment
+      seen.push({
+        dpdb: polyfillConfig.DPDB_URL,
+        wake: polyfillConfig.MOBILE_WAKE_LOCK,
+      });
+      const fork = new FakeFork();
+      player.forks.push(fork);
+      return fork;
+    });
+
+    createVrController(player).enable("180_LR");
+
+    // No request to dpdb.webvr.rocks and no data: video for a wake lock, so
+    // the CSP needs neither connect-src nor media-src data:
+    expect(seen).toEqual([{ dpdb: "", wake: false }]);
   });
 
   it("enable before metadata leaves the start to the fork's loadedmetadata", () => {

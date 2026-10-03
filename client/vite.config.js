@@ -109,7 +109,9 @@ export default defineConfig(({ mode }) => ({
   // The VR fork is first met through loadVr's import(): pre-bundle it at
   // start, or Vite dev re-optimises and reloads the page at the VR click
   optimizeDeps: {
-    include: ["@blaineam/videojs-vr"],
+    // webvr-polyfill/src/config is vrPlugin's own import: listed so the
+    // optimizer shares one copy with the fork's polyfill
+    include: ["@blaineam/videojs-vr", "webvr-polyfill/src/config"],
   },
   resolve: {
     alias: {

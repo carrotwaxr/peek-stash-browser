@@ -77,3 +77,17 @@ declare module "@blaineam/videojs-vr" {
   const VR: unknown;
   export default VR;
 }
+
+/**
+ * The defaults `webvr-polyfill` (the fork's dependency) copies when it is
+ * constructed. Only the two Peek sets are declared; v0.10.12 `src/config.js`.
+ */
+declare module "webvr-polyfill/src/config" {
+  const config: {
+    /** The device database URL; falsy means no request is made. */
+    DPDB_URL: string;
+    /** Plays a `data:` video on phones to keep the screen awake. */
+    MOBILE_WAKE_LOCK: boolean;
+  };
+  export default config;
+}

@@ -557,6 +557,44 @@ section.video-container {
   font-style: italic;
 }
 
+/* VR button (vr/VrControls.ts). The icon is lucide's "rectangle-goggles"
+   (https://lucide.dev, ISC licence, Copyright (c) Lucide Contributors) drawn
+   as a mask, so it takes the control's colour. lucide-react cannot render
+   inside a video.js component. */
+.video-js .vjs-vr-button .vjs-button > .vjs-icon-placeholder::before {
+  content: "";
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4a2 2 0 0 1-1.6-.8l-1.6-2.13a1 1 0 0 0-1.6 0L9.6 17.2A2 2 0 0 1 8 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'/%3E%3C/svg%3E")
+    center / 1.5em no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4a2 2 0 0 1-1.6-.8l-1.6-2.13a1 1 0 0 0-1.6 0L9.6 17.2A2 2 0 0 1 8 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'/%3E%3C/svg%3E")
+    center / 1.5em no-repeat;
+}
+
+.video-js .vjs-vr-button.vjs-hover .vjs-menu {
+  display: none; /* Click-only behavior */
+}
+
+.video-js .vjs-vr-button .vjs-menu {
+  width: 15em; /* Projection names are long */
+}
+
+.video-js .vjs-vr-button .vjs-menu .vjs-menu-content {
+  max-height: 20em; /* All ten projections and the note */
+}
+
+.video-js .vjs-vr-button .vjs-menu li {
+  font-size: 0.8em;
+  text-transform: none;
+}
+
+.video-js .vjs-vr-button .vjs-menu li.vjs-vr-note {
+  font-weight: normal;
+  font-style: italic;
+  line-height: 1.4;
+  padding: 0.5em 1em;
+  white-space: normal;
+}
+
 /* Skip Buttons - Playlist navigation */
 .video-js .vjs-skip-button::before {
   font-size: 1.8em;

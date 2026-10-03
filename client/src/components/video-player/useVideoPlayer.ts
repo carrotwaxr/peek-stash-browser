@@ -15,6 +15,7 @@ import {
   isSessionExpired,
 } from "./sessionCheck";
 import { setupSubtitles } from "./videoPlayerUtils";
+import { type VrModeScene, useVrMode } from "./vr/useVrMode";
 import "./vtt-thumbnails.js";
 import "./plugins/big-buttons.js";
 import "./plugins/markers.js";
@@ -265,6 +266,14 @@ export function useVideoPlayer({
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The VR button and projection menu (after the player exists: its effects
+  // run once the effect above has made it)
+  useVrMode({
+    playerRef,
+    scene: scene as VrModeScene | null | undefined,
+    sceneKey,
+  });
 
   // ============================================================================
   // VTT THUMBNAILS UPDATE (from useVideoPlayerLifecycle)
