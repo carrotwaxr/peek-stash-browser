@@ -71,6 +71,13 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/user.json",
+        // The Scene page loads Google's Cast sender on a secure origin
+        // (http://localhost is one). No test reaches Google: this name never
+        // resolves, and a spec that wants the script routes it to a stub
+        // (page.route answers before DNS).
+        launchOptions: {
+          args: ["--host-resolver-rules=MAP www.gstatic.com ~NOTFOUND"],
+        },
       },
       dependencies: ["setup"],
     },

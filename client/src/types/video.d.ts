@@ -50,3 +50,27 @@ declare module "video.js" {
 declare module "videojs-seek-buttons" {
   // Side-effect import only
 }
+
+// ---------------------------------------------------------------------------
+// Google Cast sender framework (loaded from gstatic by video-player/cast/castSdk.ts)
+// Only what Peek reads; the rest of the framework stays untyped.
+// ---------------------------------------------------------------------------
+declare namespace cast.framework {
+  interface CastOptions {
+    receiverApplicationId: string;
+    autoJoinPolicy: string;
+  }
+  interface CastContext {
+    setOptions(options: CastOptions): void;
+  }
+  const CastContext: { getInstance(): CastContext };
+}
+
+declare namespace chrome.cast {
+  const AutoJoinPolicy: { ORIGIN_SCOPED: string };
+  const media: { DEFAULT_MEDIA_RECEIVER_APP_ID: string };
+}
+
+interface Window {
+  __onGCastApiAvailable?: (available: boolean) => void;
+}

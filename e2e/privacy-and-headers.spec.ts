@@ -4,7 +4,8 @@ import { type Page, chromium, expect, test } from "@playwright/test";
  * Privacy and security headers (item 84: SEC-18, CS-32).
  *
  * Peek serves its own fonts, so the browser contacts no third party while
- * browsing. The bundled nginx sends a CSP and the other security headers on
+ * browsing, except that a scene page in a secure Chromium tab fetches Google's
+ * Cast sender script (not in TV mode). The bundled nginx sends a CSP and the other security headers on
  * every response. The dev stack (Vite) sends no headers and injects inline
  * HMR scripts, so the header and CSP tests run only against the production
  * image: set E2E_PROD_IMAGE=1 and point E2E_BASE_URL at it.
@@ -43,32 +44,63 @@ async function pickScene(page: Page): Promise<SceneRow | null> {
 const scenePath = (scene: SceneRow) =>
   `/scene/${scene.id}?instance=${encodeURIComponent(scene.instanceId)}`;
 
-test("loads no third-party resources on Home, Scenes and a scene page", async ({
-  page,
-  baseURL,
-}) => {
-  const appOrigin = new URL(baseURL!).origin;
+const CAST_SENDER_URL =
+  "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
+
+/** The URLs a page requests off the app's origin, collected from now on. */
+function trackOffOrigin(page: Page, baseURL: string): string[] {
+  const appOrigin = new URL(baseURL).origin;
   const offOrigin: string[] = [];
   page.on("request", (request) => {
     const url = request.url();
     if (url.startsWith("data:") || url.startsWith("blob:")) return;
     if (new URL(url).origin !== appOrigin) offOrigin.push(url);
   });
+  return offOrigin;
+}
+
+test("loads nothing off origin on Home and Scenes, and only Google's Cast sender on a scene page", async ({
+  page,
+  baseURL,
+}) => {
+  const offOrigin = trackOffOrigin(page, baseURL!);
 
   await page.goto("/", { waitUntil: "networkidle" });
   await page.goto("/scenes", { waitUntil: "networkidle" });
+  expect(offOrigin).toEqual([]);
 
   const scene = await pickScene(page);
   if (scene) {
     await page.goto(scenePath(scene), { waitUntil: "networkidle" });
+    // The sender script is the one off-origin request a scene page may make
+    // (a secure Chromium tab; the config's host rule keeps it from resolving).
+    // The page's Cast hook loads it, so the check becomes "exactly this one"
+    // when that hook lands.
+    expect(offOrigin.filter((url) => url !== CAST_SENDER_URL)).toEqual([]);
+    expect(offOrigin.length).toBeLessThanOrEqual(1);
   }
-
-  expect(offOrigin).toEqual([]);
 
   const interFaces = await page.evaluate(
     async () => (await document.fonts.load('16px "Inter"')).length
   );
   expect(interFaces).toBeGreaterThan(0);
+});
+
+test("TV mode's scene page requests nothing off origin", async ({
+  page,
+  baseURL,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("peek-tv-mode", "true");
+  });
+  const offOrigin = trackOffOrigin(page, baseURL!);
+
+  await page.goto("/", { waitUntil: "networkidle" });
+  const scene = await pickScene(page);
+  test.skip(!scene, "No scene to open");
+  await page.goto(scenePath(scene!), { waitUntil: "networkidle" });
+
+  expect(offOrigin).toEqual([]);
 });
 
 test("the app document carries the security headers", async ({ page }) => {
@@ -77,9 +109,10 @@ test("the app document carries the security headers", async ({ page }) => {
   const response = await page.goto("/");
   expect(response).not.toBeNull();
   const headers = response!.headers();
-  expect(headers["content-security-policy"]).toContain(
-    "frame-ancestors 'self'"
-  );
+  const csp = headers["content-security-policy"];
+  expect(csp).toContain("frame-ancestors 'self'");
+  // Google's Cast sender script is the one script origin besides Peek
+  expect(csp).toContain("script-src 'self' https://www.gstatic.com;");
   expect(headers["x-content-type-options"]).toBe("nosniff");
   expect(headers["x-frame-options"]).toBe("SAMEORIGIN");
   expect(headers["referrer-policy"]).toBe("same-origin");
