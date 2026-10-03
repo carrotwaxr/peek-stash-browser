@@ -1221,15 +1221,20 @@ function parseCarouselRules(
   return { fields, where };
 }
 
-/** Rules that are undefined were not sent: no criteria */
+/**
+ * Rules that are undefined were not sent: no criteria. The rules' problems
+ * go to `ruleProblems` (by default `problems`), the sort's and direction's
+ * to `problems`.
+ */
 function parseCarouselParts(
   rules: Record<string, unknown> | undefined,
   sort: unknown,
   direction: unknown,
-  problems: Problems
+  problems: Problems,
+  ruleProblems: Problems = problems
 ): CarouselParts {
   const { fields, where } = rules
-    ? parseCarouselRules(rules, problems)
+    ? parseCarouselRules(rules, ruleProblems)
     : { fields: NO_FIELDS, where: undefined };
   // A sort reads the filter object, then the root rows of an "all" tree
   const top: Record<string, unknown> = topLevelCriteria(
@@ -1309,6 +1314,43 @@ export function parseCarouselRequest(
     input.sort,
     input.direction,
     problems
+  );
+  problems.finish();
+  return carouselQuery(parts, options);
+}
+
+/**
+ * Whether a carousel's stored rules are locked: a flat rule set (stored
+ * before 9b) naming `ids` or `instance_id`, which no tree row can hold. The
+ * carousel runs flat with them; an update keeps them as stored
+ * (`parseLockedCarouselRequest`).
+ */
+export function carouselRulesLocked(stored: unknown): boolean {
+  return (
+    isPlainObject(stored) &&
+    !isWhereShape(stored) &&
+    Object.keys(stored).some((key) => CAROUSEL_PAGE_FIELDS.has(key))
+  );
+}
+
+/**
+ * `PUT /api/carousels/:id` on a locked carousel (`carouselRulesLocked`): the
+ * sort and direction sent, checked as on any update, with the stored rules
+ * (read leniently, as the home row reads them) as the sort's context. Rules
+ * the body sends are not read: the stored ones stay.
+ */
+export function parseLockedCarouselRequest(
+  stored: Record<string, unknown>,
+  input: Omit<CarouselRequestInput, "rules">,
+  options: CarouselRequestOptions
+): ParsedListRequest<"scene"> {
+  const problems = new Problems();
+  const parts = parseCarouselParts(
+    stored,
+    input.sort,
+    input.direction,
+    problems,
+    new Problems()
   );
   problems.finish();
   return carouselQuery(parts, options);

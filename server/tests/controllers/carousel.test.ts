@@ -97,6 +97,12 @@ const ANY_TREE = {
   ],
 };
 
+/** Flat rules stored before 9b that pick fixed scenes: no tree row holds ids */
+const LOCKED_RULES = {
+  ids: { value: ["1:inst-a", "2:inst-a"], modifier: "INCLUDES" },
+  rating100: { value: 80, modifier: "GREATER_THAN" },
+};
+
 /** Sample carousel record from the database */
 const SAMPLE_CAROUSEL: UserCarousel = {
   id: "1",
@@ -219,6 +225,29 @@ describe("Carousel Controller", () => {
         await getCarousel(req, res);
 
         expect(res._getOkBody().carousel.rules).toEqual(served);
+      }
+    });
+
+    it("GET marks a flat row naming ids or instance_id as rulesLocked, and no other", async () => {
+      for (const [stored, locked] of [
+        [LOCKED_RULES, true],
+        [{ instance_id: "inst-a", rating100: RULES.rating100 }, true],
+        [{ rating100: { value: 80, modifier: "GREATER_THAN" } }, false],
+        [ANY_TREE, false],
+        [null, false],
+      ] as const) {
+        mockPrisma.userCarousel.findFirst.mockResolvedValue({
+          ...SAMPLE_CAROUSEL,
+          rules: stored,
+        });
+        const req = reqFor(getCarousel, { params: { id: "1" }, user: USER });
+        const res = resFor(getCarousel);
+        await getCarousel(req, res);
+
+        expect(
+          res._getOkBody().carousel.rulesLocked,
+          JSON.stringify(stored)
+        ).toBe(locked);
       }
     });
 
@@ -658,7 +687,59 @@ describe("Carousel Controller", () => {
       expect(data).toHaveProperty("sort");
     });
 
+    it("a locked carousel keeps its stored rules: a title edit that resends the served tree does not drop its ids", async () => {
+      const locked = { ...SAMPLE_CAROUSEL, rules: LOCKED_RULES };
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(locked);
+      mockPrisma.userCarousel.update.mockResolvedValue(locked);
+
+      const req = reqFor(updateCarousel, {
+        body: {
+          title: "Renamed",
+          // What a client built before rulesLocked sends: the served tree
+          rules: whereOfFlatFilter(LOCKED_RULES),
+          sort: "title",
+          direction: "ASC",
+        },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updateCarousel);
+      await updateCarousel(req, res);
+
+      const data = must(mockPrisma.userCarousel.update.mock.calls[0])[0].data;
+      expect(data).toEqual({
+        title: "Renamed",
+        sort: "title",
+        direction: "ASC",
+      });
+      expect(res._getOkBody().carousel.rulesLocked).toBe(true);
+    });
+
+    it("a locked carousel's sort is checked against its stored rules: Scene Number with a stored collection rule is kept", async () => {
+      const locked = {
+        ...SAMPLE_CAROUSEL,
+        rules: {
+          ...LOCKED_RULES,
+          groups: { value: ["5:inst-a"], modifier: "INCLUDES" },
+        },
+      };
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(locked);
+      mockPrisma.userCarousel.update.mockResolvedValue(locked);
+
+      const req = reqFor(updateCarousel, {
+        body: { title: "Renamed", sort: "scene_index", direction: "ASC" },
+        params: { id: "1" },
+        user: USER,
+      });
+      await updateCarousel(req, resFor(updateCarousel));
+
+      expect(
+        must(mockPrisma.userCarousel.update.mock.calls[0])[0].data
+      ).toEqual({ title: "Renamed", sort: "scene_index", direction: "ASC" });
+    });
+
     it("direction sideways answers 400 and updates nothing", async () => {
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
       const req = reqFor(updateCarousel, {
         body: { direction: "sideways" },
         params: { id: "1" },
