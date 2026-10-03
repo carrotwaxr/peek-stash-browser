@@ -10,7 +10,7 @@ import {
 } from "./types.js";
 
 /** Stash's resolutions as its panel offers them: VR_HD left out */
-const RESOLUTION_CHOICES = [
+export const RESOLUTION_CHOICES = [
   { value: "VERY_LOW", label: "144p" },
   { value: "LOW", label: "240p" },
   { value: "R360P", label: "360p" },

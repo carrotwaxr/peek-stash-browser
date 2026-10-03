@@ -1,6 +1,18 @@
 {
   "samples": [
     {
+      "label": "title: text",
+      "state": {
+        "title": "contract"
+      },
+      "request": {
+        "title": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
       "label": "performerIds: INCLUDES_ALL one id",
       "state": {
         "performerIds": [
@@ -105,6 +117,64 @@
             "2:inst-b"
           ],
           "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerIds: IS_NULL one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "performers": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "performerIds: IS_NULL two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "performers": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "performerIds: NOT_NULL one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "performers": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "performerIds: NOT_NULL two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "performers": {
+          "modifier": "NOT_NULL"
         }
       }
     },
@@ -291,6 +361,126 @@
           ],
           "modifier": "EXCLUDES",
           "depth": -1
+        }
+      }
+    },
+    {
+      "label": "studioIds: IS_NULL one id",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ],
+        "studioIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioIds: IS_NULL two ids",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioIds: IS_NULL one id, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ],
+        "studioIdsDepth": -1,
+        "studioIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioIds: IS_NULL two ids, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdsDepth": -1,
+        "studioIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioIds: NOT_NULL one id",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ],
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioIds: NOT_NULL two ids",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioIds: NOT_NULL one id, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ],
+        "studioIdsDepth": -1,
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "studioIds: NOT_NULL two ids, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdsDepth": -1,
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "studios": {
+          "modifier": "NOT_NULL"
         }
       }
     },
@@ -595,6 +785,126 @@
       }
     },
     {
+      "label": "tagIds: IS_NULL one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: IS_NULL two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: IS_NULL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: IS_NULL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: NOT_NULL one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: NOT_NULL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "tags": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
       "label": "tagIds: one id",
       "state": {
         "tagIds": [
@@ -771,6 +1081,64 @@
             "2:inst-b"
           ],
           "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "galleryIds: IS_NULL one id",
+      "state": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "galleries": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "galleryIds: IS_NULL two ids",
+      "state": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "request": {
+        "galleries": {
+          "modifier": "IS_NULL"
+        }
+      }
+    },
+    {
+      "label": "galleryIds: NOT_NULL one id",
+      "state": {
+        "galleryIds": [
+          "1:inst-a"
+        ],
+        "galleryIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "galleries": {
+          "modifier": "NOT_NULL"
+        }
+      }
+    },
+    {
+      "label": "galleryIds: NOT_NULL two ids",
+      "state": {
+        "galleryIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "galleryIdsModifier": "NOT_NULL"
+      },
+      "request": {
+        "galleries": {
+          "modifier": "NOT_NULL"
         }
       }
     },
@@ -1079,6 +1447,1658 @@
           "modifier": "BETWEEN",
           "value": 13,
           "value2": 38
+        }
+      }
+    },
+    {
+      "label": "organized: true",
+      "state": {
+        "organized": "true"
+      },
+      "request": {
+        "organized": true
+      }
+    },
+    {
+      "label": "organized: false",
+      "state": {
+        "organized": "false"
+      },
+      "request": {
+        "organized": false
+      }
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL one id",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL two ids",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: INCLUDES one id",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: INCLUDES two ids",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: INCLUDES one id, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: EXCLUDES one id",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: EXCLUDES two ids",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1,
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: one id",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: two ids",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: one id, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "performerTagIds: two ids, with sub-items",
+      "state": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1
+      },
+      "request": {
+        "performer_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "date: start only",
+      "state": {
+        "date": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "date": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "date: end only",
+      "state": {
+        "date": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "date": {
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "date: start and end",
+      "state": {
+        "date": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "date": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "createdAt: start only",
+      "state": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "created_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "createdAt: end only",
+      "state": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "created_at": {
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "createdAt: start and end",
+      "state": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "created_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: start only",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "updated_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: end only",
+      "state": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "updated_at": {
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: start and end",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "updated_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS VERY_LOW",
+      "state": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "VERY_LOW",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS LOW",
+      "state": {
+        "resolution": "LOW",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "LOW",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS R360P",
+      "state": {
+        "resolution": "R360P",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "R360P",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS STANDARD",
+      "state": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS WEB_HD",
+      "state": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "WEB_HD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS STANDARD_HD",
+      "state": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD_HD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS FULL_HD",
+      "state": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "FULL_HD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS QUAD_HD",
+      "state": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "QUAD_HD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS FOUR_K",
+      "state": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "FOUR_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS FIVE_K",
+      "state": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS SIX_K",
+      "state": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS EIGHT_K",
+      "state": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "EIGHT_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EQUALS HUGE",
+      "state": {
+        "resolution": "HUGE",
+        "resolutionModifier": "EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS VERY_LOW",
+      "state": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "VERY_LOW",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS LOW",
+      "state": {
+        "resolution": "LOW",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "LOW",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS R360P",
+      "state": {
+        "resolution": "R360P",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "R360P",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD",
+      "state": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS WEB_HD",
+      "state": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "WEB_HD",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD_HD",
+      "state": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD_HD",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS FULL_HD",
+      "state": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "FULL_HD",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS QUAD_HD",
+      "state": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "QUAD_HD",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS FOUR_K",
+      "state": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "FOUR_K",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS FIVE_K",
+      "state": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS SIX_K",
+      "state": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS EIGHT_K",
+      "state": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "EIGHT_K",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: NOT_EQUALS HUGE",
+      "state": {
+        "resolution": "HUGE",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN VERY_LOW",
+      "state": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "VERY_LOW",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN LOW",
+      "state": {
+        "resolution": "LOW",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "LOW",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN R360P",
+      "state": {
+        "resolution": "R360P",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "R360P",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD",
+      "state": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN WEB_HD",
+      "state": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "WEB_HD",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD_HD",
+      "state": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD_HD",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN FULL_HD",
+      "state": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "FULL_HD",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN QUAD_HD",
+      "state": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "QUAD_HD",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN FOUR_K",
+      "state": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "FOUR_K",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN FIVE_K",
+      "state": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN SIX_K",
+      "state": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN EIGHT_K",
+      "state": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "EIGHT_K",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: GREATER_THAN HUGE",
+      "state": {
+        "resolution": "HUGE",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "GREATER_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN VERY_LOW",
+      "state": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "VERY_LOW",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN LOW",
+      "state": {
+        "resolution": "LOW",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "LOW",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN R360P",
+      "state": {
+        "resolution": "R360P",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "R360P",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD",
+      "state": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN WEB_HD",
+      "state": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "WEB_HD",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD_HD",
+      "state": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD_HD",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN FULL_HD",
+      "state": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "FULL_HD",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN QUAD_HD",
+      "state": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "QUAD_HD",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN FOUR_K",
+      "state": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "FOUR_K",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN FIVE_K",
+      "state": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN SIX_K",
+      "state": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN EIGHT_K",
+      "state": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "EIGHT_K",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: LESS_THAN HUGE",
+      "state": {
+        "resolution": "HUGE",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "request": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "LESS_THAN"
+        }
+      }
+    },
+    {
+      "label": "resolution: VERY_LOW",
+      "state": {
+        "resolution": "VERY_LOW"
+      },
+      "request": {
+        "resolution": {
+          "value": "VERY_LOW",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: LOW",
+      "state": {
+        "resolution": "LOW"
+      },
+      "request": {
+        "resolution": {
+          "value": "LOW",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: R360P",
+      "state": {
+        "resolution": "R360P"
+      },
+      "request": {
+        "resolution": {
+          "value": "R360P",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: STANDARD",
+      "state": {
+        "resolution": "STANDARD"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: WEB_HD",
+      "state": {
+        "resolution": "WEB_HD"
+      },
+      "request": {
+        "resolution": {
+          "value": "WEB_HD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: STANDARD_HD",
+      "state": {
+        "resolution": "STANDARD_HD"
+      },
+      "request": {
+        "resolution": {
+          "value": "STANDARD_HD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: FULL_HD",
+      "state": {
+        "resolution": "FULL_HD"
+      },
+      "request": {
+        "resolution": {
+          "value": "FULL_HD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: QUAD_HD",
+      "state": {
+        "resolution": "QUAD_HD"
+      },
+      "request": {
+        "resolution": {
+          "value": "QUAD_HD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: FOUR_K",
+      "state": {
+        "resolution": "FOUR_K"
+      },
+      "request": {
+        "resolution": {
+          "value": "FOUR_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: FIVE_K",
+      "state": {
+        "resolution": "FIVE_K"
+      },
+      "request": {
+        "resolution": {
+          "value": "FIVE_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: SIX_K",
+      "state": {
+        "resolution": "SIX_K"
+      },
+      "request": {
+        "resolution": {
+          "value": "SIX_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: SEVEN_K",
+      "state": {
+        "resolution": "SEVEN_K"
+      },
+      "request": {
+        "resolution": {
+          "value": "SEVEN_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: EIGHT_K",
+      "state": {
+        "resolution": "EIGHT_K"
+      },
+      "request": {
+        "resolution": {
+          "value": "EIGHT_K",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "resolution: HUGE",
+      "state": {
+        "resolution": "HUGE"
+      },
+      "request": {
+        "resolution": {
+          "value": "HUGE",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "orientation: LANDSCAPE",
+      "state": {
+        "orientation": "LANDSCAPE"
+      },
+      "request": {
+        "orientation": {
+          "value": [
+            "LANDSCAPE"
+          ]
+        }
+      }
+    },
+    {
+      "label": "orientation: PORTRAIT",
+      "state": {
+        "orientation": "PORTRAIT"
+      },
+      "request": {
+        "orientation": {
+          "value": [
+            "PORTRAIT"
+          ]
+        }
+      }
+    },
+    {
+      "label": "orientation: SQUARE",
+      "state": {
+        "orientation": "SQUARE"
+      },
+      "request": {
+        "orientation": {
+          "value": [
+            "SQUARE"
+          ]
+        }
+      }
+    },
+    {
+      "label": "details: text",
+      "state": {
+        "details": "contract"
+      },
+      "request": {
+        "details": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "code: text",
+      "state": {
+        "code": "contract"
+      },
+      "request": {
+        "code": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "photographer: text",
+      "state": {
+        "photographer": "contract"
+      },
+      "request": {
+        "photographer": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "path: INCLUDES text",
+      "state": {
+        "path": "contract",
+        "pathModifier": "INCLUDES"
+      },
+      "request": {
+        "path": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "path: EXCLUDES text",
+      "state": {
+        "path": "contract",
+        "pathModifier": "EXCLUDES"
+      },
+      "request": {
+        "path": {
+          "value": "contract",
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "path: EQUALS text",
+      "state": {
+        "path": "contract",
+        "pathModifier": "EQUALS"
+      },
+      "request": {
+        "path": {
+          "value": "contract",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "path: NOT_EQUALS text",
+      "state": {
+        "path": "contract",
+        "pathModifier": "NOT_EQUALS"
+      },
+      "request": {
+        "path": {
+          "value": "contract",
+          "modifier": "NOT_EQUALS"
+        }
+      }
+    },
+    {
+      "label": "path: STARTS_WITH text",
+      "state": {
+        "path": "contract",
+        "pathModifier": "STARTS_WITH"
+      },
+      "request": {
+        "path": {
+          "value": "contract",
+          "modifier": "STARTS_WITH"
+        }
+      }
+    },
+    {
+      "label": "path: text",
+      "state": {
+        "path": "contract"
+      },
+      "request": {
+        "path": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "url: text",
+      "state": {
+        "url": "contract"
+      },
+      "request": {
+        "url": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerFavorite: true",
+      "state": {
+        "performerFavorite": "true"
+      },
+      "request": {
+        "performer_favorite": true
+      }
+    },
+    {
+      "label": "performerFavorite: false",
+      "state": {
+        "performerFavorite": "false"
+      },
+      "request": {
+        "performer_favorite": false
+      }
+    },
+    {
+      "label": "studioFavorite: true",
+      "state": {
+        "studioFavorite": "true"
+      },
+      "request": {
+        "studio_favorite": true
+      }
+    },
+    {
+      "label": "studioFavorite: false",
+      "state": {
+        "studioFavorite": "false"
+      },
+      "request": {
+        "studio_favorite": false
+      }
+    },
+    {
+      "label": "tagFavorite: true",
+      "state": {
+        "tagFavorite": "true"
+      },
+      "request": {
+        "tag_favorite": true
+      }
+    },
+    {
+      "label": "tagFavorite: false",
+      "state": {
+        "tagFavorite": "false"
+      },
+      "request": {
+        "tag_favorite": false
+      }
+    },
+    {
+      "label": "performerCount: min only",
+      "state": {
+        "performerCount": {
+          "min": "5"
+        }
+      },
+      "request": {
+        "performer_count": {
+          "modifier": "BETWEEN",
+          "value": 5
+        }
+      }
+    },
+    {
+      "label": "performerCount: max only",
+      "state": {
+        "performerCount": {
+          "max": "15"
+        }
+      },
+      "request": {
+        "performer_count": {
+          "modifier": "BETWEEN",
+          "value2": 15
+        }
+      }
+    },
+    {
+      "label": "performerCount: min and max",
+      "state": {
+        "performerCount": {
+          "min": "5",
+          "max": "15"
+        }
+      },
+      "request": {
+        "performer_count": {
+          "modifier": "BETWEEN",
+          "value": 5,
+          "value2": 15
+        }
+      }
+    },
+    {
+      "label": "performerAge: min only",
+      "state": {
+        "performerAge": {
+          "min": "39"
+        }
+      },
+      "request": {
+        "performer_age": {
+          "modifier": "BETWEEN",
+          "value": 39
+        }
+      }
+    },
+    {
+      "label": "performerAge: max only",
+      "state": {
+        "performerAge": {
+          "max": "80"
+        }
+      },
+      "request": {
+        "performer_age": {
+          "modifier": "BETWEEN",
+          "value2": 80
+        }
+      }
+    },
+    {
+      "label": "performerAge: min and max",
+      "state": {
+        "performerAge": {
+          "min": "39",
+          "max": "80"
+        }
+      },
+      "request": {
+        "performer_age": {
+          "modifier": "BETWEEN",
+          "value": 39,
+          "value2": 80
         }
       }
     }

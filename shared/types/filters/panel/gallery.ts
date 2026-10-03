@@ -3,6 +3,22 @@
 import type { GALLERY_FIELDS } from "../fields.js";
 import { HAS_MODIFIERS, HAS_ONE_MODIFIERS, type PanelField } from "./types.js";
 
+/** Has ALL, ANY or NONE of these, or none or any at all */
+const HAS_OR_PRESENCE = [...HAS_MODIFIERS, "IS_NULL", "NOT_NULL"] as const;
+/** The one studio: ANY or NONE of these, or none or any at all */
+const HAS_ONE_OR_PRESENCE = [
+  ...HAS_ONE_MODIFIERS,
+  "IS_NULL",
+  "NOT_NULL",
+] as const;
+
+/** A three-state filter: "Any" sends nothing, the others send true or false */
+const YES_NO_ANY = [
+  { value: "true", label: "Yes", sends: true },
+  { value: "false", label: "No", sends: false },
+  { value: "any", label: "Any", sends: undefined },
+] as const;
+
 export const GALLERY_PANEL = [
   // Common
   {
@@ -21,7 +37,7 @@ export const GALLERY_PANEL = [
     editor: "ref",
     multi: true,
     placeholder: "Select performers...",
-    modifiers: HAS_MODIFIERS,
+    modifiers: HAS_OR_PRESENCE,
     modifierKey: "performerIdsModifier",
     defaultModifier: "INCLUDES",
     modifierLabels: "has",
@@ -36,7 +52,7 @@ export const GALLERY_PANEL = [
     editor: "ref",
     multi: true,
     placeholder: "Select studios...",
-    modifiers: HAS_ONE_MODIFIERS,
+    modifiers: HAS_ONE_OR_PRESENCE,
     modifierKey: "studioIdsModifier",
     defaultModifier: "INCLUDES",
     modifierLabels: "has",
@@ -53,7 +69,7 @@ export const GALLERY_PANEL = [
     editor: "ref",
     multi: true,
     placeholder: "Select tags...",
-    modifiers: HAS_MODIFIERS,
+    modifiers: HAS_OR_PRESENCE,
     modifierKey: "tagIdsModifier",
     defaultModifier: "INCLUDES_ALL",
     modifierLabels: "has",
@@ -105,6 +121,161 @@ export const GALLERY_PANEL = [
     group: "common",
     editor: "toggle",
     placeholder: "Has at least one favorited image",
+  },
+  {
+    key: "organized",
+    field: "organized",
+    label: "Organized",
+    group: "common",
+    editor: "choice",
+    placeholder: "Any",
+    choices: YES_NO_ANY,
+    defaultValue: "any",
+  },
+
+  // Entities
+  {
+    key: "performerTagIds",
+    field: "performer_tags",
+    label: "Performer Tags",
+    group: "entities",
+    editor: "ref",
+    multi: true,
+    placeholder: "Select performer tags...",
+    modifiers: HAS_MODIFIERS,
+    modifierKey: "performerTagIdsModifier",
+    defaultModifier: "INCLUDES",
+    modifierLabels: "has",
+    hierarchyKey: "performerTagIdsDepth",
+    hierarchyLabel: "Include sub-tags",
+    excludeKey: "performerTagIdsExclude",
+  },
+
+  // Dates
+  {
+    key: "date",
+    field: "date",
+    label: "Gallery Date",
+    group: "dates",
+    editor: "date",
+  },
+  {
+    key: "createdAt",
+    field: "created_at",
+    label: "Created Date",
+    group: "dates",
+    editor: "date",
+  },
+  {
+    key: "updatedAt",
+    field: "updated_at",
+    label: "Updated Date",
+    group: "dates",
+    editor: "date",
+  },
+
+  // Other
+  {
+    key: "isZip",
+    field: "is_zip",
+    label: "Zip or Folder",
+    group: "other",
+    editor: "choice",
+    placeholder: "Any",
+    choices: [
+      { value: "true", label: "Zip file", sends: true },
+      { value: "false", label: "Folder", sends: false },
+      { value: "any", label: "Any", sends: undefined },
+    ],
+    defaultValue: "any",
+  },
+  {
+    key: "details",
+    field: "details",
+    label: "Details Search",
+    group: "other",
+    editor: "text",
+    placeholder: "Search details...",
+  },
+  {
+    key: "code",
+    field: "code",
+    label: "Code",
+    group: "other",
+    editor: "text",
+    placeholder: "Search code...",
+  },
+  {
+    key: "photographer",
+    field: "photographer",
+    label: "Photographer",
+    group: "other",
+    editor: "text",
+    placeholder: "Search photographer...",
+  },
+  {
+    key: "path",
+    field: "path",
+    label: "Path",
+    group: "other",
+    editor: "text",
+    placeholder: "Search path...",
+    modifierKey: "pathModifier",
+    modifiers: ["INCLUDES", "EXCLUDES", "EQUALS", "NOT_EQUALS", "STARTS_WITH"],
+  },
+  {
+    key: "url",
+    field: "url",
+    label: "URL",
+    group: "other",
+    editor: "text",
+    placeholder: "Search URLs...",
+  },
+  {
+    key: "performerFavorite",
+    field: "performer_favorite",
+    label: "Favorite Performers",
+    group: "other",
+    editor: "choice",
+    placeholder: "Any",
+    choices: YES_NO_ANY,
+    defaultValue: "any",
+  },
+  {
+    key: "studioFavorite",
+    field: "studio_favorite",
+    label: "Favorite Studios",
+    group: "other",
+    editor: "choice",
+    placeholder: "Any",
+    choices: YES_NO_ANY,
+    defaultValue: "any",
+  },
+  {
+    key: "tagFavorite",
+    field: "tag_favorite",
+    label: "Favorite Tags",
+    group: "other",
+    editor: "choice",
+    placeholder: "Any",
+    choices: YES_NO_ANY,
+    defaultValue: "any",
+  },
+  {
+    key: "performerCount",
+    field: "performer_count",
+    label: "Performer Count",
+    group: "other",
+    editor: "number",
+    bounds: { min: 0, max: 20 },
+  },
+  {
+    key: "performerAge",
+    field: "performer_age",
+    label: "Performer Age",
+    group: "other",
+    editor: "number",
+    bounds: { min: 18, max: 100 },
   },
 ] as const satisfies readonly PanelField<
   Extract<keyof typeof GALLERY_FIELDS, string>

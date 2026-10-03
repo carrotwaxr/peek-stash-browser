@@ -1,5 +1,10 @@
 {
   "ownedKeys": [
+    "title",
+    "title_min",
+    "title_max",
+    "title_start",
+    "title_end",
     "performerIds",
     "performerId",
     "performerIdsModifier",
@@ -54,6 +59,97 @@
     "tagCount_max",
     "tagCount_start",
     "tagCount_end",
+    "organized",
+    "organized_min",
+    "organized_max",
+    "organized_start",
+    "organized_end",
+    "performerTagIds",
+    "performerTagId",
+    "performerTagIdsModifier",
+    "performerTagIdsDepth",
+    "performerTagIdsExclude",
+    "performerTagIds_min",
+    "performerTagIds_max",
+    "performerTagIds_start",
+    "performerTagIds_end",
+    "date",
+    "date_min",
+    "date_max",
+    "date_start",
+    "date_end",
+    "createdAt",
+    "createdAt_min",
+    "createdAt_max",
+    "createdAt_start",
+    "createdAt_end",
+    "updatedAt",
+    "updatedAt_min",
+    "updatedAt_max",
+    "updatedAt_start",
+    "updatedAt_end",
+    "resolution",
+    "resolutionModifier",
+    "resolution_min",
+    "resolution_max",
+    "resolution_start",
+    "resolution_end",
+    "orientation",
+    "orientation_min",
+    "orientation_max",
+    "orientation_start",
+    "orientation_end",
+    "details",
+    "details_min",
+    "details_max",
+    "details_start",
+    "details_end",
+    "code",
+    "code_min",
+    "code_max",
+    "code_start",
+    "code_end",
+    "photographer",
+    "photographer_min",
+    "photographer_max",
+    "photographer_start",
+    "photographer_end",
+    "path",
+    "pathModifier",
+    "path_min",
+    "path_max",
+    "path_start",
+    "path_end",
+    "url",
+    "url_min",
+    "url_max",
+    "url_start",
+    "url_end",
+    "performerFavorite",
+    "performerFavorite_min",
+    "performerFavorite_max",
+    "performerFavorite_start",
+    "performerFavorite_end",
+    "studioFavorite",
+    "studioFavorite_min",
+    "studioFavorite_max",
+    "studioFavorite_start",
+    "studioFavorite_end",
+    "tagFavorite",
+    "tagFavorite_min",
+    "tagFavorite_max",
+    "tagFavorite_start",
+    "tagFavorite_end",
+    "performerCount",
+    "performerCount_min",
+    "performerCount_max",
+    "performerCount_start",
+    "performerCount_end",
+    "performerAge",
+    "performerAge_min",
+    "performerAge_max",
+    "performerAge_start",
+    "performerAge_end",
     "filters",
     "q",
     "sort",
@@ -67,6 +163,14 @@
     "folderPath"
   ],
   "roundTrip": [
+    {
+      "label": "title: text",
+      "params": "title=contract",
+      "parsed": {
+        "title": "contract"
+      },
+      "lossless": true
+    },
     {
       "label": "performerIds: INCLUDES_ALL one id",
       "params": "performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES_ALL",
@@ -135,6 +239,38 @@
         "performerIdsModifier": "EXCLUDES"
       },
       "lossless": true
+    },
+    {
+      "label": "performerIds: IS_NULL one id",
+      "params": "performerIdsModifier=IS_NULL",
+      "parsed": {
+        "performerIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "performerIds: IS_NULL two ids",
+      "params": "performerIdsModifier=IS_NULL",
+      "parsed": {
+        "performerIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "performerIds: NOT_NULL one id",
+      "params": "performerIdsModifier=NOT_NULL",
+      "parsed": {
+        "performerIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "performerIds: NOT_NULL two ids",
+      "params": "performerIdsModifier=NOT_NULL",
+      "parsed": {
+        "performerIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
     },
     {
       "label": "performerIds: one id",
@@ -252,6 +388,70 @@
         "studioIdsDepth": -1
       },
       "lossless": true
+    },
+    {
+      "label": "studioIds: IS_NULL one id",
+      "params": "studioIdsModifier=IS_NULL",
+      "parsed": {
+        "studioIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioIds: IS_NULL two ids",
+      "params": "studioIdsModifier=IS_NULL",
+      "parsed": {
+        "studioIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioIds: IS_NULL one id, with sub-items",
+      "params": "studioIdsModifier=IS_NULL",
+      "parsed": {
+        "studioIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioIds: IS_NULL two ids, with sub-items",
+      "params": "studioIdsModifier=IS_NULL",
+      "parsed": {
+        "studioIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioIds: NOT_NULL one id",
+      "params": "studioIdsModifier=NOT_NULL",
+      "parsed": {
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioIds: NOT_NULL two ids",
+      "params": "studioIdsModifier=NOT_NULL",
+      "parsed": {
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioIds: NOT_NULL one id, with sub-items",
+      "params": "studioIdsModifier=NOT_NULL",
+      "parsed": {
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "studioIds: NOT_NULL two ids, with sub-items",
+      "params": "studioIdsModifier=NOT_NULL",
+      "parsed": {
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
     },
     {
       "label": "studioIds: one id",
@@ -442,6 +642,70 @@
       "lossless": true
     },
     {
+      "label": "tagIds: IS_NULL one id",
+      "params": "tagIdsModifier=IS_NULL",
+      "parsed": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: IS_NULL two ids",
+      "params": "tagIdsModifier=IS_NULL",
+      "parsed": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: IS_NULL one id, with sub-items",
+      "params": "tagIdsModifier=IS_NULL",
+      "parsed": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: IS_NULL two ids, with sub-items",
+      "params": "tagIdsModifier=IS_NULL",
+      "parsed": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: NOT_NULL one id",
+      "params": "tagIdsModifier=NOT_NULL",
+      "parsed": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids",
+      "params": "tagIdsModifier=NOT_NULL",
+      "parsed": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: NOT_NULL one id, with sub-items",
+      "params": "tagIdsModifier=NOT_NULL",
+      "parsed": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids, with sub-items",
+      "params": "tagIdsModifier=NOT_NULL",
+      "parsed": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
       "label": "tagIds: one id",
       "params": "tagIds=1%3Ainst-a",
       "parsed": {
@@ -553,6 +817,38 @@
         "galleryIdsModifier": "EXCLUDES"
       },
       "lossless": true
+    },
+    {
+      "label": "galleryIds: IS_NULL one id",
+      "params": "galleryIdsModifier=IS_NULL",
+      "parsed": {
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "galleryIds: IS_NULL two ids",
+      "params": "galleryIdsModifier=IS_NULL",
+      "parsed": {
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "galleryIds: NOT_NULL one id",
+      "params": "galleryIdsModifier=NOT_NULL",
+      "parsed": {
+        "galleryIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
+    },
+    {
+      "label": "galleryIds: NOT_NULL two ids",
+      "params": "galleryIdsModifier=NOT_NULL",
+      "parsed": {
+        "galleryIdsModifier": "NOT_NULL"
+      },
+      "lossless": false
     },
     {
       "label": "galleryIds: one id",
@@ -754,10 +1050,1150 @@
         }
       },
       "lossless": true
+    },
+    {
+      "label": "organized: true",
+      "params": "organized=true",
+      "parsed": {
+        "organized": "true"
+      },
+      "lossless": true
+    },
+    {
+      "label": "organized: false",
+      "params": "organized=false",
+      "parsed": {
+        "organized": "false"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL one id",
+      "params": "performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL two ids",
+      "params": "performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES_ALL",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL one id, with sub-items",
+      "params": "performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES_ALL&performerTagIdsDepth=-1",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL",
+        "performerTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL two ids, with sub-items",
+      "params": "performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES_ALL&performerTagIdsDepth=-1",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL",
+        "performerTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES one id",
+      "params": "performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES two ids",
+      "params": "performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES one id, with sub-items",
+      "params": "performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES&performerTagIdsDepth=-1",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES two ids, with sub-items",
+      "params": "performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES&performerTagIdsDepth=-1",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: EXCLUDES one id",
+      "params": "performerTagIds=1%3Ainst-a&performerTagIdsModifier=EXCLUDES",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: EXCLUDES two ids",
+      "params": "performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=EXCLUDES",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: EXCLUDES one id, with sub-items",
+      "params": "performerTagIds=1%3Ainst-a&performerTagIdsModifier=EXCLUDES&performerTagIdsDepth=-1",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "EXCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: EXCLUDES two ids, with sub-items",
+      "params": "performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=EXCLUDES&performerTagIdsDepth=-1",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "EXCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: one id",
+      "params": "performerTagIds=1%3Ainst-a",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: two ids",
+      "params": "performerTagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: one id, with sub-items",
+      "params": "performerTagIds=1%3Ainst-a&performerTagIdsDepth=-1",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerTagIds: two ids, with sub-items",
+      "params": "performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsDepth=-1",
+      "parsed": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1
+      },
+      "lossless": true
+    },
+    {
+      "label": "date: start only",
+      "params": "date_start=2020-01-01",
+      "parsed": {
+        "date": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "date: end only",
+      "params": "date_end=2024-12-31",
+      "parsed": {
+        "date": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "date: start and end",
+      "params": "date_start=2020-01-01&date_end=2024-12-31",
+      "parsed": {
+        "date": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start only",
+      "params": "createdAt_start=2020-01-01",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: end only",
+      "params": "createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "params": "createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "params": "updatedAt_start=2020-01-01",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "params": "updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "params": "updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS VERY_LOW",
+      "params": "resolution=VERY_LOW&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS LOW",
+      "params": "resolution=LOW&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "LOW",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS R360P",
+      "params": "resolution=R360P&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "R360P",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS STANDARD",
+      "params": "resolution=STANDARD&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS WEB_HD",
+      "params": "resolution=WEB_HD&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS STANDARD_HD",
+      "params": "resolution=STANDARD_HD&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS FULL_HD",
+      "params": "resolution=FULL_HD&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS QUAD_HD",
+      "params": "resolution=QUAD_HD&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS FOUR_K",
+      "params": "resolution=FOUR_K&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS FIVE_K",
+      "params": "resolution=FIVE_K&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS SIX_K",
+      "params": "resolution=SIX_K&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS SEVEN_K",
+      "params": "resolution=SEVEN_K&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS EIGHT_K",
+      "params": "resolution=EIGHT_K&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EQUALS HUGE",
+      "params": "resolution=HUGE&resolutionModifier=EQUALS",
+      "parsed": {
+        "resolution": "HUGE",
+        "resolutionModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS VERY_LOW",
+      "params": "resolution=VERY_LOW&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS LOW",
+      "params": "resolution=LOW&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "LOW",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS R360P",
+      "params": "resolution=R360P&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "R360P",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD",
+      "params": "resolution=STANDARD&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS WEB_HD",
+      "params": "resolution=WEB_HD&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD_HD",
+      "params": "resolution=STANDARD_HD&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS FULL_HD",
+      "params": "resolution=FULL_HD&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS QUAD_HD",
+      "params": "resolution=QUAD_HD&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS FOUR_K",
+      "params": "resolution=FOUR_K&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS FIVE_K",
+      "params": "resolution=FIVE_K&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS SIX_K",
+      "params": "resolution=SIX_K&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS SEVEN_K",
+      "params": "resolution=SEVEN_K&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS EIGHT_K",
+      "params": "resolution=EIGHT_K&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS HUGE",
+      "params": "resolution=HUGE&resolutionModifier=NOT_EQUALS",
+      "parsed": {
+        "resolution": "HUGE",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN VERY_LOW",
+      "params": "resolution=VERY_LOW&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN LOW",
+      "params": "resolution=LOW&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "LOW",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN R360P",
+      "params": "resolution=R360P&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "R360P",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD",
+      "params": "resolution=STANDARD&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN WEB_HD",
+      "params": "resolution=WEB_HD&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD_HD",
+      "params": "resolution=STANDARD_HD&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN FULL_HD",
+      "params": "resolution=FULL_HD&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN QUAD_HD",
+      "params": "resolution=QUAD_HD&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN FOUR_K",
+      "params": "resolution=FOUR_K&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN FIVE_K",
+      "params": "resolution=FIVE_K&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN SIX_K",
+      "params": "resolution=SIX_K&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN SEVEN_K",
+      "params": "resolution=SEVEN_K&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN EIGHT_K",
+      "params": "resolution=EIGHT_K&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: GREATER_THAN HUGE",
+      "params": "resolution=HUGE&resolutionModifier=GREATER_THAN",
+      "parsed": {
+        "resolution": "HUGE",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN VERY_LOW",
+      "params": "resolution=VERY_LOW&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN LOW",
+      "params": "resolution=LOW&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "LOW",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN R360P",
+      "params": "resolution=R360P&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "R360P",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD",
+      "params": "resolution=STANDARD&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN WEB_HD",
+      "params": "resolution=WEB_HD&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD_HD",
+      "params": "resolution=STANDARD_HD&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN FULL_HD",
+      "params": "resolution=FULL_HD&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN QUAD_HD",
+      "params": "resolution=QUAD_HD&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN FOUR_K",
+      "params": "resolution=FOUR_K&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN FIVE_K",
+      "params": "resolution=FIVE_K&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN SIX_K",
+      "params": "resolution=SIX_K&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN SEVEN_K",
+      "params": "resolution=SEVEN_K&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN EIGHT_K",
+      "params": "resolution=EIGHT_K&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LESS_THAN HUGE",
+      "params": "resolution=HUGE&resolutionModifier=LESS_THAN",
+      "parsed": {
+        "resolution": "HUGE",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: VERY_LOW",
+      "params": "resolution=VERY_LOW",
+      "parsed": {
+        "resolution": "VERY_LOW"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: LOW",
+      "params": "resolution=LOW",
+      "parsed": {
+        "resolution": "LOW"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: R360P",
+      "params": "resolution=R360P",
+      "parsed": {
+        "resolution": "R360P"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: STANDARD",
+      "params": "resolution=STANDARD",
+      "parsed": {
+        "resolution": "STANDARD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: WEB_HD",
+      "params": "resolution=WEB_HD",
+      "parsed": {
+        "resolution": "WEB_HD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: STANDARD_HD",
+      "params": "resolution=STANDARD_HD",
+      "parsed": {
+        "resolution": "STANDARD_HD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: FULL_HD",
+      "params": "resolution=FULL_HD",
+      "parsed": {
+        "resolution": "FULL_HD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: QUAD_HD",
+      "params": "resolution=QUAD_HD",
+      "parsed": {
+        "resolution": "QUAD_HD"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: FOUR_K",
+      "params": "resolution=FOUR_K",
+      "parsed": {
+        "resolution": "FOUR_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: FIVE_K",
+      "params": "resolution=FIVE_K",
+      "parsed": {
+        "resolution": "FIVE_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: SIX_K",
+      "params": "resolution=SIX_K",
+      "parsed": {
+        "resolution": "SIX_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: SEVEN_K",
+      "params": "resolution=SEVEN_K",
+      "parsed": {
+        "resolution": "SEVEN_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: EIGHT_K",
+      "params": "resolution=EIGHT_K",
+      "parsed": {
+        "resolution": "EIGHT_K"
+      },
+      "lossless": true
+    },
+    {
+      "label": "resolution: HUGE",
+      "params": "resolution=HUGE",
+      "parsed": {
+        "resolution": "HUGE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "orientation: LANDSCAPE",
+      "params": "orientation=LANDSCAPE",
+      "parsed": {
+        "orientation": "LANDSCAPE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "orientation: PORTRAIT",
+      "params": "orientation=PORTRAIT",
+      "parsed": {
+        "orientation": "PORTRAIT"
+      },
+      "lossless": true
+    },
+    {
+      "label": "orientation: SQUARE",
+      "params": "orientation=SQUARE",
+      "parsed": {
+        "orientation": "SQUARE"
+      },
+      "lossless": true
+    },
+    {
+      "label": "details: text",
+      "params": "details=contract",
+      "parsed": {
+        "details": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "code: text",
+      "params": "code=contract",
+      "parsed": {
+        "code": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "photographer: text",
+      "params": "photographer=contract",
+      "parsed": {
+        "photographer": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "path: INCLUDES text",
+      "params": "path=contract&pathModifier=INCLUDES",
+      "parsed": {
+        "path": "contract",
+        "pathModifier": "INCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "path: EXCLUDES text",
+      "params": "path=contract&pathModifier=EXCLUDES",
+      "parsed": {
+        "path": "contract",
+        "pathModifier": "EXCLUDES"
+      },
+      "lossless": true
+    },
+    {
+      "label": "path: EQUALS text",
+      "params": "path=contract&pathModifier=EQUALS",
+      "parsed": {
+        "path": "contract",
+        "pathModifier": "EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "path: NOT_EQUALS text",
+      "params": "path=contract&pathModifier=NOT_EQUALS",
+      "parsed": {
+        "path": "contract",
+        "pathModifier": "NOT_EQUALS"
+      },
+      "lossless": true
+    },
+    {
+      "label": "path: STARTS_WITH text",
+      "params": "path=contract&pathModifier=STARTS_WITH",
+      "parsed": {
+        "path": "contract",
+        "pathModifier": "STARTS_WITH"
+      },
+      "lossless": true
+    },
+    {
+      "label": "path: text",
+      "params": "path=contract",
+      "parsed": {
+        "path": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "url: text",
+      "params": "url=contract",
+      "parsed": {
+        "url": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerFavorite: true",
+      "params": "performerFavorite=true",
+      "parsed": {
+        "performerFavorite": "true"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerFavorite: false",
+      "params": "performerFavorite=false",
+      "parsed": {
+        "performerFavorite": "false"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioFavorite: true",
+      "params": "studioFavorite=true",
+      "parsed": {
+        "studioFavorite": "true"
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioFavorite: false",
+      "params": "studioFavorite=false",
+      "parsed": {
+        "studioFavorite": "false"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagFavorite: true",
+      "params": "tagFavorite=true",
+      "parsed": {
+        "tagFavorite": "true"
+      },
+      "lossless": true
+    },
+    {
+      "label": "tagFavorite: false",
+      "params": "tagFavorite=false",
+      "parsed": {
+        "tagFavorite": "false"
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerCount: min only",
+      "params": "performerCount_min=5",
+      "parsed": {
+        "performerCount": {
+          "min": "5"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerCount: max only",
+      "params": "performerCount_max=15",
+      "parsed": {
+        "performerCount": {
+          "max": "15"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerCount: min and max",
+      "params": "performerCount_min=5&performerCount_max=15",
+      "parsed": {
+        "performerCount": {
+          "min": "5",
+          "max": "15"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerAge: min only",
+      "params": "performerAge_min=39",
+      "parsed": {
+        "performerAge": {
+          "min": "39"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerAge: max only",
+      "params": "performerAge_max=80",
+      "parsed": {
+        "performerAge": {
+          "max": "80"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerAge: min and max",
+      "params": "performerAge_min=39&performerAge_max=80",
+      "parsed": {
+        "performerAge": {
+          "min": "39",
+          "max": "80"
+        }
+      },
+      "lossless": true
     }
   ],
   "imperialRoundTrip": [],
   "listParams": [
+    {
+      "label": "title: text",
+      "written": "instance=inst-a&tab=x&title=contract",
+      "filters": {
+        "title": "contract"
+      },
+      "hasFilters": true
+    },
     {
       "label": "performerIds: INCLUDES_ALL one id",
       "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a&performerIdsModifier=INCLUDES_ALL",
@@ -824,6 +2260,38 @@
           "2:inst-b"
         ],
         "performerIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: IS_NULL one id",
+      "written": "instance=inst-a&tab=x&performerIdsModifier=IS_NULL",
+      "filters": {
+        "performerIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: IS_NULL two ids",
+      "written": "instance=inst-a&tab=x&performerIdsModifier=IS_NULL",
+      "filters": {
+        "performerIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: NOT_NULL one id",
+      "written": "instance=inst-a&tab=x&performerIdsModifier=NOT_NULL",
+      "filters": {
+        "performerIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: NOT_NULL two ids",
+      "written": "instance=inst-a&tab=x&performerIdsModifier=NOT_NULL",
+      "filters": {
+        "performerIdsModifier": "NOT_NULL"
       },
       "hasFilters": true
     },
@@ -941,6 +2409,70 @@
         ],
         "studioIdsModifier": "EXCLUDES",
         "studioIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioIds: IS_NULL one id",
+      "written": "instance=inst-a&tab=x&studioIdsModifier=IS_NULL",
+      "filters": {
+        "studioIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioIds: IS_NULL two ids",
+      "written": "instance=inst-a&tab=x&studioIdsModifier=IS_NULL",
+      "filters": {
+        "studioIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioIds: IS_NULL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioIdsModifier=IS_NULL",
+      "filters": {
+        "studioIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioIds: IS_NULL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&studioIdsModifier=IS_NULL",
+      "filters": {
+        "studioIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioIds: NOT_NULL one id",
+      "written": "instance=inst-a&tab=x&studioIdsModifier=NOT_NULL",
+      "filters": {
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioIds: NOT_NULL two ids",
+      "written": "instance=inst-a&tab=x&studioIdsModifier=NOT_NULL",
+      "filters": {
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioIds: NOT_NULL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&studioIdsModifier=NOT_NULL",
+      "filters": {
+        "studioIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioIds: NOT_NULL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&studioIdsModifier=NOT_NULL",
+      "filters": {
+        "studioIdsModifier": "NOT_NULL"
       },
       "hasFilters": true
     },
@@ -1133,6 +2665,70 @@
       "hasFilters": true
     },
     {
+      "label": "tagIds: IS_NULL one id",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=IS_NULL",
+      "filters": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: IS_NULL two ids",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=IS_NULL",
+      "filters": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: IS_NULL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=IS_NULL",
+      "filters": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: IS_NULL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=IS_NULL",
+      "filters": {
+        "tagIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: NOT_NULL one id",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=NOT_NULL",
+      "filters": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=NOT_NULL",
+      "filters": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: NOT_NULL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=NOT_NULL",
+      "filters": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagIds: NOT_NULL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&tagIdsModifier=NOT_NULL",
+      "filters": {
+        "tagIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
       "label": "tagIds: one id",
       "written": "instance=inst-a&tab=x&tagIds=1%3Ainst-a",
       "filters": {
@@ -1242,6 +2838,38 @@
           "2:inst-b"
         ],
         "galleryIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "galleryIds: IS_NULL one id",
+      "written": "instance=inst-a&tab=x&galleryIdsModifier=IS_NULL",
+      "filters": {
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "galleryIds: IS_NULL two ids",
+      "written": "instance=inst-a&tab=x&galleryIdsModifier=IS_NULL",
+      "filters": {
+        "galleryIdsModifier": "IS_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "galleryIds: NOT_NULL one id",
+      "written": "instance=inst-a&tab=x&galleryIdsModifier=NOT_NULL",
+      "filters": {
+        "galleryIdsModifier": "NOT_NULL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "galleryIds: NOT_NULL two ids",
+      "written": "instance=inst-a&tab=x&galleryIdsModifier=NOT_NULL",
+      "filters": {
+        "galleryIdsModifier": "NOT_NULL"
       },
       "hasFilters": true
     },
@@ -1442,6 +3070,1138 @@
         "tagCount": {
           "min": "13",
           "max": "38"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "organized: true",
+      "written": "instance=inst-a&tab=x&organized=true",
+      "filters": {
+        "organized": "true"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "organized: false",
+      "written": "instance=inst-a&tab=x&organized=false",
+      "filters": {
+        "organized": "false"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL one id",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL two ids",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES_ALL",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL one id, with sub-items",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES_ALL&performerTagIdsDepth=-1",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL",
+        "performerTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES_ALL two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES_ALL&performerTagIdsDepth=-1",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES_ALL",
+        "performerTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES one id",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES two ids",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a&performerTagIdsModifier=INCLUDES&performerTagIdsDepth=-1",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "INCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: INCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=INCLUDES&performerTagIdsDepth=-1",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "INCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: EXCLUDES one id",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a&performerTagIdsModifier=EXCLUDES",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: EXCLUDES two ids",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=EXCLUDES",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: EXCLUDES one id, with sub-items",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a&performerTagIdsModifier=EXCLUDES&performerTagIdsDepth=-1",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsModifier": "EXCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: EXCLUDES two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsModifier=EXCLUDES&performerTagIdsDepth=-1",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsModifier": "EXCLUDES",
+        "performerTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: one id",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: two ids",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: one id, with sub-items",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a&performerTagIdsDepth=-1",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a"
+        ],
+        "performerTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerTagIds: two ids, with sub-items",
+      "written": "instance=inst-a&tab=x&performerTagIds=1%3Ainst-a%2C2%3Ainst-b&performerTagIdsDepth=-1",
+      "filters": {
+        "performerTagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerTagIdsDepth": -1
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "date: start only",
+      "written": "instance=inst-a&tab=x&date_start=2020-01-01",
+      "filters": {
+        "date": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "date: end only",
+      "written": "instance=inst-a&tab=x&date_end=2024-12-31",
+      "filters": {
+        "date": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "date: start and end",
+      "written": "instance=inst-a&tab=x&date_start=2020-01-01&date_end=2024-12-31",
+      "filters": {
+        "date": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start only",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: end only",
+      "written": "instance=inst-a&tab=x&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "written": "instance=inst-a&tab=x&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "LOW",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "R360P",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EQUALS HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE&resolutionModifier=EQUALS",
+      "filters": {
+        "resolution": "HUGE",
+        "resolutionModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "LOW",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "R360P",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: NOT_EQUALS HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE&resolutionModifier=NOT_EQUALS",
+      "filters": {
+        "resolution": "HUGE",
+        "resolutionModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "LOW",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "R360P",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: GREATER_THAN HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE&resolutionModifier=GREATER_THAN",
+      "filters": {
+        "resolution": "HUGE",
+        "resolutionModifier": "GREATER_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "LOW",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "R360P",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "STANDARD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "WEB_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "FULL_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "FOUR_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "FIVE_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "SIX_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LESS_THAN HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE&resolutionModifier=LESS_THAN",
+      "filters": {
+        "resolution": "HUGE",
+        "resolutionModifier": "LESS_THAN"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "filters": {
+        "resolution": "VERY_LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "filters": {
+        "resolution": "LOW"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "filters": {
+        "resolution": "R360P"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "filters": {
+        "resolution": "STANDARD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "filters": {
+        "resolution": "WEB_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "filters": {
+        "resolution": "STANDARD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "filters": {
+        "resolution": "FULL_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "filters": {
+        "resolution": "QUAD_HD"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "filters": {
+        "resolution": "FOUR_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "filters": {
+        "resolution": "FIVE_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "filters": {
+        "resolution": "SIX_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "filters": {
+        "resolution": "SEVEN_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "filters": {
+        "resolution": "EIGHT_K"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "resolution: HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "filters": {
+        "resolution": "HUGE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "orientation: LANDSCAPE",
+      "written": "instance=inst-a&tab=x&orientation=LANDSCAPE",
+      "filters": {
+        "orientation": "LANDSCAPE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "orientation: PORTRAIT",
+      "written": "instance=inst-a&tab=x&orientation=PORTRAIT",
+      "filters": {
+        "orientation": "PORTRAIT"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "orientation: SQUARE",
+      "written": "instance=inst-a&tab=x&orientation=SQUARE",
+      "filters": {
+        "orientation": "SQUARE"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "details: text",
+      "written": "instance=inst-a&tab=x&details=contract",
+      "filters": {
+        "details": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "code: text",
+      "written": "instance=inst-a&tab=x&code=contract",
+      "filters": {
+        "code": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "photographer: text",
+      "written": "instance=inst-a&tab=x&photographer=contract",
+      "filters": {
+        "photographer": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "path: INCLUDES text",
+      "written": "instance=inst-a&tab=x&path=contract&pathModifier=INCLUDES",
+      "filters": {
+        "path": "contract",
+        "pathModifier": "INCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "path: EXCLUDES text",
+      "written": "instance=inst-a&tab=x&path=contract&pathModifier=EXCLUDES",
+      "filters": {
+        "path": "contract",
+        "pathModifier": "EXCLUDES"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "path: EQUALS text",
+      "written": "instance=inst-a&tab=x&path=contract&pathModifier=EQUALS",
+      "filters": {
+        "path": "contract",
+        "pathModifier": "EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "path: NOT_EQUALS text",
+      "written": "instance=inst-a&tab=x&path=contract&pathModifier=NOT_EQUALS",
+      "filters": {
+        "path": "contract",
+        "pathModifier": "NOT_EQUALS"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "path: STARTS_WITH text",
+      "written": "instance=inst-a&tab=x&path=contract&pathModifier=STARTS_WITH",
+      "filters": {
+        "path": "contract",
+        "pathModifier": "STARTS_WITH"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "path: text",
+      "written": "instance=inst-a&tab=x&path=contract",
+      "filters": {
+        "path": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "url: text",
+      "written": "instance=inst-a&tab=x&url=contract",
+      "filters": {
+        "url": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerFavorite: true",
+      "written": "instance=inst-a&tab=x&performerFavorite=true",
+      "filters": {
+        "performerFavorite": "true"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerFavorite: false",
+      "written": "instance=inst-a&tab=x&performerFavorite=false",
+      "filters": {
+        "performerFavorite": "false"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioFavorite: true",
+      "written": "instance=inst-a&tab=x&studioFavorite=true",
+      "filters": {
+        "studioFavorite": "true"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioFavorite: false",
+      "written": "instance=inst-a&tab=x&studioFavorite=false",
+      "filters": {
+        "studioFavorite": "false"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagFavorite: true",
+      "written": "instance=inst-a&tab=x&tagFavorite=true",
+      "filters": {
+        "tagFavorite": "true"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "tagFavorite: false",
+      "written": "instance=inst-a&tab=x&tagFavorite=false",
+      "filters": {
+        "tagFavorite": "false"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerCount: min only",
+      "written": "instance=inst-a&tab=x&performerCount_min=5",
+      "filters": {
+        "performerCount": {
+          "min": "5"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerCount: max only",
+      "written": "instance=inst-a&tab=x&performerCount_max=15",
+      "filters": {
+        "performerCount": {
+          "max": "15"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerCount: min and max",
+      "written": "instance=inst-a&tab=x&performerCount_min=5&performerCount_max=15",
+      "filters": {
+        "performerCount": {
+          "min": "5",
+          "max": "15"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerAge: min only",
+      "written": "instance=inst-a&tab=x&performerAge_min=39",
+      "filters": {
+        "performerAge": {
+          "min": "39"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerAge: max only",
+      "written": "instance=inst-a&tab=x&performerAge_max=80",
+      "filters": {
+        "performerAge": {
+          "max": "80"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerAge: min and max",
+      "written": "instance=inst-a&tab=x&performerAge_min=39&performerAge_max=80",
+      "filters": {
+        "performerAge": {
+          "min": "39",
+          "max": "80"
         }
       },
       "hasFilters": true
