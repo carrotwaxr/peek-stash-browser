@@ -18,7 +18,10 @@ const ROUTE_FOCUS_WAIT_MS = 5000;
  * whole page. PageUp and PageDown are left to the page's own scope. On a
  * closed select the arrows move focus too and Enter opens it; on a slider Up
  * and Down move focus while Left and Right change its value (the rules are
- * `targetOwnsKey`'s in TV mode).
+ * `targetOwnsKey`'s in TV mode). In a single-line text field Up and Down
+ * move focus, and Left and Right once the caret is at that edge (at once in
+ * a number or date field, which shows the page no caret: `caretAtEdge`), so
+ * a field never strands the controls beside it.
  *
  * After a route change it focuses the first `[data-tv-item]` in `<main>`
  * once one renders, unless focus is still inside `<main>` (a list keeps it in

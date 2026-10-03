@@ -1,6 +1,7 @@
 import { createContext } from "react";
 import {
   buildKeyCombo,
+  caretAtEdge,
   isEditableTarget,
   isModifierKey,
   isSingleLineTextInput,
@@ -19,7 +20,8 @@ import {
  * 1. A pending sequence (a prefix like `r` under 1 s old) gives the key to its
  *    owner and to nothing else.
  * 2. In a text field only Escape is dispatched (exception: Up and Down leave a
- *    single-line input, to `tv` scopes only). A key the focused control owns
+ *    single-line input, and Left and Right leave it at the caret's edge, to
+ *    `tv` scopes only: `caretAtEdge`). A key the focused control owns
  *    (Space on a button, arrows on a slider) is not dispatched.
  * 3. Scopes are walked from the top layer down, the most recently registered
  *    first within a layer, skipping disabled scopes and scopes whose root does
@@ -174,8 +176,11 @@ export class ShortcutDispatcher {
     let tvOnly = false;
     if (isEditableTarget(target)) {
       if (
-        (combo === "up" || combo === "down") &&
-        isSingleLineTextInput(target)
+        isSingleLineTextInput(target) &&
+        (combo === "up" ||
+          combo === "down" ||
+          ((combo === "left" || combo === "right") &&
+            caretAtEdge(target, combo)))
       ) {
         tvOnly = true;
       } else if (combo !== "esc") {

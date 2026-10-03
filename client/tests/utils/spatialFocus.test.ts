@@ -402,6 +402,9 @@ describe("moveFocus in the filter panel", () => {
     "cell-duration": [273, 797, 665, 863],
     "duration-min": [273, 825, 465, 863],
     "duration-max": [473, 825, 665, 863],
+    "cell-play-count": [1496, 797, 1887, 863],
+    "play-count-min": [1496, 825, 1688, 863],
+    "play-count-max": [1695, 825, 1887, 863],
     cancel: [1600, 900, 1700, 934],
     apply: [1710, 900, 1887, 934],
   };
@@ -436,6 +439,7 @@ describe("moveFocus in the filter panel", () => {
             <div><input id="rating-min" /><input id="rating-max" /></div>
           </div>
           <div id="cell-duration"><div><input id="duration-min" /><input id="duration-max" /></div></div>
+          <div id="cell-play-count"><div><input id="play-count-min" /><input id="play-count-max" /></div></div>
         </div>
         <div><button id="cancel">Cancel</button><button id="apply">Apply Filters</button></div>
       </main>`;
@@ -497,6 +501,14 @@ describe("moveFocus in the filter panel", () => {
       "performers-condition",
       "studio-picker",
     ]);
+  });
+
+  it("Right from a checkbox in the last column goes nowhere, not to a field lower in that column", () => {
+    renderPanel();
+    // The checkbox is 16 px wide: Play Count's Max, two rows down, starts
+    // right of it but is not beside it
+    expect(walk("studio-depth", ["right"])).toEqual(["studio-depth"]);
+    expect(walk("studio-picker", ["right"])).toEqual(["studio-picker"]);
   });
 
   it("Down inside a field reaches its own controls first", () => {
