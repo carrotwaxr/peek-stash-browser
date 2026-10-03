@@ -35,7 +35,7 @@ const SceneContent = () => {
   const leftColumnRef = useRef<HTMLDivElement>(null);
 
   // Read state from context
-  const { scene, sceneLoading, sceneError, playlist, retryScene } =
+  const { scene, sceneLoading, sceneError, playlist, retryScene, requested } =
     useScenePlayer();
 
   // Navigation state for back button
@@ -52,8 +52,14 @@ const SceneContent = () => {
     "Scene";
   usePageTitle(displayTitle);
 
-  // Set initial focus to video player when page loads (excluding back button)
-  useInitialFocus(pageRef, ".vjs-big-play-button", !sceneLoading);
+  // Set initial focus to video player when page loads (excluding back button).
+  // A new requested scene starts a change even while the last still loads.
+  useInitialFocus(
+    pageRef,
+    ".vjs-big-play-button",
+    !sceneLoading,
+    requested ? makeCompositeKey(requested.sceneId, requested.instanceId) : null
+  );
 
   // Local UI state (not managed by context)
   const [showDetails, setShowDetails] = useState(true);

@@ -106,16 +106,32 @@ export const useFocusTrap = (
  * @param {Object} containerRef Ref to the container element
  * @param {string} selector Optional CSS selector for the element to focus
  * @param {boolean} enabled Whether to auto-focus on mount
+ * @param {string|null} changeKey What the page is loading (the Scene page's
+ *   requested scene); a new one starts a change even while a load runs
  */
 export const useInitialFocus = (
   containerRef: React.RefObject<HTMLElement | null>,
   selector: string | null = null,
-  enabled = true
+  enabled = true,
+  changeKey: string | null = null
 ) => {
-  // What had focus when the load began: on mount, and each time `enabled`
-  // goes false (the Scene page's next scene starts loading). Undefined until
-  // the first run.
+  // What had focus when the load began: on mount, each time `enabled` goes
+  // false (the Scene page's next scene starts loading), and each time
+  // `changeKey` moves from one value to another (a queue step taken while
+  // the last scene still loads, so `enabled` never goes true in between).
+  // Undefined until the first run.
   const focusAtStartRef = useRef<Element | null | undefined>(undefined);
+
+  // The first key is the first load's: its start is the mount's, so a
+  // control the user focuses before that load starts keeps focus
+  const lastChangeKeyRef = useRef(changeKey);
+  useEffect(() => {
+    const last = lastChangeKeyRef.current;
+    lastChangeKeyRef.current = changeKey;
+    if (last !== null && changeKey !== last) {
+      focusAtStartRef.current = document.activeElement;
+    }
+  }, [changeKey]);
 
   useEffect(() => {
     if (!enabled || focusAtStartRef.current === undefined) {

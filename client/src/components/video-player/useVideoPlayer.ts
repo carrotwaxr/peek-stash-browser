@@ -74,6 +74,7 @@ export function useVideoPlayer({
   prevScene,
   registerPlayer,
   location,
+  sceneRequest = null,
   hasResumedRef,
   initialResumeTimeRef,
   watchHistory,
@@ -99,6 +100,11 @@ export function useVideoPlayer({
   /** Tells the player context which player this is (null: it is gone) */
   registerPlayer: (player: { paused(): boolean } | null) => void;
   location: any;
+  /**
+   * The scene the latest load asked for (`requested`, as a composite key):
+   * a new one starts a scene change before its scene lands or its URL shows
+   */
+  sceneRequest?: string | null;
   hasResumedRef: React.RefObject<boolean>;
   initialResumeTimeRef: React.RefObject<number | null>;
   watchHistory: any;
@@ -138,12 +144,16 @@ export function useVideoPlayer({
   // Keys video.js's controls stop go to the shortcut dispatcher (stable)
   const hotkeys = usePlayerHotkeys();
 
-  // What had focus when the page opened or the route last changed (a scene
-  // change begins with its URL, before the scene lands): the player may take
-  // focus from it, the control that started the change. Recorded before the
-  // effects below run, by declaration order. The route, not the history
-  // key: the queue's controls rewrite the entry at the same URL, and a
-  // control the user toggles while a scene loads starts no change.
+  // What had focus when the page opened or a scene change began: the player
+  // may take focus from it, the control that started the change. A change
+  // begins with its URL (a link to another scene) or with its load (a queue
+  // step, whose URL follows only once its scene lands, so Next pressed while
+  // the last scene still loads is seen before the next one lands). Recorded
+  // before the effects below run, by declaration order. The route, not the
+  // history key: the queue's controls rewrite the entry at the same URL, and
+  // a control the user toggles while a scene loads starts no change. The
+  // first load's start is the mount's, so a control the user focuses before
+  // that load starts keeps focus.
   const focusAtStartRef = useRef<Element | null>(null);
   const { pathname, search } = location as {
     pathname?: string;
@@ -153,6 +163,14 @@ export function useVideoPlayer({
   useEffect(() => {
     focusAtStartRef.current = document.activeElement;
   }, [route]);
+  const lastRequestRef = useRef(sceneRequest);
+  useEffect(() => {
+    const last = lastRequestRef.current;
+    lastRequestRef.current = sceneRequest;
+    if (last !== null && sceneRequest !== last) {
+      focusAtStartRef.current = document.activeElement;
+    }
+  }, [sceneRequest]);
 
   // ============================================================================
   // PLAYER INITIALIZATION (from useVideoPlayerLifecycle)

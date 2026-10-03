@@ -188,6 +188,11 @@ function renderPlayer(
     restartCount?: number;
     /** The route: a new one starts a scene change before its scene lands */
     pathname?: string;
+    /**
+     * The scene the latest load asked for: a new one starts a scene change
+     * (a queue step's URL follows only once its scene lands)
+     */
+    request?: string | null;
   };
   const queryClient = new QueryClient({
     defaultOptions: { queries: { gcTime: Infinity } },
@@ -195,7 +200,7 @@ function renderPlayer(
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);
   const rendered = renderHook<ReturnType<typeof useVideoPlayer>, Props>(
-    ({ current, restartCount = 0, pathname = "/scene/123" }) =>
+    ({ current, restartCount = 0, pathname = "/scene/123", request = null }) =>
       useVideoPlayer({
         // No container: the lifecycle effect creates no player, the test's
         // stands in for it
@@ -214,6 +219,7 @@ function renderPlayer(
         prevScene: noop,
         registerPlayer: noop,
         location: { state: null, pathname, search: "" },
+        sceneRequest: request,
         hasResumedRef,
         initialResumeTimeRef,
         watchHistory:
@@ -565,6 +571,48 @@ describe("useVideoPlayer", () => {
       expect(player.focus).toHaveBeenCalledTimes(1);
       expect(document.activeElement).toBe(outside);
       card.remove();
+      outside.remove();
+      player.el().remove();
+    });
+
+    it("Next pressed while the first scene still loads moves focus into the new player", () => {
+      const player = fakePlayer();
+      document.body.appendChild(player.el());
+      const next = document.createElement("button");
+      document.body.appendChild(next);
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+      const { rerender } = renderPlayer(player, onA);
+      rerender({ current: onA, request: "123:inst-a" });
+      expect(player.focus).toHaveBeenCalledTimes(1);
+
+      // Next is focused when the step starts; the queue's URL follows only
+      // once the next scene lands
+      next.focus();
+      rerender({ current: onA, request: "124:inst-a" });
+      rerender({ current: onA2, request: "124:inst-a" });
+
+      expect(player.focus).toHaveBeenCalledTimes(2);
+      next.remove();
+      player.el().remove();
+    });
+
+    it("the first load starting after the user focused a control leaves focus there", () => {
+      const player = fakePlayer();
+      document.body.appendChild(player.el());
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+
+      // The page opens before its load has asked for the scene
+      const { rerender } = renderPlayer(player, null);
+      outside.focus();
+      rerender({ current: null, request: "123:inst-a" });
+      rerender({ current: onA, request: "123:inst-a" });
+
+      expect(player.focus).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(outside);
       outside.remove();
       player.el().remove();
     });

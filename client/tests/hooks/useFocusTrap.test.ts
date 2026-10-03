@@ -68,16 +68,22 @@ describe("useInitialFocus", () => {
     expect(document.activeElement).toBe(outside);
   });
 
-  /** The Scene page: enabled while no scene loads */
-  function renderOnPage(container: HTMLElement) {
+  /**
+   * The Scene page: enabled while no scene loads, and `request` the scene the
+   * latest load asked for (null before the first load starts)
+   */
+  function renderOnPage(
+    container: HTMLElement,
+    initialProps: { loading: boolean; request?: string | null } = {
+      loading: false,
+    }
+  ) {
+    // One ref for the page's life, as the page's own is
+    const ref = { current: container };
     return renderHook(
-      ({ loading }: { loading: boolean }) =>
-        useInitialFocus(
-          { current: container },
-          ".vjs-big-play-button",
-          !loading
-        ),
-      { initialProps: { loading: false } }
+      ({ loading, request }: { loading: boolean; request?: string | null }) =>
+        useInitialFocus(ref, ".vjs-big-play-button", !loading, request),
+      { initialProps }
     );
   }
 
@@ -111,5 +117,41 @@ describe("useInitialFocus", () => {
     vi.advanceTimersByTime(100);
 
     expect(document.activeElement).toBe(other);
+  });
+
+  it("Next pressed while the first scene still loads moves focus to the target once the next scene lands", () => {
+    const { container, player, play, outside: next } = page();
+    // The player took focus for the first scene, which is still loading
+    player.focus();
+    const { rerender } = renderOnPage(container, {
+      loading: true,
+      request: "123:inst-a",
+    });
+    vi.advanceTimersByTime(100);
+
+    // Next is focused when the step starts and keeps focus until the next
+    // scene lands
+    next.focus();
+    rerender({ loading: true, request: "124:inst-a" });
+    rerender({ loading: false, request: "124:inst-a" });
+    vi.advanceTimersByTime(100);
+
+    expect(document.activeElement).toBe(play);
+  });
+
+  it("the first load starting after the user focused a control leaves focus there", () => {
+    const { container, outside } = page();
+    // The page mounts loading, before the load has asked for its scene
+    const { rerender } = renderOnPage(container, {
+      loading: true,
+      request: null,
+    });
+
+    outside.focus();
+    rerender({ loading: true, request: "123:inst-a" });
+    rerender({ loading: false, request: "123:inst-a" });
+    vi.advanceTimersByTime(100);
+
+    expect(document.activeElement).toBe(outside);
   });
 });
