@@ -17,18 +17,18 @@ Groups support two view modes:
 
 | Filter | Description |
 |--------|-------------|
-| **Name** | Text search on group name |
-| **Synopsis** | Text search on group synopsis |
-| **Director** | Text search on director name |
+| **Name Search** | Text search on group name |
+| **Synopsis Search** | Text search on group synopsis |
+| **Director Search** | Text search on director name |
 | **Aliases**, **URL** | Text search. A collection's aliases are matched as one text; Has none / Has any |
 | **Performers** | Performers in any scene within the group you can see. Supports ANY / ALL / NONE modifiers |
 | **Studio** | Filter by studio: ANY or NONE, with **Include sub-studios**, and Has none / Has any |
 | **Tags** | Filter by tags. Supports ANY / ALL / NONE modifiers, with "Include sub-tags": "all of" then matches a collection tagged with any sub-tag of each chosen tag; Has none / Has any |
-| **Rating** | 0-100 range slider |
+| **Rating (0-100)** | A range on the stored 0-100 scale, which is ten times the rating shown (a collection shown as 7.5 is 75), or Rated / Not rated |
 | **Scene Count**, **Tag Count** | Range filters for the number of scenes and tags you can see |
 | **Duration** | Range filter for total duration in minutes; **Not set** lists collections with no duration |
 | **O Count**, **Play Count** | Your own O count and plays, summed over the collection's scenes you can see |
-| **Favorites** | Show only favorited groups |
+| **Favorite Collections** | Show only favorited groups |
 | **Has a Favorite Performer** | Yes / No / Any: a favorite performer in one of its scenes you can see |
 | **Parent collection** | The sub-collections of the collections you pick; **Include sub-collections** goes deeper than direct children |
 | **Sub-collections** | The collections that contain the ones you pick; **Include all parent collections** goes further up |
@@ -45,9 +45,9 @@ Sort by Created At, Date, Duration, Name (default), O Count, Performer Count, Ra
 
 Click a group to open its detail page showing:
 
-- **Header** — Group name, aliases, favorite toggle, and "View in Stash" link
+- **Header**: Group name, aliases and favorite toggle. Admins also see a "View in Stash" button
 - **Cover Art** — Front and back images with a toggle to flip between them (DVD cover style, 2:3 aspect ratio)
-- **Rating** — 0-100 slider (keyboard shortcut: ++r++ then ++1++ through ++5++)
+- **Rating**: A slider from 0 to 10 in steps of 0.1, shown as a number (keyboard shortcut: ++r++ then ++1++ through ++5++ for 2, 4, 6, 8 or 10; ++r++ then ++0++ clears it)
 
 ### Statistics
 
@@ -97,8 +97,9 @@ Collections you cannot see (hidden, or excluded by your content restrictions) ar
 
 - **Rate** a group using the slider, or press ++r++ then a number key
 - **Favorite** a group with the heart icon, or press ++r++ then ++f++
-- Ratings use a 0-100 scale (displayed as 5 stars)
-- Ratings and favorites are per-user and do not affect your Stash library
+- Ratings run from 0 to 10 in steps of 0.1 and show as a number, not stars. Peek stores them as 0-100 (7.5 is 75)
+- Ratings and favorites are per user: what you see is yours, not Stash's
+- With **Sync to Stash** on for your account (an admin sets it), a group rating you set is also written to Stash. Group favorites stay in Peek. See [Sync to Stash](user-management.md#sync-to-stash-export)
 
 ## Related
 
