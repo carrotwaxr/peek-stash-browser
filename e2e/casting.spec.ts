@@ -313,13 +313,13 @@ test.describe("Casting", () => {
     );
   });
 
-  test("at 390 px with a stub device on a VR scene, the fullscreen toggle lies inside the player", async ({
-    browser,
-    baseURL,
-    request: admin,
-  }) => {
-    const { context, page } = await castingPage(browser, baseURL, admin);
-    await page.setViewportSize({ width: 390, height: 844 });
+  /** The replay's VR scene, opened with the Cast and VR buttons both shown */
+  async function openVrScene(
+    context: BrowserContext,
+    page: Page,
+    viewport: { width: number; height: number }
+  ) {
+    await page.setViewportSize(viewport);
     // The replay's VR scene: the first scene whose lookup answers a projection
     const found = (await (
       await mustOk(
@@ -340,11 +340,20 @@ test.describe("Casting", () => {
     requireData(vrScene.vr ?? undefined, "the VR scene's projection");
 
     await page.goto(scenePath(vrScene));
-    const player = page.locator(".video-js").first();
     await expect(page.locator(".vjs-vr-button")).toBeVisible({
       timeout: 15_000,
     });
     await expect(castButton(page)).toBeVisible({ timeout: 15_000 });
+  }
+
+  test("at 390 px with a stub device on a VR scene, the fullscreen toggle lies inside the player", async ({
+    browser,
+    baseURL,
+    request: admin,
+  }) => {
+    const { context, page } = await castingPage(browser, baseURL, admin);
+    await openVrScene(context, page, { width: 390, height: 844 });
+    const player = page.locator(".video-js").first();
 
     const bounds = requireData(await player.boundingBox(), "the player's box");
     const toggle = requireData(
@@ -364,4 +373,78 @@ test.describe("Casting", () => {
     expect(display.length).toBeGreaterThan(0);
     expect(display.every((value) => value === "none")).toBe(true);
   });
+
+  // The Scene page's player is 552 px wide at 1280 px (the Recommended
+  // sidebar has the rest), so the bar answers the player's width, not the
+  // viewport's
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`at ${viewport.width} px with the Cast and VR buttons, every control lies inside the player and fullscreen shows`, async ({
+      browser,
+      baseURL,
+      request: admin,
+    }) => {
+      const { context, page } = await castingPage(browser, baseURL, admin);
+      await openVrScene(context, page, viewport);
+      // The bar shows while the pointer is over the player
+      await page.locator(".video-js").first().hover();
+
+      const bounds = requireData(
+        await page.locator(".video-js").first().boundingBox(),
+        "the player's box"
+      );
+      const controls = await page
+        .locator(".video-js .vjs-control-bar > *")
+        .evaluateAll((children) =>
+          children
+            .filter((child) => {
+              const box = child.getBoundingClientRect();
+              // The progress bar floats above the bar and spans the player
+              return (
+                !child.classList.contains("vjs-progress-control") &&
+                box.width > 0 &&
+                box.height > 0 &&
+                getComputedStyle(child).display !== "none" &&
+                getComputedStyle(child).visibility !== "hidden"
+              );
+            })
+            .map((child) => {
+              const box = child.getBoundingClientRect();
+              return {
+                name: child.className.split(" ").slice(0, 2).join(" "),
+                left: box.left,
+                right: box.right,
+              };
+            })
+        );
+      expect(controls.length).toBeGreaterThan(0);
+      const outside = controls.filter(
+        (control) =>
+          control.left < bounds.x - 0.5 ||
+          control.right > bounds.x + bounds.width + 0.5
+      );
+      expect(outside, `controls outside the player's box`).toEqual([]);
+
+      const fullscreen = page.locator(".vjs-fullscreen-control");
+      await expect(fullscreen).toBeVisible();
+      const toggle = requireData(
+        await fullscreen.boundingBox(),
+        "the fullscreen toggle's box"
+      );
+      expect(toggle.x + toggle.width).toBeLessThanOrEqual(
+        bounds.x + bounds.width + 0.5
+      );
+      // The buttons that matter stay
+      for (const kept of [
+        ".vjs-play-control",
+        ".vjs-volume-panel",
+        ".vjs-vr-button",
+        ".vjs-cast-button",
+      ]) {
+        await expect(page.locator(kept).first()).toBeVisible();
+      }
+    });
+  }
 });

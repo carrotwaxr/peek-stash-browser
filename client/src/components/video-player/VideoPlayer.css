@@ -655,19 +655,191 @@ section.video-container {
     center / contain no-repeat;
 }
 
-/* A phone's control bar has room for so many buttons: the Cast and VR buttons
-   come beside skip, seek, rate, captions, source and fullscreen (and the
-   headset button while VR runs), and the bar would push fullscreen out of the
-   player. While either shows, the bar's seek buttons go (the big buttons in
-   the middle keep seeking). */
-@media (max-width: 576px) {
-  .video-js
-    .vjs-control-bar:has(
-      .vjs-cast-button:not(.vjs-hidden),
-      .vjs-vr-button:not(.vjs-hidden)
-    )
+/* The control bar answers the player's own width, not the viewport's: on the
+   Scene page the Recommended sidebar takes the rest of a wide screen, and the
+   player is about 550 px wide at 1280 px. The video.js element is the
+   container (inline-size only; its height still follows the video's shape).
+
+   Buttons give way in a fixed order as the player narrows: the seek buttons
+   first (the big buttons in the middle keep seeking), then the playback rate,
+   then the time display. Play, volume, source, captions, VR, AirPlay, Cast
+   and fullscreen always stay. Each threshold is the width of the bar with
+   what is left (506 px with everything, 386 without seek, 326 without rate),
+   plus 30 px for a time past an hour, plus 60 px for each optional button
+   shown (captions, VR, the headset button, AirPlay, Cast). One block per
+   count of optional buttons (direct children of the bar: a menu button holds
+   an inner button of the same class), the sibling combinator counting them;
+   a count past four is treated as four. The widths are for 60 px controls: on a phone
+   (38 px controls) the buttons hide a little early. */
+.video-js {
+  container-type: inline-size;
+}
+
+.video-js .vjs-control-bar {
+  @container (width < 536px) {
     .vjs-seek-button {
-    display: none;
+      display: none;
+    }
+  }
+  @container (width < 416px) {
+    .vjs-playback-rate {
+      display: none;
+    }
+  }
+  @container (width < 356px) {
+    :is(.vjs-current-time, .vjs-time-divider, .vjs-duration) {
+      display: none;
+    }
+  }
+}
+
+.video-js
+  .vjs-control-bar:has(
+    > :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+  ) {
+  @container (width < 596px) {
+    .vjs-seek-button {
+      display: none;
+    }
+  }
+  @container (width < 476px) {
+    .vjs-playback-rate {
+      display: none;
+    }
+  }
+  @container (width < 416px) {
+    :is(.vjs-current-time, .vjs-time-divider, .vjs-duration) {
+      display: none;
+    }
+  }
+}
+
+.video-js
+  .vjs-control-bar:has(
+    > :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+      ~ :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+  ) {
+  @container (width < 656px) {
+    .vjs-seek-button {
+      display: none;
+    }
+  }
+  @container (width < 536px) {
+    .vjs-playback-rate {
+      display: none;
+    }
+  }
+  @container (width < 476px) {
+    :is(.vjs-current-time, .vjs-time-divider, .vjs-duration) {
+      display: none;
+    }
+  }
+}
+
+.video-js
+  .vjs-control-bar:has(
+    > :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+      ~ :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+      ~ :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+  ) {
+  @container (width < 716px) {
+    .vjs-seek-button {
+      display: none;
+    }
+  }
+  @container (width < 596px) {
+    .vjs-playback-rate {
+      display: none;
+    }
+  }
+  @container (width < 536px) {
+    :is(.vjs-current-time, .vjs-time-divider, .vjs-duration) {
+      display: none;
+    }
+  }
+}
+
+.video-js
+  .vjs-control-bar:has(
+    > :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+      ~ :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+      ~ :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+      ~ :is(
+        .vjs-subs-caps-button,
+        .vjs-vr-button,
+        .vjs-button-vr,
+        .vjs-airplay-button,
+        .vjs-cast-button
+      ):not(.vjs-hidden)
+  ) {
+  @container (width < 776px) {
+    .vjs-seek-button {
+      display: none;
+    }
+  }
+  @container (width < 656px) {
+    .vjs-playback-rate {
+      display: none;
+    }
+  }
+  @container (width < 596px) {
+    :is(.vjs-current-time, .vjs-time-divider, .vjs-duration) {
+      display: none;
+    }
   }
 }
 
