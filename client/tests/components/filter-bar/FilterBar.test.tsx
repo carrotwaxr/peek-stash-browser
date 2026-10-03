@@ -778,6 +778,26 @@ describe("in the list's controls", () => {
     expect(addFilter()).toHaveFocus();
   });
 
+  it("Clear all drops the active View: the list shows no View, unmodified", async () => {
+    const user = userEvent.setup();
+    const list = renderListControls(
+      {},
+      {
+        url: "/scenes?savedView=v1&favorite=true",
+        presets: {
+          scene: [{ id: "v1", name: "Faves", filters: { favorite: "true" } }],
+        },
+      }
+    );
+    await list.firstQuery();
+
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
+
+    await waitFor(() => expect(list.params().get("filters")).toBe("none"));
+    expect(list.params().has("savedView")).toBe(false);
+    expect(list.params().has("favorite")).toBe(false);
+  });
+
   it("removing the first of two Tags rows keeps focus on its chip, which then shows the row that took its number", async () => {
     const user = userEvent.setup();
     const list = renderListControls(
