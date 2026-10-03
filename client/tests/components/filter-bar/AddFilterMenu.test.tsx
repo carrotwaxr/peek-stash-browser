@@ -537,6 +537,42 @@ describe("values", () => {
     expect(list.params().get("tagIdsExclude")).toBe("1:a");
   });
 
+  it('a value never joins a "none of" row: it starts a new row of the field', async () => {
+    const list = renderListControls(
+      {},
+      { url: "/scenes?tagIds=1:a&tagIdsModifier=EXCLUDES" }
+    );
+    await list.firstQuery();
+    const user = await openMenu();
+    await user.keyboard("out");
+
+    await user.click(
+      await screen.findByRole("option", { name: "Tags: Outdoor" })
+    );
+
+    await waitFor(() => expect(list.params().get("2.tagIds")).toBe("2:a"));
+    expect(list.params().get("tagIds")).toBe("1:a");
+    expect(list.params().get("tagIdsModifier")).toBe("EXCLUDES");
+  });
+
+  it('at the 20-row limit a value whose field holds only a "none of" row is disabled', async () => {
+    const rows = Array.from(
+      { length: 19 },
+      (_, index) => `${index === 0 ? "" : `${index + 1}.`}performerIds=1:a`
+    ).join("&");
+    const list = renderListControls(
+      {},
+      { url: `/scenes?${rows}&tagIds=1:a&tagIdsModifier=EXCLUDES` }
+    );
+    await list.firstQuery();
+    const user = await openMenu();
+    await user.keyboard("out");
+
+    expect(
+      await screen.findByRole("option", { name: "Tags: Outdoor" })
+    ).toHaveAttribute("aria-disabled", "true");
+  });
+
   it("at the 20-row limit a value of a field not in use is disabled, one of a field in use still adds", async () => {
     const rows = Array.from(
       { length: 20 },

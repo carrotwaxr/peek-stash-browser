@@ -147,12 +147,40 @@ export const sameRowState = (
   JSON.stringify(canonical(normalizePanelState(kind, b)));
 
 /**
- * The state with one entity picked on a ref field's first root row
- * (`{ group: 0, occurrence: 1, key }`): the id joins the row's values (once),
- * leaves its exclusions (picking an excluded value includes it), and the
- * row's condition stays as it is, but for a presence choice ("Has none",
- * "Has any"), which ids cannot sit beside. A single row's value is replaced;
- * a row that is not there is added. `id` is the entity's `"id:instanceId"`.
+ * The root row a ref field's picked value goes to: the field's first root
+ * row whose condition is not EXCLUDES, else a new row after its last (a
+ * pick never joins a "none of" row, which would exclude it too).
+ */
+export function refValueTarget(
+  kind: ListKind,
+  state: PanelState,
+  key: string
+): RowKey {
+  const field = fieldOf(kind, key);
+  const count = treeOf(kind, state).rows.filter(
+    (row) => row.field.key === key
+  ).length;
+  for (let occurrence = 1; occurrence <= count; occurrence += 1) {
+    const at: RowKey = { group: 0, occurrence, key };
+    const modifierKey = field?.modifierKey;
+    if (
+      modifierKey === undefined ||
+      rowState(kind, state, at)[modifierKey] !== "EXCLUDES"
+    ) {
+      return at;
+    }
+  }
+  return { group: 0, occurrence: count + 1, key };
+}
+
+/**
+ * The state with one entity picked on a ref field's root row
+ * (`refValueTarget`: the first that does not exclude, else a new one): the
+ * id joins the row's values (once), leaves its exclusions (picking an
+ * excluded value includes it), and the row's condition stays as it is, but
+ * for a presence choice ("Has none", "Has any"), which ids cannot sit
+ * beside. A single row's value is replaced; a row that is not there is
+ * added. `id` is the entity's `"id:instanceId"`.
  */
 export function withRefValue(
   kind: ListKind,
@@ -162,7 +190,7 @@ export function withRefValue(
 ): PanelState {
   const field = fieldOf(kind, key);
   if (field === undefined || field.editor !== "ref") return state;
-  const at: RowKey = { group: 0, occurrence: 1, key };
+  const at = refValueTarget(kind, state, key);
   const row = rowState(kind, state, at);
 
   const values = valuesOf(row[key]);
