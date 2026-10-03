@@ -26,6 +26,10 @@ import {
   testUser,
 } from "../../tests/helpers/controllerTestUtils.js";
 import { must } from "../../tests/helpers/must.js";
+import type {
+  GetRecommendedScenesResponse,
+  ListCountResponse,
+} from "../../types/api/index.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import {
   FX,
@@ -406,5 +410,115 @@ describe("Recommended scenes (integration)", () => {
       `${SAME}:${A}`,
       `${EXTRA}:${A}`,
     ]);
+  });
+
+  describe("the scene list request (POST)", () => {
+    const POST = "/api/library/scenes/recommended";
+    /** Scenes with the performer VISIBLE_A@A: SAME@A and EXTRA@A */
+    const withVisibleA = {
+      performers: { value: [`${VISIBLE_A}:${A}`], modifier: "INCLUDES" },
+    };
+
+    const post = async (viewer: Viewer, body: object) => {
+      const response = await viewer.client.post<GetRecommendedScenesResponse>(
+        POST,
+        body
+      );
+      expect(response.status).toBe(200);
+      return response.data;
+    };
+
+    const count = async (viewer: Viewer, body: object) => {
+      const response = await viewer.client.post<ListCountResponse>(
+        `${POST}/count`,
+        body
+      );
+      expect(response.status).toBe(200);
+      return response.data.count;
+    };
+
+    it("a filter in the POST body narrows within the ranked list", async () => {
+      const viewer = await createViewer("access_it_rec_post_filter");
+      await hideFixtureDefaults(viewer.id);
+      await favoritePerformer(viewer.id, SAME, A);
+      await favoritePerformer(viewer.id, SAME, B);
+
+      const all = await post(viewer, {});
+      // The file's other tests may have synced more scenes onto the favourite
+      const ranked = all.scenes.map(key);
+      expect(ranked).toEqual(
+        expect.arrayContaining([`${SAME}:${A}`, `${B_ONLY}:${B}`])
+      );
+      expect(ranked).not.toContain(`${EXTRA}:${A}`);
+      expect(all.count).toBe(ranked.length);
+
+      // EXTRA@A holds VISIBLE_A too, but the viewer's list does not rank it
+      const narrowed = await post(viewer, { scene_filter: withVisibleA });
+      expect(narrowed.scenes.map(key)).toEqual([`${SAME}:${A}`]);
+      expect(narrowed.count).toBe(1);
+
+      // A scene sort pages over the ranked scenes only; a count-less page keeps no total
+      const byTitle = await post(viewer, {
+        filter: { sort: "title", direction: "ASC", page: 1, per_page: 1 },
+      });
+      expect(byTitle.scenes).toHaveLength(1);
+      expect(byTitle.count).toBe(ranked.length);
+      const noCount = await post(viewer, {
+        filter: { page: 2, per_page: 1, count: false },
+      });
+      expect(noCount.scenes).toHaveLength(1);
+      expect(noCount.count).toBeNull();
+    });
+
+    it("the count is what the viewer sees after a hide", async () => {
+      const viewer = await createViewer("access_it_rec_post_hide");
+      await favoritePerformer(viewer.id, SAME, A);
+      await favoritePerformer(viewer.id, SAME, B);
+      const before = await post(viewer, {});
+      expect(before.scenes.map(key)).toContain(`${B_ONLY}:${B}`);
+
+      await hideFor(viewer.id, "scene", B_ONLY, B);
+
+      const after = await post(viewer, {});
+      expect(after.scenes.map(key)).not.toContain(`${B_ONLY}:${B}`);
+      expect(after.count).toBe(before.count !== null ? before.count - 1 : null);
+      expect(after.count).toBe(after.scenes.length);
+    });
+
+    it("the recommended count equals the POST's total for the same body", async () => {
+      const viewer = await createViewer("access_it_rec_post_count");
+      await favoritePerformer(viewer.id, SAME, A);
+      await favoritePerformer(viewer.id, SAME, B);
+
+      for (const body of [
+        {},
+        { scene_filter: withVisibleA },
+        {
+          where: {
+            match: "any",
+            rules: [
+              { field: "performers", criterion: withVisibleA.performers },
+              {
+                field: "performers",
+                criterion: {
+                  value: [`${SAME}:${B}`],
+                  modifier: "INCLUDES",
+                },
+              },
+            ],
+          },
+        },
+        { filter: { q: "nothing matches this" } },
+      ]) {
+        expect(await count(viewer, body), JSON.stringify(body)).toBe(
+          (await post(viewer, body)).count
+        );
+      }
+      // The count route never sends the page's ids in: a body naming ids is a 400
+      const refused = await viewer.client.post(`${POST}/count`, {
+        ids: [`${SAME}:${A}`],
+      });
+      expect(refused.status).toBe(400);
+    });
   });
 });

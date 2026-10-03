@@ -30,6 +30,7 @@ import {
   parseMinimalRequest,
   parsePlaylistItemsRequest,
   parsePlaylistQueueRequest,
+  parseRecommendedListRequest,
   parseRecommendedRequest,
   parseSceneClipsRequest,
   parseSimilarScenesRequest,
@@ -2478,6 +2479,113 @@ describe("parseRecommendedRequest", () => {
     expect(issuesOf(() => parseRecommendedRequest("x", opts()))).toEqual([
       { path: "query", message: "Expected an object" },
     ]);
+  });
+});
+
+describe("parseRecommendedListRequest", () => {
+  const recommended = (body: Record<string, unknown>) =>
+    parseRecommendedListRequest(body, opts());
+
+  it("takes the scene list body: paging, q, sort, direction, count and scene_filter", () => {
+    const parsed = recommended({
+      filter: {
+        page: 2,
+        per_page: 40,
+        q: " beach ",
+        sort: "title",
+        direction: "asc",
+        count: false,
+      },
+      scene_filter: { rating100: { value: 60, modifier: "GREATER_THAN" } },
+    });
+    expect(parsed).toMatchObject({
+      page: 2,
+      perPage: 40,
+      q: "beach",
+      count: false,
+      sort: { field: "title", direction: "ASC" },
+      filter: { rating100: { modifier: "GREATER_THAN" } },
+    });
+  });
+
+  it("defaults to the Recommended sort, best first", () => {
+    expect(recommended({}).sort).toEqual({
+      field: "recommended",
+      direction: "DESC",
+      seed: undefined,
+    });
+    expect(recommended({ filter: { direction: "ASC" } }).sort).toEqual({
+      field: "recommended",
+      direction: "ASC",
+      seed: undefined,
+    });
+  });
+
+  it("accepts every scene sort and `recommended`; refuses `position`", () => {
+    for (const sort of ["recommended", "title", "created_at", "random_5"]) {
+      expect(() => recommended({ filter: { sort } })).not.toThrow();
+    }
+    expect(recommended({ filter: { sort: "recommended" } }).sort.field).toBe(
+      "recommended"
+    );
+    expect(
+      paths(issuesOf(() => recommended({ filter: { sort: "position" } })))
+    ).toEqual(["filter.sort"]);
+    // The plain scene list never takes it
+    expect(
+      paths(
+        issuesOf(() =>
+          parseListRequest("scene", { filter: { sort: "recommended" } }, opts())
+        )
+      )
+    ).toEqual(["filter.sort"]);
+  });
+
+  it("still needs the filter Scene Number and Playlist order read", () => {
+    expect(
+      paths(issuesOf(() => recommended({ filter: { sort: "scene_index" } })))
+    ).toEqual(["filter.sort"]);
+    expect(
+      paths(
+        issuesOf(() => recommended({ filter: { sort: "playlist_position" } }))
+      )
+    ).toEqual(["filter.sort"]);
+    expect(
+      recommended({
+        filter: { sort: "scene_index" },
+        scene_filter: { groups: { value: ["7:B"], modifier: "INCLUDES" } },
+      }).sort.field
+    ).toBe("scene_index");
+  });
+
+  it("refuses top-level `ids` and `scene_filter.ids`", () => {
+    for (const [path, body] of [
+      ["ids", { ids: ["1:A"] }],
+      ["scene_filter.ids", { scene_filter: { ids: { value: ["1:A"] } } }],
+    ] as const) {
+      expect(issuesOf(() => recommended(body))).toEqual([
+        { path, message: "Recommended lists its own scenes" },
+      ]);
+    }
+  });
+
+  it("keeps the instance of every filter value", () => {
+    const parsed = recommended({
+      scene_filter: { tags: { value: ["12:B"], modifier: "INCLUDES" } },
+      where: {
+        match: "any",
+        rules: [
+          {
+            field: "tags",
+            criterion: { value: ["13:A"], modifier: "INCLUDES" },
+          },
+        ],
+      },
+    });
+    expect(parsed.filter.tags).toMatchObject({
+      refs: [{ id: "12", instanceId: "B" }],
+    });
+    expect(JSON.stringify(parsed.where)).toContain('"instanceId":"A"');
   });
 });
 

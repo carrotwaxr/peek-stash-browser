@@ -73,6 +73,8 @@ const LIBRARY_ROUTES = [
   "POST /api/library/scenes/minimal",
   "GET /api/library/scenes/:id/similar",
   "GET /api/library/scenes/recommended",
+  "POST /api/library/scenes/recommended",
+  "POST /api/library/scenes/recommended/count",
   "POST /api/library/performers",
   "POST /api/library/performers/minimal",
   "GET /api/library/performers/:id/counts",

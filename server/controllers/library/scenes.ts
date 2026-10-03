@@ -8,6 +8,7 @@ import { stashEntityService } from "../../services/StashEntityService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
+  FindRecommendedScenesRequest,
   FindScenesMinimalRequest,
   FindScenesMinimalResponse,
   FindScenesRequest,
@@ -18,15 +19,18 @@ import type {
   GetRecommendedScenesQuery,
   GetRecommendedScenesResponse,
   ListCount,
+  ListCountResponse,
   TypedLibraryRequest,
   TypedResponse,
   WithStashUrl,
 } from "../../types/api/index.js";
 import type { NormalizedScene } from "../../types/index.js";
+import type { ParsedListRequest } from "../../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../../utils/entityRef.js";
 import {
   parseListRequest,
   parseMinimalRequest,
+  parseRecommendedListRequest,
   parseRecommendedRequest,
   parseSimilarScenesRequest,
   singleIdRef,
@@ -214,13 +218,158 @@ export const findSimilarScenes = async (
   });
 };
 
+/** The counts Recommended's empty answers carry */
+type RecommendedCriteria = NonNullable<
+  GetRecommendedScenesResponse["criteria"]
+>;
+
 /**
- * Recommended scenes: the user's ranked list (`RecommendationService`,
- * scored once per change to their ratings, plays, hidden items or rankings
- * or to the library), one page of it fetched through the scene builder by
- * (id, instance) and put back in ranked order. The list already honours the
- * user's exclusions and instances, so every page is full and the count is
- * what the user can see.
+ * What a Recommended request runs within: the user's ranked refs (scored
+ * once per change to their ratings, plays, hidden items or rankings or to
+ * the library, over their allowed instances), or the empty answer to send
+ */
+type RankedWithin =
+  | { readonly refs: readonly EntityRef[] }
+  | { readonly empty: string };
+
+async function rankedWithin(
+  userId: number,
+  allowedInstanceIds: readonly string[]
+): Promise<{
+  within: RankedWithin;
+  criteria: RecommendedCriteria;
+}> {
+  const { refs, criteria } = await recommendationService.getRankedRefs(
+    userId,
+    allowedInstanceIds
+  );
+  if (!hasAnyCriteria(criteria)) {
+    return { within: { empty: "No recommendations yet" }, criteria };
+  }
+  if (refs.length === 0) {
+    return { within: { empty: "No matching recommendations found" }, criteria };
+  }
+  return { within: { refs }, criteria };
+}
+
+/** Rankings over an hour old are recomputed, awaited; a failed recompute is logged by the service and the request scores with the stored rankings */
+async function freshRankings(userId: number): Promise<void> {
+  await rankingComputeService
+    .ensureFresh(userId, { wait: true })
+    .catch(() => undefined);
+}
+
+/**
+ * Recommended scenes for a parsed scene list request: the scene builder lists
+ * the user's ranked scenes with the request's filter, `where`, search, sort
+ * and paging, in SQL, so every page is full and the count is what the user
+ * can see (their exclusions and instances apply to the ranked refs again).
+ * Rankings are refreshed on page 1 only, so the pages that follow are scored
+ * with the rankings page 1 used.
+ */
+async function listRecommended(
+  req: Pick<TypedLibraryRequest, "user" | "allowedInstanceIds" | "timeZone">,
+  res: TypedResponse<GetRecommendedScenesResponse | ApiErrorResponse>,
+  request: ParsedListRequest<"scene">
+): Promise<void> {
+  const startTime = Date.now();
+  const userId = req.user.id;
+  const { page, perPage } = request;
+
+  if (page === 1) await freshRankings(userId);
+
+  const { allowedInstanceIds, timeZone } = req;
+  const { within, criteria } = await rankedWithin(userId, allowedInstanceIds);
+
+  if ("empty" in within) {
+    res.json({
+      scenes: [],
+      count: 0,
+      page,
+      perPage,
+      message: within.empty,
+      criteria,
+    });
+    return;
+  }
+
+  const result = await sceneQueryBuilder.execute({
+    userId,
+    allowedInstanceIds,
+    timeZone,
+    request,
+    ranked: within.refs,
+  });
+
+  logger.debug("findRecommendedScenes completed", {
+    totalTime: `${Date.now() - startTime}ms`,
+    userId,
+    candidateCount: within.refs.length,
+    resultCount: result.items.length,
+    total: result.total,
+    page,
+  });
+
+  res.json({
+    scenes: addStashUrl(result.items, req.user),
+    count: result.total,
+    page,
+    perPage,
+  });
+}
+
+/**
+ * `POST /api/library/scenes/recommended`: the scene list request within the
+ * user's ranked list. A ValidationError (400) reaches the central error
+ * handler.
+ */
+export const findRecommendedScenes = async (
+  req: TypedLibraryRequest<FindRecommendedScenesRequest>,
+  res: TypedResponse<GetRecommendedScenesResponse | ApiErrorResponse>
+) => {
+  const request = parseRecommendedListRequest(req.body, {
+    userId: req.user.id,
+  });
+  await listRecommended(req, res, request);
+};
+
+/**
+ * `POST /api/library/scenes/recommended/count`: how many scenes the
+ * request matches within the ranked list, the number `findRecommendedScenes`
+ * answers as `count`. It reads the stored rankings (no recompute, so a count
+ * made while the filter sheet is open never waits on one); no ranked scenes
+ * answer 0.
+ */
+export const countRecommendedScenes = async (
+  req: TypedLibraryRequest<FindRecommendedScenesRequest>,
+  res: TypedResponse<ListCountResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const request = parseRecommendedListRequest(req.body, { userId });
+  const { allowedInstanceIds, timeZone } = req;
+
+  const { within } = await rankedWithin(userId, allowedInstanceIds);
+  if ("empty" in within) {
+    res.json({ count: 0 });
+    return;
+  }
+
+  res.json({
+    count: await sceneQueryBuilder.count({
+      userId,
+      allowedInstanceIds,
+      timeZone,
+      request,
+      ranked: within.refs,
+    }),
+  });
+};
+
+/**
+ * `GET /api/library/scenes/recommended`: kept for a browser tab still on the
+ * 3.4.0-beta.8 bundle, which pages the ranked list with `page` and
+ * `per_page`. It runs the POST's path with no filter and the Recommended
+ * sort. Remove it in the release after 3.4.0-beta.9, with the beta.8 tabs.
  */
 export const getRecommendedScenes = async (
   req: TypedLibraryRequest<
@@ -230,85 +379,15 @@ export const getRecommendedScenes = async (
   >,
   res: TypedResponse<GetRecommendedScenesResponse | ApiErrorResponse>
 ) => {
-  const startTime = Date.now();
   const userId = req.user.id;
   // page >= 1 and per_page 1..250 (24 when absent); a ValidationError (400)
   // reaches the central error handler
-  const request = parseRecommendedRequest(req.query, { userId });
-
-  const { page, perPage } = request;
-
-  // Rankings over an hour old are recomputed here, on page 1 only, so the
-  // pages that follow are scored with the rankings page 1 used. A failed
-  // recompute is logged by the service; this request scores with the stored
-  // rankings.
-  if (page === 1) {
-    await rankingComputeService
-      .ensureFresh(userId, { wait: true })
-      .catch(() => undefined);
-  }
-
-  const { allowedInstanceIds } = req;
-  const { refs, criteria } = await recommendationService.getRankedRefs(
-    userId,
-    allowedInstanceIds
+  const { page, perPage } = parseRecommendedRequest(req.query, { userId });
+  const request = parseRecommendedListRequest(
+    { filter: { page, per_page: perPage } },
+    { userId }
   );
-
-  if (!hasAnyCriteria(criteria)) {
-    res.json({
-      scenes: [],
-      count: 0,
-      page,
-      perPage,
-      message: "No recommendations yet",
-      criteria,
-    });
-    return;
-  }
-
-  if (refs.length === 0) {
-    res.json({
-      scenes: [],
-      count: 0,
-      page,
-      perPage,
-      message: "No matching recommendations found",
-      criteria,
-    });
-    return;
-  }
-
-  const startIndex = (page - 1) * perPage;
-  const pageRefs = refs.slice(startIndex, startIndex + perPage);
-
-  const scenes = await sceneQueryBuilder.getByRefs({
-    userId,
-    refs: pageRefs,
-    allowedInstanceIds,
-  });
-
-  // Back in ranked order: getByRefs returns the page in no particular order
-  const sceneByKey = new Map(
-    scenes.map((s) => [entityKey(s.id, s.instanceId), s])
-  );
-  const orderedScenes = pageRefs
-    .map((ref) => sceneByKey.get(entityKey(ref.id, ref.instanceId)))
-    .filter((s): s is NormalizedScene => s !== undefined);
-
-  logger.debug("getRecommendedScenes completed", {
-    totalTime: `${Date.now() - startTime}ms`,
-    userId,
-    candidateCount: refs.length,
-    resultCount: orderedScenes.length,
-    page,
-  });
-
-  res.json({
-    scenes: orderedScenes,
-    count: refs.length,
-    page,
-    perPage,
-  });
+  await listRecommended(req, res, request);
 };
 
 /**

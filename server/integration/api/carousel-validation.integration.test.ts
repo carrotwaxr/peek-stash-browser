@@ -543,13 +543,13 @@ describe("carousel, recommended and similar requests", () => {
       expect(body.count).toBe(REC_SCENES);
       expect(body.perPage).toBe(250);
       expect(body.scenes).toHaveLength(250);
-      // The clamped page is 250 refs; the hydration statement binds them
-      // and carries no LIMIT (a bare ref may match a row per instance)
-      expect(
-        recorder.statements.filter(({ sql }) =>
-          sql.includes("LIMIT ? OFFSET ?")
-        )
-      ).toHaveLength(0);
+      // The page is the scene list's statement within the ranked refs (one
+      // joined CTE), paged in SQL, never a lookup of the page's refs
+      const pages = recorder.statements.filter(({ sql }) =>
+        sql.includes("LIMIT ? OFFSET ?")
+      );
+      expect(pages).toHaveLength(1);
+      expect(pages[0]?.sql).toContain("JOIN ranked_refs k");
     });
 
     it("recommended page abc answers 400", async () => {
