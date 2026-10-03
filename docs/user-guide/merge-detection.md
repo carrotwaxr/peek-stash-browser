@@ -62,8 +62,8 @@ For scenes that were merged before this feature was implemented, or where automa
 ### Accessing the Tool
 
 1. Go to **Settings** (gear icon)
-2. Click the **Server** tab
-3. Select **Merge Recovery**
+2. Switch to **Server Settings**
+3. Open the **Merge Recovery** tab
 
 ### Understanding the Interface
 
@@ -81,7 +81,7 @@ The Merge Recovery tab shows:
 **For a single scene:**
 
 1. Click on an orphaned scene to expand it
-2. Review the potential matches (sorted by likelihood)
+2. Review the potential matches. Every match has the same PHASH as the orphan. The one most recently updated in Stash comes first and is marked **Recommended**
 3. Either:
     - Click **Transfer** next to a match to transfer activity to that scene
     - Enter a scene ID manually if you know the correct target. The ID is a scene on the orphan's instance (the field says which); a scene that is deleted or unknown there is refused

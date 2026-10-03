@@ -20,15 +20,14 @@ Peek is a browser/player focused on video playback and discovery, while Stash is
 
 ### Does Peek modify my Stash library?
 
-Peek can optionally sync ratings, favorites, and O-counter back to Stash (configurable). It never modifies your files or core metadata.
+Peek never edits your files or your Stash metadata (titles, tags, performers and the like). The one thing it writes to Stash is a user's own activity, and only when an admin switches **Sync to Stash** on for that user: ratings (not on tags), favorites (performers, studios and tags), plays, watch time, resume points and O counts. Admins switch it on per user under Settings → Server Settings → User Management. See [Sync to Stash](../user-guide/user-management.md#sync-to-stash-export).
 
 ### How does Peek sync with Stash?
 
-Peek maintains a local cache of your Stash library for fast queries. Three sync mechanisms keep it updated:
+Peek maintains a local cache of your Stash library for fast queries. Two kinds of sync keep it updated:
 
-- **Smart Sync** (automatic) - Runs on startup and periodically, only syncing what changed
-- **Incremental Sync** - Manual option to sync recent changes since a specific time
-- **Full Sync** - Complete refresh, from the Full Sync button, and automatically once a day (the startup or a scheduled sync becomes a full one) to catch changes Stash makes without marking items updated. When an upgrade changes how Peek stores part of the library, the next sync refetches that part whole on its own
+- **Scheduled sync** (automatic) - Runs on startup and then every sync interval (every hour by default, set under Settings → Server Settings → Server Configuration), only syncing what changed
+- **Full Sync** - Complete refresh, from the **Full Sync** button under Server Statistics, and automatically once a day (the startup or a scheduled sync becomes a full one) to catch changes Stash makes without marking items updated. When an upgrade changes how Peek stores part of the library, the next sync refetches that part whole on its own
 
 **Key points:**
 
@@ -37,6 +36,7 @@ Peek maintains a local cache of your Stash library for fast queries. Three sync 
 - Changes made in Stash appear in Peek after the next sync
 - Open pages pick up a finished sync on their next request; you don't need to reload
 - User data (watch history, playlists, ratings) is stored separately and never affected by sync
+- The library sync only reads from Stash. Your own activity goes to Stash only through **Sync to Stash**, and an admin can bring a user's activity in from Stash with **Sync from Stash**, both in Settings → Server Settings → User Management
 
 See [Sync Architecture](../development/sync-architecture.md) for technical details.
 
@@ -46,7 +46,7 @@ See [Sync Architecture](../development/sync-architecture.md) for technical detai
 
 - **unRAID**: Manual Docker template installation
 - **Docker**: Any platform supporting Docker (AMD64 and ARM64)
-- **Development**: Node.js 18+ on Windows/Mac/Linux
+- **Development**: Node.js 22 on Windows/Mac/Linux
 
 ### Do I need a separate database server?
 
@@ -102,7 +102,7 @@ Create custom playlists of your favorite scenes:
 
 1. Click **Playlists** in the navigation
 2. Click **Create Playlist**
-3. Add scenes using the **+** icon on scene cards
+3. Add scenes with the **Add to Playlist** button on a scene's page or player, or select scenes in a list and use **Add to Playlist** on the bar that appears
 
 See the [Playlists Guide](../user-guide/playlists.md) for details.
 
@@ -125,13 +125,9 @@ See the [Keyboard Navigation Guide](../user-guide/keyboard-navigation.md) for al
 
 ### What about TV Mode?
 
-TV Mode is a work-in-progress feature for couch/remote browsing. You can enable it from the user menu, but:
+TV Mode is for couch and remote browsing. Turn it on from the user menu. The arrow keys then move focus to the nearest item in that direction, on every page, and Enter opens it. The best experience is with a wireless keyboard.
 
-- Grid navigation works on most pages (Scenes, Performers, etc.)
-- Some pages don't have full TV navigation yet
-- Best experience is with a wireless keyboard
-
-TV Mode will be improved in future updates.
+See [TV Mode](../user-guide/keyboard-navigation.md#tv-mode) for the details.
 
 ### Can I use Peek on mobile?
 
@@ -147,7 +143,7 @@ No. Peek requires a Stash server for media library management and streaming.
 
 Peek includes JWT authentication, bcrypt password hashing, and session management.
 
-**Important**: Change the default admin password immediately after setup!
+There is no default password. The setup wizard asks you to choose the admin account's password, so pick a strong one.
 
 ### Should I expose Peek to the internet?
 

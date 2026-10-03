@@ -20,7 +20,7 @@ Peek has two user roles:
 
 **Requirements:** Admin role
 
-1. Go to **Settings** → **User Management** tab
+1. Go to **Settings** → **Server Settings** → **User Management**
 2. Click **+ Create User**
 3. Enter:
    - **Username** (must be unique)
@@ -42,10 +42,11 @@ Click on any user row in the User Management table to open the **User Edit Modal
 
 | Section | Description |
 |---------|-------------|
-| **Account** | Change username, password, and role |
+| **Basic Info** | The username (read-only) and the role |
 | **Groups** | Manage group memberships for permission inheritance |
 | **Permissions** | View and override individual permissions |
 | **Content Restrictions** | Set what content the user can see |
+| **Account Actions** | Reset the password, regenerate the recovery key, or delete the user |
 
 Each change saves as you make it, and **Saved** appears beside the control (or the error, with the control back at its stored value). Changing the role asks you to confirm first. There is no Save button: **Close** closes the editor, and the user list updates.
 
@@ -56,10 +57,12 @@ From the user table, you can also:
 | Action | Description |
 |--------|-------------|
 | **Sync from Stash** | Import ratings, favorites, O counts, plays, watch time and resume points from Stash for this user |
-| **Delete** | Remove the user account, all their data and their download files |
+| **Edit** | Open the User Edit Modal |
 
-!!! warning "Cannot Delete Self"
-    Admins cannot delete their own account. Another admin must perform this action.
+To delete a user, open **Edit** and use **Delete User** under **Account Actions**. It removes the user account, all their data and their download files.
+
+!!! warning "Cannot Modify Self"
+    The User Edit Modal does not change your own account, and an admin cannot delete their own account. Another admin must do that. Use your own account settings (Settings → User Preferences → Account) for your password.
 
 ---
 
@@ -78,8 +81,8 @@ User groups allow you to manage permissions for multiple users at once. Users in
 
 **Requirements:** Admin role
 
-1. Go to **Settings** → **Groups** tab
-2. Click **+ Create Group** to add a new group
+1. Go to **Settings** → **Server Settings** → **User Management**
+2. In the **User Groups** panel at the top, click **Create Group**
 3. Enter:
    - **Name** (must be unique)
    - **Description** (optional)
@@ -90,7 +93,7 @@ User groups allow you to manage permissions for multiple users at once. Users in
 
 | Permission | Description |
 |------------|-------------|
-| **Can Share** | Allow users to share content links (future feature) |
+| **Can Share** | Allow users to share their playlists with the groups they belong to |
 | **Can Download Files** | Allow downloading individual scenes and images |
 | **Can Download Playlists** | Allow downloading playlist zip archives |
 
@@ -123,7 +126,7 @@ Permissions control what actions users can perform beyond viewing content.
 
 | Permission | Description |
 |------------|-------------|
-| **Can Share** | Share content links with others |
+| **Can Share** | Share your playlists with the groups you belong to |
 | **Can Download Files** | Download individual scenes and images |
 | **Can Download Playlists** | Download playlist zip archives |
 
@@ -132,13 +135,17 @@ Permissions control what actions users can perform beyond viewing content.
 1. Click on a user in the User Management table
 2. Go to the **Permissions** section
 3. For each permission, choose:
-   - **Inherit** — Use the value from group memberships
-   - **Allow** — Explicitly grant this permission
-   - **Deny** — Explicitly deny this permission
-4. Click **Save**
+   - **Inherit from groups**: Use the value from group memberships
+   - **Force enabled**: Explicitly grant this permission
+   - **Force disabled**: Explicitly deny this permission
+
+Each choice saves as you make it.
 
 !!! note "Override Priority"
-    User-level overrides always take precedence over group permissions. An explicit "Deny" will block a permission even if a group grants it.
+    User-level overrides always take precedence over group permissions. A forced-disabled permission is blocked even if a group grants it.
+
+!!! note "Admins Need a Grant Too"
+    The admin role gives no permission to share or download. An admin gets Can Share, Can Download Files and Can Download Playlists from a group or a user setting, like anyone else. All three are denied until then.
 
 ---
 
@@ -217,7 +224,7 @@ Each user can customize their own experience:
 
 ### Accessing Settings
 
-- Click your username in the header → **Settings**
+- Click **Settings** at the bottom of the sidebar
 - Or navigate directly to the Settings page
 
 ---
@@ -231,7 +238,7 @@ Imports a user's ratings, favorites, O counts, plays, watch time and resume poin
 - Recovering from a Peek database reset
 
 **To sync:**
-1. Go to **User Management**
+1. Go to **Settings** → **Server Settings** → **User Management**
 2. Click **Sync from Stash** for the user
 3. Select what to import, per type
 4. Click **Start Sync**
@@ -262,14 +269,16 @@ When enabled, user activity syncs back to Stash:
 | Data | Sync Behavior |
 |------|---------------|
 | **O-Counter** | Aggregates across users (increments add up), for scenes and images; Remove last O takes away Stash's newest O |
-| **Ratings** | Overwrites (last user to rate wins) |
-| **Favorites** | Overwrites (last user to change it wins), for performers, studios and tags; Stash has no favorite on scenes, galleries, groups or images |
+| **Plays** | Each play is added to the scene in Stash, so plays add up across users |
+| **Watch time and resume points** | Sent as you watch. Stash's watch time grows by what each user watches; its resume point is the last one written |
+| **Ratings** | Overwrites (last user to rate wins), for scenes, performers, studios, galleries, collections and images. Stash has no rating on tags |
+| **Favorites** | Overwrites (last user to change it wins), for performers, studios and tags; Stash has no favorite on scenes, galleries, collections or images |
 
 !!! warning "Multi-User Considerations"
     If multiple users rate the same scene, the last rating wins in Stash. O-counters aggregate, so they'll be higher in Stash than for any individual user.
 
 **To enable/disable:**
-1. Go to **User Management**
+1. Go to **Settings** → **Server Settings** → **User Management**
 2. Find the user in the table
 3. Toggle the **Sync to Stash** column
 
@@ -288,7 +297,7 @@ Users can hide individual items they don't want to see. Unlike admin restriction
 
 ### Managing Hidden Items
 
-1. Go to **Settings** → **Hidden Items** tab
+1. Go to **Settings** → **User Preferences** → **Content** → **Hidden Items**
 2. View all hidden items by type
 3. Click **Unhide** to restore visibility
 
