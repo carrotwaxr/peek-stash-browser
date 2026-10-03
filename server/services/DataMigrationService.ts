@@ -1,6 +1,8 @@
+import { presetArtifactType } from "@peek/shared-types/presetContexts.js";
 import prisma from "../prisma/singleton.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
+import { isWhereShape } from "../utils/whereTree.js";
 import { entityImageCountService } from "./EntityImageCountService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
@@ -12,6 +14,7 @@ import {
   type CleanReport,
   bareRefLookupFor,
   cleanCarouselRules,
+  cleanCarouselTree,
   cleanFilterPresets,
 } from "./StoredFilterCleaner.js";
 import { userStatsService } from "./UserStatsService.js";
@@ -82,10 +85,12 @@ export async function deleteOrphanedUserRows(
   return deleted;
 }
 
-/** A user's saved presets, as stored */
+/** A user's saved presets, as stored (and their defaults, for migration 012) */
 interface StoredPresetsRow {
   userId: number;
-  presets: string;
+  presets: string | null;
+  /** `defaultFilterPresets`: read by migration 012 only */
+  defaults?: string | null;
 }
 
 /** A custom carousel's stored query */
@@ -129,18 +134,26 @@ function reportFields(report: CleanReport) {
 /** Parsed stored JSON; undefined, with a warning, when it does not parse */
 function parseStored(
   text: string,
-  what: Record<string, unknown>
+  what: Record<string, unknown>,
+  tag: string = MIGRATION_009
 ): { value: unknown } | undefined {
   try {
     return { value: JSON.parse(text) as unknown };
   } catch {
-    logger.warn(`${MIGRATION_009} Left a stored value it cannot read`, what);
+    logger.warn(`${tag} Left a stored value it cannot read`, what);
     return undefined;
   }
 }
 
-/** Every stored preset list and carousel of the users in scope, by user */
-async function readStoredFilters(userIds: readonly number[] | undefined) {
+/**
+ * Every stored preset list and carousel of the users in scope, by user.
+ * With `withDefaults` (migration 012) the users are those holding presets
+ * or defaults, and the defaults are read too.
+ */
+async function readStoredFilters(
+  userIds: readonly number[] | undefined,
+  withDefaults = false
+) {
   const inScope = (column: string) =>
     userIds === undefined
       ? { sql: "", params: [] }
@@ -150,9 +163,16 @@ async function readStoredFilters(userIds: readonly number[] | undefined) {
         };
   const byUser = inScope("id");
   const presetRows = await prisma.$queryRawUnsafe<StoredPresetsRow[]>(
-    `SELECT id AS userId, CAST(filterPresets AS TEXT) AS presets FROM "User"
-     WHERE filterPresets IS NOT NULL ${byUser.sql}
-     ORDER BY id`,
+    withDefaults
+      ? `SELECT id AS userId, CAST(filterPresets AS TEXT) AS presets,
+                CAST(defaultFilterPresets AS TEXT) AS defaults
+         FROM "User"
+         WHERE ("filterPresets" IS NOT NULL OR "defaultFilterPresets" IS NOT NULL)
+           ${byUser.sql}
+         ORDER BY id`
+      : `SELECT id AS userId, CAST(filterPresets AS TEXT) AS presets FROM "User"
+         WHERE filterPresets IS NOT NULL ${byUser.sql}
+         ORDER BY id`,
     ...byUser.params
   );
   const byOwner = inScope("userId");
@@ -187,10 +207,11 @@ async function cleanUserStoredFilters(
   carouselRows: readonly StoredCarouselRow[],
   summary: StoredFilterCleanup
 ): Promise<void> {
-  const presets = presetRow
-    ? parseStored(presetRow.presets, { userId, column: "filterPresets" })
-    : undefined;
-  if (presetRow && !presets) summary.skipped++;
+  const presets =
+    presetRow?.presets != null
+      ? parseStored(presetRow.presets, { userId, column: "filterPresets" })
+      : undefined;
+  if (presetRow?.presets != null && !presets) summary.skipped++;
   const carousels = carouselRows.flatMap((row) => {
     const rules = parseStored(row.rules, { userId, carouselId: row.id });
     if (!rules) summary.skipped++;
@@ -329,6 +350,276 @@ export async function cleanStoredFilters(
       summary
     );
     if (summary.presets + summary.carousels > before) summary.users++;
+  }
+  return summary;
+}
+
+const MIGRATION_012 = "[Migration 012]";
+
+/** What migration 012 changed: counts and key names, no values */
+export interface StoredFilterTreeMigration extends StoredFilterCleanup {
+  /** Saved Views read (changed or not) */
+  presetsExamined: number;
+  /** A multi row's lone value made a one-element list */
+  valuesListed: number;
+  /** Flat carousels naming `ids` or an instance, which a tree cannot hold */
+  carouselsLeftFlat: number;
+  /** Defaults that named a View its list no longer holds */
+  defaultsDropped: number;
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * A flat carousel that names `ids` or `instance_id`: the tree has no rows
+ * for them, so converting it would widen the carousel. It runs flat, with
+ * its ids, as the readers keep it.
+ */
+const namesIdsOrInstance = (rules: unknown): boolean =>
+  isObject(rules) &&
+  !isWhereShape(rules) &&
+  ["ids", "instance_id"].some((key) =>
+    Object.prototype.hasOwnProperty.call(rules, key)
+  );
+
+/**
+ * The defaults that still name a View their list holds: a default of a
+ * context names a View of `presetArtifactType(context)`.
+ */
+function heldDefaults(
+  defaults: Record<string, unknown>,
+  views: Record<string, unknown>
+): [string, unknown][] {
+  return Object.entries(defaults).filter(([context, id]) => {
+    const list = views[presetArtifactType(context)];
+    return (
+      typeof id === "string" &&
+      Array.isArray(list) &&
+      list.some((view) => isObject(view) && view.id === id)
+    );
+  });
+}
+
+/**
+ * One user's Views, defaults and carousels in the canonical form, written in
+ * one unit when anything changed, each write naming the text it read.
+ * Adds to `summary`.
+ */
+async function migrateUserStoredFilters(
+  userId: number,
+  userRow: StoredPresetsRow | undefined,
+  carouselRows: readonly StoredCarouselRow[],
+  summary: StoredFilterTreeMigration
+): Promise<void> {
+  const presets =
+    userRow?.presets != null
+      ? parseStored(
+          userRow.presets,
+          { userId, column: "filterPresets" },
+          MIGRATION_012
+        )
+      : undefined;
+  if (userRow?.presets != null && !presets) summary.skipped++;
+  const defaults =
+    userRow?.defaults != null
+      ? parseStored(
+          userRow.defaults,
+          { userId, column: "defaultFilterPresets" },
+          MIGRATION_012
+        )
+      : undefined;
+  if (userRow?.defaults != null && !defaults) summary.skipped++;
+
+  const carousels = carouselRows.flatMap((row) => {
+    const rules = parseStored(
+      row.rules,
+      { userId, carouselId: row.id },
+      MIGRATION_012
+    );
+    if (!rules) summary.skipped++;
+    if (rules && namesIdsOrInstance(rules.value)) {
+      summary.carouselsLeftFlat++;
+      return [];
+    }
+    return rules ? [{ row, rules: rules.value }] : [];
+  });
+
+  const clean = (lookup: BareRefLookup) => ({
+    presets: presets ? cleanFilterPresets(presets.value, lookup) : undefined,
+    carousels: carousels.map(({ row, rules }) => ({
+      row,
+      cleaned: cleanCarouselTree(rules, row.sort, row.direction, lookup),
+    })),
+  });
+  const cleaned = clean(await bareRefLookupFor(clean));
+  for (const { report } of [
+    ...(cleaned.presets?.results ?? []),
+    ...cleaned.carousels.map((carousel) => carousel.cleaned),
+  ]) {
+    summary.refsLeftBare += report.refsLeftBare;
+  }
+  summary.presetsExamined += cleaned.presets?.results.length ?? 0;
+
+  // The Views the defaults are held against: none when the column is NULL;
+  // unreadable or not a map of lists, nothing can be said of them
+  const views = userRow?.presets == null ? {} : cleaned.presets?.value;
+  const keptDefaults =
+    isObject(defaults?.value) && isObject(views)
+      ? heldDefaults(defaults.value, views)
+      : undefined;
+  const defaultsDropped =
+    isObject(defaults?.value) && keptDefaults
+      ? Object.keys(defaults.value).length - keptDefaults.length
+      : 0;
+
+  const userChanged = Boolean(cleaned.presets?.changed) || defaultsDropped > 0;
+  const carouselWrites = cleaned.carousels.filter(
+    (carousel) => carousel.cleaned.changed
+  );
+  const ops = [
+    ...(userRow && userChanged
+      ? [
+          prisma.$executeRawUnsafe(
+            `UPDATE "User" SET "filterPresets" = ?, "defaultFilterPresets" = ?, "updatedAt" = ?
+             WHERE "id" = ? AND CAST("filterPresets" AS TEXT) IS ?
+               AND CAST("defaultFilterPresets" AS TEXT) IS ?`,
+            cleaned.presets?.changed
+              ? JSON.stringify(cleaned.presets.value)
+              : userRow.presets,
+            defaultsDropped > 0 && keptDefaults
+              ? // fromEntries defines own properties, so a stored `__proto__` stays data
+                JSON.stringify(Object.fromEntries(keptDefaults))
+              : (userRow.defaults ?? null),
+            Date.now(),
+            userId,
+            userRow.presets,
+            userRow.defaults ?? null
+          ),
+        ]
+      : []),
+    ...carouselWrites.map(({ row, cleaned: carousel }) =>
+      prisma.$executeRawUnsafe(
+        `UPDATE "UserCarousel" SET "rules" = ?, "sort" = ?, "direction" = ?
+         WHERE "id" = ? AND CAST("rules" AS TEXT) IS ? AND "sort" = ? AND "direction" = ?`,
+        JSON.stringify(carousel.value.rules),
+        carousel.value.sort,
+        carousel.value.direction,
+        row.id,
+        row.rules,
+        row.sort,
+        row.direction
+      )
+    ),
+  ];
+  if (ops.length === 0) return;
+
+  // In the order of `ops`: the user first, then each carousel
+  const written = (
+    await dbWriteBatch("migration.viewsAndCarouselTrees", ops)
+  ).map((count) => count > 0);
+  const countDropped = (prefix: string, keys: readonly string[]) => {
+    for (const key of keys) {
+      const name = `${prefix}.${key}`;
+      summary.droppedKeys[name] = (summary.droppedKeys[name] ?? 0) + 1;
+    }
+  };
+
+  if (userRow && userChanged && written.shift()) {
+    summary.defaultsDropped += defaultsDropped;
+    if (defaultsDropped > 0) {
+      logger.info(`${MIGRATION_012} Dropped defaults naming a missing View`, {
+        userId,
+        defaultsDropped,
+      });
+    }
+    for (const result of cleaned.presets?.results ?? []) {
+      if (!result.changed) continue;
+      summary.presets++;
+      summary.refsRewritten += result.report.refsRewritten;
+      summary.valuesListed += result.report.valuesListed;
+      countDropped(result.entity, result.report.droppedKeys);
+      logger.info(`${MIGRATION_012} Cleaned a saved View`, {
+        userId,
+        entity: result.entity,
+        presetId: result.presetId,
+        ...reportFields(result.report),
+        valuesListed: result.report.valuesListed,
+      });
+    }
+  } else if (userRow && userChanged) {
+    summary.skipped++;
+    logger.info(
+      `${MIGRATION_012} Left saved Views changed since they were read`,
+      { userId }
+    );
+  }
+  for (const { row, cleaned: carousel } of carouselWrites) {
+    if (written.shift()) {
+      summary.carousels++;
+      summary.refsRewritten += carousel.report.refsRewritten;
+      countDropped("carousel", carousel.report.droppedKeys);
+      logger.info(`${MIGRATION_012} Stored a carousel's rules as a tree`, {
+        userId,
+        carouselId: row.id,
+        ...reportFields(carousel.report),
+      });
+    } else {
+      summary.skipped++;
+      logger.info(
+        `${MIGRATION_012} Left a carousel changed since it was read`,
+        { userId, carouselId: row.id }
+      );
+    }
+  }
+}
+
+/**
+ * Moves every user's saved Views, defaults and custom carousels to the form
+ * the Views menu and the carousel builder store (migration 012), or only
+ * those of `userIds`: each carousel's rules as a tree of rows and groups
+ * (`cleanCarouselTree`; a flat carousel naming `ids` or an instance stays
+ * flat, since a tree cannot hold them), the Views through the preset cleaner
+ * (a multi row's lone value as a list, bare ids tied), and the defaults
+ * without any naming a View their list no longer holds. One write unit per
+ * user with anything to change. Each write names the text it read, so a
+ * save in between stands. Idempotent: a second run writes nothing.
+ */
+export async function migrateStoredFiltersToTrees(
+  userIds?: readonly number[]
+): Promise<StoredFilterTreeMigration> {
+  const { users, presetsByUser, carouselsByUser } = await readStoredFilters(
+    userIds,
+    true
+  );
+  const summary: StoredFilterTreeMigration = {
+    users: 0,
+    presets: 0,
+    carousels: 0,
+    droppedKeys: {},
+    refsRewritten: 0,
+    refsLeftBare: 0,
+    skipped: 0,
+    presetsExamined: 0,
+    valuesListed: 0,
+    carouselsLeftFlat: 0,
+    defaultsDropped: 0,
+  };
+  for (const userId of users) {
+    const before =
+      summary.presets + summary.carousels + summary.defaultsDropped;
+    await migrateUserStoredFilters(
+      userId,
+      presetsByUser.get(userId),
+      carouselsByUser.get(userId) ?? [],
+      summary
+    );
+    if (
+      summary.presets + summary.carousels + summary.defaultsDropped >
+      before
+    ) {
+      summary.users++;
+    }
   }
   return summary;
 }
@@ -590,6 +881,21 @@ const migrations: Migration[] = [
     "Recompute every user's exclusions so each card's count leaves out what the user cannot see (UserExcludedContentCount), and rewrite any exclusion rows still stored for every instance per instance",
     "the per-user card counts"
   ),
+  // Saved presets are Views now and custom carousels store a tree of rows and
+  // groups (PR 9b). Readers keep both shapes, so this tidies what is stored
+  // once; it runs after the server listens, like every entry
+  {
+    name: "012_views_and_carousel_trees",
+    description:
+      "Store custom carousel rules as a tree, saved filter presets as canonical Views (a multi row's value as a list, ids tied to their server), and drop default presets naming a View that no longer exists",
+    run: async () => {
+      const summary = await migrateStoredFiltersToTrees();
+      logger.info(
+        `${MIGRATION_012} Moved saved Views and carousels to their canonical form`,
+        { ...summary }
+      );
+    },
+  },
 ];
 
 class DataMigrationService {

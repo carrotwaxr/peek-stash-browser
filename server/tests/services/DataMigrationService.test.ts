@@ -14,7 +14,7 @@ import { linkCountService } from "../../services/LinkCountService.js";
 import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
-import { objectContaining } from "../helpers/matchers.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
@@ -89,6 +89,7 @@ const MIGRATIONS = [
   "009_clean_stored_filters",
   "010_rebuild_link_counts",
   "011_recompute_exclusions_content_counts",
+  "012_views_and_carousel_trees",
 ];
 
 /** Every migration but the named ones, as applied rows */
@@ -187,6 +188,11 @@ describe("DataMigrationService", () => {
           name: "011_recompute_exclusions_content_counts",
           appliedAt: new Date(),
         },
+        {
+          id: 12,
+          name: "012_views_and_carousel_trees",
+          appliedAt: new Date(),
+        },
       ]);
 
       const { logger } = await import("../../utils/logger.js");
@@ -220,8 +226,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // All ten migrations should be marked as applied
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(11);
+      // All twelve migrations should be marked as applied
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(12);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -255,10 +261,13 @@ describe("DataMigrationService", () => {
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "011_recompute_exclusions_content_counts" },
       });
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "012_views_and_carousel_trees" },
+      });
     });
 
     it("skips already-applied migration and only runs pending ones", async () => {
-      // 001 already applied, 002 to 011 pending
+      // 001 already applied, 002 to 012 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         {
           id: 1,
@@ -277,8 +286,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // 001 is skipped; 002 to 011 are created
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(10);
+      // 001 is skipped; 002 to 012 are created
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(11);
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -740,6 +749,476 @@ describe("DataMigrationService", () => {
         // The first user's one unit failed; nothing after it ran
         expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
         expect(mockPrisma.dataMigration.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("migration 012: carousel trees, canonical presets, dangling defaults", () => {
+      /** The prod presets (filterGolden.test.ts), as stored: bare ids, lone values */
+      const FAVE = {
+        id: "6a1cdecf-5228-4e23-9205-d235bc8df240",
+        name: "Fave Ladies",
+        filters: { gender: "FEMALE" },
+        sort: "rating",
+        direction: "DESC",
+        createdAt: "2025-11-08T02:04:38.675Z",
+      };
+      const HIERARCHY = {
+        id: "3abe5163-e661-4853-8009-f161758e9efe",
+        name: "Hierarchy",
+        filters: {},
+        sort: "name",
+        direction: "ASC",
+        viewMode: "hierarchy",
+        zoomLevel: "medium",
+        tableColumns: null,
+        createdAt: "2026-01-23T19:04:44.835Z",
+      };
+      const CLIP = {
+        id: "5f300887-40f6-438a-adf1-9eb072e8352c",
+        name: "test",
+        filters: { sceneTagIds: ["280"] },
+        sort: "duration",
+        direction: "DESC",
+        viewMode: "grid",
+        zoomLevel: "medium",
+        tableColumns: null,
+        createdAt: "2026-01-29T02:00:59.279Z",
+      };
+      const TO_REVIEW = {
+        id: "afe187ab-6a14-4b06-85b3-5ea689dece32",
+        name: "To Review",
+        filters: {
+          studioIdsModifier: "EXCLUDES",
+          studioIds: ["772", "971"],
+          tagIds: ["466"],
+          tagIdsModifier: "EXCLUDES",
+        },
+        sort: "created_at",
+        direction: "ASC",
+        viewMode: "wall",
+        zoomLevel: "medium",
+        gridDensity: "small",
+        tableColumns: null,
+        perPage: 120,
+        createdAt: "2026-02-19T06:33:49.853Z",
+      };
+      const PROD_PRESETS = JSON.stringify({
+        performer: [FAVE],
+        tag: [HIERARCHY],
+        clip: [CLIP],
+        image: [TO_REVIEW],
+      });
+      const PROD_DEFAULTS = JSON.stringify({
+        performer: FAVE.id,
+        tag: HIERARCHY.id,
+      });
+      const FLAT_RULES = `{"tags":{"value":["284"],"modifier":"INCLUDES_ALL"}}`;
+      const TREE_RULES = JSON.stringify({
+        match: "all",
+        rules: [
+          {
+            field: "tags",
+            criterion: { value: ["284:default"], modifier: "INCLUDES_ALL" },
+          },
+        ],
+      });
+
+      interface UserRead {
+        userId: number;
+        presets: string | null;
+        defaults: string | null;
+      }
+      interface CarouselRead {
+        id: string;
+        userId: number;
+        rules: string;
+        sort?: string;
+        direction?: string;
+      }
+
+      /** Answers the reads by the table each names; every bare id is on one instance */
+      function stored(users: UserRead[], carousels: CarouselRead[] = []) {
+        mockPrisma.$queryRawUnsafe.mockImplementation(
+          prismaImpl((sql: string, ...params: unknown[]) => {
+            if (sql.includes('FROM "User"')) return users;
+            if (sql.includes('FROM "UserCarousel"')) {
+              return carousels.map((row) => ({
+                sort: "random",
+                direction: "DESC",
+                ...row,
+              }));
+            }
+            return (JSON.parse(String(params[0])) as string[]).map((id) => ({
+              id,
+              instanceId: "default",
+            }));
+          })
+        );
+      }
+
+      /** The writes, as table, the statement's bound values and its guard */
+      function writes() {
+        return mockPrisma.$executeRawUnsafe.mock.calls.map(
+          ([sql, ...params]: [string, ...unknown[]]) => ({
+            sql: sql.replace(/\s+/g, " "),
+            params,
+          })
+        );
+      }
+
+      async function migrate(userIds?: readonly number[]) {
+        const mod = await import("../../services/DataMigrationService.js");
+        return mod.migrateStoredFiltersToTrees(userIds);
+      }
+
+      beforeEach(() => {
+        mockPrisma.dataMigration.findMany.mockResolvedValue(
+          appliedAllBut("012_views_and_carousel_trees")
+        );
+        mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
+        mockPrisma.$executeRawUnsafe.mockResolvedValue(1);
+      });
+
+      it("012 turns the prod carousel into a tree and the prod presets into canonical views", async () => {
+        stored(
+          [{ userId: 11, presets: PROD_PRESETS, defaults: PROD_DEFAULTS }],
+          [{ id: "goddesses", userId: 11, rules: FLAT_RULES }]
+        );
+        const { logger } = await import("../../utils/logger.js");
+
+        const service = await importFresh();
+        await service.runPendingMigrations();
+
+        // One unit for the user: the presets and defaults, then the carousel
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+        const [userWrite, carouselWrite] = writes();
+        expect(userWrite?.sql).toBe(
+          'UPDATE "User" SET "filterPresets" = ?, "defaultFilterPresets" = ?, "updatedAt" = ? WHERE "id" = ? AND CAST("filterPresets" AS TEXT) IS ? AND CAST("defaultFilterPresets" AS TEXT) IS ?'
+        );
+        const [
+          presetsText,
+          defaultsText,
+          updatedAt,
+          id,
+          readPresets,
+          readDefaults,
+        ] = must(userWrite).params;
+        expect(JSON.parse(String(presetsText))).toEqual({
+          performer: [{ ...FAVE, filters: { gender: ["FEMALE"] } }],
+          tag: [HIERARCHY],
+          clip: [{ ...CLIP, filters: { sceneTagIds: ["280:default"] } }],
+          image: [
+            {
+              ...TO_REVIEW,
+              filters: {
+                studioIdsModifier: "EXCLUDES",
+                studioIds: ["772:default", "971:default"],
+                tagIds: ["466:default"],
+                tagIdsModifier: "EXCLUDES",
+              },
+            },
+          ],
+        });
+        // Both ids exist: the defaults are as they were
+        expect(defaultsText).toBe(PROD_DEFAULTS);
+        expect(updatedAt).toEqual(anyOf(Number));
+        expect([id, readPresets, readDefaults]).toEqual([
+          11,
+          PROD_PRESETS,
+          PROD_DEFAULTS,
+        ]);
+
+        expect(carouselWrite?.sql).toBe(
+          'UPDATE "UserCarousel" SET "rules" = ?, "sort" = ?, "direction" = ? WHERE "id" = ? AND CAST("rules" AS TEXT) IS ? AND "sort" = ? AND "direction" = ?'
+        );
+        expect(carouselWrite?.params).toEqual([
+          '{"match":"all","rules":[{"field":"tags","criterion":{"value":["284:default"],"modifier":"INCLUDES_ALL"}}]}',
+          "random",
+          "DESC",
+          "goddesses",
+          FLAT_RULES,
+          "random",
+          "DESC",
+        ]);
+
+        expect(logger.info).toHaveBeenCalledWith(
+          "[Migration 012] Moved saved Views and carousels to their canonical form",
+          {
+            users: 1,
+            presets: 3,
+            carousels: 1,
+            presetsExamined: 4,
+            carouselsLeftFlat: 0,
+            defaultsDropped: 0,
+            droppedKeys: {},
+            valuesListed: 1,
+            refsRewritten: 5,
+            refsLeftBare: 0,
+            skipped: 0,
+          }
+        );
+        // Key names and counts: no id, name or other value a user saved
+        const lines = vi
+          .mocked(logger.info)
+          .mock.calls.filter(([message]) => message.includes("Migration 012"));
+        const logged = JSON.stringify(lines);
+        for (const value of ["466", "284", "Fave Ladies", "To Review"]) {
+          expect(logged).not.toContain(value);
+        }
+        expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith(
+          { data: { name: "012_views_and_carousel_trees" } }
+        );
+      });
+
+      it("a default naming a deleted preset goes", async () => {
+        const defaults = JSON.stringify({
+          performer: FAVE.id,
+          scene_performer: "missing",
+          scene: "missing",
+        });
+        stored([
+          {
+            userId: 11,
+            presets: JSON.stringify({ performer: [FAVE] }),
+            defaults,
+          },
+        ]);
+
+        const summary = await migrate();
+
+        // `scene_performer` names a scene View; the user holds none
+        const [write] = writes();
+        expect(JSON.parse(String(must(write).params[1]))).toEqual({
+          performer: FAVE.id,
+        });
+        expect(summary).toEqual(
+          objectContaining({ users: 1, defaultsDropped: 2 })
+        );
+      });
+
+      it("a default of a scene tab is held by the scene Views", async () => {
+        const scene = {
+          id: "s1",
+          name: "A",
+          filters: {},
+          sort: "created_at",
+          direction: "DESC",
+        };
+        stored([
+          {
+            userId: 4,
+            presets: JSON.stringify({ scene: [scene] }),
+            defaults: JSON.stringify({ scene_tag: "s1", image_tag: "s1" }),
+          },
+        ]);
+
+        await migrate();
+
+        // `image_tag` names a View of the image list, which holds none
+        const [write] = writes();
+        expect(JSON.parse(String(must(write).params[1]))).toEqual({
+          scene_tag: "s1",
+        });
+      });
+
+      it("a user with presets and no defaults (NULL) is written", async () => {
+        stored([
+          {
+            userId: 1,
+            presets: JSON.stringify({ performer: [FAVE] }),
+            defaults: null,
+          },
+        ]);
+
+        const summary = await migrate();
+
+        const [write] = writes();
+        expect(must(write).sql).toContain(
+          'CAST("defaultFilterPresets" AS TEXT) IS ?'
+        );
+        // The column stays NULL, and the guard compares NULL with IS
+        expect(must(write).params[1]).toBeNull();
+        expect(must(write).params[5]).toBeNull();
+        expect(summary).toEqual(
+          objectContaining({ users: 1, presets: 1, skipped: 0 })
+        );
+      });
+
+      it("a user with defaults and no presets loses the dangling defaults", async () => {
+        stored([
+          {
+            userId: 12,
+            presets: null,
+            defaults: JSON.stringify({ performer: "gone", tag: "gone too" }),
+          },
+        ]);
+
+        const summary = await migrate();
+
+        const [write] = writes();
+        expect(must(write).params).toEqual([
+          null,
+          "{}",
+          anyOf(Number),
+          12,
+          null,
+          '{"performer":"gone","tag":"gone too"}',
+        ]);
+        expect(summary).toEqual(
+          objectContaining({ users: 1, presets: 0, defaultsDropped: 2 })
+        );
+        // The read covers a user with defaults alone
+        const read = mockPrisma.$queryRawUnsafe.mock.calls.find(([sql]) =>
+          sql.includes('FROM "User"')
+        );
+        expect(must(read)[0].replace(/\s+/g, " ")).toContain(
+          '"filterPresets" IS NOT NULL OR "defaultFilterPresets" IS NOT NULL'
+        );
+      });
+
+      it("a scene preset sorted by recommended keeps its sort", async () => {
+        const recommended = {
+          id: "r1",
+          name: "Best",
+          filters: { tagIds: ["284"] },
+          sort: "recommended",
+          direction: "DESC",
+        };
+        stored([
+          {
+            userId: 4,
+            presets: JSON.stringify({ scene: [recommended] }),
+            defaults: JSON.stringify({ scene_recommended: "r1" }),
+          },
+        ]);
+
+        await migrate();
+
+        const [write] = writes();
+        const saved = JSON.parse(String(must(write).params[0])) as {
+          scene: { sort: string; direction: string }[];
+        };
+        expect(must(saved.scene[0]).sort).toBe("recommended");
+        expect(must(saved.scene[0]).direction).toBe("DESC");
+        // Its default stays: the View exists
+        expect(must(write).params[1]).toBe('{"scene_recommended":"r1"}');
+      });
+
+      it("leaves a flat carousel that names ids or an instance flat, with its ids", async () => {
+        const withIds = `{"ids":["5:default"],"tags":{"value":["284:default"],"modifier":"INCLUDES"}}`;
+        const withInstance = `{"instance_id":"default","tags":{"value":["284"],"modifier":"INCLUDES"}}`;
+        stored(
+          [],
+          [
+            { id: "c1", userId: 3, rules: withIds },
+            { id: "c2", userId: 3, rules: withInstance },
+            { id: "c3", userId: 3, rules: FLAT_RULES },
+          ]
+        );
+
+        const summary = await migrate();
+
+        // Only the one without ids or instance is converted
+        expect(writes().map(({ params }) => params[3])).toEqual(["c3"]);
+        expect(summary).toEqual(
+          objectContaining({ carousels: 1, carouselsLeftFlat: 2 })
+        );
+      });
+
+      it("a value saved since it was read is left", async () => {
+        stored(
+          [{ userId: 11, presets: PROD_PRESETS, defaults: PROD_DEFAULTS }],
+          [{ id: "goddesses", userId: 11, rules: FLAT_RULES }]
+        );
+        mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+        const { logger } = await import("../../utils/logger.js");
+
+        const summary = await migrate();
+
+        expect(summary).toEqual(
+          objectContaining({ users: 0, presets: 0, carousels: 0, skipped: 2 })
+        );
+        expect(logger.info).toHaveBeenCalledWith(
+          "[Migration 012] Left saved Views changed since they were read",
+          { userId: 11 }
+        );
+        expect(logger.info).toHaveBeenCalledWith(
+          "[Migration 012] Left a carousel changed since it was read",
+          { userId: 11, carouselId: "goddesses" }
+        );
+      });
+
+      it("leaves stored JSON it cannot read as it is", async () => {
+        stored(
+          [{ userId: 3, presets: "{not json", defaults: '{"performer":"x"}' }],
+          [{ id: "c1", userId: 3, rules: "[oops" }]
+        );
+
+        const summary = await migrate();
+
+        // Nothing can be said of the defaults without the Views
+        expect(writes()).toEqual([]);
+        expect(summary).toEqual(
+          objectContaining({ users: 0, defaultsDropped: 0, skipped: 2 })
+        );
+      });
+
+      it("a second run writes nothing", async () => {
+        stored(
+          [{ userId: 11, presets: PROD_PRESETS, defaults: PROD_DEFAULTS }],
+          [{ id: "goddesses", userId: 11, rules: FLAT_RULES }]
+        );
+        await migrate();
+        const [userWrite, carouselWrite] = writes();
+        // What the first run wrote is what the second reads
+        stored(
+          [
+            {
+              userId: 11,
+              presets: String(must(userWrite).params[0]),
+              defaults: String(must(userWrite).params[1]),
+            },
+          ],
+          [
+            {
+              id: "goddesses",
+              userId: 11,
+              rules: String(must(carouselWrite).params[0]),
+            },
+          ]
+        );
+        mockPrisma.$executeRawUnsafe.mockClear();
+
+        const summary = await migrate();
+
+        expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+        expect(summary).toEqual(
+          objectContaining({ users: 0, presets: 0, carousels: 0, skipped: 0 })
+        );
+      });
+
+      it("a tree carousel is left as it is", async () => {
+        stored([], [{ id: "t1", userId: 3, rules: TREE_RULES }]);
+
+        const summary = await migrate();
+
+        expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+        expect(summary).toEqual(objectContaining({ carousels: 0 }));
+      });
+
+      it("migration 009 reads the users as it did", async () => {
+        mockPrisma.dataMigration.findMany.mockResolvedValue(
+          appliedAllBut("009_clean_stored_filters")
+        );
+        stored([]);
+
+        const service = await importFresh();
+        await service.runPendingMigrations();
+
+        const read = mockPrisma.$queryRawUnsafe.mock.calls.find(([sql]) =>
+          sql.includes('FROM "User"')
+        );
+        expect(must(read)[0]).not.toContain("defaultFilterPresets");
       });
     });
 
