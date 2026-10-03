@@ -52,6 +52,16 @@ export interface ScenePlayerReducerState {
   oCounter: number;
 }
 
+/**
+ * SET_SCENE_FAVORITE's payload: the viewer's favourite on one scene, which
+ * changes the loaded scene only when it is that scene on that instance
+ */
+export interface SceneFavoritePayload {
+  sceneId: string;
+  instanceId: string;
+  favorite: boolean;
+}
+
 interface ScenePlayerAction {
   type: string;
   payload?: unknown;
@@ -504,6 +514,18 @@ export function scenePlayerReducer(
         ...state,
         oCounter: action.payload as number,
       };
+
+    // The viewer's favourite, saved through useUpdateFavorite: the heart,
+    // its hotkey and the headset HUD all read scene.favorite
+    case "SET_SCENE_FAVORITE": {
+      const { sceneId, instanceId, favorite } =
+        action.payload as SceneFavoritePayload;
+      const scene = state.scene;
+      if (scene?.id !== sceneId || scene.instanceId !== instanceId) {
+        return state;
+      }
+      return { ...state, scene: { ...scene, favorite } };
+    }
 
     // Playlist controls: only the control fields change, never the queue,
     // so a toggle never loads the scene again

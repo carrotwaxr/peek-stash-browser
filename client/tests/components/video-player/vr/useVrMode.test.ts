@@ -10,15 +10,22 @@ import {
   type VrProjection,
 } from "@peek/shared-types";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { createAuthValue, must } from "@tests/testUtils";
 import videojs from "video.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VrMenuButton } from "@/components/video-player/vr/VrControls";
 import { loadVr, prefetchVr } from "@/components/video-player/vr/loadVr";
 import { useVrMode } from "@/components/video-player/vr/useVrMode";
+import type { VrHud } from "@/components/video-player/vr/vrPlugin";
 import * as vrUi from "@/components/video-player/vr/vrUi";
 import { AuthContext } from "@/contexts/AuthContextProvider";
 import { TVModeContext } from "@/contexts/TVModeContext";
+import {
+  type ScenePlayerReducerState,
+  initialState,
+  scenePlayerReducer,
+} from "@/contexts/scenePlayerReducer";
 
 vi.mock("@/components/video-player/vr/loadVr", () => ({
   loadVr: vi.fn(() => Promise.resolve()),
@@ -31,6 +38,21 @@ vi.mock("@/components/video-player/vr/vrUi", async (importOriginal) => {
   return { ...real, attachVrMode: vi.fn(real.attachVrMode) };
 });
 
+// The favourite write (useUpdateFavorite), answered by each test
+const saveFavorite = vi.hoisted(() =>
+  vi.fn(
+    (_vars: {
+      entityType: string;
+      entityId: string;
+      favorite: boolean;
+      instanceId: string;
+    }) => Promise.resolve({})
+  )
+);
+vi.mock("@/api/hooks/useFavoriteMutation", () => ({
+  useUpdateFavorite: () => ({ mutateAsync: saveFavorite }),
+}));
+
 const USER_ID = 7;
 
 interface FakeVr {
@@ -38,11 +60,20 @@ interface FakeVr {
   enable: ReturnType<typeof vi.fn>;
   setProjection: ReturnType<typeof vi.fn>;
   disable: ReturnType<typeof vi.fn>;
+  setHud: ReturnType<typeof vi.fn>;
+  setFavorite: ReturnType<typeof vi.fn>;
+  /** The handlers the HUD's buttons call, as given to `setHud` */
+  hud: VrHud | null;
 }
 
 function fakeVr(): FakeVr {
   const vr: FakeVr = {
     enabled: false,
+    hud: null,
+    setHud: vi.fn((hud: VrHud) => {
+      vr.hud = hud;
+    }),
+    setFavorite: vi.fn(),
     enable: vi.fn(() => {
       vr.enabled = true;
     }),
@@ -73,12 +104,18 @@ function makePlayer() {
   return Object.assign(player, { vr });
 }
 
-interface SceneProps {
-  scene: {
-    id: string;
-    instanceId: string;
-    vr?: SceneVr | null;
-  } | null;
+interface TestScene {
+  id: string;
+  instanceId: string;
+  favorite?: boolean;
+  vr?: SceneVr | null;
+}
+
+interface HookProps {
+  scene: TestScene | null;
+  nextScene: () => void;
+  prevScene: () => void;
+  queueLength: number;
 }
 
 const vrScene = (projection: VrProjection = "180_LR", id = "123") => ({
@@ -121,19 +158,59 @@ const settle = () =>
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
-async function setup(scene: SceneProps["scene"], { strict = false } = {}) {
+/**
+ * Renders the hook on a fresh player. `reducer`: actions go through the
+ * Scene page's reducer and its scene comes back as the next render's, as on
+ * the page; otherwise `dispatch` only records them.
+ */
+async function setup(
+  scene: TestScene | null,
+  {
+    strict = false,
+    queueLength = 3,
+    reducer = false,
+  }: { strict?: boolean; queueLength?: number; reducer?: boolean } = {}
+) {
   const player = makePlayer();
   players.push(player);
   const playerRef = { current: player };
+  let props: HookProps = {
+    scene,
+    nextScene: vi.fn(),
+    prevScene: vi.fn(),
+    queueLength,
+  };
+  let state = untrusted<ScenePlayerReducerState>({ ...initialState, scene });
+  const dispatch = vi.fn((action: { type: string; payload?: unknown }) => {
+    if (!reducer) return;
+    state = scenePlayerReducer(state, action);
+    rerender({ scene: untrusted<TestScene | null>(state.scene) });
+  });
   const rendered = renderHook(
-    ({ scene: current }: SceneProps) =>
+    (current: HookProps) =>
       useVrMode({
         playerRef,
-        scene: current,
-        sceneKey: current ? `${current.id}:${current.instanceId}` : undefined,
+        scene: current.scene,
+        sceneKey: current.scene
+          ? `${current.scene.id}:${current.scene.instanceId}`
+          : undefined,
+        nextScene: current.nextScene,
+        prevScene: current.prevScene,
+        queueLength: current.queueLength,
+        dispatch,
       }),
-    { initialProps: { scene }, wrapper: wrapperOf(strict) }
+    { initialProps: props, wrapper: wrapperOf(strict) }
   );
+  function rerender(next: Partial<HookProps>) {
+    props = { ...props, ...next };
+    if (next.scene !== undefined) {
+      state = untrusted<ScenePlayerReducerState>({
+        ...state,
+        scene: next.scene,
+      });
+    }
+    rendered.rerender(props);
+  }
   // The button comes with the vr-ui chunk, a moment after the render
   if (scene?.vr && !tvMode) {
     await waitFor(() => {
@@ -141,7 +218,13 @@ async function setup(scene: SceneProps["scene"], { strict = false } = {}) {
     });
   }
   await settle();
-  return { player, playerRef, ...rendered };
+  return {
+    player,
+    playerRef,
+    dispatch,
+    rerender,
+    props: () => props,
+  };
 }
 
 const buttons = (player: Player) =>
@@ -419,5 +502,137 @@ describe("useVrMode: the projection menu", () => {
     expect(player.vr.enable).not.toHaveBeenCalled();
     await click(toggleOf(player));
     expect(player.vr.enable).toHaveBeenCalledWith("360_LR");
+  });
+});
+
+describe("useVrMode: the headset HUD", () => {
+  /** Presses one of the HUD's buttons, as the fork calls its callbacks */
+  const press = (player: Player, button: keyof VrHud) =>
+    act(async () => {
+      must(player.vr.hud, "the HUD's handlers")[button]();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+  it("next and previous step the queue when it has more than one scene", async () => {
+    const { player, props } = await setup(vrScene(), { queueLength: 2 });
+    await click(toggleOf(player));
+
+    await press(player, "onNext");
+    await press(player, "onPrevious");
+
+    expect(props().nextScene).toHaveBeenCalledTimes(1);
+    expect(props().prevScene).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([1, 0])(
+    "next and previous do nothing with %i scenes in the queue",
+    async (queueLength) => {
+      const { player, props } = await setup(vrScene(), { queueLength });
+      await click(toggleOf(player));
+
+      await press(player, "onNext");
+      await press(player, "onPrevious");
+
+      expect(props().nextScene).not.toHaveBeenCalled();
+      expect(props().prevScene).not.toHaveBeenCalled();
+    }
+  );
+
+  it("after a re-render with new handlers, the HUD's next calls the new one", async () => {
+    const { player, props, rerender } = await setup(vrScene());
+    await click(toggleOf(player));
+    const first = props().nextScene;
+    const latest = vi.fn();
+
+    rerender({ nextScene: latest });
+    await press(player, "onNext");
+
+    expect(latest).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+  });
+
+  it("favourite saves the user's favourite with the scene's instance", async () => {
+    const { player, dispatch } = await setup({
+      ...vrScene(),
+      favorite: false,
+    });
+    await click(toggleOf(player));
+
+    await press(player, "onFavorite");
+
+    expect(saveFavorite).toHaveBeenCalledWith({
+      entityType: "scene",
+      entityId: "123",
+      favorite: true,
+      instanceId: "inst-a",
+    });
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "SET_SCENE_FAVORITE",
+      payload: { sceneId: "123", instanceId: "inst-a", favorite: true },
+    });
+  });
+
+  it("the HUD shows the scene's favourite and follows it", async () => {
+    const { player, rerender } = await setup({
+      ...vrScene(),
+      favorite: true,
+    });
+    await click(toggleOf(player));
+    expect(player.vr.setFavorite).toHaveBeenLastCalledWith(true);
+
+    rerender({ scene: { ...vrScene(), favorite: false } });
+    expect(player.vr.setFavorite).toHaveBeenLastCalledWith(false);
+  });
+
+  it("a second HUD toggle unfavourites", async () => {
+    const { player } = await setup(
+      { ...vrScene(), favorite: false },
+      { reducer: true }
+    );
+    await click(toggleOf(player));
+
+    await press(player, "onFavorite");
+    expect(player.vr.setFavorite).toHaveBeenLastCalledWith(true);
+    await press(player, "onFavorite");
+
+    expect(saveFavorite.mock.calls.map(([vars]) => vars.favorite)).toEqual([
+      true,
+      false,
+    ]);
+    expect(player.vr.setFavorite).toHaveBeenLastCalledWith(false);
+  });
+
+  it("a failed write reverts the scene's favourite and the HUD", async () => {
+    saveFavorite.mockRejectedValueOnce(new Error("offline"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { player, dispatch } = await setup(
+      { ...vrScene(), favorite: false },
+      { reducer: true }
+    );
+    await click(toggleOf(player));
+
+    await press(player, "onFavorite");
+
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: "SET_SCENE_FAVORITE",
+      payload: { sceneId: "123", instanceId: "inst-a", favorite: false },
+    });
+    expect(player.vr.setFavorite).toHaveBeenLastCalledWith(false);
+    logged.mockRestore();
+  });
+
+  it("a scene change inside VR keeps the session, and the HUD shows the new scene", async () => {
+    const { player, rerender } = await setup({
+      ...vrScene("180_LR", "123"),
+      favorite: false,
+    });
+    await click(toggleOf(player));
+
+    rerender({ scene: { ...vrScene("360", "125"), favorite: true } });
+
+    expect(player.vr.disable).not.toHaveBeenCalled();
+    expect(player.vr.enable).toHaveBeenCalledTimes(1);
+    expect(player.vr.setProjection).toHaveBeenLastCalledWith("360");
+    expect(player.vr.setFavorite).toHaveBeenLastCalledWith(true);
   });
 });

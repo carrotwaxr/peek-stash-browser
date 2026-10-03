@@ -243,13 +243,24 @@ describe("useVideoPlayer", () => {
 
   it("hands the player, the scene and its composite key to useVrMode", () => {
     const player = fakePlayer();
-    renderPlayer(player, onA);
+    const { dispatch } = renderPlayer(player, onA);
 
-    expect(vi.mocked(useVrMode)).toHaveBeenLastCalledWith({
-      playerRef: { current: player },
-      scene: onA,
-      sceneKey: "123:inst-a",
-    });
+    const [args] = must(vi.mocked(useVrMode).mock.lastCall, "useVrMode's call");
+    expect(args.playerRef).toEqual({ current: player });
+    expect(args.scene).toBe(onA);
+    expect(args.sceneKey).toBe("123:inst-a");
+    // The headset HUD's queue steps and favourite write
+    expect(args.nextScene).toBeTypeOf("function");
+    expect(args.prevScene).toBeTypeOf("function");
+    expect(args.queueLength).toBe(0);
+    expect(args.dispatch).toBe(dispatch);
+  });
+
+  it("tells useVrMode how many scenes the queue holds", () => {
+    renderPlayer(fakePlayer(), onA, null, { playlist: rowQueue() });
+
+    const [args] = must(vi.mocked(useVrMode).mock.lastCall, "useVrMode's call");
+    expect(args.queueLength).toBe(3);
   });
 
   it("save-activity and increment-play-count carry the scene's instance", async () => {

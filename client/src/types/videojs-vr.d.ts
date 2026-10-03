@@ -41,9 +41,13 @@ declare module "@blaineam/videojs-vr" {
     enableVRHUD?: boolean;
     /** The in-headset media gallery (on by default; Peek turns it off). */
     enableVRGallery?: boolean;
+    /**
+     * The HUD's buttons. The fork reads these once, when `player.vr()`
+     * creates it; `onFavorite` also makes the HUD draw its favourite button.
+     */
     onNext?: (() => void) | null;
     onPrevious?: (() => void) | null;
-    onFavorite?: ((isFavorited: boolean) => void) | null;
+    onFavorite?: (() => void) | null;
   }
 
   /** The plugin instance `player.vr(options)` creates. */
@@ -64,6 +68,7 @@ declare module "@blaineam/videojs-vr" {
     /** Ends the plugin: `reset()`, and `player.vr` creates a new one again. */
     dispose(): void;
     isPresenting(): boolean;
+    /** The HUD's favourite button; lost when `init()` builds a new HUD. */
     setFavoriteState(isFavorited: boolean): void;
     /** Plugin events: `initialized`, `vr-next`, `vr-previous`, `vr-favorite`. */
     on(type: string, listener: () => void): void;

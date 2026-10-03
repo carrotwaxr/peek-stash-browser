@@ -12,6 +12,7 @@ import type {
   VrTexture,
 } from "@blaineam/videojs-vr";
 import { untrusted } from "@tests/helpers/untrusted";
+import { must } from "@tests/testUtils";
 import videojs from "video.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -115,10 +116,9 @@ describe("peekVr", () => {
     vr.enable("360_TB");
 
     expect(player.vr).toHaveBeenCalledTimes(1);
-    expect(player.vr).toHaveBeenCalledWith({
-      projection: "180_LR",
-      enableVRGallery: false,
-    });
+    const [options] = must(player.vr.mock.calls[0], "player.vr's call");
+    expect(options.projection).toBe("180_LR");
+    expect(options.enableVRGallery).toBe(false);
     expect(player.fork.setProjection).toHaveBeenCalledWith("360_TB");
     expect(vr.enabled).toBe(true);
   });
@@ -270,10 +270,9 @@ describe("peekVr", () => {
     vr.enable("360_TB");
 
     expect(player.vr).toHaveBeenCalledTimes(2);
-    expect(player.vr).toHaveBeenLastCalledWith({
-      projection: "360_TB",
-      enableVRGallery: false,
-    });
+    const [options] = must(player.vr.mock.lastCall, "player.vr's last call");
+    expect(options.projection).toBe("360_TB");
+    expect(options.enableVRGallery).toBe(false);
   });
 
   it("disable when VR is off does nothing", () => {
@@ -283,6 +282,85 @@ describe("peekVr", () => {
     expect(() => {
       vr.disable();
     }).not.toThrow();
+    expect(player.vr).not.toHaveBeenCalled();
+  });
+});
+
+describe("peekVr: the headset HUD", () => {
+  const optionsOf = (player: FakePlayer): VrOptions =>
+    must(player.vr.mock.calls[0], "player.vr's call")[0];
+
+  const hud = () => ({
+    onNext: vi.fn(),
+    onPrevious: vi.fn(),
+    onFavorite: vi.fn(),
+  });
+
+  it("gives the fork next, previous and favourite callbacks", () => {
+    const player = new FakePlayer();
+    createVrController(player).enable("180_LR");
+
+    const options = optionsOf(player);
+    expect(options.onNext).toBeTypeOf("function");
+    expect(options.onPrevious).toBeTypeOf("function");
+    // With onFavorite the fork draws the HUD's favourite button
+    expect(options.onFavorite).toBeTypeOf("function");
+    // Pressed before any handler is set: nothing happens
+    expect(() => options.onNext?.()).not.toThrow();
+  });
+
+  it("the HUD's buttons call the handlers set last, not those at creation", () => {
+    const player = new FakePlayer();
+    const vr = createVrController(player);
+    const first = hud();
+    const latest = hud();
+    vr.setHud(first);
+    vr.enable("180_LR");
+    vr.setHud(latest);
+
+    const options = optionsOf(player);
+    options.onNext?.();
+    options.onPrevious?.();
+    options.onFavorite?.();
+
+    expect(latest.onNext).toHaveBeenCalledTimes(1);
+    expect(latest.onPrevious).toHaveBeenCalledTimes(1);
+    expect(latest.onFavorite).toHaveBeenCalledTimes(1);
+    expect(first.onNext).not.toHaveBeenCalled();
+    expect(first.onPrevious).not.toHaveBeenCalled();
+    expect(first.onFavorite).not.toHaveBeenCalled();
+  });
+
+  it("shows the favourite set before enable once the fork has built its HUD", () => {
+    const player = new FakePlayer();
+    player.state = 1;
+    const vr = createVrController(player);
+    vr.setFavorite(true);
+    vr.enable("180_LR");
+
+    expect(player.fork.setFavoriteState).toHaveBeenLastCalledWith(true);
+  });
+
+  it("follows each change, and shows it again on a rebuilt HUD", () => {
+    const player = new FakePlayer();
+    player.state = 1;
+    const vr = createVrController(player);
+    vr.enable("180_LR");
+
+    vr.setFavorite(true);
+    expect(player.fork.setFavoriteState).toHaveBeenLastCalledWith(true);
+    vr.setFavorite(false);
+    expect(player.fork.setFavoriteState).toHaveBeenLastCalledWith(false);
+
+    // The next source's loadedmetadata: the fork builds a new HUD
+    player.fork.setFavoriteState.mockClear();
+    player.fork.init();
+    expect(player.fork.setFavoriteState).toHaveBeenCalledWith(false);
+  });
+
+  it("a favourite set while off creates no fork", () => {
+    const player = new FakePlayer();
+    createVrController(player).setFavorite(true);
     expect(player.vr).not.toHaveBeenCalled();
   });
 });

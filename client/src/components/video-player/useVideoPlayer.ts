@@ -268,11 +268,17 @@ export function useVideoPlayer({
   }, []);
 
   // The VR button and projection menu (after the player exists: its effects
-  // run once the effect above has made it)
+  // run once the effect above has made it), and the headset HUD's queue
+  // steps and favourite
   useVrMode({
     playerRef,
     scene: scene as VrModeScene | null | undefined,
     sceneKey,
+    nextScene,
+    prevScene,
+    queueLength:
+      (playlist as { scenes?: unknown[] } | null)?.scenes?.length ?? 0,
+    dispatch,
   });
 
   // ============================================================================

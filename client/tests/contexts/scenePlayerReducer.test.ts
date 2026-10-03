@@ -657,6 +657,63 @@ describe("scenePlayerReducer", () => {
   });
 
   // -------------------------------------------------------------------------
+  // The viewer's favourite on the playing scene
+  // -------------------------------------------------------------------------
+  describe("SET_SCENE_FAVORITE", () => {
+    const playing = untrusted<WithStashUrl<NormalizedScene>>({
+      id: "7",
+      instanceId: "inst-b",
+      title: "A scene",
+      favorite: false,
+      rating: 80,
+      files: [],
+    });
+    const withScene: ScenePlayerReducerState = {
+      ...initialState,
+      scene: playing,
+      oCounter: 3,
+      currentIndex: 2,
+    };
+
+    it("patches only scene.favorite", () => {
+      const result = scenePlayerReducer(withScene, {
+        type: "SET_SCENE_FAVORITE",
+        payload: { sceneId: "7", instanceId: "inst-b", favorite: true },
+      });
+
+      expect(result.scene).toEqual({ ...playing, favorite: true });
+      expect({ ...result, scene: null }).toEqual({
+        ...withScene,
+        scene: null,
+      });
+      // The scene the page holds is left as it was
+      expect(playing.favorite).toBe(false);
+    });
+
+    it.each([
+      ["another scene", { sceneId: "8", instanceId: "inst-b" }],
+      [
+        "the same id on another instance",
+        { sceneId: "7", instanceId: "inst-a" },
+      ],
+    ])("changes nothing for %s", (_name, ref) => {
+      const result = scenePlayerReducer(withScene, {
+        type: "SET_SCENE_FAVORITE",
+        payload: { ...ref, favorite: true },
+      });
+      expect(result).toBe(withScene);
+    });
+
+    it("changes nothing with no scene loaded", () => {
+      const result = scenePlayerReducer(initialState, {
+        type: "SET_SCENE_FAVORITE",
+        payload: { sceneId: "7", instanceId: "inst-b", favorite: true },
+      });
+      expect(result).toBe(initialState);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Playlist controls
   // -------------------------------------------------------------------------
   describe("Playlist controls", () => {

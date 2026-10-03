@@ -10,6 +10,10 @@
  * The fork, three.js and `peekVr` are the separate, large `vr` chunk,
  * reached only through `loadVr()`: where the browser can enter a headset
  * (`isSessionSupported`) it is fetched ahead, elsewhere at the first VR click.
+ *
+ * In a headset the fork's HUD steps the queue and toggles the viewer's
+ * favourite through the handlers `useVrMode` gives here, and shows the
+ * favourite it is told.
  */
 import { VR_PROJECTIONS, type VrProjection } from "@peek/shared-types";
 import {
@@ -19,7 +23,7 @@ import {
 } from "../controlBarOrder";
 import { VR_BUTTON_NAME, VrMenuButton } from "./VrControls";
 import { loadVr, prefetchVr } from "./loadVr";
-import type { PeekVr } from "./vrPlugin";
+import type { PeekVr, VrHud } from "./vrPlugin";
 
 /** The part of the player VR mode uses (video.js types it `any`). */
 export interface VrModePlayer {
@@ -42,6 +46,8 @@ export interface VrModeInputs {
 export interface VrMode {
   /** Another scene, or another user key: its projection, kept in VR. */
   update(inputs: VrModeInputs): void;
+  /** The viewer's favourite on the scene, for the HUD to show. */
+  setFavorite(favorite: boolean): void;
   /** Turns VR off and removes the button (nothing to do on a disposed player). */
   detach(): void;
 }
@@ -84,12 +90,18 @@ function prefetchWhereHeadsetsRun(run: { cancelled: boolean }) {
   })();
 }
 
-/** Puts the VR button on `player` and runs VR mode until `detach()`. */
+/**
+ * Puts the VR button on `player` and runs VR mode until `detach()`. `hud` is
+ * what the headset HUD's buttons do; its functions are called afresh on each
+ * press, so they can reach the page's latest handlers.
+ */
 export function attachVrMode(
   player: VrModePlayer,
-  initial: VrModeInputs
+  initial: VrModeInputs,
+  hud: VrHud
 ): VrMode {
   let inputs = initial;
+  let favorite = false;
   let alive = true;
   let loading = false;
   const run = { cancelled: false };
@@ -117,7 +129,11 @@ export function attachVrMode(
     try {
       await loadVr();
       if (!alive || player.isDisposed()) return;
-      player.peekVr?.().enable(view.projection);
+      const vr = player.peekVr?.();
+      if (!vr) return;
+      vr.setHud(hud);
+      vr.setFavorite(favorite);
+      vr.enable(view.projection);
       view.enabled = true;
     } catch (error) {
       // Stays flat; the next click tries again
@@ -158,6 +174,10 @@ export function attachVrMode(
       view.projection = readChoice(next.storageKey) ?? next.detected;
       if (view.enabled) player.peekVr?.().setProjection(view.projection);
       refresh();
+    },
+    setFavorite(next) {
+      favorite = next;
+      if (view.enabled) player.peekVr?.().setFavorite(next);
     },
     detach() {
       alive = false;

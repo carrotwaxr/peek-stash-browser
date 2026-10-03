@@ -1,7 +1,9 @@
 /**
  * `peekVr`: Peek's thin layer over `@blaineam/videojs-vr` (the fork, which
  * bundles three.js). It turns the fork on with a projection, changes the
- * projection, turns it off again, and tags the fork's textures sRGB.
+ * projection, turns it off again, and tags the fork's textures sRGB. The
+ * headset HUD's next, previous and favourite buttons call Peek's handlers,
+ * and its favourite shows the viewer's own.
  *
  * This module is the fork's only importer, and only `loadVr.ts` imports this
  * module (lint), through `import()`: it and the fork make the lazy `vr` chunk.
@@ -22,6 +24,13 @@ export interface VrPlayer {
   off(type: string, listener: () => void): void;
 }
 
+/** What the headset HUD's buttons do. */
+export interface VrHud {
+  onNext(): void;
+  onPrevious(): void;
+  onFavorite(): void;
+}
+
 export interface PeekVr {
   /**
    * Shows the player in 3D with `projection`; when already on, only changes
@@ -32,6 +41,10 @@ export interface PeekVr {
   setProjection(projection: VrProjection): void;
   /** Disposes the fork: the canvas goes and the flat video shows again. */
   disable(): void;
+  /** What the HUD's next, previous and favourite do; the last given wins. */
+  setHud(hud: VrHud): void;
+  /** The favourite the HUD shows, kept across the HUDs the fork rebuilds. */
+  setFavorite(favorite: boolean): void;
   readonly enabled: boolean;
 }
 
@@ -79,6 +92,14 @@ function tagPosterOnAssignment(fork: VrPlugin) {
 
 export function createVrController(player: VrPlayer): PeekVr {
   let fork: VrPlugin | null = null;
+  let hud: VrHud | null = null;
+  let favorite = false;
+
+  // The fork builds a new HUD on each `init()` (a new source), with the
+  // favourite button unset
+  const showFavorite = () => {
+    fork?.setFavoriteState(favorite);
+  };
 
   // `init()` makes a new video texture. Inside a headset session it returns
   // before `initialized`, so the fork's own loadedmetadata handler (which runs
@@ -102,9 +123,18 @@ export function createVrController(player: VrPlayer): PeekVr {
         return;
       }
       silencePolyfill();
-      fork = player.vr({ projection, enableVRGallery: false });
+      // The fork keeps these callbacks for its life: they call whatever
+      // `setHud` gave last
+      fork = player.vr({
+        projection,
+        enableVRGallery: false,
+        onNext: () => hud?.onNext(),
+        onPrevious: () => hud?.onPrevious(),
+        onFavorite: () => hud?.onFavorite(),
+      });
       tagPosterOnAssignment(fork);
       fork.on("initialized", fixVideoTexture);
+      fork.on("initialized", showFavorite);
       player.on("loadedmetadata", fixVideoTexture);
       // The fork starts on `loadedmetadata`. Peek's players preload nothing,
       // and a click during playback comes after it: start now when the
@@ -121,6 +151,13 @@ export function createVrController(player: VrPlayer): PeekVr {
       // the headset session go, the video shows again, and `player.vr` makes a
       // fresh instance next time
       ending.dispose();
+    },
+    setHud(next) {
+      hud = next;
+    },
+    setFavorite(next) {
+      favorite = next;
+      showFavorite();
     },
     get enabled() {
       return fork !== null;

@@ -509,7 +509,7 @@
       "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/video-player/VideoPlayer.tsx": {

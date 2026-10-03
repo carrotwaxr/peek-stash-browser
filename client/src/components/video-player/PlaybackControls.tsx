@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiPost } from "../../api";
-import {
-  useDecrementOCounter,
-  useUpdateFavorite,
-  useUpdateRating,
-} from "../../api/hooks";
+import { useDecrementOCounter, useUpdateRating } from "../../api/hooks";
 import { useInvalidateDownloads } from "../../api/hooks/useDownloads";
 import { useMyPermissions } from "../../api/hooks/useMyPermissions";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
@@ -20,6 +16,7 @@ import {
   OCounterButton,
   RatingSlider,
 } from "../ui/index";
+import { useSceneFavorite } from "./useSceneFavorite";
 
 interface RemoveLastOMenuProps {
   scene: { id: string; instanceId: string; title?: string | null };
@@ -74,11 +71,15 @@ const PlaybackControls = () => {
   const { getSettings } = useCardDisplaySettings();
   const sceneSettings = getSettings("scene") as Record<string, boolean>;
 
-  // Rating and favorite state
+  // Rating state; the favourite is the player state's scene.favorite, which
+  // the headset HUD changes too
   const [rating, setRating] = useState<number | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
   const { mutateAsync: saveRating } = useUpdateRating();
-  const { mutateAsync: saveFavorite } = useUpdateFavorite();
+  const {
+    favorite: isFavorite,
+    setFavorite,
+    toggleFavorite,
+  } = useSceneFavorite(scene, dispatch);
 
   // Download state
   const [downloading, setDownloading] = useState(false);
@@ -88,13 +89,11 @@ const PlaybackControls = () => {
   // Sync state when scene changes
   const sceneId = scene?.id;
   const sceneRating = scene?.rating;
-  const sceneFavorite = scene?.favorite;
   useEffect(() => {
     if (sceneId != null) {
       setRating(sceneRating ?? null);
-      setIsFavorite(sceneFavorite || false);
     }
-  }, [sceneId, sceneRating, sceneFavorite]);
+  }, [sceneId, sceneRating]);
 
   // Handle rating change
   const handleRatingChange = async (newRating: number | null) => {
@@ -116,31 +115,11 @@ const PlaybackControls = () => {
     }
   };
 
-  // Handle favorite change
-  const handleFavoriteChange = async (newFavorite: boolean) => {
-    if (!scene?.id) return;
-
-    const previousFavorite = isFavorite;
-    setIsFavorite(newFavorite);
-
-    try {
-      await saveFavorite({
-        entityType: "scene",
-        entityId: scene.id,
-        favorite: newFavorite,
-        instanceId: scene.instanceId,
-      });
-    } catch (error) {
-      console.error("Failed to update scene favorite:", error);
-      setIsFavorite(previousFavorite);
-    }
-  };
-
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
   useRatingHotkeys({
     enabled: !sceneLoading && !!scene,
     setRating: (newRating) => void handleRatingChange(newRating),
-    toggleFavorite: () => void handleFavoriteChange(!isFavorite),
+    toggleFavorite: () => void toggleFavorite(),
   });
 
   // Handle scene download
@@ -230,9 +209,7 @@ const PlaybackControls = () => {
             {sceneSettings.showFavorite && (
               <FavoriteButton
                 isFavorite={isFavorite}
-                onChange={(newFavorite) =>
-                  void handleFavoriteChange(newFavorite)
-                }
+                onChange={(newFavorite) => void setFavorite(newFavorite)}
                 size="medium"
               />
             )}
@@ -295,9 +272,7 @@ const PlaybackControls = () => {
               {sceneSettings.showFavorite && (
                 <FavoriteButton
                   isFavorite={isFavorite}
-                  onChange={(newFavorite) =>
-                    void handleFavoriteChange(newFavorite)
-                  }
+                  onChange={(newFavorite) => void setFavorite(newFavorite)}
                   size="medium"
                 />
               )}
@@ -350,9 +325,7 @@ const PlaybackControls = () => {
             {sceneSettings.showFavorite && (
               <FavoriteButton
                 isFavorite={isFavorite}
-                onChange={(newFavorite) =>
-                  void handleFavoriteChange(newFavorite)
-                }
+                onChange={(newFavorite) => void setFavorite(newFavorite)}
                 size="medium"
               />
             )}
