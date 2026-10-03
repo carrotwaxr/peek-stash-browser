@@ -14,6 +14,7 @@ import prisma from "../../prisma/singleton.js";
 import type { DateCriterion, FilterRef } from "../../types/parsedFilters.js";
 import {
   type JunctionTarget,
+  NEGATIVE_INLINE_LIMIT,
   PAIR_INLINE_LIMIT,
   RESOLUTION_RANGES,
   type ViaSceneSpec,
@@ -730,7 +731,7 @@ describe("refClause", () => {
       );
     });
 
-    it("EXCLUDES keeps the matched set's NOT IN", () => {
+    it("EXCLUDES keeps its refs-set probe whatever the sort", () => {
       const refs = many(PAIR_INLINE_LIMIT + 1);
 
       expect(refClause(SCENE_TAGS, refs, "EXCLUDES", WALKED)).toEqual(
@@ -800,15 +801,14 @@ describe("refClause", () => {
       },
     ]);
 
+    // EXCLUDES probes the refs set from each row's junction rows, never a
+    // row-value NOT IN and no matched set
     const excludes = refClause(SCENE_TAGS, refs, "EXCLUDES", OPTS);
     expect(excludes.sql).toBe(
-      "(s.id || ':' || s.stashInstanceId) NOT IN (SELECT id || ':' || inst FROM tags_matched)"
+      "NOT EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND (+st.tagId, st.tagInstanceId) IN (SELECT id, inst FROM tags_refs))"
     );
     expect(excludes.joins).toBeUndefined();
-    // Without an inherited list the matched set is the junction's rows only
-    expect(excludes.ctes?.[1]?.sql).toBe(
-      "tags_matched(id, inst) AS MATERIALIZED (SELECT DISTINCT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst)"
-    );
+    expect(excludes.ctes?.map((c) => c.name)).toEqual(["tags_refs"]);
   });
 
   it("a large column target is matched through the parent table by the column", () => {
@@ -895,8 +895,110 @@ describe("refClause", () => {
         "(c.sceneId, c.sceneInstanceId) IN (SELECT id, inst FROM tags_matched)"
       );
       expect(refClause(TAGS, many(65), "EXCLUDES", opts).sql).toBe(
-        "(c.sceneId || ':' || c.sceneInstanceId) NOT IN (SELECT id || ':' || inst FROM tags_matched)"
+        "(NOT EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = c.sceneId AND st.sceneInstanceId = c.sceneInstanceId AND (+st.tagId, st.tagInstanceId) IN (SELECT id, inst FROM tags_refs)) AND NOT EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = c.sceneId AND sit.sceneInstanceId = c.sceneInstanceId AND (+sit.tagId, sit.tagInstanceId) IN (SELECT id, inst FROM tags_refs)))"
       );
+    });
+  });
+
+  describe("EXCLUDES over many refs probes a refs set per row (F11b)", () => {
+    const STUDIO = {
+      kind: "column" as const,
+      parentTable: "StashScene",
+      parentAlias: "s",
+      idCol: "studioId",
+      instanceCol: "stashInstanceId",
+    };
+    const PROBE_DIRECT =
+      "NOT EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND (+st.tagId, st.tagInstanceId) IN (SELECT id, inst FROM tags_refs))";
+    const PROBE_INHERITED =
+      "NOT EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = s.id AND sit.sceneInstanceId = s.stashInstanceId AND (+sit.tagId, sit.tagInstanceId) IN (SELECT id, inst FROM tags_refs))";
+
+    it("up to the negative inline limit the refs stay inline pairs", () => {
+      expect(NEGATIVE_INLINE_LIMIT).toBe(8);
+      const tags = refClause(
+        SCENE_TAGS,
+        many(NEGATIVE_INLINE_LIMIT),
+        "EXCLUDES",
+        OPTS
+      );
+      expect(tags.ctes).toBeUndefined();
+      expect(tags.sql).toMatch(/^NOT EXISTS \(SELECT 1 FROM SceneTag st WHERE/);
+
+      const studios = refClause(
+        STUDIO,
+        many(NEGATIVE_INLINE_LIMIT),
+        "EXCLUDES",
+        { ...OPTS, name: "studios" }
+      );
+      expect(studios.ctes).toBeUndefined();
+      expect(studios.sql).toMatch(/^\(s\.studioId IS NULL OR NOT \(/);
+    });
+
+    it("above it a junction's rows of each row are matched against the refs CTE, one NOT EXISTS per junction", () => {
+      const refs = many(NEGATIVE_INLINE_LIMIT + 1);
+      const clause = refClause(SCENE_TAGS, refs, "EXCLUDES", {
+        ...OPTS,
+        inheritedJunction: SCENE_INHERITED_TAGS,
+      });
+
+      expect(clause).toEqual({
+        sql: `(${PROBE_DIRECT} AND ${PROBE_INHERITED})`,
+        params: [],
+        ctes: [
+          {
+            name: "tags_refs",
+            sql: "tags_refs(id, inst) AS MATERIALIZED (SELECT DISTINCT json_extract(j.value, '$[0]'), json_extract(j.value, '$[1]') FROM json_each(?) j)",
+            params: [JSON.stringify(refs.map((r) => [r.id, r.instanceId]))],
+          },
+        ],
+      });
+      expect(refClause(SCENE_TAGS, refs, "EXCLUDES", OPTS).sql).toBe(
+        PROBE_DIRECT
+      );
+    });
+
+    it("above it a column's key is matched against the refs' keys, keeping rows with no value", () => {
+      const clause = refClause(
+        STUDIO,
+        many(NEGATIVE_INLINE_LIMIT + 1),
+        "EXCLUDES",
+        { ...OPTS, name: "studios" }
+      );
+
+      expect(clause.sql).toBe(
+        "(s.studioId IS NULL OR (s.studioId || ':' || s.stashInstanceId) NOT IN (SELECT id || ':' || inst FROM studios_refs))"
+      );
+      expect(clause.params).toEqual([]);
+      expect(clause.ctes?.map((c) => c.name)).toEqual(["studios_refs"]);
+    });
+
+    it("the same shape above PAIR_INLINE_LIMIT and under every sort: no matched set", () => {
+      const refs = many(PAIR_INLINE_LIMIT + 1);
+      for (const sortedByIndex of [undefined, true, false]) {
+        const clause = refClause(SCENE_TAGS, refs, "EXCLUDES", {
+          ...OPTS,
+          ...(sortedByIndex === undefined ? {} : { sortedByIndex }),
+        });
+        expect(clause.sql).toBe(PROBE_DIRECT);
+        expect(clause.ctes?.map((c) => c.name)).toEqual(["tags_refs"]);
+      }
+    });
+
+    it("a bare ref matches its id on every allowed instance, as the pairs do", () => {
+      const clause = refClause(
+        SCENE_TAGS,
+        [...many(NEGATIVE_INLINE_LIMIT), bare("bare")],
+        "EXCLUDES",
+        { ...OPTS, allowedInstanceIds: [A, B] }
+      );
+
+      const bound = JSON.parse(
+        String(clause.ctes?.[0]?.params[0])
+      ) as string[][];
+      expect(bound.filter(([id]) => id === "bare")).toEqual([
+        ["bare", A],
+        ["bare", B],
+      ]);
     });
   });
 
@@ -2347,5 +2449,60 @@ describe("stashIdsClause, run on SQLite", () => {
     expect(await matches({ modifier: "IS_NULL" }, ids(""))).toBe(true);
     expect(await matches({ modifier: "NOT_NULL" }, ids("a"))).toBe(true);
     expect(await matches({ modifier: "IS_NULL" }, ids("a"))).toBe(false);
+  });
+});
+
+describe("refClause EXCLUDES, run on SQLite: the refs-set probe lists what the pairs list", () => {
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  // Scenes 1 to 6 on A and 1 on B. Tags: scene 1 holds 3@A, scene 2
+  // inherits 5@A, scene 3 holds 3@B (another server's tag 3), scene 4
+  // holds 20@A (no ref), scene 5 holds the bare ref's id on A, scene 6
+  // none; 1@B holds the bare ref's id on B. Studios: 1 has 2@A, 2 has
+  // 2@B, 3 none, 4 the bare ref's id on A, 5 has 30@A.
+  const DATA = `SceneTag(sceneId, sceneInstanceId, tagId, tagInstanceId) AS (VALUES ('1', '${A}', '3', '${A}'), ('3', '${A}', '3', '${B}'), ('4', '${A}', '20', '${A}'), ('5', '${A}', '99', '${A}'), ('1', '${B}', '99', '${B}')),
+SceneInheritedTag(sceneId, sceneInstanceId, tagId, tagInstanceId) AS (VALUES ('2', '${A}', '5', '${A}')),
+sc(id, stashInstanceId, studioId) AS (VALUES ('1', '${A}', '2'), ('2', '${A}', '2'), ('3', '${A}', NULL), ('4', '${A}', '99'), ('5', '${A}', '30'), ('6', '${A}', NULL), ('1', '${B}', NULL))`;
+
+  async function listed(
+    target: JunctionTarget | Parameters<typeof refClause>[0],
+    inlineLimit: number
+  ): Promise<string[]> {
+    // Refs 1 to 9 on A (more than the negative limit) and the bare 99
+    const refs = [...many(9), bare("99")];
+    const clause = refClause(target, refs, "EXCLUDES", {
+      ...OPTS,
+      inheritedJunction: SCENE_INHERITED_TAGS,
+      inlineLimit,
+    });
+    const ctes = (clause.ctes ?? []).map((c) => c.sql);
+    const rows = await prisma.$queryRawUnsafe<Array<{ k: string }>>(
+      `WITH ${[...ctes, DATA].join(",\n")}
+SELECT s.id || ':' || s.stashInstanceId AS k FROM sc s WHERE ${clause.sql} ORDER BY k`,
+      ...(clause.ctes ?? []).flatMap((c) => c.params),
+      ...clause.params
+    );
+    return rows.map((r) => r.k);
+  }
+
+  it("a junction, its inherited arm included", async () => {
+    const probe = await listed(SCENE_TAGS, NEGATIVE_INLINE_LIMIT);
+    expect(probe).toEqual(await listed(SCENE_TAGS, Number.POSITIVE_INFINITY));
+    expect(probe).toEqual([`3:${A}`, `4:${A}`, `6:${A}`]);
+  });
+
+  it("a column, rows with no value kept", async () => {
+    const STUDIO = {
+      kind: "column" as const,
+      parentTable: "StashScene",
+      parentAlias: "s",
+      idCol: "studioId",
+      instanceCol: "stashInstanceId",
+    };
+    const probe = await listed(STUDIO, NEGATIVE_INLINE_LIMIT);
+    expect(probe).toEqual(await listed(STUDIO, Number.POSITIVE_INFINITY));
+    expect(probe).toEqual([`1:${B}`, `3:${A}`, `5:${A}`, `6:${A}`]);
   });
 });

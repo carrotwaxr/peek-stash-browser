@@ -11,10 +11,11 @@
  * index, one row-value IN over the junction's ref index: see
  * junctionInList). Above it the refs travel as one JSON parameter into a
  * materialized CTE, and the matched entities into a second one; the list
- * matches them with a row-value IN on its primary key (INCLUDES) or a
- * single-column key NOT IN (EXCLUDES, see matchedSetClause); a junction
- * INCLUDES on a page walking a sort index reads the refs list's junction
- * rows instead (junctionRefsList). Never a ref list inside a correlated
+ * matches them with a row-value IN on its primary key (INCLUDES); a
+ * junction INCLUDES on a page walking a sort index reads the refs list's
+ * junction rows instead (junctionRefsList). An EXCLUDES stays inline up to
+ * NEGATIVE_INLINE_LIMIT refs only; above it each row probes the refs CTE
+ * (excludesRefsProbe), with no matched set. Never a ref list inside a correlated
  * subquery (re-evaluated per row, 12 s at 200k scenes; a materialized CTE
  * probed with IN from one is built once, plan `LIST SUBQUERY`) and never a
  * row-value `NOT IN (subquery)` (78 s: the set is scanned per row).
@@ -80,6 +81,17 @@ export interface FilterClause {
  * 1,000 pairs fails to prepare.
  */
 export const PAIR_INLINE_LIMIT = 64;
+
+/**
+ * The most refs an EXCLUDES matches inline. Above it each row's junction
+ * rows (or its own key) probe the refs CTE (`excludesRefsProbe`): the
+ * inline pairs cost every row a comparison per ref, the probe one index
+ * search per junction row whatever the count. At 142k images and 207k
+ * scenes the two are within 10 % up to 8 refs and the probe wins from 16
+ * (49 favourite tags no image holds: 181 ms against 125; 40 rare scene
+ * tags: 148 against 72), never slower on common tags (F11b).
+ */
+export const NEGATIVE_INLINE_LIMIT = 8;
 
 const EMPTY: FilterClause = { sql: "", params: [] };
 
@@ -240,7 +252,10 @@ export interface RefClauseOptions {
    * table and alias. Junction targets only.
    */
   readonly inheritedJunction?: JunctionTarget;
-  /** Most refs matched inline; Infinity keeps every set inline. Default PAIR_INLINE_LIMIT. */
+  /**
+   * Most refs matched inline; Infinity keeps every set inline. Default
+   * PAIR_INLINE_LIMIT, and NEGATIVE_INLINE_LIMIT for an EXCLUDES.
+   */
   readonly inlineLimit?: number;
   /**
    * How the statement reads its rows, for a junction INCLUDES. `true`: in
@@ -251,7 +266,8 @@ export interface RefClauseOptions {
    * match, in no order (a count, or a sort with no index). Up to the limit
    * the matches are read once from the junction's ref index as a row-value
    * IN (junctionInList); above it the matched set. Absent: the default
-   * shapes (the EXISTS, the matched set). EXCLUDES never changes (L8, L9).
+   * shapes (the EXISTS, the matched set). EXCLUDES never changes (L8, L9,
+   * F11b).
    */
   readonly sortedByIndex?: boolean;
 }
@@ -434,7 +450,8 @@ function gathered(clauses: readonly FilterClause[]): {
  * Filters the listed entity by refs of another entity: INCLUDES any of them,
  * INCLUDES_ALL every one (one INCLUDES per ref, AND-ed), EXCLUDES none. No
  * refs is no filter. The shape follows `refs.length` (see the module
- * comment); a large INCLUDES_ALL is one small INCLUDES per ref.
+ * comment); a large INCLUDES_ALL is one small INCLUDES per ref, and an
+ * EXCLUDES above NEGATIVE_INLINE_LIMIT probes the refs per row.
  */
 export function refClause(
   target: JunctionTarget | ColumnTarget,
@@ -454,6 +471,12 @@ export function refClause(
     );
   }
 
+  if (
+    modifier === "EXCLUDES" &&
+    refs.length > (opts.inlineLimit ?? NEGATIVE_INLINE_LIMIT)
+  ) {
+    return excludesRefsProbe(target, refs, opts);
+  }
   const limit = opts.inlineLimit ?? PAIR_INLINE_LIMIT;
   if (refs.length > limit) {
     const refsName = `${opts.name}_refs`;
@@ -494,6 +517,52 @@ export function refClause(
   return modifier === "INCLUDES"
     ? includes
     : { sql: `NOT ${includes.sql}`, params: includes.params };
+}
+
+/**
+ * EXCLUDES over more than NEGATIVE_INLINE_LIMIT refs: the refs as one JSON
+ * parameter in a materialized CTE (`<name>_refs`, a bare ref one pair per
+ * allowed instance), probed per row. A junction target keeps a keyed NOT
+ * EXISTS on each junction (the inherited one too, AND-ed), its rows read by
+ * the primary key from the row's key and matched with
+ * `(+ref, refInstance) IN` the CTE, which SQLite builds once (`LIST
+ * SUBQUERY`); the `+` keeps the junction's ref index out, so the probe
+ * starts from the row. A column target matches its key as one text key NOT
+ * IN the refs' keys (an ephemeral index, never a row-value NOT IN), and
+ * keeps a row with no value. No matched set: building one costs every
+ * junction row of the refs, 12 times the probe for 40 common tags at 207k
+ * scenes (564 ms against 37), whatever the sort (F11b).
+ */
+function excludesRefsProbe(
+  target: JunctionTarget | ColumnTarget,
+  refs: readonly FilterRef[],
+  opts: RefClauseOptions
+): FilterClause {
+  const refsName = `${opts.name}_refs`;
+  const ctes = [refsCte(refsName, refs, opts.allowedInstanceIds)];
+  if (target.kind === "column") {
+    const col = `${target.parentAlias}.${target.idCol}`;
+    const inst = `${target.parentAlias}.${target.instanceCol}`;
+    return {
+      sql: `(${col} IS NULL OR (${col} || ':' || ${inst}) NOT IN (SELECT id || ':' || inst FROM ${refsName}))`,
+      params: [],
+      ctes,
+    };
+  }
+  const notExists = (t: JunctionTarget): string => {
+    const j = t.alias;
+    const [id, instance] = parentKeyOf(t);
+    return `NOT EXISTS (SELECT 1 FROM ${t.table} ${j} WHERE ${j}.${t.parentIdCol} = ${id} AND ${j}.${t.parentInstanceCol} = ${instance} AND (+${j}.${t.refIdCol}, ${j}.${t.refInstanceCol}) IN (SELECT id, inst FROM ${refsName}))`;
+  };
+  const { inheritedJunction } = opts;
+  return {
+    sql:
+      inheritedJunction === undefined
+        ? notExists(target)
+        : `(${notExists(target)} AND ${notExists(inheritedJunction)})`,
+    params: [],
+    ctes,
+  };
 }
 
 /**

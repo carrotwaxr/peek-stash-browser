@@ -1250,13 +1250,14 @@ describe("leavesOf: excludes beside a ref's values", () => {
     });
 
     const page = must(statements()[0]).sql;
+    // The excludes probe their refs per row: a refs CTE, no matched set
     for (const name of [
       "performers_refs",
       "performers_matched",
       "performers_not_refs",
-      "performers_not_matched",
     ]) {
       expect(page).toContain(`${name}(id, inst) AS MATERIALIZED`);
     }
+    expect(page).toContain("IN (SELECT id, inst FROM performers_not_refs)");
   });
 });
