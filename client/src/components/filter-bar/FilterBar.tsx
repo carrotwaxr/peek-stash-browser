@@ -1,52 +1,37 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  type ListPins,
   PANEL_FIELDS,
   type PinnedFilter,
   type RowKey,
   rowKeyOf,
 } from "@peek/shared-types";
 import { LucideSlidersHorizontal } from "lucide-react";
-import { useFilterPins, useSetPins } from "../../api/hooks/useFilterPins";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import type { ListFilters } from "../../hooks/useListFilters";
 import {
   type ChipParts,
   type FilterOption,
-  type FilterChip as PermanentChip,
   rowChip,
 } from "../../utils/filterFields";
 import {
-  atCap,
-  isPinnable,
   isPinnedFilterOn,
-  pinField,
-  pinFilter,
-  pinnedFilterOf,
-  pinsOf,
   togglePinnedFilter,
-  unpinField,
   unpinFilter,
-  visiblePins,
 } from "../../utils/filterFields/pins";
 import AdvancedFilterView from "../filter-rows/AdvancedFilterView";
 import Button from "../ui/Button";
 import AddFilterMenu from "./AddFilterMenu";
-import ChipEditor, {
-  type ChipEditorClose,
-  type ChipPinning,
-} from "./ChipEditor";
+import ChipEditor, { type ChipEditorClose } from "./ChipEditor";
 import FilterChip from "./FilterChip";
+import type { SheetFocus } from "./FilterSheet";
 import GroupChip from "./GroupChip";
 import PinnedFilterToggle from "./PinnedFilterToggle";
-import { groupText } from "./chipText";
-
-interface PermanentFiltersMetadata {
-  performers?: Array<{ id: string; name: string }>;
-  studios?: Array<{ id: string; name: string }>;
-  tags?: Array<{ id: string; name: string }>;
-  [key: string]: unknown;
-}
+import {
+  type PermanentFiltersMetadata,
+  groupText,
+  permanentChipsOf,
+} from "./chipText";
+import { useListPinning } from "./useListPinning";
 
 interface FilterBarProps {
   filters: ListFilters;
@@ -54,6 +39,12 @@ interface FilterBarProps {
   permanentFilters?: Record<string, unknown>;
   /** Their names, drawn as dimmed labels before the chips */
   permanentFiltersMetadata?: PermanentFiltersMetadata;
+  /**
+   * Set on a phone or a TV (the `sheet` surface): a chip's body and
+   * "+ Filter" open the filter sheet at that row or at its field list,
+   * instead of a popover, and the row scrolls sideways
+   */
+  onOpenSheet?: ((focus: SheetFocus) => void) | undefined;
 }
 
 /**
@@ -103,6 +94,11 @@ const sameAt = (a: RowKey, b: RowKey): boolean =>
  * in "+ Filter" opens its chip's editor, or, when it is not in use, a
  * pending chip's that leaves nothing if closed empty.
  *
+ * On a phone or a TV (`onOpenSheet`), the row scrolls sideways and a chip
+ * or "+ Filter" opens the filter sheet (`FilterSheet`) instead: the edit
+ * applies there with "Show N results". Pinned filters and group chips act
+ * as on a desktop.
+ *
  * A pinned filter acts on its key's first root row: pressed while that row
  * holds its value (the row then draws no chip of its own), a tap sets or
  * removes the row, one history entry each. Pins are per list kind
@@ -112,6 +108,7 @@ const FilterBar = ({
   filters,
   permanentFilters = NONE,
   permanentFiltersMetadata = NONE,
+  onOpenSheet,
 }: FilterBarProps) => {
   const { kind, tree, options } = filters;
   const { unitPreference } = useUnitPreference();
@@ -122,18 +119,14 @@ const FilterBar = ({
   const [editor, setEditor] = useState<OpenEditor | null>(null);
   const [advanced, setAdvanced] = useState<AdvancedOpen | null>(null);
 
-  const stored = useFilterPins(kind);
-  const { mutate: savePins } = useSetPins();
-  const pins = useMemo(() => pinsOf(kind, stored), [kind, stored]);
-  const shownPins = useMemo(
-    () => visiblePins(kind, pins, options),
-    [kind, pins, options]
-  );
-  // The bar's pins, and the server's cap over every stored one
-  const capped = atCap(shownPins) || atCap(pins);
-  const save = (next: ListPins | undefined) => {
-    if (next !== undefined && next !== pins) savePins({ kind, pins: next });
-  };
+  const {
+    pins,
+    shownPins,
+    capped,
+    save,
+    toggleField: toggleFieldPin,
+    pinningOf,
+  } = useListPinning(kind, options);
 
   // Each pinned filter, pressed while its key's first root row holds it
   const pinnedFilters = useMemo(
@@ -403,32 +396,6 @@ const FilterBar = ({
     filters.commit(togglePinnedFilter(kind, filters.filters, pin));
   };
 
-  const toggleFieldPin = (key: string) =>
-    save(
-      pins.fields.includes(key)
-        ? unpinField(pins, key)
-        : pinField(kind, pins, key)
-    );
-
-  const pinningOf = (key: string): ChipPinning | undefined => {
-    if (!isPinnable(kind, key)) return undefined;
-    return {
-      fieldPinned: pins.fields.includes(key),
-      capped,
-      isFilterPinned: (state) =>
-        pinnedFilterOf(kind, pins, state, key) !== undefined,
-      toggleField: () => toggleFieldPin(key),
-      toggleFilter: (state) => {
-        const pinned = pinnedFilterOf(kind, pins, state, key);
-        save(
-          pinned === undefined
-            ? pinFilter(kind, pins, state, key)
-            : unpinFilter(pins, pinned.id)
-        );
-      },
-    };
-  };
-
   const moveEditor = useCallback((at: RowKey) => {
     setEditor((open) => (open === null ? open : { ...open, at }));
   }, []);
@@ -436,20 +403,7 @@ const FilterBar = ({
   // A detail page's own filters: a plain label, no edit and no remove
   // (also the Advanced view's "Fixed by this page", which then names them)
   const permanentChips = useMemo(
-    (): PermanentChip[] => [
-      ...(permanentFiltersMetadata.performers ?? []).map((performer) => ({
-        key: "performers",
-        parts: { label: "Performer", values: [performer.name] },
-      })),
-      ...(permanentFiltersMetadata.studios ?? []).map((studio) => ({
-        key: "studios",
-        parts: { label: "Studio", values: [studio.name] },
-      })),
-      ...(permanentFiltersMetadata.tags ?? []).map((tag) => ({
-        key: "tags",
-        parts: { label: "Tag", values: [tag.name] },
-      })),
-    ],
+    () => permanentChipsOf(permanentFiltersMetadata),
     [permanentFiltersMetadata]
   );
   const permanentLabels = permanentChips.map(
@@ -463,7 +417,11 @@ const FilterBar = ({
       ref={barRef}
       role="group"
       aria-label="Filters"
-      className="flex flex-wrap items-center gap-2"
+      className={
+        onOpenSheet === undefined
+          ? "flex flex-wrap items-center gap-2"
+          : "flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [&>*]:shrink-0"
+      }
     >
       {permanentLabels.map((label, index) => (
         <div
@@ -518,7 +476,9 @@ const FilterBar = ({
             entityType={item.entityType}
             open={open}
             anchorRef={open ? anchorRef : undefined}
-            onToggle={() => toggle(item.at)}
+            onToggle={() =>
+              onOpenSheet === undefined ? toggle(item.at) : onOpenSheet(item.at)
+            }
             onRemove={() => removeChip(item.at)}
           >
             {open && (
@@ -551,6 +511,9 @@ const FilterBar = ({
         onTogglePin={toggleFieldPin}
         onPick={pick}
         triggerRef={addRef}
+        {...(onOpenSheet === undefined
+          ? {}
+          : { onOpen: () => onOpenSheet("add") })}
       />
       <div data-tv-search-item="advanced-filters">
         <Button

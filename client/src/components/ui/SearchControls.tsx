@@ -1,16 +1,27 @@
-import React, { useCallback, useMemo, useRef } from "react";
-import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import {
+  LucideArrowDown,
+  LucideArrowUp,
+  type LucideIcon,
+  LucideSlidersHorizontal,
+} from "lucide-react";
 import type { ColumnConfig } from "../../config/tableColumns";
+import { useFilterSurface } from "../../hooks/useFilterSurface";
 import { useListFilters } from "../../hooks/useListFilters";
 import { useFilterOptions } from "../../hooks/useListOptions";
 import type { ListUrlState } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
-import { activeFieldCount } from "../../utils/filterFields";
-import { sortOptionsFor } from "../../utils/listQuery";
+import { type PanelState, activeFieldCount } from "../../utils/filterFields";
+import { buildListQuery, sortOptionsFor } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
 import FilterBar from "../filter-bar/FilterBar";
+import FilterSheet, {
+  type CountRequestOf,
+  type SheetFocus,
+} from "../filter-bar/FilterSheet";
 import ViewsMenu from "../filter-bar/ViewsMenu";
+import { permanentChipsOf } from "../filter-bar/chipText";
 import {
   Button,
   ContextSettings,
@@ -60,6 +71,12 @@ interface SearchControlsProps {
    * are set
    */
   filterable?: boolean;
+  /**
+   * The filter sheet's count request for a draft: the page's request over
+   * it (a detail tab's lock, a list hook's own shape, Recommended's count
+   * route). Left out, the list's request built from the list state.
+   */
+  countRequestOf?: CountRequestOf;
 }
 
 const NO_FILTERS: Record<string, unknown> = {};
@@ -68,8 +85,14 @@ const NO_SETTINGS: SettingConfig[] = [];
 
 /**
  * The list's controls: search, sort, Views and the view in row 1, the
- * filter chips with "+ Filter" and "Advanced" in row 2, and paging. Every control writes
- * the URL through the list state; nothing here holds a copy of it.
+ * filter chips with "+ Filter" and "Advanced" in row 2, and paging. Every
+ * control writes the URL through the list state; nothing here holds a copy
+ * of it.
+ *
+ * On a phone or a TV (`useFilterSurface`), row 1 is search and "Filters
+ * (n)", row 2 the sort, Views and view controls (wrapping), and row 3 the
+ * chips, scrolling sideways; "Filters", a chip and "+ Filter" open the
+ * filter sheet (`FilterSheet`), which applies with "Show N results".
  */
 const SearchControls = ({
   artifactType = "scene",
@@ -87,6 +110,7 @@ const SearchControls = ({
   contextSettings = NO_SETTINGS,
   isRefreshing = false,
   filterable = true,
+  countRequestOf,
 }: SearchControlsProps) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
@@ -103,6 +127,16 @@ const SearchControls = ({
     allFilterOptions
   );
   const filterOptions = listFilters.options;
+  const surface = useFilterSurface();
+  const [sheet, setSheet] = useState<{ focus?: SheetFocus } | null>(null);
+  const openSheet = useCallback(
+    (focus?: SheetFocus) => setSheet(focus === undefined ? {} : { focus }),
+    []
+  );
+  const permanentChips = useMemo(
+    () => permanentChipsOf(permanentFiltersMetadata),
+    [permanentFiltersMetadata]
+  );
 
   const {
     filters,
@@ -190,6 +224,72 @@ const SearchControls = ({
     [artifactType, filters, permanentFilters]
   );
 
+  // The sheet's count: the page's request over the draft, else the list's
+  // own request built from the list state
+  const { ready } = listState;
+  const listCountRequestOf = useCallback<CountRequestOf>(
+    (draft: PanelState) => {
+      const query = buildListQuery(
+        artifactType as ListEntity,
+        {
+          ready,
+          filters: draft,
+          sort,
+          page: currentPage,
+          perPage,
+          q: searchText,
+        },
+        permanentFilters
+      );
+      return query === null ? null : { body: { ...query } };
+    },
+    [
+      artifactType,
+      ready,
+      sort,
+      currentPage,
+      perPage,
+      searchText,
+      permanentFilters,
+    ]
+  );
+
+  // "Filters (n)": the rows the bar draws a chip for, a group as one
+  const freeKeys = useMemo(
+    () =>
+      new Set(
+        filterOptions
+          .filter((option) => permanentFilters[option.key] === undefined)
+          .map((option) => option.key)
+      ),
+    [filterOptions, permanentFilters]
+  );
+  const filterCount =
+    listFilters.tree.rows.filter((row) => freeKeys.has(row.field.key)).length +
+    groupCount;
+  const usesSheet = surface === "sheet" && filterable;
+  // A phone turned wide, or a view without filters, closes the sheet for
+  // good (its draft discarded), so it does not come back on its own
+  if (!usesSheet && sheet !== null) setSheet(null);
+
+  const searchBox = (
+    <div
+      data-tv-search-item="search-input"
+      className={
+        usesSheet
+          ? "min-w-0 flex-1"
+          : "w-full sm:w-auto sm:flex-1 sm:min-w-[180px] sm:max-w-sm"
+      }
+    >
+      <SearchInput
+        placeholder="Search..."
+        value={searchText}
+        onSearch={setQuery}
+        className="w-full"
+      />
+    </div>
+  );
+
   return (
     <div>
       <div
@@ -199,19 +299,33 @@ const SearchControls = ({
           border: "1px solid var(--border-color)",
         }}
       >
-        {/* Row 1: search, sort, Views, then how to show the list */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div
-            data-tv-search-item="search-input"
-            className="w-full sm:w-auto sm:flex-1 sm:min-w-[180px] sm:max-w-sm"
-          >
-            <SearchInput
-              placeholder="Search..."
-              value={searchText}
-              onSearch={setQuery}
-              className="w-full"
-            />
+        {/* Row 1: search, sort, Views, then how to show the list; on a
+            phone or a TV, search and "Filters (n)", the rest in row 2 */}
+        {usesSheet && (
+          <div className="flex items-center gap-2 mb-2">
+            {searchBox}
+            <div data-tv-search-item="filters">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => openSheet()}
+                aria-haspopup="dialog"
+                aria-expanded={sheet !== null}
+                className="whitespace-nowrap"
+                icon={
+                  <LucideSlidersHorizontal
+                    className="w-4 h-4"
+                    aria-hidden="true"
+                  />
+                }
+              >
+                {filterCount > 0 ? `Filters (${filterCount})` : "Filters"}
+              </Button>
+            </div>
           </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {!usesSheet && searchBox}
 
           {/* Sort: the field, then its direction */}
           <div className="flex items-center gap-1">
@@ -299,6 +413,16 @@ const SearchControls = ({
               filters={listFilters}
               permanentFilters={permanentFilters}
               permanentFiltersMetadata={permanentFiltersMetadata}
+              {...(usesSheet ? { onOpenSheet: openSheet } : {})}
+            />
+            <FilterSheet
+              filters={listFilters}
+              open={usesSheet && sheet !== null}
+              focusKey={sheet?.focus}
+              onClose={() => setSheet(null)}
+              countRequestOf={countRequestOf ?? listCountRequestOf}
+              permanentFilters={permanentFilters}
+              permanentChips={permanentChips}
             />
           </div>
         ) : (

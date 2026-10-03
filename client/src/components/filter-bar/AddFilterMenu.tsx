@@ -32,7 +32,11 @@ interface AddFilterMenuProps {
   /** A field was picked: the bar opens its editor */
   onPick: (option: FilterOption) => void;
   /** "+ Filter" itself, for the bar to move focus to */
-  triggerRef: RefObject<HTMLButtonElement | null>;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
+  /** "+ Filter" opens something else (the sheet on a phone or a TV), not the menu */
+  onOpen?: (() => void) | undefined;
+  /** Drawn in place (in the sheet): the search box and the list, no button or popover */
+  inline?: boolean;
 }
 
 /** A run of options under one heading: a panel section, or the pinned fields */
@@ -104,6 +108,11 @@ function sectionsOf(
  * At the row limit (`WHERE_LIMITS.rows`) the menu says so, and only fields
  * already in use at the root stay pickable: picking one opens its chip.
  *
+ * `inline` draws the search box and the list in place, always open (the
+ * filter sheet's field list, over the sheet's draft): a pick clears the
+ * search, and a value picked applies to the draft. `onOpen` makes the
+ * button open something else (the sheet) instead.
+ *
  * Each field option carries a pin icon that pins or unpins the field
  * without picking it. It is a mouse affordance (`aria-hidden`, not
  * focusable): an option holds no control of its own, so keyboard and TV
@@ -116,10 +125,15 @@ const AddFilterMenu = ({
   onTogglePin,
   onPick,
   triggerRef,
+  onOpen,
+  inline = false,
 }: AddFilterMenuProps) => {
-  const [open, setOpen] = useState(false);
+  const [isOpen, setOpen] = useState(false);
+  const open = inline || isOpen;
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const ownTriggerRef = useRef<HTMLButtonElement>(null);
+  const anchorRef = triggerRef ?? ownTriggerRef;
   const listRef = useRef<HTMLDivElement>(null);
   const id = useId().replace(/:/g, "");
   const listboxId = `add-filter-${id}-list`;
@@ -166,13 +180,18 @@ const AddFilterMenu = ({
     onTogglePin !== undefined && isPinnable(filters.kind, key);
 
   const toggle = () => {
-    if (!open) setQuery("");
-    setOpen(!open);
+    if (onOpen !== undefined) {
+      onOpen();
+      return;
+    }
+    if (!isOpen) setQuery("");
+    setOpen(!isOpen);
   };
 
   const pick = (option: FilterOption) => {
     if (isDisabled(option)) return;
     setOpen(false);
+    if (inline) setQuery("");
     onPick(option);
   };
 
@@ -182,7 +201,12 @@ const AddFilterMenu = ({
     filters.commit(
       withRefValue(filters.kind, filters.filters, value.field.key, value.ref)
     );
-    triggerRef.current?.focus();
+    if (inline) {
+      setQuery("");
+      inputRef.current?.focus();
+    } else {
+      anchorRef.current?.focus();
+    }
   };
 
   const enabledOptions = () =>
@@ -225,145 +249,79 @@ const AddFilterMenu = ({
     pickIt();
   };
 
-  return (
-    <div className="relative" data-tv-search-item="add-filter">
-      <Button
-        ref={triggerRef}
-        variant="secondary"
-        size="sm"
-        onClick={toggle}
-        aria-label="Add filter"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        className="rounded-full"
-        icon={<LucidePlus className="w-4 h-4" aria-hidden="true" />}
-      >
-        Filter
-      </Button>
-      <Popover
-        anchorRef={triggerRef}
-        open={open}
-        onClose={() => setOpen(false)}
-        label="Choose a filter"
-        className="w-72 max-w-[calc(100vw-2rem)] p-2"
-      >
-        <input
-          ref={inputRef}
-          type="text"
-          role="combobox"
-          aria-label="Find a filter"
-          aria-expanded={shown.length > 0}
-          aria-controls={listboxId}
-          aria-autocomplete="list"
-          placeholder="Find a filter..."
-          value={query}
-          onChange={(event: ChangeEvent<HTMLInputElement>) =>
-            setQuery(event.target.value)
-          }
-          onKeyDown={handleInputKeyDown}
-          data-popover-focus=""
-          className="w-full px-3 py-1.5 rounded-md text-sm border"
-          style={{
-            backgroundColor: "var(--bg-card)",
-            borderColor: "var(--border-color)",
-            color: "var(--text-primary)",
-          }}
-        />
-        {atLimit && (
-          <p
-            className="px-2 pt-2 text-xs"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            {WHERE_LIMITS.rows} filters is the most a list takes: remove one to
-            add another.
-          </p>
-        )}
-        {shown.length === 0 ? (
-          <p
-            className="px-2 py-3 text-sm"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            No filter matches “{query.trim()}”
-          </p>
-        ) : (
-          <div
-            ref={listRef}
-            id={listboxId}
-            role="listbox"
-            aria-label="Filters"
-            onKeyDown={handleListKeyDown}
-            className="mt-2 max-h-80 overflow-y-auto"
-          >
-            {sections.map((section) => {
-              const headingId = `add-filter-${id}-${section.key}`;
-              return (
-                <div key={section.key} role="group" aria-labelledby={headingId}>
-                  <div
-                    id={headingId}
-                    role="presentation"
-                    className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    {section.label}
-                  </div>
-                  {section.options.map((option) => {
-                    const disabled = isDisabled(option);
-                    return (
-                      <div
-                        key={option.key}
-                        role="option"
-                        tabIndex={-1}
-                        aria-selected={false}
-                        aria-disabled={disabled || undefined}
-                        onClick={() => pick(option)}
-                        onKeyDown={(event) =>
-                          handleOptionKeyDown(event, () => pick(option))
-                        }
-                        className={`px-2 py-1.5 rounded text-sm ${
-                          disabled
-                            ? "cursor-not-allowed opacity-50"
-                            : "cursor-pointer hover:bg-[var(--bg-tertiary)] focus:bg-[var(--bg-tertiary)]"
-                        }`}
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span>{labelOf(option)}</span>
-                          {canPin(option.key) && (
-                            <PinIcon
-                              pinned={pinned.has(option.key)}
-                              capped={pinCapped}
-                              onClick={() => onTogglePin?.(option.key)}
-                            />
-                          )}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-            {values.length > 0 && (
-              <div role="group" aria-labelledby={`add-filter-${id}-values`}>
+  const body = (
+    <>
+      <input
+        ref={inputRef}
+        type="text"
+        role="combobox"
+        aria-label="Find a filter"
+        aria-expanded={shown.length > 0}
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+        placeholder="Find a filter..."
+        value={query}
+        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+          setQuery(event.target.value)
+        }
+        onKeyDown={handleInputKeyDown}
+        data-popover-focus=""
+        className="w-full px-3 py-1.5 rounded-md text-sm border"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--border-color)",
+          color: "var(--text-primary)",
+        }}
+      />
+      {atLimit && (
+        <p
+          className="px-2 pt-2 text-xs"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {WHERE_LIMITS.rows} filters is the most a list takes: remove one to
+          add another.
+        </p>
+      )}
+      {shown.length === 0 ? (
+        <p
+          className="px-2 py-3 text-sm"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          No filter matches “{query.trim()}”
+        </p>
+      ) : (
+        <div
+          ref={listRef}
+          id={listboxId}
+          role="listbox"
+          aria-label="Filters"
+          onKeyDown={handleListKeyDown}
+          className={inline ? "mt-2" : "mt-2 max-h-80 overflow-y-auto"}
+        >
+          {sections.map((section) => {
+            const headingId = `add-filter-${id}-${section.key}`;
+            return (
+              <div key={section.key} role="group" aria-labelledby={headingId}>
                 <div
-                  id={`add-filter-${id}-values`}
+                  id={headingId}
                   role="presentation"
                   className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Values
+                  {section.label}
                 </div>
-                {values.map((value) => {
-                  const disabled = isValueDisabled(value);
+                {section.options.map((option) => {
+                  const disabled = isDisabled(option);
                   return (
                     <div
-                      key={value.key}
+                      key={option.key}
                       role="option"
                       tabIndex={-1}
                       aria-selected={false}
                       aria-disabled={disabled || undefined}
-                      onClick={() => pickValue(value)}
+                      onClick={() => pick(option)}
                       onKeyDown={(event) =>
-                        handleOptionKeyDown(event, () => pickValue(value))
+                        handleOptionKeyDown(event, () => pick(option))
                       }
                       className={`px-2 py-1.5 rounded text-sm ${
                         disabled
@@ -372,14 +330,88 @@ const AddFilterMenu = ({
                       }`}
                       style={{ color: "var(--text-primary)" }}
                     >
-                      {`${labelOf(value.field)}: ${value.name || "Unknown"}`}
+                      <span className="flex items-center justify-between gap-2">
+                        <span>{labelOf(option)}</span>
+                        {canPin(option.key) && (
+                          <PinIcon
+                            pinned={pinned.has(option.key)}
+                            capped={pinCapped}
+                            onClick={() => onTogglePin?.(option.key)}
+                          />
+                        )}
+                      </span>
                     </div>
                   );
                 })}
               </div>
-            )}
-          </div>
-        )}
+            );
+          })}
+          {values.length > 0 && (
+            <div role="group" aria-labelledby={`add-filter-${id}-values`}>
+              <div
+                id={`add-filter-${id}-values`}
+                role="presentation"
+                className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Values
+              </div>
+              {values.map((value) => {
+                const disabled = isValueDisabled(value);
+                return (
+                  <div
+                    key={value.key}
+                    role="option"
+                    tabIndex={-1}
+                    aria-selected={false}
+                    aria-disabled={disabled || undefined}
+                    onClick={() => pickValue(value)}
+                    onKeyDown={(event) =>
+                      handleOptionKeyDown(event, () => pickValue(value))
+                    }
+                    className={`px-2 py-1.5 rounded text-sm ${
+                      disabled
+                        ? "cursor-not-allowed opacity-50"
+                        : "cursor-pointer hover:bg-[var(--bg-tertiary)] focus:bg-[var(--bg-tertiary)]"
+                    }`}
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {`${labelOf(value.field)}: ${value.name || "Unknown"}`}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  if (inline) return <div>{body}</div>;
+
+  return (
+    <div className="relative" data-tv-search-item="add-filter">
+      <Button
+        ref={anchorRef}
+        variant="secondary"
+        size="sm"
+        onClick={toggle}
+        aria-label="Add filter"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        className="rounded-full"
+        icon={<LucidePlus className="w-4 h-4" aria-hidden="true" />}
+      >
+        Filter
+      </Button>
+      <Popover
+        anchorRef={anchorRef}
+        open={isOpen}
+        onClose={() => setOpen(false)}
+        label="Choose a filter"
+        className="w-72 max-w-[calc(100vw-2rem)] p-2"
+      >
+        {body}
       </Popover>
     </div>
   );
