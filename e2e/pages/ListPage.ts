@@ -13,6 +13,10 @@ export class ListPage {
   readonly addFilterButton: Locator;
   /** "Filters (n)" on a phone or a TV, which opens the filter sheet */
   readonly filtersButton: Locator;
+  /** "Advanced", which opens the Advanced view (rows and groups) */
+  readonly advancedButton: Locator;
+  /** The Advanced view, while it is open */
+  readonly advancedDialog: Locator;
   /** "Views" or "Views: <name>", the saved Views menu */
   readonly viewsButton: Locator;
   /** The filter sheet (a phone or a TV) */
@@ -35,6 +39,13 @@ export class ListPage {
     this.searchInput = page.getByPlaceholder("Search...");
     this.addFilterButton = page.getByRole("button", { name: "Add filter" });
     this.filterBar = page.getByRole("group", { name: "Filters", exact: true });
+    this.advancedButton = page.getByRole("button", {
+      name: "Advanced",
+      exact: true,
+    });
+    this.advancedDialog = page.getByRole("dialog", {
+      name: "Advanced filters",
+    });
     this.filtersButton = page.getByRole("button", {
       name: /^Filters( \(\d+\))?$/,
     });
@@ -119,6 +130,13 @@ export class ListPage {
     return this.page.getByRole("dialog", {
       name: new RegExp(`^${name}( \\(.+\\))? filter$`),
     });
+  }
+
+  /** Opens the Advanced view from the bar's "Advanced" button */
+  async openAdvanced(): Promise<Locator> {
+    await this.advancedButton.click();
+    await expect(this.advancedDialog).toBeVisible();
+    return this.advancedDialog;
   }
 
   /** A row of the filter sheet, by its field's name (the row's heading) */
