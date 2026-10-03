@@ -15,6 +15,14 @@ import { requireData } from "./support/data";
 interface SceneRow {
   id: string;
   instanceId: string;
+  captions?: unknown[];
+}
+
+/** The parts of the media-link response this spec reads */
+interface MediaLinkBody {
+  streams: { url: string }[];
+  captions: { url: string }[];
+  poster: string | null;
 }
 
 interface FindScenesBody {
@@ -139,6 +147,113 @@ test("the external-player link plays logged out and a tampered one fails", async
     expect((await anonymous.get(tampered)).status()).toBe(401);
   } finally {
     await anonymous.dispose();
+  }
+});
+
+test("a cast device's requests pass with the media link and nothing else", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  test.setTimeout(90_000); // Stash transcodes the playlist and segment on demand
+
+  // The library's captioned scene (the replay has one among hundreds), and
+  // another scene for the cross-scene checks
+  let scene: SceneRow | undefined;
+  let other: SceneRow | undefined;
+  for (let pageNumber = 1; pageNumber <= 20 && !scene; pageNumber++) {
+    const found = await page.request.post("/api/library/scenes", {
+      data: { filter: { per_page: 100, page: pageNumber } },
+    });
+    expect(found.ok(), await found.text()).toBeTruthy();
+    const { scenes } = ((await found.json()) as FindScenesBody).findScenes;
+    if (scenes.length === 0) break;
+    other ??= scenes[0];
+    scene = scenes.find((s) => (s.captions?.length ?? 0) > 0);
+  }
+  const castScene = requireData(scene, "a scene with captions");
+  if (other?.id === castScene.id) other = undefined;
+  other = requireData(other, "a second scene");
+
+  const minted = await page.request.post(
+    `/api/scene/${castScene.id}/media-link`,
+    { data: { instanceId: castScene.instanceId } }
+  );
+  expect(minted.status(), await minted.text()).toBe(200);
+  const castLink = (await minted.json()) as MediaLinkBody;
+  const directUrl = requireData(
+    castLink.streams.find((s) => /\/proxy-stream\/stream\?/.test(s.url)),
+    "a Direct stream"
+  ).url;
+  const hlsUrl = requireData(
+    castLink.streams.find((s) => /\/stream\.m3u8\?/.test(s.url)),
+    "an HLS tier"
+  ).url;
+  const captionUrl = requireData(castLink.captions[0], "a caption").url;
+  const posterUrl = requireData(castLink.poster, "a poster");
+
+  // A device that has never signed in: a fresh browser context with no
+  // cookies and no storage, sending the link and the receiver's origin
+  const receiverContext = await browser.newContext({
+    baseURL,
+    storageState: { cookies: [], origins: [] },
+    extraHTTPHeaders: { Origin: "https://www.gstatic.com" },
+  });
+  try {
+    const direct = await receiverContext.request.get(directUrl, {
+      headers: { Range: "bytes=0-1023" },
+    });
+    expect(direct.status()).toBe(206);
+    expect(direct.headers()["access-control-allow-origin"]).toBe("*");
+    expect(
+      direct.headers()["access-control-allow-credentials"]
+    ).toBeUndefined();
+
+    const playlist = await receiverContext.request.get(hlsUrl, {
+      timeout: 30_000,
+    });
+    expect(playlist.status()).toBe(200);
+    const playlistText = await playlist.text();
+    const segmentUrl = requireData(
+      playlistText
+        .split("\n")
+        .find((line) => /\/proxy-stream\/stream\.m3u8\/0\.ts/.test(line)),
+      "a first segment line"
+    );
+    expect(segmentUrl).toContain("sig=");
+    expect(
+      (
+        await receiverContext.request.get(segmentUrl, { timeout: 30_000 })
+      ).status()
+    ).toBe(200);
+
+    const caption = await receiverContext.request.get(captionUrl);
+    expect(caption.status()).toBe(200);
+    expect(await caption.text()).toContain("WEBVTT");
+
+    const poster = await receiverContext.request.get(posterUrl);
+    expect(poster.status()).toBe(200);
+    expect(poster.headers()["content-type"]).toMatch(/^image\//);
+
+    // A tampered scope, and the link on another scene
+    const tampered = new URL(directUrl, "http://peek.invalid");
+    tampered.searchParams.set("scope", "other");
+    expect(
+      (
+        await receiverContext.request.get(
+          `${tampered.pathname}${tampered.search}`
+        )
+      ).status()
+    ).toBe(401);
+    for (const url of [directUrl, hlsUrl, captionUrl, posterUrl]) {
+      const elsewhere = url.replace(
+        `/scene/${castScene.id}/`,
+        `/scene/${other.id}/`
+      );
+      expect((await receiverContext.request.get(elsewhere)).status()).toBe(401);
+    }
+  } finally {
+    await receiverContext.close();
   }
 });
 

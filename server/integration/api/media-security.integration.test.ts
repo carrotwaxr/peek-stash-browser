@@ -12,6 +12,7 @@
  * external-player link), accepts only Stash's media shapes, and answers 404
  * for an entity the user cannot see.
  */
+import type { SceneMediaLinkResponse } from "@peek/shared-types/api/video.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
@@ -22,6 +23,7 @@ import {
   restoreInstanceSelection,
   selectTestInstanceForClient,
   selectTestInstanceOnly,
+  setInstanceSelection,
 } from "../helpers/testClient.js";
 
 interface FindScenesResponse {
@@ -31,6 +33,7 @@ interface FindScenesResponse {
       id: string;
       sceneStreams?: Array<{ url: string }>;
       paths?: Record<string, string | null>;
+      captions?: unknown[];
     }>;
   };
 }
@@ -81,6 +84,50 @@ async function media(
   };
   await res.body?.cancel();
   return result;
+}
+
+/** A cast receiver's request: no cookie, the receiver's origin, the link only. */
+async function receiver(
+  path: string,
+  init: { range?: string; method?: "GET" | "POST" } = {}
+): Promise<{
+  status: number;
+  allowOrigin: string | null;
+  allowCredentials: string | null;
+  contentType: string;
+  body: string;
+}> {
+  const headers: Record<string, string> = {
+    Origin: "https://www.gstatic.com",
+  };
+  if (init.range) headers["Range"] = init.range;
+  if (init.method === "POST") headers["Content-Type"] = "application/json";
+  const res = await fetch(`${TEST_CONFIG.baseUrl}${path}`, {
+    headers,
+    method: init.method ?? "GET",
+    ...(init.method === "POST" ? { body: JSON.stringify({}) } : {}),
+  });
+  const body = await res.text();
+  return {
+    status: res.status,
+    allowOrigin: res.headers.get("access-control-allow-origin"),
+    allowCredentials: res.headers.get("access-control-allow-credentials"),
+    contentType: res.headers.get("content-type") ?? "",
+    body,
+  };
+}
+
+/** The same signed URL with one query parameter replaced, added or removed. */
+function withParam(url: string, key: string, value: string | null): string {
+  const u = new URL(url, "http://peek.invalid");
+  if (value === null) u.searchParams.delete(key);
+  else u.searchParams.set(key, value);
+  return `${u.pathname}${u.search}`;
+}
+
+/** The same signed URL for another scene (the scene id sits in the path). */
+function forScene(url: string, from: string, to: string): string {
+  return url.replace(`/scene/${from}/`, `/scene/${to}/`);
 }
 
 describe("media security", () => {
@@ -299,6 +346,228 @@ describe("media security", () => {
         expect(Number(probe.contentLength)).toBeGreaterThan(1);
       }
     );
+  });
+
+  describe("a cast device's requests", () => {
+    const CAST_USER = {
+      username: "cast_it_user",
+      password: "cast_it_pass_123",
+    };
+    let sceneId: string;
+    let otherSceneId: string;
+    let castUserId: number;
+    let castClient: TestClient;
+    let link: SceneMediaLinkResponse;
+    let directUrl: string;
+    let hlsUrl: string;
+    let segmentUrl: string;
+    let captionUrl: string;
+    let posterUrl: string;
+    let signedQuery: string;
+    let otherInstanceId: string;
+
+    beforeAll(async () => {
+      const users = await adminClient.get<{
+        users?: Array<{ id: number; username: string }>;
+      }>("/api/user/all");
+      const leftover = users.data.users?.find(
+        (u) => u.username === CAST_USER.username
+      );
+      if (leftover) await adminClient.delete(`/api/user/${leftover.id}`);
+      const created = await adminClient.post<{
+        user?: { id: number };
+      }>("/api/user/create", { ...CAST_USER, role: "USER" });
+      if (!created.ok || !created.data.user) {
+        throw new Error(`Failed to create ${CAST_USER.username}`);
+      }
+      castUserId = created.data.user.id;
+
+      castClient = new TestClient();
+      await castClient.login(CAST_USER.username, CAST_USER.password);
+      await selectTestInstanceForClient(castClient);
+
+      const instances = await adminClient.get<{
+        instances?: Array<{ id: string }>;
+      }>("/api/setup/stash-instances");
+      otherInstanceId = must(
+        instances.data.instances?.find((i) => i.id !== instanceId)?.id,
+        "a second Stash instance"
+      );
+
+      // A scene with captions, and another one for the cross-scene checks
+      const found = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        { filter: { per_page: 100 } }
+      );
+      const scenes = found.data.findScenes.scenes;
+      sceneId = must(
+        scenes.find((s) => (s.captions?.length ?? 0) > 0)?.id,
+        "a scene with captions"
+      );
+      otherSceneId = must(
+        scenes.find((s) => s.id !== sceneId)?.id,
+        "a second scene"
+      );
+
+      const minted = await castClient.post<SceneMediaLinkResponse>(
+        `/api/scene/${sceneId}/media-link`,
+        { instanceId }
+      );
+      expect(minted.status).toBe(200);
+      link = minted.data;
+      directUrl = must(
+        link.streams.find((s) => /\/proxy-stream\/stream\?/.test(s.url)),
+        "the Direct stream"
+      ).url;
+      hlsUrl = must(
+        link.streams.find((s) => /\/stream\.m3u8\?/.test(s.url)),
+        "an HLS tier"
+      ).url;
+      captionUrl = must(link.captions[0], "a caption").url;
+      posterUrl = must(link.poster, "a poster");
+      signedQuery = new URL(directUrl, "http://peek.invalid").search;
+
+      // Stash lists the first segment as a path that carries the signature
+      const playlist = await receiver(hlsUrl);
+      expect(playlist.status).toBe(200);
+      segmentUrl = must(
+        playlist.body
+          .split("\n")
+          .find((line) => /\/proxy-stream\/stream\.m3u8\/0\.ts/.test(line)),
+        "the first segment line"
+      );
+    }, 60_000);
+
+    afterAll(async () => {
+      if (castUserId) await adminClient.delete(`/api/user/${castUserId}`);
+    });
+
+    it("the link alone plays the direct stream, the playlist, a segment, a caption and the poster across origins", async () => {
+      const direct = await receiver(directUrl, { range: "bytes=0-1023" });
+      expect(direct.status).toBe(206);
+      expect(direct.allowOrigin).toBe("*");
+      expect(direct.allowCredentials).toBeNull();
+      expect(direct.contentType.startsWith("video/")).toBe(true);
+
+      const playlist = await receiver(hlsUrl);
+      expect(playlist.status).toBe(200);
+      expect(playlist.allowOrigin).toBe("*");
+      expect(playlist.allowCredentials).toBeNull();
+      expect(playlist.body).toContain("#EXTM3U");
+      expect(playlist.body).not.toContain("apikey");
+
+      const segment = await receiver(segmentUrl);
+      expect(segment.status).toBe(200);
+      expect(segment.allowOrigin).toBe("*");
+      expect(segment.allowCredentials).toBeNull();
+
+      const caption = await receiver(captionUrl);
+      expect(caption.status).toBe(200);
+      expect(caption.allowOrigin).toBe("*");
+      expect(caption.allowCredentials).toBeNull();
+      expect(caption.body).toContain("WEBVTT");
+
+      const poster = await receiver(posterUrl);
+      expect(poster.status).toBe(200);
+      expect(poster.allowOrigin).toBe("*");
+      expect(poster.allowCredentials).toBeNull();
+      expect(poster.contentType.startsWith("image/")).toBe(true);
+    }, 30_000);
+
+    it("a tampered scope is refused, and the link opens no other scene", async () => {
+      const urls = [directUrl, hlsUrl, segmentUrl, captionUrl, posterUrl];
+      for (const url of urls) {
+        // Another scope, a missing scope (read as an external-player link)
+        // and an empty one
+        for (const scope of ["other", "", null]) {
+          expect((await receiver(withParam(url, "scope", scope))).status).toBe(
+            401
+          );
+        }
+      }
+
+      // Scene 2's stream, caption and poster with scene 1's link
+      for (const url of [directUrl, hlsUrl, captionUrl, posterUrl]) {
+        const res = await receiver(forScene(url, sceneId, otherSceneId), {
+          range: "bytes=0-1023",
+        });
+        expect(res.status).toBe(401);
+      }
+      expect(
+        (await receiver(forScene(segmentUrl, sceneId, otherSceneId))).status
+      ).toBe(401);
+    }, 30_000);
+
+    it("the link opens neither the MKV nor the MP4 transcode", async () => {
+      for (const file of ["stream.mkv", "stream.mp4", "stream.webm"]) {
+        const url = directUrl.replace(
+          "/proxy-stream/stream?",
+          `/proxy-stream/${file}?`
+        );
+        expect((await receiver(url)).status).toBe(401);
+      }
+    });
+
+    it("the link opens no other route", async () => {
+      // The same scene's screenshot through the generic proxy
+      const screenshot = `/api/proxy/stash?path=${encodeURIComponent(`/scene/${sceneId}/screenshot`)}&instanceId=${encodeURIComponent(instanceId)}&${signedQuery.slice(1)}`;
+      expect((await receiver(screenshot)).status).toBe(401);
+      expect(
+        (await receiver(`/api/proxy/scene/${sceneId}/preview${signedQuery}`))
+          .status
+      ).toBe(401);
+      expect(
+        (
+          await receiver(`/api/scene/${sceneId}/media-link${signedQuery}`, {
+            method: "POST",
+          })
+        ).status
+      ).toBe(401);
+    });
+
+    it("a scene the user hides answers 404 on every route the link opens, until it is shown again", async () => {
+      const hide = await castClient.post("/api/user/hidden-entities", {
+        entityType: "scene",
+        entityId: sceneId,
+        instanceId,
+      });
+      expect(hide.status).toBe(200);
+      try {
+        const answers = [];
+        for (const url of [directUrl, segmentUrl, captionUrl, posterUrl]) {
+          answers.push((await receiver(url, { range: "bytes=0-1023" })).status);
+        }
+        expect(answers).toEqual([404, 404, 404, 404]);
+      } finally {
+        const unhide = await castClient.delete(
+          `/api/user/hidden-entities/scene/${sceneId}?instanceId=${encodeURIComponent(instanceId)}`
+        );
+        expect(unhide.status).toBe(200);
+      }
+      expect((await receiver(segmentUrl)).status).toBe(200);
+    }, 30_000);
+
+    it("narrowing the user to another instance answers 404 on the segment", async () => {
+      await setInstanceSelection([otherInstanceId], castClient);
+      try {
+        expect((await receiver(segmentUrl)).status).toBe(404);
+      } finally {
+        await selectTestInstanceForClient(castClient);
+      }
+      expect((await receiver(segmentUrl)).status).toBe(200);
+    }, 30_000);
+
+    it("a password change revokes the link", async () => {
+      const changed = await castClient.post("/api/user/change-password", {
+        currentPassword: CAST_USER.password,
+        newPassword: "cast_it_pass_456",
+      });
+      expect(changed.status).toBe(200);
+      expect((await receiver(segmentUrl)).status).toBe(401);
+      expect(
+        (await receiver(directUrl, { range: "bytes=0-1023" })).status
+      ).toBe(401);
+    }, 30_000);
   });
 
   describe("external-player links", () => {
