@@ -297,6 +297,16 @@ export function apiPut<T = unknown>(
   });
 }
 
+export function apiPatch<T = unknown>(
+  endpoint: string,
+  data?: unknown
+): Promise<T> {
+  return apiFetch<T>(endpoint, {
+    method: "PATCH",
+    body: data !== undefined ? JSON.stringify(data) : undefined,
+  });
+}
+
 export function apiDelete<T = unknown>(endpoint: string): Promise<T> {
   return apiFetch<T>(endpoint, { method: "DELETE" });
 }

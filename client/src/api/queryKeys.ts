@@ -122,6 +122,16 @@ export const queryKeys = {
       ["images", instanceId, "detail", id] as const,
   },
 
+  // A list's "how many rows match" for the filter sheet's "Show N results"
+  // (`useListCount`). It sits under the list's root, so every library
+  // invalidation marks it, in a segment of its own: `listCountKey`'s
+  // "listCount" entries hold the totals the pages cache, bare numbers
+  listCount: (
+    root: string,
+    path: string,
+    body: Record<string, unknown> | null
+  ) => [root, undefined, "count", path, body] as const,
+
   // Whether the user's library can be shown yet (useLibraryReady)
   library: {
     ready: () => ["library", "ready"] as const,
@@ -156,6 +166,8 @@ export const queryKeys = {
     permissions: () => ["user", "permissions"] as const,
     filterPresets: () => ["user", "filterPresets"] as const,
     defaultPresets: () => ["user", "defaultPresets"] as const,
+    /** Every list's pinned fields and filters (`GET /user/filter-pins`) */
+    filterPins: () => ["user", "filterPins"] as const,
     hiddenEntities: () => ["user", "hiddenEntities"] as const,
     /** One page of the Hidden Items list; `hiddenEntities()` is its prefix */
     hiddenItems: (type: string, page: number) =>
