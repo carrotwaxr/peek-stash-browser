@@ -56,6 +56,7 @@ export type {
 export {
   CLIP_FIELDS,
   DEFAULT_PLAYLIST_ITEM_SORT,
+  DEFAULT_RECOMMENDED_SORT,
   DEFAULT_SORT,
   FIELDS,
   FILTER_BODY_KEYS,
@@ -71,6 +72,8 @@ export {
   PER_PAGE_MAX,
   PLAYLIST_ITEM_SORTS,
   Q_MAX_LENGTH,
+  RECOMMENDED_LIMIT,
+  RECOMMENDED_SORTS,
   SCENE_FIELDS,
   SORTS,
   SORT_DIRECTIONS,
@@ -83,6 +86,7 @@ export type {
   ListKind,
   PlaylistItemSort,
   RandomSortKey,
+  RecommendedSort,
   SortDirection,
   SortOf,
 } from "./fields.js";

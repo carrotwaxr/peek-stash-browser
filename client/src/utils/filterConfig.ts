@@ -74,6 +74,12 @@ export const SCENE_SORT_OPTIONS = [
   SCENE_INDEX_SORT_OPTION,
 ].sort((a, b) => a.label.localeCompare(b.label));
 
+// Recommended sorts: its rank first, then every scene sort
+export const RECOMMENDED_SORT_OPTIONS = [
+  { value: "recommended", label: "Recommended" },
+  ...SCENE_SORT_OPTIONS,
+];
+
 // Performer sorting options (alphabetically organized by label)
 export const PERFORMER_SORT_OPTIONS = [
   { value: "birthdate", label: "Birthdate" },
