@@ -4,16 +4,16 @@ Create personalized homepage carousels using a visual query builder. Custom caro
 
 ## Creating a Custom Carousel
 
-1. Navigate to **Settings** → **Homepage Carousels**
+1. Navigate to **Settings** → **User Preferences** → **Navigation** → **Homepage Carousels**
 2. Click **Create Carousel**
 3. Configure your carousel:
    - **Title**: Give your carousel a descriptive name
    - **Icon**: Choose from a selection of icons
    - **Filter Rules**: Add one or more rules, and optionally groups of rules, to define which scenes appear
-   - **Sort**: Choose how scenes are ordered (Random, Recently Added, etc.). Playlist order needs exactly one playlist rule, and Scene Number needs a collection rule, each at the top level (not inside a group) with the top level set to Match all; without that rule the sort is not offered, and removing the rule puts the sort back to Random
+   - **Sort By** and **Direction**: Choose how scenes are ordered, by any sort of the Scenes page (Random, Created At, Rating and the rest), Descending or Ascending. Playlist order needs exactly one playlist rule, and Scene Number needs a collection rule, each at the top level (not inside a group) with the top level set to Match all; without that rule the sort is not offered, and removing the rule puts the sort back to Random
 
 4. Click **Preview** to see matching scenes
-5. Click **Save** once you're satisfied with the preview
+5. Click **Save** once you're satisfied with the preview. Save works only after a successful Preview, and any change to the rules or sort asks for a new one. When you edit a carousel, the button reads **Update**
 
 ## Filter Rules
 
@@ -139,4 +139,4 @@ Click the trash icon to delete a custom carousel. This action cannot be undone.
 
 - Make sure the carousel is enabled (eye icon should be visible, not crossed out)
 - Try refreshing the page
-- Check Settings → Homepage Carousels to verify it's toggled on
+- Check Settings → User Preferences → Navigation → Homepage Carousels to verify it's toggled on
