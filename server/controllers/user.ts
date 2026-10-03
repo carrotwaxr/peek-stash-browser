@@ -1,6 +1,7 @@
 import {
   type GetUserRestrictionsResponse,
   TABLE_COLUMN_KINDS,
+  VIEW_NAME_TAKEN,
 } from "@peek/shared-types/api/user.js";
 import {
   LIST_KINDS,
@@ -1075,8 +1076,6 @@ function nameTaken(
   );
 }
 
-const DUPLICATE_NAME = "Another View of this list has that name";
-
 /** What a View stores beside its id, name and dates */
 type ViewState = Omit<SavedView, "id" | "name" | "createdAt" | "updatedAt">;
 
@@ -1225,7 +1224,7 @@ export const saveFilterPreset = async (
           ],
         });
       }
-      if (nameTaken(views, viewName)) throw new ConflictError(DUPLICATE_NAME);
+      if (nameTaken(views, viewName)) throw new ConflictError(VIEW_NAME_TAKEN);
       return {
         ...values,
         filterPresets: { ...presets, [artifactType]: [...views, { ...view }] },
@@ -1316,7 +1315,7 @@ export const renameFilterPreset = async (
       const current = views[index];
       if (!current) throw new NotFoundError("View not found");
       if (nameTaken(views, name, presetId)) {
-        throw new ConflictError(DUPLICATE_NAME);
+        throw new ConflictError(VIEW_NAME_TAKEN);
       }
       const next: FilterPreset = { ...current, name, updatedAt };
       renamed = next;
