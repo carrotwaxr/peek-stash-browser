@@ -12,6 +12,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -417,5 +418,187 @@ describe("CarouselBuilder", () => {
 
     const { saved } = await previewAndUpdate(fetchMock);
     expect(saved).toEqual(stored);
+  });
+  describe("sort options follow the rules", () => {
+    const PLAYLISTS = {
+      "/playlists": () =>
+        jsonResponse(200, { playlists: [{ id: 12, name: "Road trip" }] }),
+      "/playlists/shared": () =>
+        jsonResponse(200, {
+          playlists: [
+            { id: 40, name: "Weekend", owner: { username: "alice" } },
+          ],
+        }),
+    };
+    const COLLECTIONS = {
+      "/library/groups/minimal": () =>
+        jsonResponse(200, {
+          groups: [{ id: "5", instanceId: "a", name: "Series" }],
+        }),
+    };
+    const sortSelect = () => screen.getByRole("combobox", { name: "Sort By" });
+    const sortLabels = () =>
+      within(sortSelect())
+        .getAllByRole("option")
+        .map((option) => option.textContent);
+
+    /** The builder on a new carousel */
+    function renderNew() {
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <MemoryRouter initialEntries={["/settings/carousels/new"]}>
+            <Routes>
+              <Route
+                path="/settings/carousels/new"
+                element={<CarouselBuilder />}
+              />
+              <Route path="/settings" element={<div>Settings</div>} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+    }
+
+    it("Playlist order is offered with one playlist rule and saved", async () => {
+      const fetchMock = stubApi({
+        "/carousels": () => jsonResponse(200, { carousel: CAROUSEL }),
+        "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+        ...PLAYLISTS,
+      });
+      renderNew();
+
+      fireEvent.click(screen.getByRole("button", { name: /Add Rule/ }));
+      fireEvent.change(screen.getByRole("combobox", { name: "Filter" }), {
+        target: { value: "playlistIds" },
+      });
+      expect(sortLabels()).not.toContain("Playlist Order");
+      fireEvent.click(
+        await screen.findByRole("button", { name: /^Playlists/ })
+      );
+      fireEvent.click(await screen.findByRole("button", { name: "Road trip" }));
+
+      expect(sortLabels()).toContain("Playlist Order");
+      fireEvent.change(sortSelect(), {
+        target: { value: "playlist_position" },
+      });
+      fireEvent.change(screen.getByPlaceholderText("My Custom Carousel"), {
+        target: { value: "In order" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+      const save = await screen.findByRole("button", { name: /^Save/ });
+      await waitFor(() => expect(save).toBeEnabled());
+      fireEvent.click(save);
+      await screen.findByText("Settings");
+
+      const post = must(
+        fetchMock.mock.calls.find(
+          ([url, init]) =>
+            init?.method === "POST" && !url.includes("/carousels/preview")
+        )
+      );
+      expect(JSON.parse(post[1]?.body as string)).toMatchObject({
+        sort: "playlist_position",
+        rules: { playlists: { value: [12], modifier: "INCLUDES" } },
+      });
+      const preview = must(
+        fetchMock.mock.calls.find(([url]) => url.includes("/carousels/preview"))
+      );
+      expect(JSON.parse(preview[1]?.body as string)).toMatchObject({
+        sort: "playlist_position",
+      });
+    });
+
+    it("Playlist order is not offered with two playlists or none", async () => {
+      await openWith(
+        { playlists: { value: [12, 40], modifier: "INCLUDES" } },
+        PLAYLISTS
+      );
+      expect(sortLabels()).not.toContain("Playlist Order");
+      cleanup();
+      vi.unstubAllGlobals();
+
+      await openWith({ rating100: { modifier: "GREATER_THAN", value: 50 } });
+      expect(sortLabels()).not.toContain("Playlist Order");
+    });
+
+    it("Scene Number is offered only with a collection rule", async () => {
+      await openWith({ rating100: { modifier: "GREATER_THAN", value: 50 } });
+      expect(sortLabels()).not.toContain("Scene Number");
+      cleanup();
+      vi.unstubAllGlobals();
+
+      await openWith(
+        { groups: { value: ["5:a"], modifier: "INCLUDES" } },
+        COLLECTIONS
+      );
+      expect(sortLabels()).toContain("Scene Number");
+    });
+
+    it("removing the rule a sort needs puts the sort back to Random and says so", async () => {
+      const fetchMock = stubApi({
+        "/carousels/c1": () =>
+          jsonResponse(200, {
+            carousel: {
+              ...CAROUSEL,
+              rules: { playlists: { value: [12], modifier: "INCLUDES" } },
+              sort: "playlist_position",
+            },
+          }),
+        "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+        ...PLAYLISTS,
+      });
+      renderEditor(createQueryClient());
+      await screen.findByDisplayValue("Highly rated");
+      expect(sortSelect()).toHaveDisplayValue("Playlist Order");
+      expect(screen.queryByText(/sorted by Random/)).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove rule" }));
+
+      expect(sortSelect()).toHaveDisplayValue("Random");
+      expect(
+        screen.getByText(
+          "Playlist order needs one playlist rule; sorted by Random"
+        )
+      ).toBeVisible();
+
+      // A new rule of another field is previewed and saved with Random
+      fireEvent.click(screen.getByRole("button", { name: /Add Rule/ }));
+      fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+      await waitFor(() =>
+        expect(requestsTo(fetchMock, "/carousels/preview")).toHaveLength(1)
+      );
+      const preview = must(
+        fetchMock.mock.calls.find(([url]) => url.includes("/carousels/preview"))
+      );
+      expect(JSON.parse(preview[1]?.body as string)).toMatchObject({
+        sort: "random",
+      });
+    });
+
+    it("editing a stored carousel sorted by Playlist order keeps the sort", async () => {
+      const stored = {
+        ...CAROUSEL,
+        rules: { playlists: { value: [12], modifier: "INCLUDES" } },
+        sort: "playlist_position",
+      };
+      const fetchMock = stubApi({
+        "/carousels/c1": () => jsonResponse(200, { carousel: stored }),
+        "/carousels/preview": () => jsonResponse(200, { scenes: [] }),
+        ...PLAYLISTS,
+      });
+      renderEditor(createQueryClient());
+      await screen.findByDisplayValue("Highly rated");
+      expect(sortSelect()).toHaveDisplayValue("Playlist Order");
+      expect(screen.queryByText(/sorted by Random/)).toBeNull();
+
+      const { saved } = await previewAndUpdate(fetchMock);
+      expect(saved).toEqual(stored.rules);
+      const put = must(
+        fetchMock.mock.calls.find(([, init]) => init?.method === "PUT")
+      );
+      expect(JSON.parse(put[1]?.body as string)).toMatchObject({
+        sort: "playlist_position",
+      });
+    });
   });
 });

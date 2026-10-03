@@ -15,21 +15,22 @@ import { useSaveCarousel } from "../../api/hooks/useCarousels";
 import {
   CAROUSEL_FIELDS,
   CAROUSEL_FILTER_DEFINITIONS,
-  SCENE_SORT_OPTIONS,
   buildCarouselRules,
   carouselRulesToFilterState,
 } from "../../utils/filterConfig";
 import { type PanelState, codecOf, valuesOf } from "../../utils/filterFields";
-import { Button } from "../ui/index";
+import { sortOptionsFor } from "../../utils/listQuery";
+import { Button, StatusMessage } from "../ui/index";
 import CarouselPreview from "./CarouselPreview";
 import IconPickerButton from "./IconPickerButton";
 import RuleEditor from "./RuleEditor";
 import { getCarouselIcon } from "./carouselIcons";
 
-/** A carousel names no playlist, so Playlist order has no list to read */
-const CAROUSEL_SORT_OPTIONS = SCENE_SORT_OPTIONS.filter(
-  (option) => option.value !== "playlist_position"
-);
+/** Why a sort the rules no longer allow is replaced, by the sort's value */
+const SORT_NEEDS: Readonly<Record<string, string>> = {
+  playlist_position: "Playlist order needs one playlist rule",
+  scene_index: "Scene Number needs a collection rule",
+};
 
 // Simple ID generator for rule keys (doesn't need to be cryptographically secure)
 let ruleIdCounter = 0;
@@ -165,6 +166,13 @@ const CarouselBuilder = () => {
     void loadCarousel();
   }, [id, isEditing]);
 
+  // A sort the rules do not offer (its rule was removed) reads as Random
+  const filterState = convertRulesToFilterState(rules);
+  const sortOptions = sortOptionsFor("scene", filterState);
+  const effectiveSort = sortOptions.some((option) => option.value === sort)
+    ? sort
+    : "random";
+
   /**
    * A rule now edits this field: the kept rule of the same field goes, as
    * the save would overwrite it
@@ -258,7 +266,7 @@ const CarouselBuilder = () => {
 
       const result = await libraryApi.previewCarousel({
         rules: apiRules,
-        sort,
+        sort: effectiveSort,
         direction,
       });
 
@@ -305,7 +313,7 @@ const CarouselBuilder = () => {
         title: title.trim(),
         icon,
         rules: apiRules,
-        sort,
+        sort: effectiveSort,
         direction,
       };
 
@@ -566,13 +574,15 @@ const CarouselBuilder = () => {
           <div className="flex flex-wrap gap-4">
             <div className="space-y-1">
               <label
+                htmlFor="carousel-sort"
                 className="block text-xs"
                 style={{ color: "var(--text-muted)" }}
               >
                 Sort By
               </label>
               <select
-                value={sort}
+                id="carousel-sort"
+                value={effectiveSort}
                 onChange={(e) => {
                   setSort(e.target.value);
                   setPreviewValid(false);
@@ -585,7 +595,7 @@ const CarouselBuilder = () => {
                   color: "var(--text-primary)",
                 }}
               >
-                {CAROUSEL_SORT_OPTIONS.map((opt) => (
+                {sortOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
@@ -619,6 +629,14 @@ const CarouselBuilder = () => {
               </select>
             </div>
           </div>
+
+          {effectiveSort !== sort && (
+            <StatusMessage
+              variant="info"
+              title={null}
+              message={`${SORT_NEEDS[sort] ?? "That sort is not available with these rules"}; sorted by Random`}
+            />
+          )}
         </div>
 
         {/* Preview Section */}

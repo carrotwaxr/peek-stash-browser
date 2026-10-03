@@ -10,7 +10,7 @@ Create personalized homepage carousels using a visual query builder. Custom caro
    - **Title**: Give your carousel a descriptive name
    - **Icon**: Choose from a selection of icons
    - **Filter Rules**: Add one or more rules to define which scenes appear
-   - **Sort**: Choose how scenes are ordered (Random, Recently Added, etc.)
+   - **Sort**: Choose how scenes are ordered (Random, Recently Added, etc.). Playlist order needs exactly one playlist rule, and Scene Number needs a collection rule; without that rule the sort is not offered, and removing the rule puts the sort back to Random
 
 4. Click **Preview** to see matching scenes
 5. Click **Save** once you're satisfied with the preview
