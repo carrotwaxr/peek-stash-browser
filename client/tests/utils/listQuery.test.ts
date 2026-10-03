@@ -276,21 +276,26 @@ describe("a page change reuses its list's count (fetchListPage)", () => {
     expect(page2.findPerformers.count).toBe(70);
   });
 
-  it("a clip page change sends count false and fills total and totalPages", async () => {
+  it("a clip page change sends filter.count false and fills total and totalPages", async () => {
     const clipSent: Record<string, unknown>[] = [];
+    const filterOf = (clipRequest: Record<string, unknown>) =>
+      clipRequest.filter as Record<string, unknown>;
     const clipServer = (clipRequest: Record<string, unknown>) => {
       clipSent.push(clipRequest);
-      const counted = clipRequest.count !== false;
+      const counted = filterOf(clipRequest).count !== false;
       return Promise.resolve({
         clips: [],
         total: counted ? 50 : null,
-        page: clipRequest.page,
+        page: filterOf(clipRequest).page,
         perPage: 24,
         totalPages: counted ? 3 : null,
       });
     };
     const loadClips = (page: number) => {
-      const clipRequest = { page, perPage: 24, sortBy: "title" };
+      const clipRequest = {
+        filter: { page, per_page: 24, sort: "title" },
+        clip_filter: { is_generated: true },
+      };
       return client.fetchQuery({
         queryKey: queryKeys.clips.list(clipRequest),
         queryFn: (context) =>
@@ -301,8 +306,8 @@ describe("a page change reuses its list's count (fetchListPage)", () => {
     await loadClips(1);
     const page2 = await loadClips(2);
 
-    expect(must(clipSent[0]).count).toBeUndefined();
-    expect(must(clipSent[1]).count).toBe(false);
+    expect(filterOf(must(clipSent[0])).count).toBeUndefined();
+    expect(filterOf(must(clipSent[1])).count).toBe(false);
     expect(page2).toMatchObject({ total: 50, totalPages: 3, page: 2 });
   });
 });

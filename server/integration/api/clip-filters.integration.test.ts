@@ -32,6 +32,7 @@ import type {
   FilterRef,
   RefCriterion,
 } from "../../types/parsedFilters.js";
+import { parseClipQuery, parseListRequest } from "../../utils/listRequest.js";
 import { PAIR_INLINE_LIMIT } from "../../utils/sqlClauses.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -218,7 +219,7 @@ describeWithDb("Clip filters: every modifier (integration)", () => {
     it("Has ANY [T1, T2] on cf-a lists cf-a's clips holding either", async () => {
       expect(
         await clipKeys({
-          tagIds: criterion("INCLUDES", ref(T1, A), ref(T2, A)),
+          tags: criterion("INCLUDES", ref(T1, A), ref(T2, A)),
         })
       ).toEqual(on(A, C_MIXED, C_LIST, C_PRIMARY, C_LIST_ONE).sort());
     });
@@ -226,7 +227,7 @@ describeWithDb("Clip filters: every modifier (integration)", () => {
     it("Has ALL [T1, T2] returns only clips with both, from the primary tag or the list, on the named instance only", async () => {
       expect(
         await clipKeys({
-          tagIds: criterion("INCLUDES_ALL", ref(T1, A), ref(T2, A)),
+          tags: criterion("INCLUDES_ALL", ref(T1, A), ref(T2, A)),
         })
       ).toEqual(on(A, C_MIXED, C_LIST).sort());
     });
@@ -234,25 +235,25 @@ describeWithDb("Clip filters: every modifier (integration)", () => {
     it("Has NONE [T1, T2] returns clips with neither (no primary tag counts), and every clip of the other instance", async () => {
       expect(
         await clipKeys({
-          tagIds: criterion("EXCLUDES", ref(T1, A), ref(T2, A)),
+          tags: criterion("EXCLUDES", ref(T1, A), ref(T2, A)),
         })
       ).toEqual(sorted(on(A, C_NONE, C_OTHER), allOn(B)));
     });
 
     it("Has NONE [T1] drops a clip whose primary tag is T1 and one whose list holds it", async () => {
       expect(
-        await clipKeys({ tagIds: criterion("EXCLUDES", ref(T1, A)) })
+        await clipKeys({ tags: criterion("EXCLUDES", ref(T1, A)) })
       ).toEqual(sorted(on(A, C_LIST_ONE, C_NONE, C_OTHER), allOn(B)));
     });
 
     it("bare refs match their ids on every instance", async () => {
       expect(
         await clipKeys({
-          tagIds: criterion("INCLUDES_ALL", ref(T1), ref(T2)),
+          tags: criterion("INCLUDES_ALL", ref(T1), ref(T2)),
         })
       ).toEqual(sorted(on(A, C_MIXED, C_LIST), on(B, C_MIXED, C_LIST)));
       expect(
-        await clipKeys({ tagIds: criterion("EXCLUDES", ref(T1), ref(T2)) })
+        await clipKeys({ tags: criterion("EXCLUDES", ref(T1), ref(T2)) })
       ).toEqual(sorted(on(A, C_NONE, C_OTHER), on(B, C_NONE, C_OTHER)));
     });
 
@@ -262,12 +263,12 @@ describeWithDb("Clip filters: every modifier (integration)", () => {
       );
       expect(
         await clipKeys({
-          tagIds: criterion("EXCLUDES", ...padding, ref(T1, A), ref(T2, A)),
+          tags: criterion("EXCLUDES", ...padding, ref(T1, A), ref(T2, A)),
         })
       ).toEqual(sorted(on(A, C_NONE, C_OTHER), allOn(B)));
       expect(
         await clipKeys({
-          tagIds: criterion("INCLUDES", ...padding, ref(T1, A)),
+          tags: criterion("INCLUDES", ...padding, ref(T1, A)),
         })
       ).toEqual(on(A, C_MIXED, C_LIST, C_PRIMARY).sort());
     });
@@ -277,7 +278,7 @@ describeWithDb("Clip filters: every modifier (integration)", () => {
     it("Has ALL [T1, T2] returns the clips of scenes with both, on the named instance only", async () => {
       expect(
         await clipKeys({
-          sceneTagIds: criterion("INCLUDES_ALL", ref(T1, A), ref(T2, A)),
+          scene_tags: criterion("INCLUDES_ALL", ref(T1, A), ref(T2, A)),
         })
       ).toEqual(on(A, C_MIXED, C_LIST_ONE).sort());
     });
@@ -285,7 +286,7 @@ describeWithDb("Clip filters: every modifier (integration)", () => {
     it("Has NONE [T1, T2] returns the clips of scenes with neither, and every clip of the other instance", async () => {
       expect(
         await clipKeys({
-          sceneTagIds: criterion("EXCLUDES", ref(T1, A), ref(T2, A)),
+          scene_tags: criterion("EXCLUDES", ref(T1, A), ref(T2, A)),
         })
       ).toEqual(sorted(on(A, C_PRIMARY, C_OTHER), allOn(B)));
     });
@@ -295,7 +296,7 @@ describeWithDb("Clip filters: every modifier (integration)", () => {
     it("Has ALL [P1, P2] returns the clips of scenes with both, on the named instance only", async () => {
       expect(
         await clipKeys({
-          performerIds: criterion("INCLUDES_ALL", ref(P1, A), ref(P2, A)),
+          performers: criterion("INCLUDES_ALL", ref(P1, A), ref(P2, A)),
         })
       ).toEqual(on(A, C_MIXED, C_LIST_ONE).sort());
     });
@@ -303,15 +304,371 @@ describeWithDb("Clip filters: every modifier (integration)", () => {
     it("Has NONE [P1, P2] returns the clips of scenes with neither, and every clip of the other instance", async () => {
       expect(
         await clipKeys({
-          performerIds: criterion("EXCLUDES", ref(P1, A), ref(P2, A)),
+          performers: criterion("EXCLUDES", ref(P1, A), ref(P2, A)),
         })
       ).toEqual(sorted(on(A, C_PRIMARY, C_OTHER), allOn(B)));
     });
 
     it("Has ANY [P2] on cf-b lists cf-b's clips of scene 7891001 only", async () => {
       expect(
-        await clipKeys({ performerIds: criterion("INCLUDES", ref(P2, B)) })
+        await clipKeys({ performers: criterion("INCLUDES", ref(P2, B)) })
       ).toEqual(on(B, C_MIXED, C_LIST_ONE).sort());
     });
+  });
+});
+
+/**
+ * The filter body's fields (F16): depth on the clip's tags, its scene's tags
+ * and its scene's studio, the studio's EXCLUDES, the duration, the dates and
+ * several scenes, each read as the parser hands it on. Two made-up
+ * instances reuse the same ids and hold the same rows unless named:
+ * - tags 7892001 (TP), 7892002 (TC, under TP), 7892003 (TG, under TC),
+ *   7892004 (TO); studios 7892001 (SP) and 7892002 (SC, under SP)
+ * - scene 7892001: studio SP, tagged TC; 7892002: studio SC, inheriting TG;
+ *   7892003: no studio, no tag; 7892004: studio SP, hidden by the viewer on
+ *   cfx-a only
+ * - clip 7892101 (scene 7892001): primary tag TC, 0 to 20 s, with preview
+ * - clip 7892102 (scene 7892002): tag list TG, 10 to 50 s, with preview
+ * - clip 7892103 (scene 7892003): primary tag TO, from 5 s with no end
+ * - clip 7892104 (scene 7892004): primary tag TP, 0 to 10 s, with preview
+ * - clip 7892105 (scene 7892001): no tag, 30 to 40 s; hidden by the viewer
+ *   on cfx-b only
+ * On cfx-a the clips were created (and updated) 7892101 at
+ * 2021-10-13T03:00Z (22:00 on 12 Oct in Chicago), 7892102 at
+ * 2021-10-12T12:00Z, 7892104 at 2021-10-12T15:00Z, 7892105 at
+ * 2021-10-20T12:00Z; on cfx-b every one at 2021-11-01T12:00Z; 7892103
+ * never. Every seeded row and the viewer are deleted before the file ends.
+ */
+describeWithDb("Clip filters: the filter body (integration)", () => {
+  const X = "cfx-a";
+  const Y = "cfx-b";
+  const BOTH = [X, Y];
+  const VIEWER = "clip-filters-viewer";
+  const CHICAGO = "America/Chicago";
+  const [TP, TC, TG, TO] = ["7892001", "7892002", "7892003", "7892004"];
+  const [SP, SC] = ["7892001", "7892002"];
+  const [S1, S2, S3, S4] = ["7892001", "7892002", "7892003", "7892004"];
+  const [K1, K2, K3, K4, K5] = [
+    "7892101",
+    "7892102",
+    "7892103",
+    "7892104",
+    "7892105",
+  ];
+  let viewerId = 0;
+
+  const at = (instance: string, ...ids: string[]): string[] =>
+    ids.map((id) => `${id}:${instance}`);
+
+  async function removeRows(): Promise<void> {
+    await prisma.user.deleteMany({ where: { username: VIEWER } });
+    const where = { stashInstanceId: { in: BOTH } };
+    await prisma.stashClip.deleteMany({ where });
+    await prisma.stashScene.deleteMany({ where });
+    await prisma.stashStudio.deleteMany({ where });
+    await prisma.stashTag.deleteMany({ where });
+  }
+
+  /**
+   * The clips a `clip_filter` lists for the viewer through the parser, as
+   * sorted "id:instance" keys
+   */
+  async function listed(
+    clipFilter: Record<string, unknown>,
+    options: { timeZone?: string; applyExclusions?: boolean } = {}
+  ): Promise<string[]> {
+    const request = parseListRequest(
+      "clip",
+      { filter: { per_page: 100 }, clip_filter: clipFilter },
+      { userId: viewerId }
+    );
+    const { items, total } = await clipQueryBuilder.execute({
+      userId: viewerId,
+      allowedInstanceIds: BOTH,
+      request,
+      ...options,
+    });
+    const keys = items.map((clip) => `${clip.id}:${clip.instanceId}`).sort();
+    expect(total).toBe(keys.length);
+    return keys;
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    await prisma.stashTag.createMany({
+      data: BOTH.flatMap((i) => [
+        { id: TP, stashInstanceId: i, name: `TP ${i}` },
+        { id: TC, stashInstanceId: i, name: `TC ${i}`, parentIds: `["${TP}"]` },
+        { id: TG, stashInstanceId: i, name: `TG ${i}`, parentIds: `["${TC}"]` },
+        { id: TO, stashInstanceId: i, name: `TO ${i}` },
+      ]),
+    });
+    await prisma.stashStudio.createMany({
+      data: BOTH.flatMap((i) => [
+        { id: SP, stashInstanceId: i, name: `SP ${i}` },
+        { id: SC, stashInstanceId: i, name: `SC ${i}`, parentId: SP },
+      ]),
+    });
+    await prisma.stashScene.createMany({
+      data: BOTH.flatMap((i) => [
+        { id: S1, stashInstanceId: i, title: `S1 ${i}`, studioId: SP },
+        { id: S2, stashInstanceId: i, title: `S2 ${i}`, studioId: SC },
+        { id: S3, stashInstanceId: i, title: `S3 ${i}` },
+        { id: S4, stashInstanceId: i, title: `S4 ${i}`, studioId: SP },
+      ]),
+    });
+    await prisma.sceneTag.createMany({
+      data: BOTH.map((i) => ({
+        sceneId: S1,
+        sceneInstanceId: i,
+        tagId: TC,
+        tagInstanceId: i,
+      })),
+    });
+    await prisma.sceneInheritedTag.createMany({
+      data: BOTH.map((i) => ({
+        sceneId: S2,
+        sceneInstanceId: i,
+        tagId: TG,
+        tagInstanceId: i,
+      })),
+    });
+    const created = (instance: string, iso: string | null) => {
+      const when =
+        iso === null
+          ? null
+          : new Date(instance === X ? iso : "2021-11-01T12:00:00Z");
+      return { stashCreatedAt: when, stashUpdatedAt: when };
+    };
+    const clip = (
+      id: string,
+      instance: string,
+      sceneId: string,
+      seconds: number,
+      endSeconds: number | null,
+      isGenerated: boolean,
+      createdAt: string | null,
+      primaryTagId?: string
+    ) => ({
+      id,
+      stashInstanceId: instance,
+      sceneId,
+      sceneInstanceId: instance,
+      title: `Clip ${id} ${instance}`,
+      seconds,
+      endSeconds,
+      isGenerated,
+      ...created(instance, createdAt),
+      ...(primaryTagId === undefined
+        ? {}
+        : { primaryTagId, primaryTagInstanceId: instance }),
+    });
+    await prisma.stashClip.createMany({
+      data: BOTH.flatMap((i) => [
+        clip(K1, i, S1, 0, 20, true, "2021-10-13T03:00:00Z", TC),
+        clip(K2, i, S2, 10, 50, true, "2021-10-12T12:00:00Z"),
+        clip(K3, i, S3, 5, null, false, null, TO),
+        clip(K4, i, S4, 0, 10, true, "2021-10-12T15:00:00Z", TP),
+        clip(K5, i, S1, 30, 40, false, "2021-10-20T12:00:00Z"),
+      ]),
+    });
+    await prisma.clipTag.createMany({
+      data: BOTH.map((i) => ({
+        clipId: K2,
+        clipInstanceId: i,
+        tagId: TG,
+        tagInstanceId: i,
+      })),
+    });
+    const viewer = await prisma.user.create({
+      data: { username: VIEWER, password: "x", role: "USER" },
+    });
+    viewerId = viewer.id;
+    await prisma.userExcludedEntity.createMany({
+      data: [
+        {
+          userId: viewerId,
+          entityType: "scene",
+          entityId: S4,
+          instanceId: X,
+          reason: "hidden",
+        },
+        {
+          userId: viewerId,
+          entityType: "clip",
+          entityId: K5,
+          instanceId: Y,
+          reason: "hidden",
+        },
+      ],
+    });
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  it("tags with depth -1 match a sub-tag on the primary tag or the tag list", async () => {
+    expect(
+      await listed({ tags: { value: [`${TP}:${X}`], depth: -1 } })
+    ).toEqual(at(X, K1, K2).sort());
+    // One level: TC on the primary tag, not TG in the list
+    expect(await listed({ tags: { value: [`${TP}:${X}`], depth: 1 } })).toEqual(
+      at(X, K1)
+    );
+    // No depth: the hidden scene's clip holds TP itself
+    expect(await listed({ tags: { value: [`${TP}:${X}`] } })).toEqual([]);
+    expect(
+      await listed(
+        { tags: { value: [`${TP}:${X}`] } },
+        { applyExclusions: false }
+      )
+    ).toEqual(at(X, K4));
+  });
+
+  it("scene tags with a depth match the scene's own and inherited sub-tags", async () => {
+    expect(
+      await listed({ scene_tags: { value: [`${TP}:${Y}`], depth: -1 } })
+    ).toEqual(at(Y, K1, K2).sort());
+    expect(
+      await listed({ scene_tags: { value: [`${TP}:${Y}`], depth: 1 } })
+    ).toEqual(at(Y, K1));
+    expect(await listed({ scene_tags: { value: [`${TP}:${Y}`] } })).toEqual([]);
+  });
+
+  it("studios with a depth take the sub-studios' clips; EXCLUDES keeps clips whose scene has no studio", async () => {
+    expect(
+      await listed({ studios: { value: [`${SP}:${X}`], depth: -1 } })
+    ).toEqual(at(X, K1, K2, K5).sort());
+    expect(await listed({ studios: { value: [`${SP}:${X}`] } })).toEqual(
+      at(X, K1, K5).sort()
+    );
+    expect(
+      await listed({
+        studios: { value: [`${SP}:${X}`], modifier: "EXCLUDES", depth: -1 },
+      })
+    ).toEqual([...at(X, K3), ...at(Y, K1, K2, K3, K4)].sort());
+  });
+
+  it("the duration is end less start, and a clip without an end matches no comparison", async () => {
+    expect(
+      await listed({ duration: { modifier: "LESS_THAN", value: 30 } })
+    ).toEqual([...at(X, K1, K5), ...at(Y, K1, K4)].sort());
+    expect(
+      await listed({
+        duration: { modifier: "NOT_BETWEEN", value: 15, value2: 25 },
+      })
+    ).toEqual([...at(X, K2, K5), ...at(Y, K2, K4)].sort());
+    expect(
+      await listed({ duration: { modifier: "NOT_EQUALS", value: 20 } })
+    ).not.toContain(`${K3}:${X}`);
+  });
+
+  it("created and updated dates are the viewer's local day, a clip without one matching no comparison", async () => {
+    const oct12 = {
+      modifier: "BETWEEN",
+      value: "2021-10-12",
+      value2: "2021-10-12",
+    };
+    expect(await listed({ created_at: oct12 }, { timeZone: CHICAGO })).toEqual(
+      at(X, K1, K2).sort()
+    );
+    // 7892101 was created on 13 Oct in UTC
+    expect(await listed({ created_at: oct12 }, { timeZone: "UTC" })).toEqual(
+      at(X, K2)
+    );
+    expect(
+      await listed(
+        { updated_at: { modifier: "EQUALS", value: "2021-11-01" } },
+        { timeZone: CHICAGO }
+      )
+    ).toEqual(at(Y, K1, K2, K4).sort());
+    expect(
+      await listed(
+        { created_at: { modifier: "NOT_EQUALS", value: "2021-10-12" } },
+        { timeZone: CHICAGO }
+      )
+    ).toEqual([...at(X, K5), ...at(Y, K1, K2, K4)].sort());
+    expect(
+      await listed(
+        { created_at: { modifier: "IS_NULL" } },
+        { timeZone: CHICAGO }
+      )
+    ).toEqual([...at(X, K3), ...at(Y, K3)].sort());
+  });
+
+  it("scenes INCLUDES several scenes lists their clips; 7892001@cfx-a lists only cfx-a's clips", async () => {
+    expect(
+      await listed({ scenes: { value: [`${S1}:${X}`, `${S2}:${X}`] } })
+    ).toEqual(at(X, K1, K2, K5).sort());
+    expect(await listed({ scenes: { value: [`${S1}:${X}`] } })).toEqual(
+      at(X, K1, K5).sort()
+    );
+    // A bare id on every instance, the hidden clip left out
+    expect(await listed({ scenes: { value: [S1] } })).toEqual(
+      [...at(X, K1, K5), ...at(Y, K1)].sort()
+    );
+  });
+
+  it("a hidden scene's clip and a hidden clip are never listed, in any form", async () => {
+    const forms: Record<string, unknown>[] = [
+      { scenes: { value: [`${S4}:${X}`, `${S1}:${Y}`] } },
+      { tags: { value: [`${TO}:${X}`], modifier: "EXCLUDES" } },
+      { tags: { value: [`${TP}:${X}`, `${TP}:${Y}`] } },
+      { tags: { value: [], excludes: [`${TO}:${X}`] } },
+      { scene_tags: { value: [`${TC}:${X}`], modifier: "EXCLUDES" } },
+      { performers: { value: ["7892999"], modifier: "EXCLUDES" } },
+      { studios: { value: [`${SC}:${X}`], modifier: "EXCLUDES" } },
+      { studios: { value: [`${SP}:${X}`, `${SP}:${Y}`] } },
+      { duration: { modifier: "NOT_EQUALS", value: 99 } },
+      { duration: { modifier: "NOT_BETWEEN", value: 90, value2: 99 } },
+      { created_at: { modifier: "NOT_EQUALS", value: "2000-01-01" } },
+      { created_at: { modifier: "NOT_NULL" } },
+      {
+        updated_at: {
+          modifier: "NOT_BETWEEN",
+          value: "2000-01-01",
+          value2: "2000-01-02",
+        },
+      },
+      { title: { modifier: "NOT_NULL" } },
+      { title: { modifier: "EXCLUDES", value: "zzz" } },
+      { is_generated: true },
+      { is_generated: false },
+    ];
+    for (const form of forms) {
+      const keys = await listed(form, { timeZone: CHICAGO });
+      expect(keys, JSON.stringify(form)).not.toContain(`${K4}:${X}`);
+      expect(keys, JSON.stringify(form)).not.toContain(`${K5}:${Y}`);
+    }
+    // Without the viewer's exclusions both list
+    expect(
+      await listed(
+        { scenes: { value: [`${S4}:${X}`, `${S1}:${Y}`] } },
+        { applyExclusions: false }
+      )
+    ).toEqual([...at(X, K4), ...at(Y, K1, K5)].sort());
+  });
+
+  it("the prod clip preset's body matches the same clips as the GET ?sceneTagIds=<id> (a bare id on every instance)", async () => {
+    // What buildPanelFilter("clip", { sceneTagIds: ["7892002"] }) sends
+    const body = {
+      scene_tags: { value: [TC], modifier: "INCLUDES" },
+      is_generated: true,
+    };
+    const fromQuery = parseClipQuery(
+      { sceneTagIds: TC, isGenerated: "true", perPage: "100" },
+      { userId: viewerId }
+    );
+    const viaGet = await clipQueryBuilder.execute({
+      userId: viewerId,
+      allowedInstanceIds: BOTH,
+      request: fromQuery,
+    });
+    const getKeys = viaGet.items
+      .map((clip) => `${clip.id}:${clip.instanceId}`)
+      .sort();
+    expect(await listed(body)).toEqual(getKeys);
+    expect(getKeys).toEqual([...at(X, K1), ...at(Y, K1)].sort());
   });
 });

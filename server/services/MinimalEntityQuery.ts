@@ -1,6 +1,10 @@
 /**
  * The entity pickers' search (item 41.1): `POST /library/<entities>/minimal`
- * for performers, studios, tags, groups and galleries, in one statement.
+ * for scenes, performers, studios, tags, groups and galleries, in one
+ * statement. Scenes (a clip filter's scene picker, F16) are named and
+ * searched by their displayed title, the stored `titleSort` (the title, else
+ * the file name, ASCII lower-cased: LIKE folds ASCII case only, so it
+ * matches what the shown name would), and take no scope or counts.
  *
  * Every row goes through the exclusion anti-join with the instance,
  * `deletedAt IS NULL` and the user's allowed instances (invariants 3 and 11:
@@ -35,7 +39,10 @@ import {
   searchAll,
 } from "../utils/sqlClauses.js";
 import { emptyToNull, jsonListArm, searchTerms } from "../utils/sqlHelpers.js";
-import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
+import {
+  getGalleryFallbackTitle,
+  getSceneFallbackTitle,
+} from "../utils/titleUtils.js";
 
 type SqlParam = string | number | boolean;
 
@@ -69,6 +76,14 @@ interface MinimalConfig {
 const GALLERY_NAME = galleryNameSql("x");
 
 const CONFIGS: Record<MinimalKind, MinimalConfig> = {
+  scene: {
+    table: "StashScene",
+    entityType: "scene",
+    name: "x.titleSort",
+    extraColumns: "x.title, x.filePath",
+    search: ["x.titleSort"],
+    counts: [],
+  },
   performer: {
     table: "StashPerformer",
     entityType: "performer",
@@ -201,8 +216,15 @@ LIMIT ?`,
   };
 }
 
-/** The name a picker shows: a gallery's as the gallery pages show it */
+/** The name a picker shows: a gallery's and a scene's as their pages show it */
 function displayName(kind: MinimalKind, row: MinimalEntityQueryRow): string {
+  if (kind === "scene") {
+    return (
+      emptyToNull(row.title) ??
+      getSceneFallbackTitle(row.filePath ?? null) ??
+      ""
+    );
+  }
   if (kind !== "gallery") return row.name ?? "";
   return (
     emptyToNull(row.title) ??

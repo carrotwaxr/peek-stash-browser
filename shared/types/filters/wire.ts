@@ -23,12 +23,13 @@ import type {
   TextSpec,
 } from "./criteria.js";
 import type {
-  CLIP_PARAMS,
+  CLIP_FIELDS,
   FieldSpecOf,
   FilterBodyKey,
   GALLERY_FIELDS,
   GROUP_FIELDS,
   IMAGE_FIELDS,
+  ListKind,
   PERFORMER_FIELDS,
   RandomSortKey,
   SCENE_FIELDS,
@@ -213,13 +214,14 @@ export type TagFilterInput = FilterInput<typeof TAG_FIELDS>;
 export type GroupFilterInput = FilterInput<typeof GROUP_FIELDS>;
 export type GalleryFilterInput = FilterInput<typeof GALLERY_FIELDS>;
 export type ImageFilterInput = FilterInput<typeof IMAGE_FIELDS>;
+export type ClipFilterInput = FilterInput<typeof CLIP_FIELDS>;
 
 // =============================================================================
 // REQUESTS
 // =============================================================================
 
 /** The `filter` object of a list request: paging, sort and text search */
-export interface ListPageInput<E extends EntityKind> {
+export interface ListPageInput<E extends ListKind> {
   page?: number;
   /** 1 to PER_PAGE_MAX */
   per_page?: number;
@@ -234,40 +236,14 @@ export interface ListPageInput<E extends EntityKind> {
 }
 
 /** `POST /api/library/<entities>`: paging, top-level ids and the entity's filter */
-export type ListRequestInput<E extends EntityKind> = {
+export type ListRequestInput<E extends ListKind> = {
   filter?: ListPageInput<E>;
   /** Only these, as `"id:instanceId"` */
   ids?: string[];
 } & { [K in FilterBodyKey<E>]?: FilterInput<FieldSpecOf<E>> };
 
-type ClipParams = typeof CLIP_PARAMS;
-
-/** A ref parameter with a choice of modifier takes it from `<param>Modifier` */
-type ClipModifierParam<K extends string, S> =
-  S extends RefSpec<EntityKind, infer M>
-    ? [Exclude<M, "INCLUDES">] extends [never]
-      ? never
-      : `${K}Modifier`
-    : never;
-
-/** `GET /api/clips` query parameters */
-export type ClipQueryInput = {
-  page?: string;
-  /** 1 to PER_PAGE_MAX */
-  perPage?: string;
-  sortBy?: SortOf<"clip"> | RandomSortKey;
-  sortDir?: "asc" | "desc";
-  q?: string;
-  /** "false": the page alone, its `total` and `totalPages` null; counted when absent */
-  count?: "false";
-} & {
-  /** Refs as one comma-separated list; booleans as "true" or "false" */
-  [K in keyof ClipParams]?: ClipParams[K] extends BooleanSpec
-    ? "true" | "false"
-    : string;
-} & {
-  [K in keyof ClipParams as ClipModifierParam<
-    Extract<K, string>,
-    ClipParams[K]
-  >]?: ClipParams[K] extends RefSpec<EntityKind, infer M> ? M : never;
-};
+/**
+ * `POST /api/library/clips`: paging, sort and search, and the clip filter
+ * (`clip_filter`); clips take no top-level ids
+ */
+export type ClipListRequestInput = Omit<ListRequestInput<"clip">, "ids">;

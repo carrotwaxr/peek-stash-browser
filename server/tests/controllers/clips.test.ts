@@ -122,13 +122,14 @@ describe("Clips Controller", () => {
           perPage: 10,
           q: "search term",
           sort: { field: "title", direction: "ASC", seed: undefined },
+          // Each parameter read onto its clip filter field
           filter: {
-            isGenerated: false,
-            sceneId: refs(["42", undefined]),
-            tagIds: refs(["5", undefined]),
-            sceneTagIds: refs(["6", "inst-1"]),
-            performerIds: refs(["7", undefined]),
-            studioId: refs(["8", undefined]),
+            is_generated: false,
+            scenes: refs(["42", undefined]),
+            tags: refs(["5", undefined]),
+            scene_tags: refs(["6", "inst-1"]),
+            performers: refs(["7", undefined]),
+            studios: refs(["8", undefined]),
           },
           specificInstanceId: "inst-1",
         },
@@ -159,9 +160,9 @@ describe("Clips Controller", () => {
         );
       const { filter } = must(mockClipService.getClips.mock.calls[0])[0]
         .request;
-      expect(ids(filter.tagIds)).toEqual(["1", "2", "3"]);
-      expect(ids(filter.sceneTagIds)).toEqual(["4", "5:inst-1"]);
-      expect(ids(filter.performerIds)).toEqual(["6", "7", "8", "9"]);
+      expect(ids(filter.tags)).toEqual(["1", "2", "3"]);
+      expect(ids(filter.scene_tags)).toEqual(["4", "5:inst-1"]);
+      expect(ids(filter.performers)).toEqual(["6", "7", "8", "9"]);
     });
 
     it("passes the seed of random_<seed> to the service", async () => {

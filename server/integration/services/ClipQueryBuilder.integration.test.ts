@@ -301,18 +301,18 @@ describeWithDb("Clip builder on the base (integration)", () => {
 
   it("the tag filter matches the primary tag or a junction tag by (id, instance)", async () => {
     const onA = await clips({
-      filter: { tagIds: includes({ id: TAG, instanceId: A }) },
+      filter: { tags: includes({ id: TAG, instanceId: A }) },
     });
     expect(keys(onA.items)).toEqual([key(PRIMARY, A), key(JUNCTION, A)]);
     expect(onA.total).toBe(2);
 
     const onB = await clips({
-      filter: { tagIds: includes({ id: TAG, instanceId: B }) },
+      filter: { tags: includes({ id: TAG, instanceId: B }) },
     });
     expect(keys(onB.items)).toEqual([key(PRIMARY, B), key(JUNCTION, B)]);
 
     const bare = await clips({
-      filter: { tagIds: includes({ id: TAG, instanceId: undefined }) },
+      filter: { tags: includes({ id: TAG, instanceId: undefined }) },
     });
     expect(keys(bare.items)).toEqual([
       key(PRIMARY, A),
@@ -356,34 +356,31 @@ describeWithDb("Clip builder on the base (integration)", () => {
 
   it("scene tags, performers and the studio keep their instance", async () => {
     const sceneTag = await clips({
-      filter: { sceneTagIds: includes({ id: TAG, instanceId: B }) },
+      filter: { scene_tags: includes({ id: TAG, instanceId: B }) },
     });
     expect(keys(sceneTag.items)).toEqual([key(PRIMARY, B), key(JUNCTION, B)]);
 
     const performer = await clips({
-      filter: { performerIds: includes({ id: PERFORMER, instanceId: A }) },
+      filter: { performers: includes({ id: PERFORMER, instanceId: A }) },
     });
     expect(keys(performer.items)).toEqual(
       [PRIMARY, JUNCTION, OTHER].map((id) => key(id, A)).sort()
     );
 
     const studio = await clips({
-      filter: { studioId: includes({ id: STUDIO, instanceId: B }) },
+      filter: { studios: includes({ id: STUDIO, instanceId: B }) },
     });
     expect(keys(studio.items)).toEqual([key(PRIMARY, B), key(JUNCTION, B)]);
 
     const scene = await clips({
-      filter: { sceneId: includes({ id: SCENE, instanceId: A }) },
+      filter: { scenes: includes({ id: SCENE, instanceId: A }) },
     });
     expect(scene.total).toBe(3);
   });
 
   it("the scene tags filter matches a clip whose scene inherits the tag (SceneInheritedTag) and not one whose scene lacks it", async () => {
     const onI = (criterion: RefCriterion) =>
-      clips(
-        { filter: { sceneTagIds: criterion } },
-        { allowedInstanceIds: [I] }
-      );
+      clips({ filter: { scene_tags: criterion } }, { allowedInstanceIds: [I] });
     const tag = { id: TAG, instanceId: I };
 
     const matched = await onI(includes(tag));
@@ -401,7 +398,7 @@ describeWithDb("Clip builder on the base (integration)", () => {
     const { items, total } = await clips(
       {
         filter: {
-          sceneTagIds: {
+          scene_tags: {
             refs: [{ id: TAG, instanceId: I }],
             modifier: "EXCLUDES",
             depth: 0,
@@ -419,7 +416,7 @@ describeWithDb("Clip builder on the base (integration)", () => {
     const { items, total } = await clips(
       {
         filter: {
-          sceneTagIds: {
+          scene_tags: {
             refs: [
               { id: TAG, instanceId: I },
               { id: OTHER_TAG, instanceId: I },

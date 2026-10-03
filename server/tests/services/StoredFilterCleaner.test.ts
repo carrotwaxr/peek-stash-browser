@@ -158,7 +158,7 @@ describe("cleanPresetState", () => {
     expect(zero.changed).toBe(false);
   });
 
-  it("a tag or collection preset's sceneId goes (the panel no longer has it); a clip preset keeps its sceneId", () => {
+  it("a tag or collection preset's sceneId goes (the panel no longer has it); a clip preset keeps its scenes, the clip filter's field", () => {
     const tag = cleanPresetState(
       "tag",
       preset({ filters: { sceneId: "12", favorite: true }, sort: "name" })
@@ -170,7 +170,7 @@ describe("cleanPresetState", () => {
     const clip = cleanPresetState(
       "clip",
       preset({
-        filters: { sceneId: "12:a", isGenerated: "all" },
+        filters: { scenes: ["12:a"], isGenerated: "all" },
         sort: "stashCreatedAt",
       })
     );

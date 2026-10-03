@@ -340,6 +340,7 @@ describe("Minimal Endpoint Count Filters", () => {
     async function clearPageSizeFixture(): Promise<void> {
       await prisma.user.deleteMany({ where: { username: USERNAME } });
       const onInstance = { where: { stashInstanceId: INSTANCE } };
+      await prisma.stashScene.deleteMany(onInstance);
       await prisma.stashPerformer.deleteMany(onInstance);
       await prisma.stashStudio.deleteMany(onInstance);
       await prisma.stashTag.deleteMany(onInstance);
@@ -369,8 +370,59 @@ describe("Minimal Endpoint Count Filters", () => {
       await prisma.stashGallery.createMany({
         data: named.map(({ name, ...row }) => ({ ...row, title: name })),
       });
+      // Scenes as the sync stores them: titleSort is the displayed title
+      // (the title, else the file name without its extension), lower-cased
+      await prisma.stashScene.createMany({
+        data: [
+          {
+            id: "7780901",
+            stashInstanceId: INSTANCE,
+            title: "Beach Day",
+            titleSort: "beach day",
+            filePath: "/media/a.mp4",
+          },
+          {
+            id: "7780902",
+            stashInstanceId: INSTANCE,
+            title: null,
+            titleSort: "beach walk",
+            filePath: "/media/Beach Walk.mp4",
+          },
+          {
+            id: "7780903",
+            stashInstanceId: INSTANCE,
+            title: "Beach Hidden",
+            titleSort: "beach hidden",
+            filePath: "/media/c.mp4",
+          },
+          {
+            id: "7780904",
+            stashInstanceId: INSTANCE,
+            title: "Mountain",
+            titleSort: "mountain",
+            filePath: "/media/d.mp4",
+          },
+          {
+            id: "7780905",
+            stashInstanceId: INSTANCE,
+            title: "Beach Gone",
+            titleSort: "beach gone",
+            filePath: "/media/e.mp4",
+            deletedAt: new Date(),
+          },
+        ],
+      });
       // No instance selection: every enabled instance, this one included
       viewer = await createApiUser(USERNAME, "minimal_it_pass_1");
+      await prisma.userExcludedEntity.create({
+        data: {
+          userId: viewer.id,
+          entityType: "scene",
+          entityId: "7780903",
+          instanceId: INSTANCE,
+          reason: "hidden",
+        },
+      });
     }, 60000);
 
     afterAll(async () => {
@@ -422,6 +474,31 @@ describe("Minimal Endpoint Count Filters", () => {
         expect(rows(response.data)).toHaveLength(50);
       }
     );
+
+    it("scenes: lists the visible live scenes by displayed title, never a hidden one", async () => {
+      const { client } = must(viewer, "the viewer");
+
+      const response = await client.post<{
+        scenes: Array<{ id: string; instanceId: string; name: string }>;
+      }>("/api/library/scenes/minimal", { filter: { q: "beach" } });
+
+      expect(response.status).toBe(200);
+      const mine = response.data.scenes.filter(
+        (scene) => scene.instanceId === INSTANCE
+      );
+      expect(mine.map((scene) => [scene.id, scene.name])).toEqual([
+        ["7780901", "Beach Day"],
+        ["7780902", "Beach Walk"],
+      ]);
+    });
+
+    it("scenes: scope allEnabled answers 400 (the Content Restrictions editor restricts no scenes)", async () => {
+      const response = await adminClient.post("/api/library/scenes/minimal", {
+        scope: "allEnabled",
+      });
+
+      expectRefused(response, ["scope"]);
+    });
 
     it("minimal: an unknown count_filter key answers 400", async () => {
       const { client } = must(viewer, "the viewer");

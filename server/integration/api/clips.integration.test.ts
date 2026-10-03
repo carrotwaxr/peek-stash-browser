@@ -22,6 +22,7 @@ import {
   hideFixtureDefaults,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
+import { expectRefused } from "../helpers/refused.js";
 import type { TestClient } from "../helpers/testClient.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -72,6 +73,37 @@ describe("Clip endpoints (integration)", () => {
     expect(same?.scene).toEqual(
       objectContaining({ id: FX_ID.SAME, instanceId: FX.A })
     );
+  });
+
+  it("POST /api/library/clips lists what the GET with the same filter lists, with its total", async () => {
+    const posted = await reader.client.post<{
+      clips: ListedClip[];
+      total: number;
+      perPage: number;
+    }>("/api/library/clips", {
+      filter: { per_page: 250 },
+      clip_filter: { is_generated: false },
+    });
+    const got = await reader.client.get<{ clips: ListedClip[] }>(
+      "/api/clips?isGenerated=false&perPage=250"
+    );
+
+    expect(posted.ok).toBe(true);
+    expect(posted.data.perPage).toBe(250);
+    expect(posted.data.clips.map(keyOf)).toEqual(got.data.clips.map(keyOf));
+    expect(posted.data.total).toBe(posted.data.clips.length);
+    // The hidden scene's clip and the disabled instance's never list
+    const unseen = new Set<string>([FX_ID.ON_OFF, FX_ID.CLIP_OF_GLOBAL]);
+    expect(posted.data.clips.filter((c) => unseen.has(c.id))).toEqual([]);
+  });
+
+  it("POST /api/library/clips refuses the GET's parameter names and top-level ids", async () => {
+    const response = await reader.client.post("/api/library/clips", {
+      ids: ["1"],
+      clip_filter: { isGenerated: true },
+    });
+
+    expectRefused(response, ["ids", "clip_filter.isGenerated"]);
   });
 
   it("the disabled instance's clip is not listed even when asked for by instance", async () => {

@@ -45,7 +45,7 @@ function useClipListPage({ fromPageTitle }: ListPageData): ListPageExtras {
   return { cardHandlers };
 }
 
-/** The clip list; a scene's own clips fix its scene (`permanentFilters.sceneId`) */
+/** The clip list; a scene's own clips fix its scene (`permanentFilters.scenes`) */
 const CLIP_LIST: ListPageConfig = {
   entityType: "clip",
   title: "Clips",
@@ -84,7 +84,7 @@ interface ClipSearchProps {
   /** The preset context; "clip" by default */
   context?: string;
   initialSort?: string;
-  /** The page's own filters: `sceneId` lists one scene's clips */
+  /** The page's own filters: `scenes` (`{ value: ["id:instanceId"] }`) lists one scene's clips */
   permanentFilters?: Record<string, unknown>;
   permanentFiltersMetadata?: Record<string, unknown>;
   subtitle?: string;

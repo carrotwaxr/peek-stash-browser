@@ -54,7 +54,7 @@ export type {
 } from "./criteria.js";
 
 export {
-  CLIP_PARAMS,
+  CLIP_FIELDS,
   DEFAULT_PLAYLIST_ITEM_SORT,
   DEFAULT_SORT,
   FIELDS,
@@ -62,6 +62,7 @@ export {
   GALLERY_FIELDS,
   GROUP_FIELDS,
   IMAGE_FIELDS,
+  LIST_FIELDS,
   LIST_KINDS,
   MAX_REF_VALUES,
   MINIMAL_IDS_MAX,
@@ -133,7 +134,8 @@ export type {
 } from "./panel/index.js";
 
 export type {
-  ClipQueryInput,
+  ClipFilterInput,
+  ClipListRequestInput,
   CriterionInput,
   DateInput,
   EnumInput,

@@ -614,7 +614,7 @@ describeWithDb(
           perPage: 10,
           sort: { field: "seconds", direction: "ASC", seed: undefined },
           filter: {
-            sceneId: {
+            scenes: {
               refs: [{ id: SC_FAVORITES, instanceId: A }],
               modifier: "INCLUDES",
               depth: 0,

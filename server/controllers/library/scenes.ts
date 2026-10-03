@@ -1,4 +1,5 @@
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
+import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { hasAnyCriteria } from "../../services/RecommendationScoringService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
@@ -7,6 +8,8 @@ import { stashEntityService } from "../../services/StashEntityService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
+  FindScenesMinimalRequest,
+  FindScenesMinimalResponse,
   FindScenesRequest,
   FindScenesResponse,
   FindSimilarScenesParams,
@@ -23,6 +26,7 @@ import type { NormalizedScene } from "../../types/index.js";
 import { type EntityRef, entityKey } from "../../utils/entityRef.js";
 import {
   parseListRequest,
+  parseMinimalRequest,
   parseRecommendedRequest,
   parseSimilarScenesRequest,
   singleIdRef,
@@ -305,4 +309,26 @@ export const getRecommendedScenes = async (
     page,
     perPage,
   });
+};
+
+/**
+ * One page of scenes for the scene picker (a clip filter's scenes), by
+ * displayed title: the title or file name matched in SQL, or the ids a
+ * picker has selected, only scenes the viewer can see. No scope: the
+ * Content Restrictions editor restricts no scenes (a 400). A
+ * ValidationError (400) reaches the central error handler.
+ */
+export const findScenesMinimal = async (
+  req: TypedLibraryRequest<FindScenesMinimalRequest>,
+  res: TypedResponse<FindScenesMinimalResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const request = parseMinimalRequest("scene", req.body, { userId });
+
+  const scenes = await findMinimalEntities(
+    req.user,
+    request,
+    req.allowedInstanceIds
+  );
+  res.json({ scenes });
 };

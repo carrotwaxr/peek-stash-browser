@@ -1,6 +1,8 @@
 import { ValidationError } from "../middleware/errorHandler.js";
 import { clipService } from "../services/ClipService.js";
 import type {
+  FindClipsRequest,
+  FindClipsResponse,
   GetClipByIdParams,
   GetClipByIdResponse,
   GetClipsForSceneParams,
@@ -18,17 +20,61 @@ import type {
   TypedResponse,
 } from "../types/api/express.js";
 import type { ListCount } from "../types/api/library.js";
+import type { ClipListRequest } from "../types/parsedFilters.js";
 import {
   parseClipQuery,
   parseFilterRef,
+  parseListRequest,
   parseSceneClipsRequest,
 } from "../utils/listRequest.js";
 import { logger } from "../utils/logger.js";
 
+/** One page of clips for the request, as both clip routes answer it */
+async function clipPage(
+  req: {
+    user: { id: number };
+    allowedInstanceIds: readonly string[];
+    timeZone: string;
+  },
+  request: ClipListRequest
+): Promise<GetClipsResponse<ListCount>> {
+  const { page, perPage } = request;
+  const result = await clipService.getClips({
+    userId: req.user.id,
+    allowedInstanceIds: req.allowedInstanceIds,
+    timeZone: req.timeZone,
+    request,
+  });
+  return {
+    clips: result.clips,
+    total: result.total,
+    page,
+    perPage,
+    // count false: the page alone, the client keeps the total it holds
+    totalPages:
+      result.total === null ? null : Math.ceil(result.total / perPage),
+  };
+}
+
+/**
+ * POST /api/library/clips
+ * Browse clips with the clip filter body (`clip_filter`), on the user's
+ * instances (`clip_filter.instance_id` narrows them to one)
+ */
+export const findClips = async (
+  req: TypedLibraryRequest<FindClipsRequest>,
+  res: TypedResponse<FindClipsResponse<ListCount> | ApiErrorResponse>
+) => {
+  // A ValidationError (400) reaches the central error handler
+  const request = parseListRequest("clip", req.body, { userId: req.user.id });
+  res.json(await clipPage(req, request));
+};
+
 /**
  * GET /api/clips
- * Browse clips with filtering, on the user's instances (the `instanceId`
- * parameter narrows them to one)
+ * Browse clips with today's query parameters, kept for old links and
+ * callers: each is read onto its `clip_filter` field (`parseClipQuery`),
+ * on the user's instances (the `instanceId` parameter narrows them to one)
  */
 export const getClips = async (
   req: TypedLibraryRequest<never, Record<string, string>, GetClipsQuery>,
@@ -36,27 +82,7 @@ export const getClips = async (
 ) => {
   // A ValidationError (400) reaches the central error handler
   const request = parseClipQuery(req.query, { userId: req.user.id });
-
-  const userId = req.user.id;
-  const { page, perPage } = request;
-  const { allowedInstanceIds, timeZone } = req;
-
-  const result = await clipService.getClips({
-    userId,
-    allowedInstanceIds,
-    timeZone,
-    request,
-  });
-
-  res.json({
-    clips: result.clips,
-    total: result.total,
-    page,
-    perPage,
-    // count=false: the page alone, the client keeps the total it holds
-    totalPages:
-      result.total === null ? null : Math.ceil(result.total / perPage),
-  });
+  res.json(await clipPage(req, request));
 };
 
 /**

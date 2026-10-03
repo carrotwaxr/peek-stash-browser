@@ -2,75 +2,21 @@
  * Clips API endpoints.
  */
 import type {
-  ClipQueryInput,
+  FindClipsRequest,
+  FindClipsResponse,
   GetClipsForSceneResponse,
-  RefModifier,
+  ListCount,
 } from "@peek/shared-types";
-import { apiGet } from "./client";
+import { apiGet, apiPost } from "./client";
 
 /**
- * The Clips page's filter parameters, as `buildClipFilter` builds them: ids
- * as `"id:instanceId"`, each list with a choice of modifier beside it
+ * `POST /api/library/clips`: a page of the clip list, its filter in
+ * `clip_filter` (`buildClipFilter`), paging, sort and search in `filter`;
+ * `filter.count: false` asks for the page alone (`total` and `totalPages`
+ * null)
  */
-export interface ClipFilterParams {
-  tagIds?: string[];
-  tagIdsModifier?: RefModifier;
-  sceneTagIds?: string[];
-  sceneTagIdsModifier?: RefModifier;
-  performerIds?: string[];
-  performerIdsModifier?: RefModifier;
-  studioId?: string;
-  /** With (true) or without (false) a generated preview; absent lists every clip */
-  isGenerated?: boolean;
-}
-
-export interface GetClipsOptions extends ClipFilterParams {
-  page?: number;
-  perPage?: number;
-  sortBy?: ClipQueryInput["sortBy"];
-  sortDir?: ClipQueryInput["sortDir"];
-  sceneId?: string;
-  q?: string;
-  /** false: the page alone, `total` and `totalPages` null (a page change reusing its count) */
-  count?: false;
-}
-
-/** `GET /api/clips`, with every parameter as the server's contract names it */
-export async function getClips(options: GetClipsOptions = {}) {
-  const query: { -readonly [K in keyof ClipQueryInput]: ClipQueryInput[K] } =
-    {};
-
-  if (options.page) query.page = String(options.page);
-  if (options.perPage) query.perPage = String(options.perPage);
-  if (options.sortBy) query.sortBy = options.sortBy;
-  if (options.sortDir) query.sortDir = options.sortDir;
-  if (options.isGenerated !== undefined)
-    query.isGenerated = options.isGenerated ? "true" : "false";
-  if (options.sceneId) query.sceneId = options.sceneId;
-  if (options.tagIds?.length) {
-    query.tagIds = options.tagIds.join(",");
-    if (options.tagIdsModifier) query.tagIdsModifier = options.tagIdsModifier;
-  }
-  if (options.sceneTagIds?.length) {
-    query.sceneTagIds = options.sceneTagIds.join(",");
-    if (options.sceneTagIdsModifier)
-      query.sceneTagIdsModifier = options.sceneTagIdsModifier;
-  }
-  if (options.performerIds?.length) {
-    query.performerIds = options.performerIds.join(",");
-    if (options.performerIdsModifier)
-      query.performerIdsModifier = options.performerIdsModifier;
-  }
-  if (options.studioId) query.studioId = options.studioId;
-  if (options.q) query.q = options.q;
-  if (options.count === false) query.count = "false";
-
-  const queryString = new URLSearchParams(
-    Object.entries(query).filter(
-      (entry): entry is [string, string] => typeof entry[1] === "string"
-    )
-  ).toString();
-  return apiGet(`/clips${queryString ? `?${queryString}` : ""}`);
+export async function findClips(request: FindClipsRequest) {
+  return apiPost<FindClipsResponse<ListCount>>("/library/clips", request);
 }
 
 /** `GET /api/scenes/:id/clips`: the scene on its own instance, which the server requires */

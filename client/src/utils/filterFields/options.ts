@@ -7,7 +7,7 @@
  * integration walk loads `filterConfig.ts`, which reads these.
  */
 import {
-  CLIP_PARAMS,
+  CLIP_FIELDS,
   type EditorKind,
   type EntityKind,
   FIELDS,
@@ -54,12 +54,12 @@ export interface FilterOption {
   defaultOpen?: boolean;
 }
 
-/** Each list's contract fields (clips: their GET parameters) */
+/** Each list's contract fields */
 export const SPECS: Readonly<
   Record<ListKind, Readonly<Record<string, FieldSpec>>>
 > = {
   ...FIELDS,
-  clip: CLIP_PARAMS,
+  clip: CLIP_FIELDS,
 };
 
 /** The option type that draws each editor */

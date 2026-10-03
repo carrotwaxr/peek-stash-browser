@@ -8,7 +8,6 @@
  */
 import type {
   BooleanSpec,
-  CLIP_PARAMS,
   DateSpec,
   EntityKind,
   EnumSpec,
@@ -191,7 +190,7 @@ export type ParsedFields<F extends Readonly<Record<string, FieldSpec>>> = {
 };
 
 /** The parsed `<entity>_filter`; top-level ids are merged into `ids` (INCLUDES) */
-export type ParsedFilter<E extends EntityKind> = ParsedFields<FieldSpecOf<E>>;
+export type ParsedFilter<E extends ListKind> = ParsedFields<FieldSpecOf<E>>;
 
 export interface ParsedSort<K extends ListKind> {
   /** Whitelisted; "random_<n>" arrives as field "random", seed n % 1e8 */
@@ -201,7 +200,7 @@ export interface ParsedSort<K extends ListKind> {
   readonly seed: number | undefined;
 }
 
-export interface ParsedListRequest<E extends EntityKind> {
+export interface ParsedListRequest<E extends ListKind> {
   /** >= 1 */
   readonly page: number;
   /** 1..PER_PAGE_MAX */
@@ -220,29 +219,18 @@ export interface ParsedListRequest<E extends EntityKind> {
 }
 
 /**
- * `GET /api/clips`: the filter parameters. `isGenerated` absent lists every
- * clip; the Clips page sends true for its default ("With preview only").
+ * The clip filter (`clip_filter`, or the old GET's parameters mapped onto
+ * it). `is_generated` absent lists every clip; the Clips page sends true for
+ * its default ("With preview only").
  */
-export type ParsedClipFilter = ParsedFields<typeof CLIP_PARAMS>;
-
-export interface ParsedClipQuery {
-  readonly page: number;
-  readonly perPage: number;
-  readonly q: string | undefined;
-  readonly sort: ParsedSort<"clip">;
-  readonly filter: ParsedClipFilter;
-  /** The `instanceId` parameter, INSTANCE_ID_PATTERN */
-  readonly specificInstanceId: string | undefined;
-  /** The `count` parameter: false reads the page alone, as the list's `filter.count` */
-  readonly count?: boolean;
-}
+export type ParsedClipFilter = ParsedFilter<"clip">;
 
 /**
- * What the clip builder takes: the parsed clip query (`isGenerated` absent:
- * every clip, as the Clips page's All clips and a scene's clips with
- * ungenerated ones).
+ * What the clip builder takes: `POST /api/library/clips` parsed, or `GET
+ * /api/clips` read onto the same fields (`is_generated` absent: every clip,
+ * as the Clips page's All clips and a scene's clips with ungenerated ones)
  */
-export type ClipListRequest = ParsedClipQuery;
+export type ClipListRequest = ParsedListRequest<"clip">;
 
 /** `GET /api/scenes/:id/clips` */
 export interface ParsedSceneClipsQuery {
@@ -303,7 +291,13 @@ export interface ParsedPlaylistsQuery {
 }
 
 /** The lists with a `/minimal` endpoint (the entity pickers) */
-export type MinimalKind = "performer" | "studio" | "tag" | "group" | "gallery";
+export type MinimalKind =
+  | "scene"
+  | "performer"
+  | "studio"
+  | "tag"
+  | "group"
+  | "gallery";
 
 /** `POST /api/library/<entities>/minimal`: one page, always in name order */
 export interface ParsedMinimalRequest<E extends MinimalKind> {

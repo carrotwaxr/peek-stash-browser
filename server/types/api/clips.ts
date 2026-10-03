@@ -2,6 +2,8 @@
 export type {
   ClipTagRef,
   ClipWithRelations,
+  FindClipsRequest,
+  FindClipsResponse,
   GetClipsQuery,
   GetClipsResponse,
   GetClipByIdParams,

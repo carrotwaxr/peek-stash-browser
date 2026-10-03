@@ -87,6 +87,20 @@ export interface MinimalEntity {
 export type FindScenesRequest = ListRequestInput<"scene">;
 
 /**
+ * POST /api/library/scenes/minimal - the scene picker (a clip filter's
+ * scenes): the scenes the user can see, by displayed title (the title, else
+ * the file name). No `scope` (no scene is restricted) and no count_filter.
+ */
+export type FindScenesMinimalRequest = Omit<
+  MinimalRequest,
+  "scope" | "count_filter"
+>;
+
+export interface FindScenesMinimalResponse {
+  scenes: MinimalEntity[];
+}
+
+/**
  * A list response's total: a number, or null when the request asked for no
  * count (`filter.count: false`, or the clip list's `count=false`). A reader
  * that never sends the flag reads the default, a number.

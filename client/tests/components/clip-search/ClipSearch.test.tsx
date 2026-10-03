@@ -1,8 +1,9 @@
 /**
- * The Clips page on the list page shell: it sends what its filter panel
- * builds, every parameter of `buildClipFilter` with the modifiers, as
- * `getClips` takes it (item 38; the server's contract test maps the same
- * parameters, so a parameter the page dropped would pass there unseen); a
+ * The Clips page on the list page shell: it posts what its filter panel
+ * builds, every field of `buildClipFilter` with the modifiers in
+ * `clip_filter`, as `findClips` takes it (item 38, F16; the server's
+ * contract test maps the same fields, so a field the page dropped would
+ * pass there unseen); a
  * page change keeps the current clips on screen, dimmed, until the next
  * page arrives; the wall cog's Preview Behavior saves the user's wall
  * playback and the wall plays by it at once (LG-10, item 52).
@@ -14,14 +15,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as api from "@/api";
 import ClipSearch from "@/components/clip-search/ClipSearch";
 
-const { mockGetClips, mockApiPut } = vi.hoisted(() => ({
-  mockGetClips: vi.fn<(options: unknown) => Promise<unknown>>(),
+const { mockFindClips, mockApiPut } = vi.hoisted(() => ({
+  mockFindClips: vi.fn<(options: unknown) => Promise<unknown>>(),
   mockApiPut: vi.fn<(url: string, body: unknown) => Promise<unknown>>(),
 }));
 
 vi.mock("@/api", async (importOriginal) => ({
   ...(await importOriginal<typeof api>()),
-  getClips: mockGetClips,
+  findClips: mockFindClips,
   apiGet: vi.fn(() => Promise.resolve({})),
   apiPut: mockApiPut,
 }));
@@ -85,11 +86,11 @@ const renderClips = (url = "/clips", element = <ClipSearch />) =>
 describe("ClipSearch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetClips.mockResolvedValue({ clips: [], total: 0 });
+    mockFindClips.mockResolvedValue({ clips: [], total: 0 });
     mockApiPut.mockResolvedValue({ success: true });
   });
 
-  it("forwards every clip filter parameter, the modifiers included, to getClips", async () => {
+  it("posts every clip filter field, the modifiers included, with the page's scene, to findClips", async () => {
     const url =
       "/clips?page=2&per_page=48&q=kiss&sort=title&dir=ASC" +
       "&tagIds=1:server-a&tagIdsModifier=INCLUDES_ALL" +
@@ -99,27 +100,32 @@ describe("ClipSearch", () => {
 
     renderClips(
       url,
-      <ClipSearch permanentFilters={{ sceneId: "9:server-a" }} />
+      <ClipSearch
+        permanentFilters={{
+          scenes: { value: ["9:server-a"], modifier: "INCLUDES" },
+        }}
+      />
     );
 
     await waitFor(() => {
-      expect(mockGetClips).toHaveBeenCalled();
+      expect(mockFindClips).toHaveBeenCalled();
     });
-    expect(must(mockGetClips.mock.calls[0])[0]).toEqual({
-      page: 2,
-      perPage: 48,
-      sortBy: "title",
-      sortDir: "asc",
-      q: "kiss",
-      tagIds: ["1:server-a"],
-      tagIdsModifier: "INCLUDES_ALL",
-      sceneTagIds: ["2:server-a"],
-      sceneTagIdsModifier: "EXCLUDES",
-      performerIds: ["3:server-a"],
-      performerIdsModifier: "EXCLUDES",
-      studioId: "4:server-a",
-      isGenerated: false,
-      sceneId: "9:server-a",
+    expect(must(mockFindClips.mock.calls[0])[0]).toEqual({
+      filter: {
+        page: 2,
+        per_page: 48,
+        q: "kiss",
+        sort: "title",
+        direction: "ASC",
+      },
+      clip_filter: {
+        tags: { value: ["1:server-a"], modifier: "INCLUDES_ALL" },
+        scene_tags: { value: ["2:server-a"], modifier: "EXCLUDES" },
+        performers: { value: ["3:server-a"], modifier: "EXCLUDES" },
+        studios: { value: ["4:server-a"], modifier: "INCLUDES" },
+        is_generated: false,
+        scenes: { value: ["9:server-a"], modifier: "INCLUDES" },
+      },
     });
   });
 
@@ -127,20 +133,24 @@ describe("ClipSearch", () => {
     renderClips("/clips?isGenerated=all");
 
     await waitFor(() => {
-      expect(mockGetClips).toHaveBeenCalled();
+      expect(mockFindClips).toHaveBeenCalled();
     });
-    expect(must(mockGetClips.mock.calls[0])[0]).toEqual({
-      page: 1,
-      perPage: 24,
-      sortBy: "stashCreatedAt",
-      sortDir: "desc",
+    expect(must(mockFindClips.mock.calls[0])[0]).toEqual({
+      filter: {
+        page: 1,
+        per_page: 24,
+        q: "",
+        sort: "stashCreatedAt",
+        direction: "DESC",
+      },
+      clip_filter: {},
     });
   });
 
   it("page 2 keeps page 1's clips on screen, dimmed, until it loads", async () => {
     let answerPage2: (value: unknown) => void = () => {};
-    mockGetClips.mockImplementation((options) =>
-      (options as { page: number }).page === 2
+    mockFindClips.mockImplementation((options) =>
+      (options as { filter: { page: number } }).filter.page === 2
         ? new Promise((resolve) => {
             answerPage2 = resolve;
           })
@@ -181,14 +191,14 @@ describe("ClipSearch", () => {
 
   describe("table headers", () => {
     beforeEach(() => {
-      mockGetClips.mockResolvedValue({
+      mockFindClips.mockResolvedValue({
         clips: [clip("7", "A clip")],
         total: 1,
       });
     });
 
     const lastCall = () =>
-      must(mockGetClips.mock.calls[mockGetClips.mock.calls.length - 1])[0];
+      must(mockFindClips.mock.calls[mockFindClips.mock.calls.length - 1])[0];
     const header = (name: string) =>
       must(
         screen
@@ -204,14 +214,15 @@ describe("ClipSearch", () => {
       fireEvent.click(header("Start Time"));
       await waitFor(() =>
         expect(lastCall()).toMatchObject({
-          sortBy: "seconds",
-          sortDir: "desc",
+          filter: { sort: "seconds", direction: "DESC" },
         })
       );
 
       fireEvent.click(header("Start Time"));
       await waitFor(() =>
-        expect(lastCall()).toMatchObject({ sortBy: "seconds", sortDir: "asc" })
+        expect(lastCall()).toMatchObject({
+          filter: { sort: "seconds", direction: "ASC" },
+        })
       );
     });
 
@@ -221,7 +232,9 @@ describe("ClipSearch", () => {
 
       fireEvent.click(header("Title"));
       await waitFor(() =>
-        expect(lastCall()).toMatchObject({ sortBy: "title", sortDir: "desc" })
+        expect(lastCall()).toMatchObject({
+          filter: { sort: "title", direction: "DESC" },
+        })
       );
     });
 
@@ -232,8 +245,7 @@ describe("ClipSearch", () => {
       fireEvent.click(header("Duration"));
       await waitFor(() =>
         expect(lastCall()).toMatchObject({
-          sortBy: "duration",
-          sortDir: "desc",
+          filter: { sort: "duration", direction: "DESC" },
         })
       );
     });
@@ -255,7 +267,7 @@ describe("ClipSearch", () => {
       vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(
         () => {}
       );
-      mockGetClips.mockResolvedValue({
+      mockFindClips.mockResolvedValue({
         clips: [clip("7", "A clip")],
         total: 1,
       });

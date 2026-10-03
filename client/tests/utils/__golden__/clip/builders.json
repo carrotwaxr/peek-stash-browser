@@ -9,11 +9,13 @@
         "tagIdsModifier": "INCLUDES_ALL"
       },
       "request": {
-        "tagIds": [
-          "1:inst-a"
-        ],
-        "tagIdsModifier": "INCLUDES_ALL",
-        "isGenerated": true
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        },
+        "is_generated": true
       }
     },
     {
@@ -26,12 +28,14 @@
         "tagIdsModifier": "INCLUDES_ALL"
       },
       "request": {
-        "tagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "tagIdsModifier": "INCLUDES_ALL",
-        "isGenerated": true
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        },
+        "is_generated": true
       }
     },
     {
@@ -43,11 +47,13 @@
         "tagIdsModifier": "INCLUDES"
       },
       "request": {
-        "tagIds": [
-          "1:inst-a"
-        ],
-        "tagIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -60,12 +66,14 @@
         "tagIdsModifier": "INCLUDES"
       },
       "request": {
-        "tagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "tagIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -77,11 +85,13 @@
         "tagIdsModifier": "EXCLUDES"
       },
       "request": {
-        "tagIds": [
-          "1:inst-a"
-        ],
-        "tagIdsModifier": "EXCLUDES",
-        "isGenerated": true
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -94,12 +104,14 @@
         "tagIdsModifier": "EXCLUDES"
       },
       "request": {
-        "tagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "tagIdsModifier": "EXCLUDES",
-        "isGenerated": true
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -110,11 +122,13 @@
         ]
       },
       "request": {
-        "tagIds": [
-          "1:inst-a"
-        ],
-        "tagIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -126,12 +140,14 @@
         ]
       },
       "request": {
-        "tagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "tagIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -143,11 +159,13 @@
         "sceneTagIdsModifier": "INCLUDES_ALL"
       },
       "request": {
-        "sceneTagIds": [
-          "1:inst-a"
-        ],
-        "sceneTagIdsModifier": "INCLUDES_ALL",
-        "isGenerated": true
+        "scene_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        },
+        "is_generated": true
       }
     },
     {
@@ -160,12 +178,14 @@
         "sceneTagIdsModifier": "INCLUDES_ALL"
       },
       "request": {
-        "sceneTagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "sceneTagIdsModifier": "INCLUDES_ALL",
-        "isGenerated": true
+        "scene_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        },
+        "is_generated": true
       }
     },
     {
@@ -177,11 +197,13 @@
         "sceneTagIdsModifier": "INCLUDES"
       },
       "request": {
-        "sceneTagIds": [
-          "1:inst-a"
-        ],
-        "sceneTagIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "scene_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -194,12 +216,14 @@
         "sceneTagIdsModifier": "INCLUDES"
       },
       "request": {
-        "sceneTagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "sceneTagIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "scene_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -211,11 +235,13 @@
         "sceneTagIdsModifier": "EXCLUDES"
       },
       "request": {
-        "sceneTagIds": [
-          "1:inst-a"
-        ],
-        "sceneTagIdsModifier": "EXCLUDES",
-        "isGenerated": true
+        "scene_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -228,12 +254,14 @@
         "sceneTagIdsModifier": "EXCLUDES"
       },
       "request": {
-        "sceneTagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "sceneTagIdsModifier": "EXCLUDES",
-        "isGenerated": true
+        "scene_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -244,11 +272,13 @@
         ]
       },
       "request": {
-        "sceneTagIds": [
-          "1:inst-a"
-        ],
-        "sceneTagIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "scene_tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -260,12 +290,14 @@
         ]
       },
       "request": {
-        "sceneTagIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "sceneTagIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "scene_tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -277,11 +309,13 @@
         "performerIdsModifier": "INCLUDES_ALL"
       },
       "request": {
-        "performerIds": [
-          "1:inst-a"
-        ],
-        "performerIdsModifier": "INCLUDES_ALL",
-        "isGenerated": true
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        },
+        "is_generated": true
       }
     },
     {
@@ -294,12 +328,14 @@
         "performerIdsModifier": "INCLUDES_ALL"
       },
       "request": {
-        "performerIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "performerIdsModifier": "INCLUDES_ALL",
-        "isGenerated": true
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        },
+        "is_generated": true
       }
     },
     {
@@ -311,11 +347,13 @@
         "performerIdsModifier": "INCLUDES"
       },
       "request": {
-        "performerIds": [
-          "1:inst-a"
-        ],
-        "performerIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -328,12 +366,14 @@
         "performerIdsModifier": "INCLUDES"
       },
       "request": {
-        "performerIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "performerIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -345,11 +385,13 @@
         "performerIdsModifier": "EXCLUDES"
       },
       "request": {
-        "performerIds": [
-          "1:inst-a"
-        ],
-        "performerIdsModifier": "EXCLUDES",
-        "isGenerated": true
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -362,12 +404,14 @@
         "performerIdsModifier": "EXCLUDES"
       },
       "request": {
-        "performerIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "performerIdsModifier": "EXCLUDES",
-        "isGenerated": true
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -378,11 +422,13 @@
         ]
       },
       "request": {
-        "performerIds": [
-          "1:inst-a"
-        ],
-        "performerIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -394,12 +440,14 @@
         ]
       },
       "request": {
-        "performerIds": [
-          "1:inst-a",
-          "2:inst-b"
-        ],
-        "performerIdsModifier": "INCLUDES",
-        "isGenerated": true
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -408,8 +456,13 @@
         "studioId": "1:inst-a"
       },
       "request": {
-        "studioId": "1:inst-a",
-        "isGenerated": true
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "is_generated": true
       }
     },
     {
@@ -418,7 +471,7 @@
         "isGenerated": "false"
       },
       "request": {
-        "isGenerated": false
+        "is_generated": false
       }
     },
     {
@@ -468,11 +521,13 @@
             "direction": "DESC"
           },
           "clip_filter": {
-            "sceneTagIds": [
-              "280"
-            ],
-            "sceneTagIdsModifier": "INCLUDES",
-            "isGenerated": true
+            "scene_tags": {
+              "value": [
+                "280"
+              ],
+              "modifier": "INCLUDES"
+            },
+            "is_generated": true
           }
         }
       },
@@ -492,11 +547,13 @@
             "direction": "DESC"
           },
           "clip_filter": {
-            "sceneTagIds": [
-              "280"
-            ],
-            "sceneTagIdsModifier": "INCLUDES",
-            "isGenerated": true
+            "scene_tags": {
+              "value": [
+                "280"
+              ],
+              "modifier": "INCLUDES"
+            },
+            "is_generated": true
           }
         }
       },
@@ -509,11 +566,13 @@
           "direction": "DESC"
         },
         "clip_filter": {
-          "sceneTagIds": [
-            "280"
-          ],
-          "sceneTagIdsModifier": "INCLUDES",
-          "isGenerated": true
+          "scene_tags": {
+            "value": [
+              "280"
+            ],
+            "modifier": "INCLUDES"
+          },
+          "is_generated": true
         }
       }
     }

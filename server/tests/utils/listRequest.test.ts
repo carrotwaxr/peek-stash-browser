@@ -902,12 +902,12 @@ describe("parseClipQuery", () => {
 
   it("isGenerated true or false narrows to clips with or without a preview; absent lists every clip", () => {
     expect(parseClipQuery({ isGenerated: "true" }, opts()).filter).toEqual({
-      isGenerated: true,
+      is_generated: true,
     });
     expect(parseClipQuery({ isGenerated: "false" }, opts()).filter).toEqual({
-      isGenerated: false,
+      is_generated: false,
     });
-    expect(parseClipQuery({}, opts()).filter.isGenerated).toBe(undefined);
+    expect(parseClipQuery({}, opts()).filter.is_generated).toBe(undefined);
   });
 
   it("count=false asks for the page alone; true or absent counts; anything else is invalid", () => {
@@ -962,8 +962,9 @@ describe("parseClipQuery", () => {
       },
       opts()
     );
+    // The GET's parameters map onto the clip filter's fields
     expect(parsed.filter).toEqual({
-      tagIds: {
+      tags: {
         refs: [
           { id: "1", instanceId: "default" },
           { id: "2", instanceId: undefined },
@@ -971,27 +972,27 @@ describe("parseClipQuery", () => {
         modifier: "EXCLUDES",
         depth: 0,
       },
-      sceneTagIds: {
+      scene_tags: {
         refs: [{ id: "3", instanceId: undefined }],
         modifier: "INCLUDES",
         depth: 0,
       },
-      performerIds: {
+      performers: {
         refs: [{ id: "4", instanceId: "default" }],
         modifier: "INCLUDES_ALL",
         depth: 0,
       },
-      studioId: {
+      studios: {
         refs: [{ id: "5", instanceId: "default" }],
         modifier: "INCLUDES",
         depth: 0,
       },
-      sceneId: {
+      scenes: {
         refs: [{ id: "6", instanceId: undefined }],
         modifier: "INCLUDES",
         depth: 0,
       },
-      isGenerated: false,
+      is_generated: false,
     });
     expect(parsed.q).toBe("intro");
     expect(parsed.specificInstanceId).toBe("default");
@@ -1036,6 +1037,146 @@ describe("parseClipQuery", () => {
     expect(paths(issuesOf(() => parseClipQuery(query, opts())))).toEqual([
       path,
     ]);
+  });
+});
+
+describe("parseListRequest: clips", () => {
+  it("a clip_filter takes depth, a studio EXCLUDES, the duration and the dates", () => {
+    const parsed = parseListRequest(
+      "clip",
+      {
+        filter: { page: 2, sort: "seconds", direction: "ASC", q: " kiss " },
+        clip_filter: {
+          tags: { value: ["1:a"], depth: -1 },
+          scene_tags: { value: ["3:a"], modifier: "INCLUDES_ALL", depth: 2 },
+          studios: { value: ["2:a"], modifier: "EXCLUDES", depth: -1 },
+          performers: { value: ["4:a"], excludes: ["5:a"] },
+          scenes: { value: ["6:a", "7:b"] },
+          duration: { modifier: "LESS_THAN", value: 30 },
+          created_at: {
+            modifier: "BETWEEN",
+            value: "2021-10-12",
+            value2: "2021-10-13",
+          },
+          updated_at: { modifier: "IS_NULL" },
+          title: { modifier: "INCLUDES", value: "intro" },
+          is_generated: true,
+          instance_id: "a",
+        },
+      },
+      opts()
+    );
+    expect(parsed).toEqual({
+      page: 2,
+      perPage: 24,
+      q: "kiss",
+      sort: { field: "seconds", direction: "ASC", seed: undefined },
+      filter: {
+        tags: {
+          refs: [{ id: "1", instanceId: "a" }],
+          modifier: "INCLUDES",
+          depth: -1,
+        },
+        scene_tags: {
+          refs: [{ id: "3", instanceId: "a" }],
+          modifier: "INCLUDES_ALL",
+          depth: 2,
+        },
+        studios: {
+          refs: [{ id: "2", instanceId: "a" }],
+          modifier: "EXCLUDES",
+          depth: -1,
+        },
+        performers: {
+          refs: [{ id: "4", instanceId: "a" }],
+          modifier: "INCLUDES",
+          depth: 0,
+          excludes: [{ id: "5", instanceId: "a" }],
+        },
+        scenes: {
+          refs: [
+            { id: "6", instanceId: "a" },
+            { id: "7", instanceId: "b" },
+          ],
+          modifier: "INCLUDES",
+          depth: 0,
+        },
+        duration: { modifier: "LESS_THAN", value: 30 },
+        created_at: {
+          modifier: "BETWEEN",
+          value: "2021-10-12",
+          value2: "2021-10-13",
+        },
+        updated_at: { modifier: "IS_NULL" },
+        title: { modifier: "INCLUDES", value: "intro" },
+        is_generated: true,
+      },
+      specificInstanceId: "a",
+    });
+  });
+
+  it("the old GET's parameters parse to the same criteria as the body (old callers keep working)", () => {
+    const fromQuery = parseClipQuery(
+      { tagIds: "1:a", tagIdsModifier: "INCLUDES_ALL", isGenerated: "true" },
+      opts()
+    );
+    const fromBody = parseListRequest(
+      "clip",
+      {
+        clip_filter: {
+          tags: { value: ["1:a"], modifier: "INCLUDES_ALL" },
+          is_generated: true,
+        },
+      },
+      opts()
+    );
+    expect(fromQuery.filter).toEqual(fromBody.filter);
+    expect(fromQuery.filter).toEqual({
+      tags: {
+        refs: [{ id: "1", instanceId: "a" }],
+        modifier: "INCLUDES_ALL",
+        depth: 0,
+      },
+      is_generated: true,
+    });
+    expect(fromQuery.perPage).toBe(fromBody.perPage);
+  });
+
+  it("the studio is single-valued, a depth needs a hierarchical field, and top-level ids or the GET's names are unknown", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseListRequest(
+            "clip",
+            {
+              ids: ["1:a"],
+              clip_filter: {
+                studios: { value: ["2:a"], modifier: "INCLUDES_ALL" },
+                tagIds: { value: ["1:a"] },
+                duration: { modifier: "SOMETIMES", value: 3 },
+              },
+            },
+            opts()
+          )
+        )
+      )
+    ).toEqual([
+      "ids",
+      "clip_filter.studios.modifier",
+      "clip_filter.tagIds",
+      "clip_filter.duration.modifier",
+    ]);
+  });
+
+  it("an empty clip request lists every clip, newest first, 24 a page", () => {
+    expect(parseListRequest("clip", {}, opts())).toEqual({
+      page: 1,
+      perPage: 24,
+      q: undefined,
+      sort: { field: "stashCreatedAt", direction: "DESC", seed: undefined },
+      filter: {},
+      specificInstanceId: undefined,
+    });
   });
 });
 
@@ -1153,6 +1294,26 @@ describe("parseMinimalRequest", () => {
     expect(
       parseMinimalRequest("tag", { scope: null }, opts()).scope
     ).toBeUndefined();
+  });
+
+  it("scenes take q and per_page; scope allEnabled is refused for them (no scene is restricted)", () => {
+    expect(
+      parseMinimalRequest("scene", { filter: { q: " beach " } }, opts())
+    ).toEqual({
+      entity: "scene",
+      q: "beach",
+      perPage: 50,
+      ids: undefined,
+      countFilter: undefined,
+      scope: undefined,
+    });
+    expect(
+      issuesOf(() =>
+        parseMinimalRequest("scene", { scope: "allEnabled" }, opts())
+      )
+    ).toEqual([
+      { path: "scope", message: "Scenes are listed for the user only" },
+    ]);
   });
 
   it("any other scope fails: it names the instances the request looks in", () => {

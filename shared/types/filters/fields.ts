@@ -484,27 +484,38 @@ export const IMAGE_FIELDS = {
 } as const satisfies Record<string, FieldSpec>;
 
 /**
- * `GET /api/clips` query parameters that filter. Ref values are one
- * comma-separated string; a ref with a choice of modifier takes it from
- * `<param>Modifier` (`tagIdsModifier`).
+ * The clip list's filter (`POST /api/library/clips`, `clip_filter`). A
+ * clip lists with its scene, so the scene's tags, performers and studio
+ * filter it too. `GET /api/clips` maps its old query parameters onto these
+ * fields (`parseClipQuery`).
  */
-export const CLIP_PARAMS = {
-  instanceId: instance(),
-  /** Clips of this scene */
-  sceneId: ref("scene", { single: true, modifiers: ["INCLUDES"] }),
-  /** Tags on the clip itself (its primary tag or its tag list) */
-  tagIds: ref("tag"),
-  /** Tags on the clip's scene */
-  sceneTagIds: ref("tag"),
+export const CLIP_FIELDS = {
+  instance_id: instance(),
+  /** Clips of these scenes */
+  scenes: ref("scene"),
+  /** Tags on the clip itself: its primary tag or its tag list */
+  tags: ref("tag", { hierarchical: true, excludable: true }),
+  /** Tags on the clip's scene, its own or inherited */
+  scene_tags: ref("tag", { hierarchical: true, excludable: true }),
   /** Performers in the clip's scene */
-  performerIds: ref("performer"),
-  /** The clip's scene's studio */
-  studioId: ref("studio", { single: true, modifiers: ["INCLUDES"] }),
+  performers: ref("performer", { excludable: true }),
+  /** The clip's scene's studio (depth: sub-studios); EXCLUDES keeps a scene without one */
+  studios: ref("studio", {
+    hierarchical: true,
+    single: true,
+    excludable: true,
+  }),
   /**
    * Clips with (true) or without (false) a generated preview; every clip
    * when absent. The Clips page sends true for its default.
    */
-  isGenerated: bool(),
+  is_generated: bool(),
+  /** Seconds from the clip's start to its end; a clip without an end matches no comparison */
+  duration: num(),
+  created_at: date(),
+  updated_at: date(),
+  /** The clip's own title */
+  title: text(),
 } as const satisfies Record<string, FieldSpec>;
 
 export const FIELDS = {
@@ -517,7 +528,13 @@ export const FIELDS = {
   image: IMAGE_FIELDS,
 } as const satisfies Record<EntityKind, Record<string, FieldSpec>>;
 
-export type FieldSpecOf<E extends EntityKind> = (typeof FIELDS)[E];
+/** Every list's filter fields: the seven entity lists' and the clips' */
+export const LIST_FIELDS = {
+  ...FIELDS,
+  clip: CLIP_FIELDS,
+} as const satisfies Record<ListKind, Record<string, FieldSpec>>;
+
+export type FieldSpecOf<E extends ListKind> = (typeof LIST_FIELDS)[E];
 
 /** The request body key holding each list's filter */
 export const FILTER_BODY_KEYS = {
@@ -528,9 +545,10 @@ export const FILTER_BODY_KEYS = {
   group: "group_filter",
   gallery: "gallery_filter",
   image: "image_filter",
-} as const satisfies Record<EntityKind, string>;
+  clip: "clip_filter",
+} as const satisfies Record<ListKind, string>;
 
-export type FilterBodyKey<E extends EntityKind> = (typeof FILTER_BODY_KEYS)[E];
+export type FilterBodyKey<E extends ListKind> = (typeof FILTER_BODY_KEYS)[E];
 
 // =============================================================================
 // SORTS

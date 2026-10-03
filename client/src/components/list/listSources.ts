@@ -5,12 +5,9 @@
  * one a page calls never changes the hook order.
  */
 import { useCallback } from "react";
+import type { FindClipsRequest, ListPageInput } from "@peek/shared-types";
 import { type UseQueryResult, useQueryClient } from "@tanstack/react-query";
-import type {
-  ClipFilterParams,
-  GetClipsOptions,
-  LibrarySearchParams,
-} from "../../api";
+import type { LibrarySearchParams } from "../../api";
 import {
   useClipList,
   useGalleryList,
@@ -69,28 +66,21 @@ export interface ListSource {
 }
 
 /**
- * The clip list's request (`getClips`' flat options) from the list's query:
- * its page, sort and search, every parameter the panel built
- * (`buildClipFilter`), and the page's fixed scene
+ * The clip list's request (`POST /api/library/clips`) from the list's
+ * query: its page, sort and search in `filter` and the panel's
+ * `clip_filter` (a scene's own clips carry the page's permanent `scenes`
+ * there), as every list sends them; a sort not yet chosen ("") is left to
+ * the server's default, newest first
  */
-export function clipRequestOf(
-  query: ListQuery,
-  permanentFilters: Record<string, unknown>
-): GetClipsOptions {
-  const { filter } = query;
-  const clipFilter: ClipFilterParams =
-    ("clip_filter" in query ? query.clip_filter : undefined) ?? {};
-  const sceneId = permanentFilters.sceneId;
+export function clipRequestOf(query: ListQuery): FindClipsRequest {
+  const { sort, ...page } = query.filter;
+  const clipFilter = "clip_filter" in query ? query.clip_filter : undefined;
   return {
-    ...clipFilter,
-    page: filter.page,
-    perPage: filter.per_page,
-    sortBy: (filter.sort === ""
-      ? "stashCreatedAt"
-      : filter.sort) as GetClipsOptions["sortBy"],
-    sortDir: filter.direction === "ASC" ? "asc" : "desc",
-    ...(filter.q === "" ? {} : { q: filter.q }),
-    ...(typeof sceneId === "string" && sceneId !== "" ? { sceneId } : {}),
+    filter: {
+      ...page,
+      ...(sort === "" ? {} : { sort: sort as ListPageInput<"clip">["sort"] }),
+    },
+    ...(clipFilter === undefined ? {} : { clip_filter: clipFilter }),
   };
 }
 
@@ -145,13 +135,12 @@ export const LIST_SOURCES: Record<ListSourceEntity, ListSource> = {
     items: "images",
   },
   clip: {
-    useList: (request) => useClipList(request as GetClipsOptions | null),
+    useList: (request) => useClipList(request as FindClipsRequest | null),
     listKey: (params) => queryKeys.clips.list(params),
     result: null,
     items: "clips",
     count: "total",
-    toRequest: (query, permanentFilters) =>
-      clipRequestOf(query, permanentFilters) as Record<string, unknown>,
+    toRequest: (query) => clipRequestOf(query) as Record<string, unknown>,
   },
 };
 

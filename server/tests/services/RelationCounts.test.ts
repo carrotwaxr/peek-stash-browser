@@ -125,8 +125,8 @@ describe("countRelations", () => {
     expect(sent.userId).toBe(4);
     expect(sent.allowedInstanceIds).toEqual(["inst-a"]);
     expect(sent.request.filter).toEqual({
-      tagIds: { refs: [ref], modifier: "INCLUDES", depth: 0 },
-      isGenerated: true,
+      tags: { refs: [ref], modifier: "INCLUDES", depth: 0 },
+      is_generated: true,
     });
   });
 

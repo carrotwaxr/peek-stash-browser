@@ -86,7 +86,7 @@ describeWithDb("ClipQueryBuilder query plans", () => {
   });
 
   it("the default clip list (live, generated, newest first) drives from StashClip and looks each scene up by its primary key, with no temp B-tree for ORDER BY", async () => {
-    const { page, count } = await plans({ isGenerated: true });
+    const { page, count } = await plans({ is_generated: true });
     const shown = `page plan:\n${page.join("\n")}`;
 
     expect(must(page[0]), shown).toBe(
@@ -106,8 +106,8 @@ describeWithDb("ClipQueryBuilder query plans", () => {
 
   it("a scene tag filter reads SceneTag and SceneInheritedTag by their tag indexes as one list", async () => {
     const { page, count } = await plans({
-      isGenerated: true,
-      sceneTagIds: one("7"),
+      is_generated: true,
+      scene_tags: one("7"),
     });
 
     for (const plan of [page, count]) {

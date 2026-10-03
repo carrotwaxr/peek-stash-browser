@@ -24,7 +24,7 @@ describe("ClipService", () => {
     it("should return empty result when no clips exist", async () => {
       const result = await clipService.getClips({
         ...VIEWER,
-        request: parsedClipRequest({ filter: { isGenerated: true } }),
+        request: parsedClipRequest({ filter: { is_generated: true } }),
       });
       expect(result.clips).toEqual([]);
       expect(result.total).toBe(0);
