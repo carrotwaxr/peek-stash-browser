@@ -982,16 +982,34 @@ describe("Scene Number and Last O At sorts", () => {
       ],
     });
     await prisma.stashGroup.createMany({
-      data: [A, B].map((stashInstanceId) => ({
-        id: "1",
-        stashInstanceId,
-        name: `Sort ${stashInstanceId}`,
-      })),
+      data: [
+        ...[A, B].map((stashInstanceId) => ({
+          id: "1",
+          stashInstanceId,
+          name: `Sort ${stashInstanceId}`,
+        })),
+        { id: "2", stashInstanceId: A, name: "Sort sub-collection" },
+      ],
     });
-    const member = (sceneId: string, instance: string, sceneIndex: number) => ({
+    // Group 2 is a sub-collection of group 1 on so-a
+    await prisma.groupRelation.create({
+      data: {
+        containingId: "1",
+        containingInstanceId: A,
+        subId: "2",
+        subInstanceId: A,
+        orderIndex: 0,
+      },
+    });
+    const member = (
+      sceneId: string,
+      instance: string,
+      sceneIndex: number,
+      groupId = "1"
+    ) => ({
       sceneId,
       sceneInstanceId: instance,
-      groupId: "1",
+      groupId,
       groupInstanceId: instance,
       sceneIndex,
     });
@@ -1002,6 +1020,7 @@ describe("Scene Number and Last O At sorts", () => {
         member("3", A, 2),
         member("1", B, 1),
         member("2", B, 2),
+        member("4", A, 1, "2"),
       ],
     });
     const history = (sceneId: string, oCount: number, oHistory: string[]) => ({
@@ -1028,6 +1047,9 @@ describe("Scene Number and Last O At sorts", () => {
     await prisma.user.deleteMany({ where: { username: USERNAME } });
     await prisma.sceneGroup.deleteMany({
       where: { sceneInstanceId: { in: [A, B] } },
+    });
+    await prisma.groupRelation.deleteMany({
+      where: { containingInstanceId: { in: [A, B] } },
     });
     await prisma.stashGroup.deleteMany({
       where: { stashInstanceId: { in: [A, B] } },
@@ -1058,6 +1080,24 @@ describe("Scene Number and Last O At sorts", () => {
       "3:so-a",
       "1:so-a",
     ]);
+  });
+
+  it("scene_index with sub-collections keeps a scene only in a sub-collection, last, in the page and the total", async () => {
+    const filter = { groups: { ...collection("1"), depth: -1 } };
+    const sorted = await sceneQueryBuilder.execute({
+      userId,
+      applyExclusions: false,
+      allowedInstanceIds: [A, B],
+      request: parsedListRequest("scene", {
+        perPage: 50,
+        sort: { field: "scene_index", direction: "ASC", seed: undefined },
+        filter,
+      }),
+    });
+    expect(
+      sorted.items.map((scene) => `${scene.id}:${scene.instanceId}`)
+    ).toEqual(["2:so-a", "3:so-a", "1:so-a", "4:so-a"]);
+    expect(sorted.total).toBe(4);
   });
 
   it("scene_index without a collection filter answers 400", async () => {
