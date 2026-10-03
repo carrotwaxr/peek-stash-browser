@@ -385,7 +385,7 @@ describe("Home", () => {
 
   describe("See More of a custom carousel", () => {
     /** Home showing one custom carousel with these rules; resolves to its See More */
-    async function seeMoreOf(rules: unknown) {
+    async function seeMoreOf(rules: unknown, rulesLocked = false) {
       vi.mocked(libraryApi.executeCarousel).mockResolvedValue({
         carousel: { id: "c1", title: "Mine", icon: "Film" },
         scenes: [{ id: "1" }],
@@ -399,6 +399,7 @@ describe("Home", () => {
             rules,
             sort: "random",
             direction: "DESC",
+            rulesLocked,
           },
         ],
       });
@@ -445,6 +446,38 @@ describe("Home", () => {
       expect(
         await seeMoreOf({ match: "all", rules: [leaf("tags", tags)] })
       ).toBe(goddesses);
+    });
+  });
+
+  describe("See More of a carousel of fixed scenes", () => {
+    it("a locked carousel has no See More: it would list more scenes than the carousel shows", async () => {
+      vi.mocked(libraryApi.executeCarousel).mockResolvedValue({
+        carousel: { id: "c1", title: "Mine", icon: "Film" },
+        scenes: [{ id: "1" }],
+      } as never);
+      mockGetCarousels.mockResolvedValue({
+        carousels: [
+          {
+            id: "c1",
+            title: "Mine",
+            icon: "Film",
+            rules: { ids: ["1:a"], tags: { value: ["284"] } },
+            sort: "random",
+            direction: "DESC",
+            rulesLocked: true,
+          },
+        ],
+      });
+      mockMigrateCarouselPreferences.mockReturnValue([
+        { id: "custom-c1", enabled: true, order: 0 },
+      ]);
+
+      await renderHome();
+      await screen.findByText("Mine (1 scenes)");
+
+      expect(screen.getByTestId("scene-carousel")).not.toHaveAttribute(
+        "data-see-more"
+      );
     });
   });
 

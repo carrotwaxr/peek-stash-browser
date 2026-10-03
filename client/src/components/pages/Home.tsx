@@ -435,7 +435,9 @@ const CustomCarousel = ({
       selectedScenes={selectedScenes}
       onToggleSelect={onToggleSelect}
       seeMoreUrl={
-        carousel
+        // A carousel of fixed scenes: the list cannot name them, so it would
+        // show more scenes than the carousel does
+        carousel && !carousel.rulesLocked
           ? buildCustomCarouselUrl(
               carousel.rules,
               carousel.sort,
