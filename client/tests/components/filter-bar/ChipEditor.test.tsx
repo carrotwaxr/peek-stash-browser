@@ -7,12 +7,13 @@
  * adds that row and never edits a renumbered neighbour.
  */
 import { PANEL_FIELDS, PIN_LIMIT } from "@peek/shared-types";
-import { screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderListControls } from "@tests/helpers/renderListControls";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPut } from "@/api";
+import ChipEditorHeader from "@/components/filter-bar/ChipEditorHeader";
 
 interface Known {
   id: string;
@@ -276,5 +277,78 @@ describe("ChipEditor", () => {
       expect(button).toBeDisabled();
       expect(button).toHaveAccessibleDescription("Up to 10 pins");
     }
+  });
+});
+
+describe("ChipEditorHeader", () => {
+  const organized = must(
+    PANEL_FIELDS.scene.find((row) => row.key === "organized"),
+    "the Organized row"
+  );
+
+  it("names the field; Remove, Pin <field> and Pin as quick filter call back, the last only with a value", async () => {
+    const user = userEvent.setup();
+    const pinning = {
+      fieldPinned: false,
+      capped: false,
+      isFilterPinned: vi.fn(() => false),
+      toggleField: vi.fn(),
+      toggleFilter: vi.fn(),
+    };
+    const beforePin = vi.fn();
+    const onRemove = vi.fn();
+    const { rerender } = render(
+      <ChipEditorHeader
+        label="Organized"
+        field={organized}
+        state={{ organized: "true" }}
+        pinning={pinning}
+        beforePin={beforePin}
+        onRemove={onRemove}
+      />
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Organized" })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Pin Organized" }));
+    expect(pinning.toggleField).toHaveBeenCalledTimes(1);
+    await user.click(
+      screen.getByRole("button", { name: "Pin as quick filter" })
+    );
+    expect(beforePin).toHaveBeenCalledTimes(1);
+    expect(pinning.toggleFilter).toHaveBeenCalledWith({ organized: "true" });
+    await user.click(
+      screen.getByRole("button", { name: "Remove Organized filter" })
+    );
+    expect(onRemove).toHaveBeenCalledTimes(1);
+
+    // No value: nothing to pin as a quick filter
+    rerender(
+      <ChipEditorHeader
+        label="Organized"
+        field={organized}
+        state={{}}
+        pinning={pinning}
+        onRemove={onRemove}
+      />
+    );
+    expect(
+      screen.getByRole("button", { name: "Pin as quick filter" })
+    ).toBeDisabled();
+  });
+
+  it("without pinning it draws the name and Remove only", () => {
+    render(
+      <ChipEditorHeader
+        label="Organized"
+        field={organized}
+        state={{ organized: "true" }}
+        onRemove={vi.fn()}
+      />
+    );
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Remove",
+    ]);
   });
 });

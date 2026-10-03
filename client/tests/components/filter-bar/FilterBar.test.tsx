@@ -152,12 +152,14 @@ function renderBar(
     permanentFilters,
     permanentFiltersMetadata,
     pins = {},
+    onOpenSheet,
   }: {
     kind?: ListKind;
     options?: readonly FilterOption[];
     permanentFilters?: Record<string, unknown>;
     permanentFiltersMetadata?: Record<string, unknown>;
     pins?: PinsByList;
+    onOpenSheet?: (focus: RowKey | "add") => void;
   } = {}
 ) {
   const { filters, removeRow } = staticFilters(kind, state, options);
@@ -171,6 +173,7 @@ function renderBar(
         filters={filters}
         {...(permanentFilters ? { permanentFilters } : {})}
         {...(permanentFiltersMetadata ? { permanentFiltersMetadata } : {})}
+        {...(onOpenSheet ? { onOpenSheet } : {})}
       />
     </QueryClientProvider>
   );
@@ -1076,5 +1079,39 @@ describe("groups and the Advanced entry", () => {
         "Fixed by this page: Performer: Jane Roe; Studio: Brazzers"
       )
     ).toBeInTheDocument();
+  });
+});
+
+describe("on the sheet surface (a phone or a TV)", () => {
+  it("a chip, an empty pinned chip and + Filter open the sheet, not a popover; the row scrolls sideways", async () => {
+    const user = userEvent.setup();
+    const onOpenSheet = vi.fn<(focus: RowKey | "add") => void>();
+    renderBar(
+      { favorite: "true" },
+      {
+        onOpenSheet,
+        pins: { scene: { fields: ["organized"], filters: [] } },
+      }
+    );
+
+    await user.click(await edit("Favorite Scenes: Yes"));
+    expect(onOpenSheet).toHaveBeenLastCalledWith({
+      group: 0,
+      occurrence: 1,
+      key: "favorite",
+    });
+    await user.click(await edit("Organized"));
+    expect(onOpenSheet).toHaveBeenLastCalledWith({
+      group: 0,
+      occurrence: 1,
+      key: "organized",
+    });
+    await user.click(addFilter());
+    expect(onOpenSheet).toHaveBeenLastCalledWith("add");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+    const bar = screen.getByRole("group", { name: "Filters" });
+    expect(bar).toHaveClass("flex-nowrap", "overflow-x-auto");
   });
 });

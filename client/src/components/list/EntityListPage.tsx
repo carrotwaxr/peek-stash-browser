@@ -282,6 +282,26 @@ const EntityListPage = ({
     permanentFilters,
   ]);
 
+  // The filter sheet's "Show N results": the list's request over the draft,
+  // in the list hook's own shape, counted where the source counts
+  const countRequestOf = useCallback(
+    (draft: Record<string, unknown>) => {
+      const query = buildListQuery(
+        entityType,
+        { ready, filters: draft, sort, page, perPage, q },
+        permanentFilters
+      );
+      if (!query) return null;
+      return {
+        body: source.toRequest
+          ? source.toRequest(query, permanentFilters)
+          : { ...query },
+        ...(source.countPath === undefined ? {} : { path: source.countPath }),
+      };
+    },
+    [source, entityType, ready, sort, page, perPage, q, permanentFilters]
+  );
+
   // The timeline's bars count what the list shows: its search and filter
   // (the page's permanent filters, not the period's own `date`), no page or
   // sort. The user's Date filter counts before and after a period locks
@@ -555,6 +575,7 @@ const EntityListPage = ({
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={columnsPopover}
           onPresetColumns={applyPresetColumns}
+          countRequestOf={countRequestOf}
         >
           {renderResults()}
         </SearchControls>

@@ -63,6 +63,12 @@ export interface ListSource {
     query: ListQuery,
     permanentFilters: Record<string, unknown>
   ) => Record<string, unknown>;
+  /**
+   * Where the filter sheet's "Show N results" counts the request
+   * (`useListCount`); `/library/<plural>/count` unless named (Recommended
+   * counts within its own ranking)
+   */
+  countPath?: string;
 }
 
 /**

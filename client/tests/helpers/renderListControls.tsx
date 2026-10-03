@@ -82,6 +82,7 @@ export function renderListControls(
   return {
     onQueryChange,
     router,
+    queryClient,
     actions,
     params: () => new URLSearchParams(router.state.location.search),
     /** The last query the page was asked for */

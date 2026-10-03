@@ -3,7 +3,7 @@
  * `chip()`) and the names its ids resolved to.
  */
 import type { Match } from "@peek/shared-types";
-import type { ChipParts } from "../../utils/filterFields";
+import type { ChipParts, FilterChip } from "../../utils/filterFields";
 
 /** Names a chip looks up: the rest show as a count */
 export const NAMES_SHOWN = 3;
@@ -79,3 +79,32 @@ export function groupText(match: Match, labels: readonly string[]): string {
     more > 0 ? ` +${more} more` : ""
   }`;
 }
+
+/** A detail page's own filters by name (`permanentFiltersMetadata`) */
+export interface PermanentFiltersMetadata {
+  performers?: Array<{ id: string; name: string }>;
+  studios?: Array<{ id: string; name: string }>;
+  tags?: Array<{ id: string; name: string }>;
+  [key: string]: unknown;
+}
+
+/**
+ * A detail page's own filters as chips: a plain label in the bar, no edit
+ * and no remove, and the Advanced view's "Fixed by this page"
+ */
+export const permanentChipsOf = (
+  metadata: PermanentFiltersMetadata
+): FilterChip[] => [
+  ...(metadata.performers ?? []).map((performer) => ({
+    key: "performers",
+    parts: { label: "Performer", values: [performer.name] },
+  })),
+  ...(metadata.studios ?? []).map((studio) => ({
+    key: "studios",
+    parts: { label: "Studio", values: [studio.name] },
+  })),
+  ...(metadata.tags ?? []).map((tag) => ({
+    key: "tags",
+    parts: { label: "Tag", values: [tag.name] },
+  })),
+];

@@ -117,6 +117,20 @@ export const SearchableGrid = ({
     return query ? withLockedFilters(query, lockedFilters) : null;
   }, [entityType, ready, filters, sort, page, perPage, q, lockedFilters]);
 
+  // The filter sheet's "Show N results" counts what the tab would list:
+  // the draft's request with the tab's lock
+  const countRequestOf = useCallback(
+    (draft: Record<string, unknown>) => {
+      const query = buildListQuery(
+        entityType,
+        { ready, filters: draft, sort, page, perPage, q },
+        lockedFilters
+      );
+      return query ? { body: withLockedFilters(query, lockedFilters) } : null;
+    },
+    [entityType, ready, sort, page, perPage, q, lockedFilters]
+  );
+
   const { data, error, isPending, isPlaceholderData, refetch } =
     list.useList(request);
   const { items, count: totalCount } = pickPage(list, data);
@@ -142,6 +156,7 @@ export const SearchableGrid = ({
       totalPages={totalPages}
       totalCount={totalCount}
       isRefreshing={isPlaceholderData}
+      countRequestOf={countRequestOf}
     >
       <SearchResults
         entityType={entityType}

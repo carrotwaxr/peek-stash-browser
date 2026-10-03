@@ -9,10 +9,13 @@
 import { vi } from "vitest";
 import "@testing-library/jest-dom";
 
-// Mock window.matchMedia (not available in happy-dom)
+// Mock window.matchMedia (not available in happy-dom). The implementation
+// is the mock's own, so `vi.restoreAllMocks()` in a test file keeps it (a
+// `mockImplementation` would be dropped, and every `useMediaQuery` reader,
+// the list controls among them, would then throw)
 Object.defineProperty(window, "matchMedia", {
   writable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
+  value: vi.fn((query: string) => ({
     matches: false,
     media: query,
     onchange: null,
