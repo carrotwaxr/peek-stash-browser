@@ -362,6 +362,7 @@ Every list's **+ Filter** menu offers these filters, grouped in sections; the on
 - **Tags:** Name, Description and Aliases; StashDB ID; Performers, Studio and Collections; **Parent Tags** and **Child Tags** (with sub-tags); counts of scenes, parents, children, images, galleries, performers, studios, collections and markers; Rating, O Count, Play Count, dates and Favorite Tags.
 - **Collections:** Name, Synopsis, Director, Aliases and URL; Performers, Studio (with sub-studios and Has none / Has any), Tags (with sub-tags); **Parent collection** and **Sub-collections** (with depth); Scene, Sub-collection, Parent Collection and Tag counts; Duration, Rating, O Count, Play Count and Has a Favorite Performer; Release, Created and Updated dates.
 - **Clips:** see [Clips](clips.md).
+- **Recommended:** the Scenes filters, applied within your top 500 recommendations, with its own Views and default; see [Recommendations](recommendations.md#recommended-page).
 
 A collection's O Count and Play Count are yours, summed over its scenes you can see.
 
