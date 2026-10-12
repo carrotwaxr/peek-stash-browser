@@ -62,6 +62,14 @@ const renderSettings = (onSave = vi.fn().mockResolvedValue(undefined)) => {
   return onSave;
 };
 
+/** Answers the "Delete carousel?" question with Delete */
+const confirmDelete = async () => {
+  const dialog = await screen.findByRole("dialog", {
+    name: "Delete carousel?",
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+};
+
 describe("CarouselSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -87,6 +95,47 @@ describe("CarouselSettings", () => {
     expect(mockGetCarousels).toHaveBeenCalledTimes(2);
   });
 
+  it("Delete asks first, naming the carousel: Cancel keeps it, Delete removes it", async () => {
+    mockGetCarousels
+      .mockResolvedValueOnce({ carousels: CUSTOM })
+      .mockResolvedValue({ carousels: [] });
+    mockDeleteCarousel.mockResolvedValue({ success: true });
+    renderSettings();
+
+    const row = must(
+      (await screen.findByText("My Carousel")).closest<HTMLElement>(".border"),
+      "the custom carousel's row"
+    );
+    fireEvent.click(
+      within(row).getByRole("button", { name: "Delete carousel" })
+    );
+
+    // Nothing is deleted by the click itself
+    const dialog = await screen.findByRole("dialog", {
+      name: "Delete carousel?",
+    });
+    expect(within(dialog).getByText(/My Carousel/)).toBeInTheDocument();
+    expect(mockDeleteCarousel).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    await flushPromises();
+    expect(mockDeleteCarousel).not.toHaveBeenCalled();
+    expect(screen.getByText("My Carousel")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(row).getByRole("button", { name: "Delete carousel" })
+    );
+    await confirmDelete();
+
+    await waitFor(() => expect(mockDeleteCarousel).toHaveBeenCalledWith("c1"));
+    await waitFor(() =>
+      expect(screen.queryByText("My Carousel")).not.toBeInTheDocument()
+    );
+  });
+
   it("a failed delete shows the server's message and keeps the carousel", async () => {
     mockGetCarousels.mockResolvedValue({ carousels: CUSTOM });
     mockDeleteCarousel.mockRejectedValue(
@@ -101,6 +150,7 @@ describe("CarouselSettings", () => {
     fireEvent.click(
       within(row).getByRole("button", { name: "Delete carousel" })
     );
+    await confirmDelete();
 
     await waitFor(() =>
       expect(showError).toHaveBeenCalledWith("Carousel not found")
@@ -127,6 +177,7 @@ describe("CarouselSettings", () => {
     fireEvent.click(
       within(row).getByRole("button", { name: "Delete carousel" })
     );
+    await confirmDelete();
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     await flushPromises();
@@ -152,6 +203,7 @@ describe("CarouselSettings", () => {
     fireEvent.click(
       within(row).getByRole("button", { name: "Delete carousel" })
     );
+    await confirmDelete();
 
     await waitFor(() =>
       expect(screen.queryByText("My Carousel")).not.toBeInTheDocument()
