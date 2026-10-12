@@ -171,8 +171,15 @@ export function useVideoPlayer({
   // viewer's resume point, which counts only while the scene is in progress
   // (before its last 10%, as Continue Watching counts it)
   const startTime = explicitStartTime(search);
-  const sceneDuration = (scene as { files?: { duration?: unknown }[] } | null)
-    ?.files?.[0]?.duration;
+  const sceneFiles = (scene as { files?: { duration?: unknown }[] } | null)
+    ?.files;
+  const sceneDuration = sceneFiles?.[0]?.duration;
+  // Where the scene starts is known once its history has loaded and the
+  // scene itself has (its files, which carry its length): a resume point
+  // without the length cannot tell an in-progress scene from a watched one.
+  // A loaded scene whose file has no length lets any resume point count.
+  const startKnown =
+    Boolean(sceneKey) && !loadingWatchHistory && Array.isArray(sceneFiles);
   const resumePoint = inProgressResumeTime(
     (watchHistory as { resumeTime?: unknown } | null)?.resumeTime,
     sceneDuration
@@ -485,7 +492,9 @@ export function useVideoPlayer({
   // history is known (0: from the start); `hasResumedRef` turns true once
   // the start is settled: the seek made, or something else placed the
   // playhead first (a `?t=` link, a clip, the viewer's own seek, a cast).
-  // The resume seeks once and never overrides those.
+  // The resume seeks once and never overrides those. A seek event alone
+  // settles nothing: the player seeks by itself (a source switch, an HLS or
+  // tech reload), and the viewer's scrub shows as a playhead past 0 at play.
 
   // Reset resume state when scene changes
   useEffect(() => {
@@ -493,12 +502,15 @@ export function useVideoPlayer({
     initialResumeTimeRef.current = null;
   }, [sceneKey, hasResumedRef, initialResumeTimeRef]);
 
-  // Capture where the scene starts once its watch history loads. Continue
-  // Watching and Watch History (`shouldResume`) also autoplay it.
+  // Capture where the scene starts once it is known, and follow the history
+  // until the start is settled. Continue Watching and Watch History
+  // (`shouldResume`) also autoplay it.
   useEffect(() => {
-    if (!sceneKey || loadingWatchHistory) return;
-    if (initialResumeTimeRef.current !== null) return;
+    if (!startKnown) return;
+    const first = initialResumeTimeRef.current === null;
+    if (!first && hasResumedRef.current) return;
     initialResumeTimeRef.current = resumePoint ?? 0;
+    if (!first) return;
     // A link's start time places the playhead itself
     if (startTime !== null) hasResumedRef.current = true;
 
@@ -512,8 +524,7 @@ export function useVideoPlayer({
       dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: true });
     }
   }, [
-    sceneKey,
-    loadingWatchHistory,
+    startKnown,
     watchHistory,
     resumePoint,
     startTime,
@@ -532,10 +543,11 @@ export function useVideoPlayer({
     return () => window.removeEventListener("seekToTime", settle);
   }, [hasResumedRef]);
 
-  // The viewer pressing play starts the scene at its resume point. A seek
-  // (the viewer's), a playhead already placed, a cast, or a play before the
-  // history is known settles the start without seeking: the resume never
-  // jumps a scene already playing.
+  // The viewer pressing play starts the scene at its resume point. A
+  // playhead already placed (the viewer's scrub), a cast, or a play before
+  // the start is known settles the start without seeking: the resume never
+  // jumps a scene already playing. Attached again once the player is ready,
+  // since the player may come after the scene.
   useEffect(() => {
     const player = playerRef.current as
       | (CastAwarePlayer & {
@@ -548,9 +560,6 @@ export function useVideoPlayer({
       | null;
     if (!player || !sceneKey) return;
 
-    const settle = () => {
-      hasResumedRef.current = true;
-    };
     const casting = () =>
       player.peekCastConnected === true || Boolean(player.peekCastRemote);
     const onPlay = () => {
@@ -564,19 +573,17 @@ export function useVideoPlayer({
       player.currentTime(target);
     };
     const onCastState = () => {
-      if (player.peekCastConnected) settle();
+      if (player.peekCastConnected) hasResumedRef.current = true;
     };
 
     player.on("play", onPlay);
-    player.on("seeking", settle);
     player.on("peek:caststate", onCastState);
     return () => {
       if (player.isDisposed()) return;
       player.off("play", onPlay);
-      player.off("seeking", settle);
       player.off("peek:caststate", onCastState);
     };
-  }, [sceneKey, playerRef, hasResumedRef, initialResumeTimeRef]);
+  }, [sceneKey, ready, playerRef, hasResumedRef, initialResumeTimeRef]);
 
   // ============================================================================
   // VIDEO SOURCES LOADING (using sourceSelector plugin - Stash pattern)
@@ -678,9 +685,10 @@ export function useVideoPlayer({
   useEffect(() => {
     const player = playerRef.current;
     if (!player || !ready || !shouldAutoplay) return;
-    // An autoplay waits for the scene's history (one small request), so a
-    // queue step to a half-watched scene starts at its resume point
-    if (loadingWatchHistory) return;
+    // An autoplay waits for where the scene starts (its history, one small
+    // request, and its length), so a queue step to a half-watched scene
+    // starts at its resume point and a watched one from 0
+    if (!startKnown) return;
 
     // While casting, the load on the receiver plays the scene there (and a
     // session playing another scene is not taken over by an autoplay)
@@ -708,7 +716,7 @@ export function useVideoPlayer({
   }, [
     ready,
     shouldAutoplay,
-    loadingWatchHistory,
+    startKnown,
     initialResumeTimeRef,
     hasResumedRef,
     playerRef,

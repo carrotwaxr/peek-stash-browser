@@ -271,9 +271,10 @@ function requestBody(options: RequestInit | undefined): unknown {
   return typeof body === "string" ? (JSON.parse(body) as unknown) : undefined;
 }
 
-const onA = { id: "123", instanceId: "inst-a" };
-const onB = { id: "123", instanceId: "inst-b" };
-const onA2 = { id: "124", instanceId: "inst-a" };
+// Loaded scenes: their files are known (with no length or size)
+const onA = { id: "123", instanceId: "inst-a", files: [{}] };
+const onB = { id: "123", instanceId: "inst-b", files: [{}] };
+const onA2 = { id: "124", instanceId: "inst-a", files: [{}] };
 
 describe("useVideoPlayer", () => {
   beforeEach(() => {
@@ -1197,7 +1198,9 @@ describe("useVideoPlayer", () => {
     function renderResuming(
       first: Scene,
       state: { shouldResume: true } | null,
-      search = ""
+      search = "",
+      /** The player is created, and ready, only after the scene loads */
+      { lateReady = false }: { lateReady?: boolean } = {}
     ) {
       const player = fakePlayer();
       // The reducer's autoplay flag, which a queue step sets with the scene
@@ -1205,13 +1208,16 @@ describe("useVideoPlayer", () => {
       const dispatch =
         vi.fn<(action: { type: string; payload?: boolean }) => void>();
       const noop = () => {};
-      const playerRef = { current: player };
+      const playerRef = { current: lateReady ? null : player };
       const videoRef = { current: null };
       const hasResumedRef = { current: false };
       const initialResumeTimeRef = { current: null as number | null };
       const location = { state, search };
-      const rendered = renderHook(
-        ({ current }: { current: Scene }) => {
+      const rendered = renderHook<
+        undefined,
+        { current: Scene; ready?: boolean }
+      >(
+        ({ current, ready = !lateReady }) => {
           const [shouldAutoplay, setShouldAutoplay] = useState(false);
           autoplay.set = setShouldAutoplay;
           const history = useWatchHistory(current.id, current.instanceId);
@@ -1219,7 +1225,7 @@ describe("useVideoPlayer", () => {
             videoRef,
             playerRef,
             scene: current,
-            ready: true,
+            ready,
             shouldAutoplay,
             playlist: null,
             currentIndex: 0,
@@ -1247,6 +1253,12 @@ describe("useVideoPlayer", () => {
       return {
         player,
         initialResumeTimeRef,
+        /** The player is created and its sources load (`lateReady`) */
+        becomeReady: (current: Scene) =>
+          actAsync(() => {
+            playerRef.current = player;
+            rendered.rerender({ current, ready: true });
+          }),
         /** A queue step's autoplay: the reducer sets it with the scene */
         setAutoplay: (on: boolean) =>
           actAsync(() => {
@@ -1261,14 +1273,27 @@ describe("useVideoPlayer", () => {
       };
     }
 
+    /**
+     * The player seeks before play: its `seeking` event, with the playhead
+     * now at `to` (an event nothing listens for does nothing)
+     */
+    function seekBeforePlay(player: FakePlayer, to: number) {
+      player.currentTime.mockImplementation(() => to);
+      act(() => {
+        void player.handlers.get("seeking")?.();
+      });
+    }
+
     /** The seeks the player was asked for (a bare currentTime() is a read) */
     function seeks(player: FakePlayer) {
       return player.currentTime.mock.calls.filter((args) => args.length > 0);
     }
 
-    const sceneA = { id: "1", instanceId: "inst-a" };
-    const sceneB = { id: "2", instanceId: "inst-a" };
-    const sceneC = { id: "3", instanceId: "inst-a" };
+    // Loaded scenes: their files are known, with no duration (any resume
+    // point counts)
+    const sceneA = { id: "1", instanceId: "inst-a", files: [{}] };
+    const sceneB = { id: "2", instanceId: "inst-a", files: [{}] };
+    const sceneC = { id: "3", instanceId: "inst-a", files: [{}] };
 
     it("a scene opened with shouldResume and resumeTime 300 seeks to 300 once", async () => {
       const history = pendingHistory();
@@ -1353,17 +1378,70 @@ describe("useVideoPlayer", () => {
       expect(player.currentTime).not.toHaveBeenCalledWith(300);
     });
 
-    it("a seek by the viewer before play is not overridden", async () => {
+    it("the viewer scrubbing before play keeps their position", async () => {
       const history = pendingHistory();
       const { player, pressPlay } = renderResuming(sceneA, null);
       await history.answer("1", 300);
 
-      act(() => {
-        void must(player.handlers.get("seeking"), "the seeking handler")();
-      });
+      seekBeforePlay(player, 50);
       await pressPlay();
 
       expect(player.currentTime).not.toHaveBeenCalledWith(300);
+    });
+
+    it("the player's own seek to 0 before play (a source switch) keeps the resume", async () => {
+      const history = pendingHistory();
+      const { player, pressPlay } = renderResuming(sceneA, null);
+      await history.answer("1", 300);
+
+      seekBeforePlay(player, 0);
+      await pressPlay();
+
+      expect(seeks(player)).toEqual([[300]]);
+    });
+
+    it("history that arrives before the scene's length waits for it: a watched scene starts from 0", async () => {
+      const history = pendingHistory();
+      const scene = { id: "1", instanceId: "inst-a" };
+      const { player, pressPlay, rerender } = renderResuming(scene, null);
+
+      await history.answer("1", 950);
+      rerender({ current: { ...scene, files: [{ duration: 1000 }] } });
+      await pressPlay();
+
+      expect(seeks(player)).toEqual([]);
+    });
+
+    it("an autoplay waits for the scene's length: a watched scene plays from 0", async () => {
+      const history = pendingHistory();
+      const scene = { id: "1", instanceId: "inst-a" };
+      const { player, rerender } = renderResuming(scene, {
+        shouldResume: true,
+      });
+
+      await history.answer("1", 950);
+      rerender({ current: { ...scene, files: [{ duration: 1000 }] } });
+
+      await waitFor(() => {
+        expect(player.play).toHaveBeenCalledTimes(1);
+      });
+      expect(seeks(player)).toEqual([]);
+    });
+
+    it("a player that becomes ready after the scene loads still resumes on play", async () => {
+      const history = pendingHistory();
+      const { player, pressPlay, becomeReady } = renderResuming(
+        sceneA,
+        null,
+        "",
+        { lateReady: true }
+      );
+      await history.answer("1", 300);
+
+      await becomeReady(sceneA);
+      await pressPlay();
+
+      expect(seeks(player)).toEqual([[300]]);
     });
 
     it("a position set before play (a seek the element took silently) is kept", async () => {
