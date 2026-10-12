@@ -184,7 +184,7 @@ describe("findMinimalEntities", () => {
     });
     const { sql, params } = statement();
 
-    expect(sql.startsWith("WITH RECURSIVE counted(id, inst, parentIds)")).toBe(
+    expect(sql.startsWith("WITH RECURSIVE counted(id, inst, parents)")).toBe(
       true
     );
     expect(sql).toContain("(x.sceneCount >= ? OR x.imageCount >= ?)");
@@ -203,6 +203,15 @@ describe("findMinimalEntities", () => {
     mockPrisma.$queryRawUnsafe.mockClear();
     await find("tag", {});
     expect(statement().sql).not.toContain("RECURSIVE");
+  });
+
+  it("a studio passes a count minimum through its parentId chain", async () => {
+    await find("studio", { count_filter: { min_scene_count: 1 } });
+    const { sql } = statement();
+
+    expect(sql).toContain("CROSS JOIN StashStudio p ON p.id = c.parents");
+    expect(sql).not.toContain("json_each");
+    expect(sql).toContain("SELECT x.id, x.stashInstanceId, x.parentId");
   });
 
   it("ids match (id, instance) pairs, a bare id its id on every allowed instance", async () => {
@@ -279,10 +288,10 @@ describe("findMinimalEntities", () => {
         count_filter: { min_scene_count: 1 },
       };
 
-      await find("studio", request, AS_ADMIN);
+      await find("group", request, AS_ADMIN);
       const own = statement();
       mockPrisma.$queryRawUnsafe.mockClear();
-      await find("studio", { ...request, scope: "allEnabled" }, AS_ADMIN);
+      await find("group", { ...request, scope: "allEnabled" }, AS_ADMIN);
       const scoped = statement();
 
       // The same statement without the join, its two params and e.id IS NULL
@@ -294,7 +303,7 @@ describe("findMinimalEntities", () => {
           )
           .replace("\n  AND e.id IS NULL", "")
       );
-      expect(own.params.slice(0, 2)).toEqual([USER, "studio"]);
+      expect(own.params.slice(0, 2)).toEqual([USER, "group"]);
       expect(scoped.params).toEqual(own.params.slice(2));
       expect(scoped.params).toEqual([
         "a",
