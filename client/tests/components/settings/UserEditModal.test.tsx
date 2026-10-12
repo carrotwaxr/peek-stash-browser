@@ -17,7 +17,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { must } from "@tests/testUtils";
+import { actAsync, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import component after mocks
 import UserEditModal from "../../../src/components/settings/UserEditModal";
@@ -764,7 +764,14 @@ describe("UserEditModal", () => {
     });
 
     it("asks before making an admin a regular user", async () => {
-      mockApiPut.mockResolvedValue({});
+      // The server answers once the case says so
+      let answer: () => void = () => {};
+      mockApiPut.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            answer = () => resolve({});
+          })
+      );
       render(
         <UserEditModal
           user={{ id: 3, username: "otheradmin", role: "ADMIN" }}
@@ -785,12 +792,19 @@ describe("UserEditModal", () => {
         within(confirm).getByRole("button", { name: "Make user" })
       );
 
+      const role = screen.getByLabelText("Role");
       await waitFor(() =>
         expect(mockApiPut).toHaveBeenCalledWith("/user/3/role", {
           role: "USER",
         })
       );
-      expect(screen.getByLabelText("Role")).toHaveValue("USER");
+      // The select keeps the stored role while the write is out
+      expect(role).toHaveValue("ADMIN");
+
+      await actAsync(() => answer());
+
+      await waitFor(() => expect(role).toHaveAccessibleDescription("Saved"));
+      expect(role).toHaveValue("USER");
     });
 
     it("cancel leaves the role as it was", async () => {
