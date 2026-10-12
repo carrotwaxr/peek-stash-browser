@@ -127,6 +127,8 @@ const CarouselBuilder = () => {
   const [base, setBase] = useState<Draft | null>(() =>
     isEditing ? null : draft
   );
+  const rulesUnchanged =
+    isEditing && base !== null && draft.rules === base.rules;
   const dirty =
     base !== null &&
     (Object.keys(draft) as (keyof Draft)[]).some(
@@ -245,7 +247,7 @@ const CarouselBuilder = () => {
       return;
     }
 
-    if (!rulesLocked && !previewValid) {
+    if (!rulesLocked && !rulesUnchanged && !previewValid) {
       setError("Preview must succeed before saving");
       return;
     }
@@ -279,10 +281,21 @@ const CarouselBuilder = () => {
     }
   };
 
+  const SAVE_HINT_ID = "carousel-save-hint";
   const IconComponent = getCarouselIcon(icon);
+  // A saved carousel whose rules are as stored was valid when it was saved:
+  // a title, icon or sort edit needs no preview. Changed rules do.
   const canSave =
     title.trim() &&
-    (rulesLocked || (ruleCount > 0 && refused === null && previewValid));
+    (rulesLocked ||
+      (ruleCount > 0 && refused === null && (rulesUnchanged || previewValid)));
+  // Why Save is off when the rules are the only thing missing
+  const needsPreview =
+    !rulesLocked &&
+    !rulesUnchanged &&
+    !previewValid &&
+    ruleCount > 0 &&
+    refused === null;
 
   if (loading) {
     return (
@@ -308,55 +321,67 @@ const CarouselBuilder = () => {
           borderColor: "var(--border-color)",
         }}
       >
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => void handleBack()}
-              icon={<ArrowLeft className="w-4 h-4" />}
-            >
-              Back
-            </Button>
-            <h1
-              className="text-lg font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {isEditing ? "Edit Carousel" : "Create Carousel"}
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {!rulesLocked && (
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <Button
                 variant="secondary"
-                onClick={() => void handlePreview()}
-                disabled={previewing || ruleCount === 0 || refused !== null}
+                onClick={() => void handleBack()}
+                icon={<ArrowLeft className="w-4 h-4" />}
+              >
+                Back
+              </Button>
+              <h1
+                className="text-lg font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {isEditing ? "Edit Carousel" : "Create Carousel"}
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {!rulesLocked && (
+                <Button
+                  variant="secondary"
+                  onClick={() => void handlePreview()}
+                  disabled={previewing || ruleCount === 0 || refused !== null}
+                  icon={
+                    previewing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )
+                  }
+                >
+                  Preview
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                onClick={() => void handleSave()}
+                disabled={!canSave || saving}
+                aria-describedby={needsPreview ? SAVE_HINT_ID : undefined}
                 icon={
-                  previewing ? (
+                  saving ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Eye className="w-4 h-4" />
+                    <Save className="w-4 h-4" />
                   )
                 }
               >
-                Preview
+                {isEditing ? "Update" : "Save"}
               </Button>
-            )}
-            <Button
-              variant="primary"
-              onClick={() => void handleSave()}
-              disabled={!canSave || saving}
-              icon={
-                saving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )
-              }
-            >
-              {isEditing ? "Update" : "Save"}
-            </Button>
+            </div>
           </div>
+          {needsPreview && (
+            <p
+              id={SAVE_HINT_ID}
+              className="mt-1 text-right text-xs"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Preview the rules to save
+            </p>
+          )}
         </div>
       </div>
 
@@ -560,16 +585,6 @@ const CarouselBuilder = () => {
             loading={previewing}
             onPreview={() => void handlePreview()}
           />
-        )}
-
-        {/* Save Hint */}
-        {!rulesLocked && !previewValid && ruleCount > 0 && (
-          <p
-            className="text-center text-sm"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Preview your carousel to enable saving
-          </p>
         )}
       </div>
 
