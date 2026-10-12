@@ -177,6 +177,34 @@ describe("findMinimalEntities", () => {
     expect(statement().sql).not.toContain(">= ?");
   });
 
+  it("a tag passes a count minimum through its descendants: one read of the tree from the tags that pass, params in order", async () => {
+    await find("tag", {
+      filter: { q: "x", per_page: 20 },
+      count_filter: { min_scene_count: 1, min_image_count: 2 },
+    });
+    const { sql, params } = statement();
+
+    expect(sql.startsWith("WITH RECURSIVE counted(id, inst, parentIds)")).toBe(
+      true
+    );
+    expect(sql).toContain("(x.sceneCount >= ? OR x.imageCount >= ?)");
+    expect(sql).toContain("jp.value AND p.stashInstanceId = c.inst");
+    expect(sql).toContain(
+      "(x.id, x.stashInstanceId) IN (SELECT id, inst FROM counted)"
+    );
+    // The outer statement no longer compares the row's own counts
+    expect(sql.match(/sceneCount >= \?/g)).toHaveLength(1);
+    // The tree's params come first, the page size last
+    expect(params.slice(0, 2)).toEqual([USER, "tag"]);
+    expect(params[params.length - 1]).toBe(20);
+    expect(placeholders(sql)).toBe(params.length);
+
+    // A tag request with no minimum reads no tree
+    mockPrisma.$queryRawUnsafe.mockClear();
+    await find("tag", {});
+    expect(statement().sql).not.toContain("RECURSIVE");
+  });
+
   it("ids match (id, instance) pairs, a bare id its id on every allowed instance", async () => {
     await find("tag", { ids: ["12:a", "13"] });
 
@@ -251,10 +279,10 @@ describe("findMinimalEntities", () => {
         count_filter: { min_scene_count: 1 },
       };
 
-      await find("tag", request, AS_ADMIN);
+      await find("studio", request, AS_ADMIN);
       const own = statement();
       mockPrisma.$queryRawUnsafe.mockClear();
-      await find("tag", { ...request, scope: "allEnabled" }, AS_ADMIN);
+      await find("studio", { ...request, scope: "allEnabled" }, AS_ADMIN);
       const scoped = statement();
 
       // The same statement without the join, its two params and e.id IS NULL
@@ -266,7 +294,7 @@ describe("findMinimalEntities", () => {
           )
           .replace("\n  AND e.id IS NULL", "")
       );
-      expect(own.params.slice(0, 2)).toEqual([USER, "tag"]);
+      expect(own.params.slice(0, 2)).toEqual([USER, "studio"]);
       expect(scoped.params).toEqual(own.params.slice(2));
       expect(scoped.params).toEqual([
         "a",

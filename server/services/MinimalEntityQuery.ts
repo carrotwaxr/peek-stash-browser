@@ -16,9 +16,11 @@
  * without the scope (filter dropdowns, carousel rules) the admin's own
  * hidden items apply as everywhere else. The search matches the name and,
  * for performers, studios and tags, their aliases (a collection's aliases text
- * too), never a description (lead
- * decision, PR 4). The order is always the name with case folded, and the
- * `LIMIT` is the page size: a picker lists one page.
+ * too), never a description (lead decision, PR 4). A tag passes a count
+ * minimum through its descendants too (an organizing parent has no content of
+ * its own, and could not be picked for "Include sub-tags" otherwise):
+ * `ancestorsOfCounted`. The order is always the name with case folded, and
+ * the `LIMIT` is the page size: a picker lists one page.
  *
  * No index serves `%q%`, so a keystroke reads the type's live rows once and
  * sorts the matches in a temp B-tree: a few ms at 9k performers.
@@ -39,6 +41,7 @@ import {
   searchAll,
 } from "../utils/sqlClauses.js";
 import { emptyToNull, jsonListArm, searchTerms } from "../utils/sqlHelpers.js";
+import { jsonListOrEmpty } from "../utils/sqlJson.js";
 import {
   getGalleryFallbackTitle,
   getSceneFallbackTitle,
@@ -70,6 +73,13 @@ interface MinimalConfig {
   readonly searchLists?: readonly string[];
   /** The column each count minimum compares; a minimum the type lacks is ignored */
   readonly counts: readonly (readonly [keyof MinimalCountFilter, string])[];
+  /**
+   * The type is a tree of `parentIds` (a JSON list of ids on the same
+   * instance): a count minimum also passes a row with a descendant, at any
+   * depth, that passes it, so an organizing parent with no content of its own
+   * can be picked
+   */
+  readonly parentIds?: boolean;
 }
 
 /** A gallery's name as it is shown (`galleryNameSql`) */
@@ -124,6 +134,7 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
       ["min_performer_count", "x.performerCount"],
       ["min_group_count", "x.groupCount"],
     ],
+    parentIds: true,
   },
   group: {
     table: "StashGroup",
@@ -193,7 +204,14 @@ LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entity
     const min = request.countFilter?.[key];
     return min === undefined ? [] : [{ col, min }];
   });
-  if (counts.length > 0) {
+  let withClause = "";
+  const withParams: SqlParam[] = [];
+  if (counts.length > 0 && config.parentIds === true) {
+    const reach = ancestorsOfCounted(config, counts, excludedFor, instanceIds);
+    withClause = `WITH RECURSIVE ${reach.sql}\n`;
+    withParams.push(...reach.params);
+    where.push("(x.id, x.stashInstanceId) IN (SELECT id, inst FROM counted)");
+  } else if (counts.length > 0) {
     where.push(`(${counts.map(({ col }) => `${col} >= ?`).join(" OR ")})`);
     params.push(...counts.map(({ min }) => min));
   }
@@ -207,11 +225,59 @@ LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entity
   params.push(request.perPage);
   const extra = config.extraColumns ? `, ${config.extraColumns}` : "";
   return {
-    sql: `SELECT x.id, x.stashInstanceId AS instanceId, ${config.name} AS name${extra}
+    sql: `${withClause}SELECT x.id, x.stashInstanceId AS instanceId, ${config.name} AS name${extra}
 FROM ${config.table} x${exclusionJoin}
 WHERE ${where.join("\n  AND ")}
 ORDER BY name COLLATE NOCASE, x.id, x.stashInstanceId
 LIMIT ?`,
+    params: [...withParams, ...params],
+  };
+}
+
+/**
+ * `counted(id, inst, parentIds)`: the rows that pass a count minimum
+ * themselves (live, on the allowed instances, no exclusion for the viewer: an
+ * excluded sub-tag carries none of its content to its parents), then their
+ * ancestors up the same instance's tree. The walk goes through a live parent
+ * whatever its own exclusion, as the "Include sub-tags" filter does: the
+ * row's own exclusion is the outer statement's. A set read once from the
+ * seeds up, by primary key (`UNION` ends a cycle), never a probe per row.
+ */
+function ancestorsOfCounted(
+  config: MinimalConfig,
+  counts: readonly { col: string; min: number }[],
+  excludedFor: number | undefined,
+  instanceIds: readonly string[]
+): { sql: string; params: SqlParam[] } {
+  // The seed reads the type's table as `x` too: the config's columns are `x.`
+  const instances = instanceColumnClause("x.stashInstanceId", instanceIds);
+  const where = [
+    "x.deletedAt IS NULL",
+    instances.sql,
+    `(${counts.map(({ col }) => `${col} >= ?`).join(" OR ")})`,
+  ];
+  const params: SqlParam[] = [];
+  let exclusionJoin = "";
+  if (excludedFor !== undefined) {
+    exclusionJoin = `
+  LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entityId = x.id
+    AND (e.instanceId = '' OR e.instanceId = x.stashInstanceId)`;
+    where.push("e.id IS NULL");
+    params.push(excludedFor, config.entityType);
+  }
+  params.push(...instances.params, ...counts.map(({ min }) => min));
+  return {
+    sql: `counted(id, inst, parentIds) AS (
+  SELECT x.id, x.stashInstanceId, x.parentIds
+  FROM ${config.table} x${exclusionJoin}
+  WHERE ${where.join("\n    AND ")}
+  UNION
+  SELECT p.id, p.stashInstanceId, p.parentIds
+  FROM counted c
+  CROSS JOIN json_each(${jsonListOrEmpty("c.parentIds")}) jp
+  CROSS JOIN ${config.table} p ON p.id = jp.value AND p.stashInstanceId = c.inst
+  WHERE p.deletedAt IS NULL
+)`,
     params,
   };
 }
