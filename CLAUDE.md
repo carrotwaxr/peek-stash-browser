@@ -10,14 +10,14 @@ What Peek adds to Stash, and the invariants every change keeps. `.claude/rules/`
 - Per-user data, keyed by user and instance: ratings and favorites on all 7 entity types, watch history and resume points, O counts, image views, stats, hidden items, presets, carousels, themes and other preferences. Rating, favorite, O-count and play fields in responses are the requesting user's, not Stash's.
 - Content restrictions: an admin gives a user Show-only and Always-hide lists of collections, tags, studios and galleries (tags and studios include their descendants; Always-hide wins), cascading to the entities they cover; precomputed into `UserExcludedEntity`.
 - Multi-instance: one Peek in front of several Stash servers. Each user picks which enabled instances to see, as a preference, not access control.
-- Media: streams, captions and images go through Peek; the external player gets a personal signed link (12 h). Named playlists shareable with groups, TV mode, timeline and folder views, recommendations and similar scenes from the user's own data.
+- Media: streams, captions and images go through Peek; the external player and cast devices get a personal signed link (12 h). Named playlists shareable with groups, TV mode, timeline and folder views, recommendations and similar scenes from the user's own data.
 - Downloads: scene files and playlist zips with NFO, permission-gated and queued.
 - Operations: a synced SQL cache of each library, merge reconciliation, per-user Sync to Stash and Sync from Stash, database backups.
 
 Invariants:
 
 1. No user needs, sees or receives Stash credentials. The API key never leaves the server; Stash's address reaches only admins.
-2. Every request that shows or serves Stash content is authenticated as a Peek user: a session, or on the direct stream a personal signed link.
+2. Every request that shows or serves Stash content is authenticated as a Peek user: a session, or on the stream, caption and poster routes a personal signed link (the external player's opens the direct stream only; a scene's media link, for casting and Safari, opens that scene's direct stream, HLS, captions and poster).
 3. A user's exclusions (restrictions, hidden items, cascades) apply on every surface that lists, counts, recommends, shows or serves an entity, by-id lookups, downloads and media included. One exception: the image proxy serves a user the images of items they hid themselves (not restricted ones), so the Hidden Items page shows thumbnails; streams and captions stay refused.
 4. Only admins set restrictions, and never on admin accounts; users cannot bypass them. Hidden items belong to the user who hid them.
 5. Admins bypass restrictions; everyone's own hidden items apply to them everywhere, except in the admin's Content Restrictions editor, which lists everything so an admin can restrict what they hid.
