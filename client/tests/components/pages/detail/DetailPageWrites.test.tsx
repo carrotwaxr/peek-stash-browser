@@ -104,12 +104,14 @@ describe.each(TYPES)("%s page writes", (type) => {
     bodiesTo(path, api);
 
   it("sends the slider's rating on the entity's server and keeps it", async () => {
-    const { api } = render();
+    const { api, queryClient } = render();
 
     fireEvent.change(await slider(), { target: { value: "8" } });
 
     await waitFor(() => expect(written(api)).toHaveLength(1));
     expect(written(api)).toEqual([{ rating: 80, instanceId: "inst-b" }]);
+    // Kept once the server has answered, not only while the write is out
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0));
     expect(await slider()).toHaveValue("8");
     expect(screen.getByText("8.0")).toBeVisible();
   });

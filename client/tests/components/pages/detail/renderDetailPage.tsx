@@ -113,7 +113,10 @@ export interface DetailPageOptions {
   counts?: Record<string, number> | "loading" | "error" | Answer;
   /** The viewer's settings (`GET /user/settings`), over the server's defaults */
   settings?: Partial<GetUserSettingsResponse["settings"]>;
-  /** The status `PUT /ratings/<type>/<id>` answers, after 20 ms (default 200) */
+  /**
+   * The status `PUT /ratings/<type>/<id>` answers, after 20 ms (default 200):
+   * a success carries the stored row with the write applied, as the server's
+   */
   ratingAnswer?: number;
   /**
    * Further routes, by path after `/api`, over the ones above (a paged
@@ -301,11 +304,36 @@ export function renderDetailPage(
   // Each id the page may show: its counts and its writes
   const idRoutes: Record<string, Answer> = {};
   for (const other of [entityId, ...(options.otherIds ?? [])]) {
+    // The viewer's stored row, as the server keeps it: each write's fields
+    // over the last, starting from the entity's own
+    const stored = {
+      id: 1,
+      instanceId:
+        typeof entity.instanceId === "string" ? entity.instanceId : "",
+      rating: typeof entity.rating100 === "number" ? entity.rating100 : null,
+      favorite: entity.favorite === true,
+    };
     // Answered after a round trip: a failure then lands in a render of its own
-    idRoutes[`/ratings/${type}/${other}`] = () => {
-      const response = jsonResponse(options.ratingAnswer ?? 200, {
-        success: true,
-      });
+    idRoutes[`/ratings/${type}/${other}`] = (_url, init) => {
+      const status = options.ratingAnswer ?? 200;
+      let response: Response;
+      if (status >= 400) {
+        response = jsonResponse(status, { error: "Rating failed" });
+      } else {
+        if (typeof init?.body === "string") {
+          const sent = asRecord(JSON.parse(init.body), "The rating write");
+          if ("rating" in sent) {
+            stored.rating =
+              typeof sent.rating === "number" ? sent.rating : null;
+          }
+          if ("favorite" in sent) stored.favorite = sent.favorite === true;
+        }
+        // The server answers a write with the stored row, which the page keeps
+        response = jsonResponse(status, {
+          success: true,
+          rating: { ...stored },
+        });
+      }
       return new Promise<Response>((resolve) => {
         const timer = setTimeout(() => {
           unansweredWrites.delete(timer);
