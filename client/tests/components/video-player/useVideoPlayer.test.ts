@@ -14,7 +14,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { untrusted } from "@tests/helpers/untrusted";
-import { must } from "@tests/testUtils";
+import { actAsync, must } from "@tests/testUtils";
 import videojs from "video.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, apiGet, apiPost, redirectToLogin } from "@/api";
@@ -156,6 +156,7 @@ interface Scene {
   id: string;
   instanceId: string;
   paths?: { vtt?: string; sprite?: string };
+  files?: { duration?: number }[];
 }
 
 /** The player's queue and controls, as the context hands them over */
@@ -167,6 +168,8 @@ interface Controls {
   autoplay?: boolean;
   /** The user's resume point in the scene's watch history */
   resumeTime?: number;
+  /** The route's query string (`?t=120`) */
+  search?: string;
 }
 
 function renderPlayer(
@@ -218,7 +221,7 @@ function renderPlayer(
         nextScene: noop,
         prevScene: noop,
         registerPlayer: noop,
-        location: { state: null, pathname, search: "" },
+        location: { state: null, pathname, search: controls.search ?? "" },
         sceneRequest: request,
         hasResumedRef,
         initialResumeTimeRef,
@@ -978,6 +981,25 @@ describe("useVideoPlayer", () => {
     expect(player.trackActivity().incrementPlayCount).toBe(viewing.countPlay);
   });
 
+  it("hands useCast no resume point for a watched scene (last 10%)", () => {
+    renderPlayer(fakePlayer(), { ...onA, files: [{ duration: 1000 }] }, null, {
+      resumeTime: 950,
+    });
+
+    const options = must(vi.mocked(useCast).mock.lastCall, "useCast call")[0];
+    expect(options.resumeTime).toBeNull();
+  });
+
+  it("hands useCast the explicit start time (?t=) over the resume point", () => {
+    renderPlayer(fakePlayer(), onA, null, {
+      resumeTime: 300,
+      search: "?t=120",
+    });
+
+    const options = must(vi.mocked(useCast).mock.lastCall, "useCast call")[0];
+    expect(options.resumeTime).toBe(120);
+  });
+
   it("a scene change while connected leaves the local tracker disabled", () => {
     const player = Object.assign(fakePlayer(), { peekCastConnected: true });
     const { rerender } = renderPlayer(player, onA);
@@ -1174,9 +1196,12 @@ describe("useVideoPlayer", () => {
      */
     function renderResuming(
       first: Scene,
-      state: { shouldResume: true } | null
+      state: { shouldResume: true } | null,
+      search = ""
     ) {
       const player = fakePlayer();
+      // The reducer's autoplay flag, which a queue step sets with the scene
+      const autoplay = { set: (_on: boolean) => {} };
       const dispatch =
         vi.fn<(action: { type: string; payload?: boolean }) => void>();
       const noop = () => {};
@@ -1184,10 +1209,11 @@ describe("useVideoPlayer", () => {
       const videoRef = { current: null };
       const hasResumedRef = { current: false };
       const initialResumeTimeRef = { current: null as number | null };
-      const location = { state };
+      const location = { state, search };
       const rendered = renderHook(
         ({ current }: { current: Scene }) => {
           const [shouldAutoplay, setShouldAutoplay] = useState(false);
+          autoplay.set = setShouldAutoplay;
           const history = useWatchHistory(current.id, current.instanceId);
           useVideoPlayer({
             videoRef,
@@ -1218,7 +1244,26 @@ describe("useVideoPlayer", () => {
         },
         { initialProps: { current: first }, wrapper: SignedInWithQuery }
       );
-      return { player, initialResumeTimeRef, ...rendered };
+      return {
+        player,
+        initialResumeTimeRef,
+        /** A queue step's autoplay: the reducer sets it with the scene */
+        setAutoplay: (on: boolean) =>
+          actAsync(() => {
+            autoplay.set(on);
+          }),
+        /** The viewer presses play (the player's own play event) */
+        pressPlay: () =>
+          actAsync(() => {
+            void must(player.handlers.get("play"), "the play handler")();
+          }),
+        ...rendered,
+      };
+    }
+
+    /** The seeks the player was asked for (a bare currentTime() is a read) */
+    function seeks(player: FakePlayer) {
+      return player.currentTime.mock.calls.filter((args) => args.length > 0);
     }
 
     const sceneA = { id: "1", instanceId: "inst-a" };
@@ -1239,15 +1284,132 @@ describe("useVideoPlayer", () => {
       ]);
     });
 
-    it("a scene opened without shouldResume starts at 0 whatever its resumeTime", async () => {
+    it("a scene opened without shouldResume does not autoplay, and starts at its resume point when the viewer presses play", async () => {
       const history = pendingHistory();
-      const { player, initialResumeTimeRef } = renderResuming(sceneA, null);
+      const { player, pressPlay } = renderResuming(sceneA, null);
 
       await history.answer("1", 300);
 
-      expect(initialResumeTimeRef.current).toBeNull();
-      expect(player.currentTime).not.toHaveBeenCalledWith(300);
+      // Nothing plays or seeks by itself
       expect(player.play).not.toHaveBeenCalled();
+      expect(seeks(player)).toEqual([]);
+
+      await pressPlay();
+      expect(seeks(player)).toEqual([[300]]);
+
+      // Pause and play again: the resume applied once
+      await pressPlay();
+      expect(seeks(player)).toEqual([[300]]);
+    });
+
+    it("a resume point in the last 10% of the scene (watched) starts from 0", async () => {
+      const history = pendingHistory();
+      const { player, pressPlay } = renderResuming(
+        { ...sceneA, files: [{ duration: 1000 }] },
+        null
+      );
+
+      await history.answer("1", 950);
+      await pressPlay();
+
+      expect(seeks(player)).toEqual([]);
+    });
+
+    it("a resume point before the last 10% resumes there", async () => {
+      const history = pendingHistory();
+      const { player, pressPlay } = renderResuming(
+        { ...sceneA, files: [{ duration: 1000 }] },
+        null
+      );
+
+      await history.answer("1", 850);
+      await pressPlay();
+
+      expect(seeks(player)).toEqual([[850]]);
+    });
+
+    it("an explicit start time (?t=) wins over the resume point", async () => {
+      const history = pendingHistory();
+      const { player, pressPlay } = renderResuming(sceneA, null, "?t=120");
+
+      await history.answer("1", 300);
+      await pressPlay();
+
+      expect(player.currentTime).not.toHaveBeenCalledWith(300);
+    });
+
+    it("a clip clicked before play keeps its time", async () => {
+      const history = pendingHistory();
+      const { player, pressPlay } = renderResuming(sceneA, null);
+      await history.answer("1", 300);
+
+      act(() => {
+        window.dispatchEvent(
+          new CustomEvent("seekToTime", { detail: { seconds: 60 } })
+        );
+      });
+      await pressPlay();
+
+      expect(player.currentTime).not.toHaveBeenCalledWith(300);
+    });
+
+    it("a seek by the viewer before play is not overridden", async () => {
+      const history = pendingHistory();
+      const { player, pressPlay } = renderResuming(sceneA, null);
+      await history.answer("1", 300);
+
+      act(() => {
+        void must(player.handlers.get("seeking"), "the seeking handler")();
+      });
+      await pressPlay();
+
+      expect(player.currentTime).not.toHaveBeenCalledWith(300);
+    });
+
+    it("a position set before play (a seek the element took silently) is kept", async () => {
+      const history = pendingHistory();
+      const { player, pressPlay } = renderResuming(sceneA, null);
+      await history.answer("1", 300);
+
+      player.currentTime.mockImplementation(() => 30);
+      await pressPlay();
+
+      expect(player.currentTime).not.toHaveBeenCalledWith(300);
+    });
+
+    it("a play event while casting never seeks: the TV plays the scene", async () => {
+      const history = pendingHistory();
+      const { player, pressPlay } = renderResuming(sceneA, null);
+      await history.answer("1", 300);
+
+      Object.assign(player, { peekCastConnected: true });
+      await pressPlay();
+      // Back to the local player, where the TV left it
+      Object.assign(player, { peekCastConnected: false });
+      await pressPlay();
+
+      expect(seeks(player)).toEqual([]);
+    });
+
+    it("a queue step to a scene with a resume point waits for its history and resumes there", async () => {
+      const history = pendingHistory();
+      const { player, rerender, setAutoplay } = renderResuming(sceneA, null);
+      await history.answer("1", 0);
+
+      // Next, with autoplay: the step loads B and sets the flag
+      rerender({ current: sceneB });
+      await setAutoplay(true);
+      expect(player.play).not.toHaveBeenCalled();
+
+      await history.answer("2", 45);
+
+      await waitFor(() => {
+        expect(player.play).toHaveBeenCalledTimes(1);
+      });
+      expect(seeks(player)).toEqual([[45]]);
+      const seek = must(player.currentTime.mock.invocationCallOrder[0]);
+      const play = must(player.play.mock.invocationCallOrder[0]);
+      expect(seek).toBeLessThan(play);
     });
 
     it("after a queue step from a resumed entry, the next scene resumes from its own resumeTime", async () => {
