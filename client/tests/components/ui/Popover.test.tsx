@@ -118,7 +118,7 @@ describe("Popover", () => {
     );
   });
 
-  it("stays on screen sideways: an anchor near either edge keeps it 8px in", () => {
+  it("stays on screen sideways: an anchor near the right edge lines up with its right edge", () => {
     vi.spyOn(window, "innerWidth", "get").mockReturnValue(390);
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(
       function (this: HTMLElement) {
@@ -133,10 +133,64 @@ describe("Popover", () => {
       ({ top: 0, bottom: 30, left: 300, right: 340 }) as DOMRect;
     fireEvent.click(target);
 
-    // 300 + 320 would run past 390: its right edge 8px in, at 62px
+    // 300 + 320 would run past 390: it lines up with the anchor's right edge
+    // (340 - 320 = 20px), inside the 16px gutter
     const dialog = screen.getByRole("dialog");
-    expect(dialog.style.left).toBe("62px");
+    expect(dialog.style.left).toBe("20px");
     expect(dialog.style.transform).toBe("");
+  });
+
+  it("follows the anchor when the bar moves it while the popover is open", () => {
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(1280);
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(
+      function (this: HTMLElement) {
+        return this.getAttribute("role") === "dialog" ? 288 : 70;
+      }
+    );
+    function Bar() {
+      const anchorRef = useRef<HTMLButtonElement>(null);
+      const [pins, setPins] = useState(0);
+      const [open, setOpen] = useState(false);
+      return (
+        <div style={{ position: "relative" }}>
+          <button ref={anchorRef} type="button" onClick={() => setOpen(true)}>
+            Anchor
+          </button>
+          <Popover
+            anchorRef={anchorRef}
+            open={open}
+            onClose={vi.fn()}
+            label="Things"
+          >
+            <button onClick={() => setPins(pins + 1)}>Pin {pins}</button>
+          </Popover>
+        </div>
+      );
+    }
+    render(
+      <ShortcutScopeProvider>
+        <Bar />
+      </ShortcutScopeProvider>
+    );
+    // The anchor sits 400px from the screen's left, in a wrapper that starts there
+    const target = anchor();
+    let screenLeft = 400;
+    Object.defineProperty(target, "offsetLeft", { value: 0 });
+    target.getBoundingClientRect = () =>
+      ({
+        top: 0,
+        bottom: 30,
+        left: screenLeft,
+        right: screenLeft + 70,
+      }) as DOMRect;
+    fireEvent.click(target);
+    expect(screen.getByRole("dialog").style.left).toBe("0px");
+
+    // A pin added in the bar pushes the anchor to x=1092; the popover re-places
+    screenLeft = 1092;
+    fireEvent.click(screen.getByRole("button", { name: "Pin 0" }));
+    const left = Number.parseFloat(screen.getByRole("dialog").style.left);
+    expect(screenLeft + left + 288).toBeLessThanOrEqual(1280 - 16);
   });
 
   it("flips above the anchor near the bottom of the viewport", () => {

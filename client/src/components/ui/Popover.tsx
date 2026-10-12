@@ -3,11 +3,13 @@ import {
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
+import { popoverLeft } from "../../utils/popoverPlacement";
 
 interface PopoverProps {
   /** The control that opens it: the popover sits under it and focus returns to it */
@@ -24,7 +26,7 @@ interface PopoverProps {
 
 const GAP = 4;
 /** How far in from the screen's sides it stays */
-const EDGE = 8;
+const EDGE = 16;
 
 const FOCUSABLE =
   'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -66,40 +68,52 @@ const Popover = ({
   });
 
   // Under the anchor, or above it when the viewport's bottom would cut it
-  // off; lined up with the anchor's edge, but kept on screen sideways (its
-  // left edge first when it is wider than the screen)
-  useLayoutEffect(() => {
-    if (!open) return;
-    const place = () => {
-      const anchor = anchorRef.current;
-      const popover = popoverRef.current;
-      if (!anchor || !popover) return;
-      const height = popover.offsetHeight;
-      const width = popover.offsetWidth;
-      const rect = anchor.getBoundingClientRect();
-      const fitsBelow = window.innerHeight - rect.bottom >= height + GAP;
-      const up = !fitsBelow && rect.top >= height + GAP;
-      // The wrapper's left edge on screen
-      const origin = rect.left - anchor.offsetLeft;
-      const wanted =
-        placement === "bottom-end"
-          ? anchor.offsetLeft + anchor.offsetWidth - width
-          : anchor.offsetLeft;
-      setPosition({
-        top: up
-          ? anchor.offsetTop - height - GAP
-          : anchor.offsetTop + anchor.offsetHeight + GAP,
-        left: Math.max(
-          EDGE - origin,
-          Math.min(wanted, window.innerWidth - EDGE - width - origin)
-        ),
-        up,
-      });
+  // off; lined up with the anchor's edge, flipped to the other edge or held
+  // inside the gutter when that runs off the screen. It places again after
+  // every render, because the anchor moves while it is open (a pin added in
+  // the filter bar pushes "+ Filter" along), and when the window resizes.
+  const place = useCallback(() => {
+    const anchor = anchorRef.current;
+    const popover = popoverRef.current;
+    if (!anchor || !popover) return;
+    const height = popover.offsetHeight;
+    const width = popover.offsetWidth;
+    const rect = anchor.getBoundingClientRect();
+    const fitsBelow = window.innerHeight - rect.bottom >= height + GAP;
+    const up = !fitsBelow && rect.top >= height + GAP;
+    // The wrapper's left edge on screen
+    const origin = rect.left - anchor.offsetLeft;
+    const next = {
+      top: up
+        ? anchor.offsetTop - height - GAP
+        : anchor.offsetTop + anchor.offsetHeight + GAP,
+      left:
+        popoverLeft({
+          anchorLeft: rect.left,
+          anchorWidth: anchor.offsetWidth,
+          width,
+          viewportWidth: window.innerWidth,
+          gutter: EDGE,
+          placement,
+        }) - origin,
+      up,
     };
-    place();
+    setPosition((prev) =>
+      prev.top === next.top && prev.left === next.left && prev.up === next.up
+        ? prev
+        : next
+    );
+  }, [anchorRef, placement]);
+
+  useLayoutEffect(() => {
+    if (open) place();
+  });
+
+  useEffect(() => {
+    if (!open) return;
     window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
-  }, [open, anchorRef, placement]);
+  }, [open, place]);
 
   // Focus in on open, back to the anchor on close
   useEffect(() => {
