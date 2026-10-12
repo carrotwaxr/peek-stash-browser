@@ -660,6 +660,79 @@ describe("CarouselBuilder", () => {
     });
   });
 
+  describe("Save needs a preview only when the rules changed", () => {
+    const HINT = "Preview the rules to save";
+
+    it("a title edit alone enables Update, with no preview, and saves", async () => {
+      const fetchMock = await openWith(CAROUSEL.rules);
+      const update = screen.getByRole("button", { name: /Update/ });
+      // Nothing changed: the saved carousel is already valid
+      expect(screen.queryByText(HINT)).toBeNull();
+
+      fireEvent.change(screen.getByDisplayValue("Highly rated"), {
+        target: { value: "Renamed" },
+      });
+      expect(update).toBeEnabled();
+      expect(screen.queryByText(HINT)).toBeNull();
+
+      fireEvent.click(update);
+      await screen.findByText(/^Settings/);
+
+      expect(requestsTo(fetchMock, "/carousels/preview")).toEqual([]);
+      const put = fetchMock.mock.calls.find(
+        ([, init]) => init?.method === "PUT"
+      );
+      expect(JSON.parse(put?.[1]?.body as string)).toMatchObject({
+        title: "Renamed",
+      });
+    });
+
+    it("changed rules disable Update with a hint the button points to, until Preview runs", async () => {
+      await openWith(CAROUSEL.rules);
+      addRow("top level", "watched");
+      setFocused("false");
+
+      const update = screen.getByRole("button", { name: /Update/ });
+      expect(update).toBeDisabled();
+      const hint = screen.getByText(HINT);
+      expect(hint).toBeVisible();
+      expect(update).toHaveAttribute("aria-describedby", hint.id);
+
+      fireEvent.click(screen.getByRole("button", { name: /Preview/ }));
+      await waitFor(() => expect(update).toBeEnabled());
+      expect(screen.queryByText(HINT)).toBeNull();
+      expect(update).not.toHaveAttribute("aria-describedby");
+    });
+
+    it("changed rules put back as they were enable Update again", async () => {
+      await openWith(CAROUSEL.rules);
+      addRow("top level", "watched");
+      setFocused("false");
+      expect(screen.getByRole("button", { name: /Update/ })).toBeDisabled();
+
+      const actions = screen.getAllByRole("button", {
+        name: /^Row actions for/,
+      });
+      fireEvent.click(must(actions.at(-1), "the added row's actions"));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
+
+      expect(screen.getByRole("button", { name: /Update/ })).toBeEnabled();
+    });
+
+    it("a new carousel with a title and rules says to preview", () => {
+      stubApi({});
+      renderNew();
+      fireEvent.change(screen.getByPlaceholderText("My Custom Carousel"), {
+        target: { value: "Mine" },
+      });
+      addRow("top level", "watched");
+      setFocused("false");
+
+      expect(screen.getByRole("button", { name: /Save/ })).toBeDisabled();
+      expect(screen.getByText(HINT)).toBeVisible();
+    });
+  });
+
   describe("Back", () => {
     const back = () => screen.getByRole("button", { name: "Back" });
     const prompt = () =>
