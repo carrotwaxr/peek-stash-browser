@@ -72,6 +72,18 @@ const T = {
   C_IMAGES: "7790309", // imageCount 1, child of PARENT too
 } as const;
 
+/** The studio tree behind the parent-studio picker: names start "Sp " */
+const S = {
+  GRANDPARENT: "7790401", // no counts; reaches CHILD through PARENT
+  PARENT: "7790402", // no counts; child CHILD
+  CHILD: "7790403", // sceneCount 2
+  EMPTY_PARENT: "7790404", // no counts; child EMPTY_CHILD
+  EMPTY_CHILD: "7790405", // no counts
+  EXCL_PARENT: "7790406", // no counts; only child EXCL_CHILD
+  EXCL_CHILD: "7790407", // sceneCount 1; excluded for the viewer
+  CROSS: "7790408", // on A, no counts; its only "child" is on B
+} as const;
+
 const G = {
   BY_FILE: "7790201",
   BY_FOLDER: "7790202",
@@ -197,6 +209,31 @@ async function seedPickers(): Promise<void> {
       sceneCount: 3,
     },
   });
+  const studio = (
+    id: string,
+    name: string,
+    parentId: string | null,
+    sceneCount = 0
+  ) => ({ id, stashInstanceId: FX.A, name, parentId, sceneCount });
+  await prisma.stashStudio.createMany({
+    data: [
+      studio(S.GRANDPARENT, "Sp Grandparent", null),
+      studio(S.PARENT, "Sp Parent", S.GRANDPARENT),
+      studio(S.CHILD, "Sp Child scenes", S.PARENT, 2),
+      studio(S.EMPTY_PARENT, "Sp Empty parent", null),
+      studio(S.EMPTY_CHILD, "Sp Child empty", S.EMPTY_PARENT),
+      studio(S.EXCL_PARENT, "Sp Excluded parent", null),
+      studio(S.EXCL_CHILD, "Sp Child excluded", S.EXCL_PARENT, 1),
+      studio(S.CROSS, "Sp Cross", null),
+      {
+        id: "7790409",
+        stashInstanceId: FX.B,
+        name: "Sp Child on B",
+        parentId: S.CROSS,
+        sceneCount: 3,
+      },
+    ],
+  });
   // Counts: 11 has scenes, 12 images, 13 galleries only
   await prisma.stashPerformer.update({ ...onA(11), data: { sceneCount: 2 } });
   await prisma.stashPerformer.update({ ...onA(12), data: { imageCount: 1 } });
@@ -253,6 +290,16 @@ describeWithDb("findMinimalEntities (integration)", () => {
         userId: viewer,
         entityType: "tag",
         entityId: T.C_EXCLUDED,
+        instanceId: FX.A,
+        reason: "restricted",
+      },
+    });
+
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: viewer,
+        entityType: "studio",
+        entityId: S.EXCL_CHILD,
         instanceId: FX.A,
         reason: "restricted",
       },
@@ -590,6 +637,44 @@ describeWithDb("findMinimalEntities (integration)", () => {
     expect(offered).toContain("Tp Grandparent");
     expect(offered).not.toContain("Tp Child excluded");
     expect(offered).not.toContain("Tp Excluded parent");
+  });
+
+  it("the studio picker offers a parent whose sub-studios, at any depth, have scenes", async () => {
+    const sp = (userId: number, body: object) =>
+      find(userId, "studio", { filter: { q: "Sp" }, ...body });
+
+    expect(
+      names(await sp(onlyA, { count_filter: { min_scene_count: 1 } }))
+    ).toEqual([
+      "Sp Child excluded",
+      "Sp Child scenes",
+      "Sp Excluded parent",
+      "Sp Grandparent",
+      "Sp Parent",
+    ]);
+    // No content anywhere in the subtree, or on another instance's studio of
+    // the same id: not offered
+    const offered = names(
+      await sp(everyone, { count_filter: { min_scene_count: 1 } })
+    );
+    expect(offered).not.toContain("Sp Empty parent");
+    expect(offered).not.toContain("Sp Child empty");
+    expect(offered).not.toContain("Sp Cross");
+    expect(offered).toContain("Sp Child on B");
+  });
+
+  it("the studio picker leaves out a parent whose only sub-studio with scenes is excluded for the viewer", async () => {
+    const offered = names(
+      await find(viewer, "studio", {
+        filter: { q: "Sp" },
+        count_filter: { min_scene_count: 1 },
+      })
+    );
+
+    expect(offered).toContain("Sp Parent");
+    expect(offered).toContain("Sp Grandparent");
+    expect(offered).not.toContain("Sp Child excluded");
+    expect(offered).not.toContain("Sp Excluded parent");
   });
 
   it("a gallery without a title is named by its file, then its folder", async () => {

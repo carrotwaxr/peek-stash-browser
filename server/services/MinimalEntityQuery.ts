@@ -16,10 +16,10 @@
  * without the scope (filter dropdowns, carousel rules) the admin's own
  * hidden items apply as everywhere else. The search matches the name and,
  * for performers, studios and tags, their aliases (a collection's aliases text
- * too), never a description (lead decision, PR 4). A tag passes a count
- * minimum through its descendants too (an organizing parent has no content of
- * its own, and could not be picked for "Include sub-tags" otherwise):
- * `ancestorsOfCounted`. The order is always the name with case folded, and
+ * too), never a description (lead decision, PR 4). A tag or a studio passes a
+ * count minimum through its descendants too (an organizing parent has no
+ * content of its own, and could not be picked for "Include sub-tags" or
+ * sub-studios otherwise): `ancestorsOfCounted`. The order is always the name with case folded, and
  * the `LIMIT` is the page size: a picker lists one page.
  *
  * No index serves `%q%`, so a keystroke reads the type's live rows once and
@@ -74,12 +74,12 @@ interface MinimalConfig {
   /** The column each count minimum compares; a minimum the type lacks is ignored */
   readonly counts: readonly (readonly [keyof MinimalCountFilter, string])[];
   /**
-   * The type is a tree of `parentIds` (a JSON list of ids on the same
-   * instance): a count minimum also passes a row with a descendant, at any
-   * depth, that passes it, so an organizing parent with no content of its own
-   * can be picked
+   * The type is a tree on the same instance, by `parentIds` (a tag's JSON
+   * list of ids) or `parentId` (a studio's one id): a count minimum also
+   * passes a row with a descendant, at any depth, that passes it, so an
+   * organizing parent with no content of its own can be picked
    */
-  readonly parentIds?: boolean;
+  readonly parent?: "parentIds" | "parentId";
 }
 
 /** A gallery's name as it is shown (`galleryNameSql`) */
@@ -120,6 +120,7 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
       ["min_performer_count", "x.performerCount"],
       ["min_group_count", "x.groupCount"],
     ],
+    parent: "parentId",
   },
   tag: {
     table: "StashTag",
@@ -134,7 +135,7 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
       ["min_performer_count", "x.performerCount"],
       ["min_group_count", "x.groupCount"],
     ],
-    parentIds: true,
+    parent: "parentIds",
   },
   group: {
     table: "StashGroup",
@@ -206,8 +207,14 @@ LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entity
   });
   let withClause = "";
   const withParams: SqlParam[] = [];
-  if (counts.length > 0 && config.parentIds === true) {
-    const reach = ancestorsOfCounted(config, counts, excludedFor, instanceIds);
+  if (counts.length > 0 && config.parent !== undefined) {
+    const reach = ancestorsOfCounted(
+      config,
+      config.parent,
+      counts,
+      excludedFor,
+      instanceIds
+    );
     withClause = `WITH RECURSIVE ${reach.sql}\n`;
     withParams.push(...reach.params);
     where.push("(x.id, x.stashInstanceId) IN (SELECT id, inst FROM counted)");
@@ -235,9 +242,9 @@ LIMIT ?`,
 }
 
 /**
- * `counted(id, inst, parentIds)`: the rows that pass a count minimum
+ * `counted(id, inst, parents)`: the rows that pass a count minimum
  * themselves (live, on the allowed instances, no exclusion for the viewer: an
- * excluded sub-tag carries none of its content to its parents), then their
+ * excluded sub-tag or sub-studio carries none of its content to its parents), then their
  * ancestors up the same instance's tree. The walk goes through a live parent
  * whatever its own exclusion, as the "Include sub-tags" filter does: the
  * row's own exclusion is the outer statement's. A set read once from the
@@ -245,6 +252,7 @@ LIMIT ?`,
  */
 function ancestorsOfCounted(
   config: MinimalConfig,
+  parent: "parentIds" | "parentId",
   counts: readonly { col: string; min: number }[],
   excludedFor: number | undefined,
   instanceIds: readonly string[]
@@ -266,16 +274,21 @@ function ancestorsOfCounted(
     params.push(excludedFor, config.entityType);
   }
   params.push(...instances.params, ...counts.map(({ min }) => min));
+  // A tag's parents are a JSON list, a studio's one id (NULL for a root)
+  const step =
+    parent === "parentIds"
+      ? `CROSS JOIN json_each(${jsonListOrEmpty("c.parents")}) jp
+  CROSS JOIN ${config.table} p ON p.id = jp.value AND p.stashInstanceId = c.inst`
+      : `CROSS JOIN ${config.table} p ON p.id = c.parents AND p.stashInstanceId = c.inst`;
   return {
-    sql: `counted(id, inst, parentIds) AS (
-  SELECT x.id, x.stashInstanceId, x.parentIds
+    sql: `counted(id, inst, parents) AS (
+  SELECT x.id, x.stashInstanceId, x.${parent}
   FROM ${config.table} x${exclusionJoin}
   WHERE ${where.join("\n    AND ")}
   UNION
-  SELECT p.id, p.stashInstanceId, p.parentIds
+  SELECT p.id, p.stashInstanceId, p.${parent}
   FROM counted c
-  CROSS JOIN json_each(${jsonListOrEmpty("c.parentIds")}) jp
-  CROSS JOIN ${config.table} p ON p.id = jp.value AND p.stashInstanceId = c.inst
+  ${step}
   WHERE p.deletedAt IS NULL
 )`,
     params,
