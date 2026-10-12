@@ -115,14 +115,12 @@ function tagRow(overrides: Partial<TagQueryRow> = {}): TagQueryRow {
     stashInstanceId: "inst-a",
     name: "Beach",
     stashFavorite: false,
-    sceneCount: 3,
     imageCount: null,
     galleryCount: 0,
     performerCount: 2,
     studioCount: 1,
     groupCount: null,
-    sceneCountViaPerformers: 7,
-    // Direct or inherited, each scene once: more than either part
+    // Direct or inherited, each scene once
     sceneCountAll: 9,
     description: "",
     aliases: '["Shore"]',
@@ -168,6 +166,23 @@ describe("TagQueryBuilder", () => {
         "MAX(t.sceneCountAll - COALESCE(d.scenes, 0), 0) AS sceneCountAll"
       );
       expect(params).toEqual([1, 1, 1, 1, "inst-a", "inst-b", 10, 0]);
+    });
+
+    it("selects no stored scene count beside the viewer's: neither the direct nor the via-performer column", async () => {
+      await run();
+      const restricted = pageStatement().sql;
+      mockPrisma.$queryRawUnsafe.mockClear();
+      await run({}, { applyExclusions: false });
+      const admin = pageStatement().sql;
+
+      for (const sql of [restricted, admin]) {
+        expect(sql).not.toMatch(/\bt\.sceneCount\b(?!All)/);
+        expect(sql).not.toContain("sceneCountViaPerformers");
+      }
+      expect(restricted).toContain(
+        "MAX(t.sceneCountAll - COALESCE(d.scenes, 0), 0) AS sceneCountAll"
+      );
+      expect(admin).toContain("t.sceneCountAll AS sceneCountAll");
     });
 
     it("filters to the allowed instances, with no NULL arm", async () => {
@@ -545,8 +560,6 @@ describe("TagQueryBuilder", () => {
         description: null,
         aliases: ["Shore"],
         scene_count: 9,
-        scene_count_direct: 3,
-        scene_count_via_performers: 7,
         image_count: 0,
         group_count: 0,
         rating100: 40,
@@ -555,6 +568,11 @@ describe("TagQueryBuilder", () => {
         play_count: 5,
         image_path: null,
       });
+      // The stored direct and via-performer parts are not in the row
+      expect(must(result.items[0])).not.toHaveProperty("scene_count_direct");
+      expect(must(result.items[0])).not.toHaveProperty(
+        "scene_count_via_performers"
+      );
     });
 
     it("parents are the visible ones on the tag's own instance, in the tag's order; children come by name", async () => {

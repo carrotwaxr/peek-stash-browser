@@ -65,12 +65,11 @@ import {
 } from "./query/nestedRefs.js";
 
 // Column list for SELECT - all StashTag fields plus user data; the card's
-// counts as the viewer sees them (query/excludedCounts.ts). The direct and
-// via-performer scene counts stay as stored.
+// counts as the viewer sees them (query/excludedCounts.ts). The stored
+// direct and via-performer scene counts are unfiltered, so they stay out.
 const selectColumns = (ctx: QueryContext) =>
   `
     t.id, t.stashInstanceId, t.name, t.favorite AS stashFavorite,
-    t.sceneCount, t.sceneCountViaPerformers,
     ${visibleCount(ctx, "t.sceneCountAll", "scenes")} AS sceneCountAll,
     ${visibleCount(ctx, "t.imageCount", "images")} AS imageCount,
     ${visibleCount(ctx, "t.galleryCount", "galleries")} AS galleryCount,
@@ -520,9 +519,6 @@ class TagQueryBuilder extends EntityQueryBuilder<
    * Transform a raw database row into a NormalizedTag
    */
   protected transformRow(row: TagQueryRow): NormalizedTag {
-    const directSceneCount = row.sceneCount ?? 0;
-    const performerSceneCount = row.sceneCountViaPerformers ?? 0;
-
     const tag = {
       id: row.id,
       instanceId: row.stashInstanceId,
@@ -537,10 +533,8 @@ class TagQueryBuilder extends EntityQueryBuilder<
       image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
 
       // Counts: the card's scene count is the tag's Scenes tab (direct or
-      // inherited, each scene once), beside its two parts
+      // inherited, each scene once)
       scene_count: Number(row.sceneCountAll),
-      scene_count_direct: directSceneCount,
-      scene_count_via_performers: performerSceneCount,
       image_count: Number(row.imageCount ?? 0),
       gallery_count: Number(row.galleryCount ?? 0),
       performer_count: Number(row.performerCount ?? 0),
