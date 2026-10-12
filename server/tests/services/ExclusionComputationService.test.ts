@@ -260,6 +260,8 @@ const CONTENT_STUDIO =
 const EMPTY_GALLERY = /FROM StashGallery g/;
 const EMPTY_PERFORMER = /FROM StashPerformer p/;
 const EMPTY_STUDIO = /FROM StashStudio st/;
+/** The empty-studio query for listed refs only (the check under the restrictions alone) */
+const EMPTY_STUDIO_LISTED = /_peek_refs o CROSS JOIN StashStudio AS st/;
 const EMPTY_GROUP = /FROM StashGroup g/;
 const EMPTY_TAG = /FROM StashTag t[\s\S]*FROM GalleryTag gt/;
 
@@ -1680,6 +1682,22 @@ describe("computeEmptyExclusions", () => {
     expect(sql).not.toContain("LIKE");
   });
 
+  it("empty-studio query climbs parentId on the same instance, binding the instance list in the seed and the outer query", async () => {
+    await exclusionComputationService.recomputeForUser(1);
+
+    const studioQuery = queriesMatching(EMPTY_STUDIO);
+    expect(studioQuery).toHaveLength(1);
+    const [sql, ...params] = must(studioQuery[0]);
+    expect(sql).toContain("WITH RECURSIVE nonempty(id, inst)");
+    expect(sql).toContain(
+      "JOIN StashStudio p ON p.id = c.parentId AND p.stashInstanceId = c.stashInstanceId"
+    );
+    expect(sql).toContain("FROM _peek_ex_studio e WHERE e.id = p.id");
+    expect(sql).toContain("+s.stashInstanceId = st.stashInstanceId");
+    expect(sql).toContain("+i.stashInstanceId = st.stashInstanceId");
+    expect(params).toEqual(["A", "A"]);
+  });
+
   it("should handle multiple empty entity types in one pass", async () => {
     fakeRaw([
       [EMPTY_GALLERY, [{ galleryId: "g1", instanceId: "A" }]],
@@ -1869,6 +1887,9 @@ describe("reason precedence (restrictions before hides)", () => {
       [RESOLVE_STUDIO, [{ id: "st1", instanceId: "A" }]],
       [RESOLVE_SCENE, [{ id: "s1", instanceId: "A" }]],
       [EDGE_STUDIO_SCENE, [{ id: "s1", instanceId: "A" }]],
+      // Not empty under the restrictions alone; empty once its own hide
+      // cascades to its scene
+      [EMPTY_STUDIO_LISTED, []],
       [EMPTY_STUDIO, [{ studioId: "st1", instanceId: "A" }]],
     ]);
 
