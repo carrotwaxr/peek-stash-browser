@@ -290,7 +290,7 @@ const TABLES: Record<LinkCountType, { table: string; relations: Relation[] }> =
     tags: {
       table: "StashTag",
       relations: [
-        // Direct only: the response's scene_count_direct
+        // Direct only (no response field reads it)
         {
           column: "sceneCount",
           all: TAG_SCENES.all,

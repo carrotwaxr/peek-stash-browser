@@ -216,13 +216,11 @@ export interface TagQueryRow {
   stashInstanceId: string;
   name: string;
   stashFavorite: boolean;
-  sceneCount: number | null;
   imageCount: number | bigint | null;
   galleryCount: number | bigint | null;
   performerCount: number | bigint | null;
   studioCount: number | bigint | null;
   groupCount: number | bigint | null;
-  sceneCountViaPerformers: number | null;
   /** Live scenes tagged directly or inheriting the tag, each once */
   sceneCountAll: number | bigint;
   description: string | null;

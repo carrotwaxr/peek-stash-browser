@@ -550,6 +550,14 @@ describeWithDb("UserExcludedContentCount (integration)", () => {
     expect(tag).toMatchObject({ scene_count: 2, performer_count: 1 });
     expect(await tab(restricted, "tag", `1:${A}`, "scene")).toBe(2);
 
+    // The row carries no stored part of that count beside the viewer's
+    // (scene_count_direct, scene_count_via_performers), whoever asks
+    expect(tag).not.toHaveProperty("scene_count_direct");
+    expect(tag).not.toHaveProperty("scene_count_via_performers");
+    expect(await card(plain, "tag", `1:${A}`)).not.toHaveProperty(
+      "scene_count_direct"
+    );
+
     // Every card the user sees, every count, against its tab
     const pairs = await cardsAndTabs(restricted);
     expect(pairs.length).toBeGreaterThan(10);
