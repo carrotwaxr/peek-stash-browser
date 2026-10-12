@@ -2261,7 +2261,8 @@ class ExclusionComputationService {
    * Empty rules:
    * - Galleries: 0 visible images
    * - Performers: 0 visible scenes AND 0 visible images
-   * - Studios: 0 visible scenes AND 0 visible images
+   * - Studios: 0 visible scenes and 0 visible images, and no visible,
+   *   non-empty child studio at any depth (one recursive CTE over parentId)
    * - Groups: 0 visible scenes and no visible, non-empty sub-group at any
    *   depth (one recursive CTE over GroupRelation; UNION ends cycles)
    * - Tags: not attached to any visible scene, performer, studio, group,
@@ -2388,7 +2389,14 @@ class ExclusionComputationService {
       });
     }
 
-    // 3. Empty studios - studios with 0 visible scenes AND 0 visible images.
+    // 3. Empty studios - studios with 0 visible scenes and 0 visible images,
+    // and no visible, non-empty child studio at any depth (a restriction on
+    // a studio covers its descendants, so the network shows while a child
+    // does). `nonempty` seeds from every visible studio with a visible scene
+    // or image and climbs parentId, on the same instance, to each visible
+    // parent; UNION deduplicates, which ends a parentId cycle. It covers
+    // every studio in scope even with `only`, since a listed studio's
+    // emptiness depends on its children.
     // The unary + on the instance equality keeps the planner off the
     // stashInstanceId indexes (a scan of every scene and image per studio)
     // and on the studioId indexes.
@@ -2403,26 +2411,42 @@ class ExclusionComputationService {
           Array<{ studioId: string; instanceId: string }>
         >(
           `
+      WITH RECURSIVE nonempty(id, inst) AS (
+        SELECT st.id, st.stashInstanceId FROM StashStudio st
+        WHERE st.deletedAt IS NULL
+          AND ${stuFilter.sql}
+          AND NOT EXISTS (SELECT 1 FROM ${ex.studio} e WHERE e.id = st.id AND e.inst = st.stashInstanceId)
+          AND (
+            EXISTS (
+              SELECT 1 FROM StashScene s
+              WHERE s.studioId = st.id
+                AND +s.stashInstanceId = st.stashInstanceId
+                AND s.deletedAt IS NULL
+                AND NOT EXISTS (SELECT 1 FROM ${ex.scene} e WHERE e.id = s.id AND e.inst = s.stashInstanceId)
+            )
+            OR EXISTS (
+              SELECT 1 FROM StashImage i
+              WHERE i.studioId = st.id
+                AND +i.stashInstanceId = st.stashInstanceId
+                AND i.deletedAt IS NULL
+                AND NOT EXISTS (SELECT 1 FROM ${ex.image} e WHERE e.id = i.id AND e.inst = i.stashInstanceId)
+            )
+          )
+        UNION
+        SELECT p.id, p.stashInstanceId FROM nonempty n
+        JOIN StashStudio c ON c.id = n.id AND c.stashInstanceId = n.inst
+        JOIN StashStudio p ON p.id = c.parentId AND p.stashInstanceId = c.stashInstanceId
+        WHERE p.deletedAt IS NULL
+          AND NOT EXISTS (SELECT 1 FROM ${ex.studio} e WHERE e.id = p.id AND e.inst = p.stashInstanceId)
+      )
       SELECT st.id AS studioId, st.stashInstanceId AS instanceId
       FROM ${stuFrom}
       WHERE st.deletedAt IS NULL
       AND ${stuFilter.sql}
       AND NOT EXISTS (SELECT 1 FROM ${ex.studio} e WHERE e.id = st.id AND e.inst = st.stashInstanceId)
-      AND NOT EXISTS (
-        SELECT 1 FROM StashScene s
-        WHERE s.studioId = st.id
-          AND +s.stashInstanceId = st.stashInstanceId
-          AND s.deletedAt IS NULL
-          AND NOT EXISTS (SELECT 1 FROM ${ex.scene} e WHERE e.id = s.id AND e.inst = s.stashInstanceId)
-      )
-      AND NOT EXISTS (
-        SELECT 1 FROM StashImage i
-        WHERE i.studioId = st.id
-          AND +i.stashInstanceId = st.stashInstanceId
-          AND i.deletedAt IS NULL
-          AND NOT EXISTS (SELECT 1 FROM ${ex.image} e WHERE e.id = i.id AND e.inst = i.stashInstanceId)
-      )
+      AND NOT EXISTS (SELECT 1 FROM nonempty n WHERE n.id = st.id AND n.inst = st.stashInstanceId)
     `,
+          ...stuFilter.params,
           ...stuFilter.params
         );
 
