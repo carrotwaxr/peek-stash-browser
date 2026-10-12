@@ -205,6 +205,10 @@ test.describe("Carousel builder", () => {
       // (Back lands on the Customization tab; the carousels list is on Navigation)
       await page.goto("/settings?section=user&tab=navigation");
       await page.getByTitle("Delete carousel").click();
+      await page
+        .getByRole("dialog", { name: "Delete carousel?" })
+        .getByRole("button", { name: "Delete" })
+        .click();
       await expect(page.getByTitle("Delete carousel")).toHaveCount(0);
       const remaining = (await (
         await mustOk(

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { getErrorMessage } from "../../api";
 import { useCarousels, useDeleteCarousel } from "../../api/hooks/useCarousels";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { showError } from "../../utils/toast";
 import { getCarouselIcon } from "../carousel-builder/carouselIcons";
 import { Button, StatusMessage } from "../ui/index";
@@ -92,6 +93,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
       ? getErrorMessage(carouselsQuery.error)
       : null;
   const deleteCarousel = useDeleteCarousel();
+  const { confirm, dialog } = useConfirmDialog();
   const [hasChanges, setHasChanges] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -200,7 +202,16 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
     void navigate(`/settings/carousels/${actualId}/edit`);
   };
 
-  const handleDeleteCarousel = async (carouselId: string) => {
+  const handleDeleteCarousel = async (carouselId: string, title: string) => {
+    if (
+      !(await confirm({
+        title: "Delete carousel?",
+        message: `Delete the carousel "${title}"? It disappears from Home and cannot be restored.`,
+        confirmText: "Delete",
+      }))
+    ) {
+      return;
+    }
     const actualId = carouselId.replace("custom-", "");
 
     setDeletingId(carouselId);
@@ -433,7 +444,9 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
                       title="Edit carousel"
                     />
                     <Button
-                      onClick={() => void handleDeleteCarousel(pref.id)}
+                      onClick={() =>
+                        void handleDeleteCarousel(pref.id, info.title)
+                      }
                       variant="secondary"
                       className="p-2"
                       disabled={deletingId === pref.id}
@@ -487,6 +500,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
           Save Changes
         </Button>
       </div>
+      {dialog}
     </div>
   );
 };
