@@ -59,6 +59,19 @@ const P = {
   SNAKE_X: "7790104",
 } as const;
 
+/** The tag tree behind the parent-tag picker: names start "Tp " */
+const T = {
+  GRANDPARENT: "7790301", // no counts; reaches C_SCENES through PARENT
+  PARENT: "7790302", // no counts; child C_SCENES
+  C_SCENES: "7790303", // sceneCount 2
+  EMPTY_PARENT: "7790304", // no counts; child C_EMPTY
+  C_EMPTY: "7790305", // no counts
+  EXCL_PARENT: "7790306", // no counts; only child C_EXCLUDED
+  C_EXCLUDED: "7790307", // sceneCount 1; excluded for the viewer
+  CROSS: "7790308", // on A, no counts; its only "child" is on B
+  C_IMAGES: "7790309", // imageCount 1, child of PARENT too
+} as const;
+
 const G = {
   BY_FILE: "7790201",
   BY_FOLDER: "7790202",
@@ -152,6 +165,38 @@ async function seedPickers(): Promise<void> {
     ...onA(8),
     data: { aliases: "Group Alias, Third" },
   });
+  const tag = (id: string, name: string, parents: string[], counts = {}) => ({
+    id,
+    stashInstanceId: FX.A,
+    name,
+    parentIds: JSON.stringify(parents),
+    ...counts,
+  });
+  await prisma.stashTag.createMany({
+    data: [
+      tag(T.GRANDPARENT, "Tp Grandparent", []),
+      tag(T.PARENT, "Tp Parent", [T.GRANDPARENT]),
+      tag(T.C_SCENES, "Tp Child scenes", [T.PARENT], { sceneCount: 2 }),
+      tag(T.EMPTY_PARENT, "Tp Empty parent", []),
+      tag(T.C_EMPTY, "Tp Child empty", [T.EMPTY_PARENT]),
+      tag(T.EXCL_PARENT, "Tp Excluded parent", []),
+      tag(T.C_EXCLUDED, "Tp Child excluded", [T.EXCL_PARENT], {
+        sceneCount: 1,
+      }),
+      tag(T.CROSS, "Tp Cross", []),
+      tag(T.C_IMAGES, "Tp Child images", [T.PARENT], { imageCount: 1 }),
+    ],
+  });
+  // A child on B names a parent that id exists only on A: not A's parent
+  await prisma.stashTag.create({
+    data: {
+      id: "7790310",
+      stashInstanceId: FX.B,
+      name: "Tp Child on B",
+      parentIds: JSON.stringify([T.CROSS]),
+      sceneCount: 3,
+    },
+  });
   // Counts: 11 has scenes, 12 images, 13 galleries only
   await prisma.stashPerformer.update({ ...onA(11), data: { sceneCount: 2 } });
   await prisma.stashPerformer.update({ ...onA(12), data: { imageCount: 1 } });
@@ -198,6 +243,16 @@ describeWithDb("findMinimalEntities (integration)", () => {
         userId: viewer,
         entityType: "performer",
         entityId: mxId(3),
+        instanceId: FX.A,
+        reason: "restricted",
+      },
+    });
+
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: viewer,
+        entityType: "tag",
+        entityId: T.C_EXCLUDED,
         instanceId: FX.A,
         reason: "restricted",
       },
@@ -485,6 +540,56 @@ describeWithDb("findMinimalEntities (integration)", () => {
     expect(await mx({ count_filter: { min_performer_count: 1 } })).toHaveLength(
       10
     );
+  });
+
+  it("the tag picker offers a parent whose sub-tags, at any depth, have scenes", async () => {
+    const tp = (userId: number, body: object) =>
+      find(userId, "tag", { filter: { q: "Tp" }, ...body });
+
+    expect(
+      names(await tp(onlyA, { count_filter: { min_scene_count: 1 } }))
+    ).toEqual([
+      "Tp Child excluded",
+      "Tp Child scenes",
+      "Tp Excluded parent",
+      "Tp Grandparent",
+      "Tp Parent",
+    ]);
+    // Each minimum reaches the ancestors of what has that content
+    expect(
+      names(await tp(onlyA, { count_filter: { min_image_count: 1 } }))
+    ).toEqual(["Tp Child images", "Tp Grandparent", "Tp Parent"]);
+    // OR-ed over the type's counts, the ancestors of either
+    expect(
+      names(
+        await tp(onlyA, {
+          count_filter: { min_image_count: 1, min_scene_count: 1 },
+        })
+      )
+    ).toContain("Tp Child images");
+    // No content anywhere in the subtree, or on another instance's tag of
+    // the same id: not offered
+    const offered = names(
+      await tp(everyone, { count_filter: { min_scene_count: 1 } })
+    );
+    expect(offered).not.toContain("Tp Empty parent");
+    expect(offered).not.toContain("Tp Child empty");
+    expect(offered).not.toContain("Tp Cross");
+    expect(offered).toContain("Tp Child on B");
+  });
+
+  it("the tag picker leaves out a parent whose only sub-tag with scenes is excluded for the viewer", async () => {
+    const offered = names(
+      await find(viewer, "tag", {
+        filter: { q: "Tp" },
+        count_filter: { min_scene_count: 1 },
+      })
+    );
+
+    expect(offered).toContain("Tp Parent");
+    expect(offered).toContain("Tp Grandparent");
+    expect(offered).not.toContain("Tp Child excluded");
+    expect(offered).not.toContain("Tp Excluded parent");
   });
 
   it("a gallery without a title is named by its file, then its folder", async () => {
