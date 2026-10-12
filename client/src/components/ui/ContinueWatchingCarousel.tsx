@@ -97,7 +97,7 @@ const ContinueWatchingCarousel = ({
       showProgress={true}
       selectedScenes={selectedScenes}
       onToggleSelect={onToggleSelect}
-      seeMoreUrl="/watch-history"
+      seeMoreUrl="/watch-history?view=in_progress"
     />
   );
 };

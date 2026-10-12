@@ -40,8 +40,10 @@ vi.mock("@/components/ui/SceneCarousel", () => ({
     scenes,
     loading,
     onSceneClick,
+    seeMoreUrl,
   }: {
     loading: boolean;
+    seeMoreUrl?: string;
     onSceneClick: (scene: { id: string; instanceId: string }) => void;
     scenes: Array<{
       id: string;
@@ -50,7 +52,11 @@ vi.mock("@/components/ui/SceneCarousel", () => ({
       play_count: number;
     }>;
   }) => (
-    <ul data-loading={String(loading)} data-testid="carousel">
+    <ul
+      data-loading={String(loading)}
+      data-see-more={seeMoreUrl}
+      data-testid="carousel"
+    >
       {scenes.map((s) => (
         <li
           key={`${s.id}:${s.instanceId}`}
@@ -148,6 +154,17 @@ describe("ContinueWatchingCarousel", () => {
       "7:b:200:2",
       "7:a:100:1",
     ]);
+  });
+
+  it("More opens Watch History on the In Progress tab", async () => {
+    stubApi({ [WATCHED]: answer([scene("1", "a")]) });
+
+    renderCarousel();
+
+    const carousel = await screen.findByTestId("carousel");
+    expect(carousel.getAttribute("data-see-more")).toBe(
+      "/watch-history?view=in_progress"
+    );
   });
 
   it("makes no second scene request", async () => {
