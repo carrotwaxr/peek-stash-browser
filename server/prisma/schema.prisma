@@ -481,7 +481,7 @@ model UserEntityRanking {
   // Computed ranking data
   engagementScore  Float @default(0) // Raw weighted score: (oCount × 5) + (normalizedDuration) + (playCount)
   libraryPresence  Int   @default(1) // Number of scenes in library for this entity
-  engagementRate   Float @default(0) // engagementScore / libraryPresence
+  engagementRate   Float @default(0) // smoothed, decayed engagement per library scene
   percentileRank   Float @default(0) // 0-100, where 100 = top ranked among user's engaged entities of this type
 
   updatedAt DateTime @updatedAt

@@ -75,6 +75,8 @@ describe("ranking forget order", () => {
           decayedPlayDuration: 1200,
           openedCount: 4,
           keptCount: 3,
+          decayedOpened: 1,
+          decayedKept: 0.75,
           libraryPresence: 4,
         },
       ])

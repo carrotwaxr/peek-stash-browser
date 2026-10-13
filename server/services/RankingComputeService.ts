@@ -13,9 +13,10 @@
  *    user's mean over k = max(5, median presence) scenes, so a few plays
  *    of a one-scene performer stay near the mean
  * 4. affinity, in [-1, 1]: half the rate's lift over the mean (likes only),
- *    half the lift of how often the user kept (played or O'd) the entity's
- *    scenes they opened over their own kept rate; abandoned opens push it
- *    below 0, which is how dislikes show
+ *    half the lift of how often the user kept (played, O'd or watched two
+ *    minutes of) the entity's scenes they opened over their own kept rate,
+ *    both decayed; skipped opens push it below 0, which is how dislikes
+ *    show, except for an entity the user pressed O on
  *
  * Scenes are not stored: the stats page ranks its top scenes from the
  * user's watch history when it loads (UserStatsAggregationService, with
@@ -95,8 +96,11 @@ export interface RawEntityStats {
   decayedPlayDuration: number | bigint;
   /** History rows: scenes of the entity the user opened */
   openedCount: number | bigint;
-  /** Of those, the ones played or O'd */
+  /** Of those, the ones kept: played, O'd or watched `KEPT_MIN_SECONDS` */
   keptCount: number | bigint;
+  /** The same two counts, each history row weighted by its decay */
+  decayedOpened: number | bigint;
+  decayedKept: number | bigint;
   libraryPresence: number | bigint;
 }
 
@@ -119,7 +123,10 @@ export interface ComputedRanking {
 export interface RankingInputs {
   /** The average live scene duration in seconds, which normalizes watch time */
   avgSceneDuration: number;
-  /** The user's kept share of all their history rows on live scenes */
+  /**
+   * The user's kept share of all their history rows on live scenes, each
+   * row weighted by its decay
+   */
   keptBase: number;
 }
 
@@ -132,6 +139,12 @@ const DECAY_BANDS = [
 ] as const;
 const DECAY_FLOOR = 0.25;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A history row is kept when the user played it, pressed O on it, or
+ * watched at least this many seconds of it; a shorter open is a skip
+ */
+export const KEPT_MIN_SECONDS = 120;
 
 /** The smoothing's prior weight in scenes is at least this */
 const MIN_PRIOR_SCENES = 5;
@@ -150,6 +163,10 @@ function decaySql(now: number): Prisma.Sql {
   return Prisma.sql`(CASE ${Prisma.join(arms, " ")} ELSE ${DECAY_FLOOR} END)`;
 }
 
+/** 1 when the history row `w` is kept, else 0 */
+const keptSql = (): Prisma.Sql =>
+  Prisma.sql`(w.playCount > 0 OR w.oCount > 0 OR w.playDuration >= ${KEPT_MIN_SECONDS})`;
+
 /**
  * One entity's sums over the history rows of `w` grouped under it (the
  * columns of `RawEntityStats` but its key and presence), each row decayed
@@ -157,6 +174,7 @@ function decaySql(now: number): Prisma.Sql {
  */
 function historySums(now: number): Prisma.Sql {
   const decay = decaySql(now);
+  const kept = keptSql();
   return Prisma.sql`SUM(w.playCount) AS playCount,
           SUM(w.oCount) AS oCount,
           SUM(w.playDuration) AS playDuration,
@@ -164,13 +182,16 @@ function historySums(now: number): Prisma.Sql {
           SUM(${decay} * w.oCount) AS decayedOCount,
           SUM(${decay} * w.playDuration) AS decayedPlayDuration,
           COUNT(*) AS openedCount,
-          SUM(w.playCount > 0 OR w.oCount > 0) AS keptCount`;
+          SUM(${kept}) AS keptCount,
+          SUM(${decay}) AS decayedOpened,
+          SUM(${decay} * ${kept}) AS decayedKept`;
 }
 
 /** The outer select list of `historySums`' subquery `h` */
 const HISTORY_COLUMNS = Prisma.sql`h.entityId, h.instanceId, h.playCount,
         h.oCount, h.playDuration, h.decayedPlayCount, h.decayedOCount,
-        h.decayedPlayDuration, h.openedCount, h.keptCount`;
+        h.decayedPlayDuration, h.openedCount, h.keptCount, h.decayedOpened,
+        h.decayedKept`;
 
 /** Engagement: oCount × 5 + watched time / average scene length + plays */
 function engagement(
@@ -220,6 +241,8 @@ export function computeRankings(
       playDuration,
       openedCount: Math.round(Number(e.openedCount)),
       keptCount: Math.round(Number(e.keptCount)),
+      decayedOpened: Number(e.decayedOpened),
+      decayedKept: Number(e.decayedKept),
       libraryPresence: Math.max(Math.round(Number(e.libraryPresence)), 1),
       engagementScore: engagement(
         oCount,
@@ -244,23 +267,33 @@ export function computeRankings(
     median(read.map((e) => e.libraryPresence))
   );
 
-  const ranked: ComputedRanking[] = read.map(({ decayed, ...e }) => {
-    const rate = (decayed + k * mu) / (e.libraryPresence + k);
-    const lift = mu > 0 ? rate / mu : 1;
-    // A user who kept nothing anywhere gives no kept signal
-    const keptLift =
-      keptBase > 0
-        ? (e.keptCount + KEPT_PRIOR_OPENS * keptBase) /
-          (e.openedCount + KEPT_PRIOR_OPENS) /
-          keptBase
-        : 1;
-    const affinity = clamp(
-      0.5 * Math.max(0, Math.log2(lift)) + 0.5 * Math.log2(keptLift),
-      -1,
-      1
-    );
-    return { ...e, engagementRate: rate, affinity, percentileRank: 0 };
-  });
+  const ranked: ComputedRanking[] = read.map(
+    ({ decayed, decayedOpened, decayedKept, ...e }) => {
+      const rate = (decayed + k * mu) / (e.libraryPresence + k);
+      const lift = mu > 0 ? rate / mu : 1;
+      // Old and undated opens count as little as old plays. A user who kept
+      // nothing anywhere gives no kept signal.
+      const keptLift =
+        keptBase > 0
+          ? (decayedKept + KEPT_PRIOR_OPENS * keptBase) /
+            (decayedOpened + KEPT_PRIOR_OPENS) /
+            keptBase
+          : 1;
+      const affinity = clamp(
+        0.5 * Math.max(0, Math.log2(lift)) + 0.5 * Math.log2(keptLift),
+        -1,
+        1
+      );
+      // An O is an explicit like: no pattern of skips outweighs it, so an
+      // entity the user pressed O on is never disliked
+      return {
+        ...e,
+        engagementRate: rate,
+        affinity: e.oCount > 0 ? Math.max(0, affinity) : affinity,
+        percentileRank: 0,
+      };
+    }
+  );
 
   // Percentile by engagement score, 100 = the most engaged; an entity tied
   // with the one before it takes its percentile
@@ -391,11 +424,11 @@ class RankingComputeService {
     const startTime = Date.now();
     logger.debug("Starting ranking computation", { userId });
 
+    const now = Date.now();
     const inputs: RankingInputs = {
       avgSceneDuration: await this.getAverageSceneDuration(),
-      keptBase: await this.getKeptBase(userId),
+      keptBase: await this.getKeptBase(userId, now),
     };
-    const now = Date.now();
 
     // One type after another: run together, the reads contend for the
     // pool's connections and the disk
@@ -441,14 +474,18 @@ class RankingComputeService {
 
   /**
    * The share of the user's history rows on live scenes that they kept
-   * (played or O'd), against which each entity's kept rate is read; 1 with
-   * no history
+   * (`keptSql`), each row weighted by its decay at `now`, against which each
+   * entity's kept rate is read; 1 with no history
    */
-  private async getKeptBase(userId: number): Promise<number> {
+  private async getKeptBase(userId: number, now: number): Promise<number> {
+    const decay = decaySql(now);
     const [row] = await prisma.$queryRaw<
-      Array<{ opened: number | bigint; kept: number | bigint | null }>
+      Array<{
+        opened: number | bigint | null;
+        kept: number | bigint | null;
+      }>
     >`
-      SELECT COUNT(*) AS opened, SUM(w.playCount > 0 OR w.oCount > 0) AS kept
+      SELECT SUM(${decay}) AS opened, SUM(${decay} * ${keptSql()}) AS kept
       FROM WatchHistory w
       CROSS JOIN StashScene s ON s.id = w.sceneId AND s.stashInstanceId = w.instanceId AND s.deletedAt IS NULL
       WHERE w.userId = ${userId}
