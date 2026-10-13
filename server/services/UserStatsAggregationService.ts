@@ -12,8 +12,9 @@
  * - Top performers, partners, studios and tags read the rankings
  *   RankingComputeService stores (at most an hour old), ordered by:
  *   - Raw engagement: (oCount × 5) + (normalizedDuration) + (playCount)
- *   - Percentile of the raw engagement among all entities the user has
- *     engaged with (100 = top), which a list shows as its score
+ *   - Percentile of the raw engagement among the entities the list keeps
+ *     (visible, not ignored, of the list's role; 100 = top), ranked per
+ *     request, which a list shows as its score
  *   The viewer's recommendation preferences split the performers: with
  *   partner genders set, Top Partners holds the partner genders and Top
  *   Performers and Most O'd Performer everyone else (a lead gender, another
@@ -105,11 +106,11 @@ type EntitySource = keyof typeof ENTITY_SOURCES;
 /** The entity types with stored rankings, each a top list */
 type RankedType = "performer" | "studio" | "tag";
 
-/** The ranking column each sort orders the stored rankings by */
+/** The column each sort orders the ranked rows by */
 const RANKING_SORT: Record<TopListSortBy, string> = {
-  engagement: "r.engagementScore",
-  oCount: "r.oCount",
-  playCount: "r.playCount",
+  engagement: "engagementScore",
+  oCount: "oCount",
+  playCount: "playCount",
 };
 
 /** The column each sort orders the scenes ranked from history by */
@@ -221,7 +222,10 @@ interface RankedRow extends NamedRow {
   playCount: number;
   playDuration: number;
   oCount: number;
-  percentileRank: number;
+  /** RANK() by engagement among the rows kept: 1 for the most engaged */
+  position: bigint | number;
+  /** How many rows were kept */
+  total: bigint | number;
 }
 
 interface HistoryRankedSceneRow extends TitledRow {
@@ -525,7 +529,10 @@ class UserStatsAggregationService {
    * A top list of performers, studios or tags from the stored rankings, in
    * the sort's order: only entities the viewer may see now, whatever they
    * were when the rankings were computed. `extra` is one more condition on
-   * the joined entity `x` (a gender, ignored tags).
+   * the joined entity `x` (a gender, ignored tags). The score is each
+   * entity's percentile by engagement among the rows the list keeps, ranked
+   * here by a window as the top scenes are: the stored percentile counts
+   * hidden, ignored, other-instance and other-role entities too.
    */
   private async getTopEntities(
     entity: RankedType,
@@ -540,16 +547,28 @@ class UserStatsAggregationService {
       userId,
       allowedInstanceIds
     );
+    const sort = RANKING_SORT[sortBy];
     const rows = await prisma.$queryRawUnsafe<RankedRow[]>(
-      `SELECT r.entityId AS id, r.instanceId AS instanceId,
-        r.playCount AS playCount, r.playDuration AS playDuration,
-        r.oCount AS oCount, r.percentileRank AS percentileRank,
+      `WITH ranked AS (
+        SELECT r.entityId AS id, r.instanceId AS instanceId,
+          r.playCount AS playCount, r.playDuration AS playDuration,
+          r.oCount AS oCount, r.engagementScore AS engagementScore,
+          RANK() OVER (ORDER BY r.engagementScore DESC) AS position,
+          COUNT(*) OVER () AS total
+        FROM UserEntityRanking r
+        ${visible.joins}
+        WHERE r.userId = ? AND r.entityType = ? AND ${visible.where}${extra ? ` AND ${extra.sql}` : ""}
+      ),
+      top AS (
+        SELECT * FROM ranked ORDER BY ${sort} DESC, id, instanceId LIMIT ?
+      )
+      SELECT top.id AS id, top.instanceId AS instanceId,
+        top.playCount AS playCount, top.playDuration AS playDuration,
+        top.oCount AS oCount, top.position AS position, top.total AS total,
         ${ENTITY_SOURCES[entity].columns}
-      FROM UserEntityRanking r
-      ${visible.joins}
-      WHERE r.userId = ? AND r.entityType = ? AND ${visible.where}${extra ? ` AND ${extra.sql}` : ""}
-      ORDER BY ${RANKING_SORT[sortBy]} DESC, r.entityId, r.instanceId
-      LIMIT ?`,
+      FROM top
+      CROSS JOIN ${ENTITY_SOURCES[entity].table} x ON x.id = top.id AND x.stashInstanceId = top.instanceId
+      ORDER BY top.${sort} DESC, top.id, top.instanceId`,
       ...visible.joinParams,
       userId,
       entity,
@@ -566,7 +585,7 @@ class UserStatsAggregationService {
       playCount: row.playCount,
       playDuration: Math.round(row.playDuration),
       oCount: row.oCount,
-      score: row.percentileRank,
+      score: percentileRank(Number(row.position) - 1, Number(row.total)),
     }));
   }
 
