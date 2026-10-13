@@ -24,6 +24,15 @@ export const SIMILAR_STUDIO_WEIGHT = 2;
 /** A direct seed tag, times its rarity */
 export const SIMILAR_TAG_WEIGHT = 1.5;
 
+/**
+ * How many candidates the SQL reads by weight alone, and how many the list
+ * keeps once the watch factor has reordered them: a fresh candidate can rise
+ * from below the first 500 past recently watched ones (a factor of 0.3 lets
+ * one of a third the weight pass)
+ */
+export const SIMILAR_CANDIDATE_LIMIT = 1500;
+export const SIMILAR_LIST_LIMIT = 500;
+
 /** A candidate the viewer kept and last played under this many days ago */
 const RECENT_DAYS = 14;
 export const RECENT_KEPT_FACTOR = 0.3;

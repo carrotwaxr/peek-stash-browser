@@ -601,7 +601,7 @@ describe("findSimilarScenes", () => {
         studio: 2,
         tags: [],
       },
-      500
+      1500
     );
   });
 
@@ -836,6 +836,50 @@ describe("findSimilarScenes", () => {
       finishPerformers([]);
       await done;
       expect(weightsPassed().tags).toEqual([["t", 1.5 * tagIdf(10, 1000)]]);
+    });
+
+    it("reads 1,500 candidates so fresh ones beyond the first 500 rise above recently watched ones, and keeps 500", async () => {
+      const recently = new Date(Date.now() - 3 * 86_400_000);
+      // 600 recently kept at 10 (3 after the watch factor), then 300 fresh at 5
+      const watched = Array.from({ length: 600 }, (_, i) => ({
+        sceneId: `w${i}`,
+        instanceId: "inst-a",
+        weight: 10,
+        date: "2025-01-01",
+      }));
+      const fresh = Array.from({ length: 300 }, (_, i) => ({
+        sceneId: `f${i}`,
+        instanceId: "inst-a",
+        weight: 5,
+        date: "2025-01-01",
+      }));
+      seedRows({
+        history: watched.map((c) => ({
+          sceneId: c.sceneId,
+          instanceId: "inst-a",
+          kept: 1,
+          lastPlayedAt: recently,
+        })),
+      });
+      mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue([
+        ...watched,
+        ...fresh,
+      ]);
+      mockSceneQueryBuilder.getByRefs.mockImplementation(({ refs }) =>
+        Promise.resolve(
+          refs.map((r) => createMockScene({ id: r.id, instanceId: "inst-a" }))
+        )
+      );
+
+      const res = await run();
+
+      expect(
+        must(mockStashEntityService.getSimilarSceneCandidates.mock.calls[0])[3]
+      ).toBe(1500);
+      expect(res._getOkBody().count).toBe(500);
+      expect(
+        res._getOkBody().scenes.every((scene) => scene.id.startsWith("f"))
+      ).toBe(true);
     });
 
     it("a candidate kept 3 days ago drops below an otherwise equal unwatched one", async () => {
