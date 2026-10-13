@@ -1,15 +1,20 @@
 /**
  * Unit Tests for RankingComputeService
  *
- * Tests the percentile ranking algorithm, engagement score calculation,
- * tie handling, edge cases, and BigInt/float rounding from SQLite, and
+ * Tests the ranking algorithm (`computeRankings`: engagement score and its
+ * percentile, the smoothed decayed rate, the affinity from kept opens), tie
+ * handling, edge cases, and BigInt/float rounding from SQLite, and
  * `ensureFresh`: at most one recompute per user per hour, shared by
  * concurrent callers.
  */
 import { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import { rankingComputeService } from "../../services/RankingComputeService.js";
+import {
+  type RawEntityStats,
+  computeRankings,
+  rankingComputeService,
+} from "../../services/RankingComputeService.js";
 import { dbWrite } from "../../utils/dbWrite.js";
 import { logger } from "../../utils/logger.js";
 import { objectContaining } from "../helpers/matchers.js";
@@ -52,12 +57,14 @@ type RankingTx = ReturnType<typeof rankingTx>;
 /** Helper: set up mocks for a recomputeAllRankings call */
 function setupRankingMocks(opts: {
   avgDuration?: number;
+  keptBase?: { opened: number; kept: number };
   performerStats?: unknown[];
   studioStats?: unknown[];
   tagStats?: unknown[];
 }) {
   mockPrisma.$queryRaw
     .mockResolvedValueOnce([{ avgDuration: opts.avgDuration ?? 1200 }])
+    .mockResolvedValueOnce([opts.keptBase ?? { opened: 10, kept: 5 }])
     .mockResolvedValueOnce(opts.performerStats ?? [])
     .mockResolvedValueOnce(opts.studioStats ?? [])
     .mockResolvedValueOnce(opts.tagStats ?? []);
@@ -113,20 +120,21 @@ function committedRankings(entityType: string): string[][] {
 
 /** One performer's stats row as the ranking query returns it */
 function performerStats(entityId: string) {
-  return {
-    entityId,
+  return raw(entityId, {
     instanceId: "inst1",
-    playCount: 1,
     oCount: 1,
     playDuration: 600,
-    libraryPresence: 1,
-  };
+  });
 }
 
-/** The SQL of a `$queryRaw` tagged-template call */
+/** The SQL text of a `$queryRaw` tagged-template call (fragments aside) */
 function sqlOf(query: unknown): string {
   return Array.isArray(query) ? query.join("?") : "";
 }
+
+/** Whether the query is the performer read */
+const isPerformerRead = (query: unknown) =>
+  sqlOf(query).includes("sp.performerId AS entityId");
 
 describe("RankingComputeService", () => {
   beforeEach(() => {
@@ -141,14 +149,13 @@ describe("RankingComputeService", () => {
       const txMock = setupRankingMocks({
         avgDuration: 1000,
         performerStats: [
-          {
-            entityId: "perf1",
+          raw("perf1", {
             instanceId: "inst1",
             playCount: 3,
             oCount: 2,
             playDuration: 2000,
             libraryPresence: 1,
-          },
+          }),
         ],
       });
 
@@ -165,14 +172,13 @@ describe("RankingComputeService", () => {
       const txMock = setupRankingMocks({
         avgDuration: 600,
         performerStats: [
-          {
-            entityId: "perf1",
+          raw("perf1", {
             instanceId: "inst1",
             playCount: 0,
             oCount: 0,
             playDuration: 1200,
             libraryPresence: 1,
-          },
+          }),
         ],
       });
 
@@ -183,52 +189,90 @@ describe("RankingComputeService", () => {
     });
   });
 
-  describe("engagement rate (score / libraryPresence)", () => {
-    it("divides engagement score by library presence", async () => {
-      // score = (0 × 5) + (1200/1200) + 10 = 11, libraryPresence = 5
-      // rate = 11 / 5 = 2.2
+  describe("smoothed rate, affinity and opened and kept counts", () => {
+    it("writes what computeRankings computes from the rows and the user's kept rate", async () => {
+      const rows = [
+        raw("liked", {
+          playCount: 10,
+          oCount: 2,
+          playDuration: 6000,
+          decayedPlayCount: 6,
+          decayedOCount: 1,
+          decayedPlayDuration: 3000,
+          openedCount: 8,
+          keptCount: 8,
+          libraryPresence: 5,
+        }),
+        raw("dropped", {
+          playCount: 0,
+          playDuration: 300,
+          openedCount: 9,
+          keptCount: 0,
+          libraryPresence: 40,
+        }),
+      ];
       const txMock = setupRankingMocks({
         avgDuration: 1200,
-        performerStats: [
-          {
-            entityId: "perf1",
-            instanceId: "inst1",
-            playCount: 10,
-            oCount: 0,
-            playDuration: 1200,
-            libraryPresence: 5,
-          },
-        ],
+        keptBase: { opened: 20, kept: 10 },
+        performerStats: rows,
       });
 
       await rankingComputeService.recomputeAllRankings(1);
 
-      const rankings = getWrittenRankings(txMock, "performer");
-      expect(must(rankings[0]).engagementRate).toBeCloseTo(2.2, 5);
+      const expected = computeRankings(rows, {
+        avgSceneDuration: 1200,
+        keptBase: 0.5,
+      });
+      const written = getWrittenRankings(txMock, "performer");
+      expect(written).toHaveLength(2);
+      for (const want of expected) {
+        const row = must(written.find((r) => r.entityId === want.entityId));
+        expect(row.engagementRate).toBeCloseTo(want.engagementRate, 9);
+        expect(row.affinity).toBeCloseTo(want.affinity, 9);
+        expect(row.openedCount).toBe(want.openedCount);
+        expect(row.keptCount).toBe(want.keptCount);
+      }
+      const dropped = must(written.find((r) => r.entityId === "dropped"));
+      expect(dropped.affinity).toBeLessThan(0);
     });
 
-    it("uses Math.max(libraryPresence, 1) to avoid division by zero", async () => {
+    it("a user with no history on live scenes has a kept rate of 1", async () => {
+      const rows = [raw("p", { openedCount: 4, keptCount: 2 })];
+      const txMock = setupRankingMocks({
+        keptBase: { opened: 0, kept: 0 },
+        performerStats: rows,
+      });
+
+      await rankingComputeService.recomputeAllRankings(1);
+
+      const [want] = computeRankings(rows, {
+        avgSceneDuration: 1200,
+        keptBase: 1,
+      });
+      const [row] = getWrittenRankings(txMock, "performer");
+      expect(must(row).affinity).toBeCloseTo(must(want).affinity, 9);
+    });
+
+    it("reads a library presence of 0 as 1", async () => {
       const txMock = setupRankingMocks({
         avgDuration: 1200,
         performerStats: [
-          {
-            entityId: "perf1",
+          raw("perf1", {
             instanceId: "inst1",
             playCount: 5,
             oCount: 1,
             playDuration: 1200,
             libraryPresence: 0, // Zero library presence
-          },
+          }),
         ],
       });
 
       await rankingComputeService.recomputeAllRankings(1);
 
       const rankings = getWrittenRankings(txMock, "performer");
-      // Should not be Infinity — divides by max(0, 1) = 1
-      expect(Number.isFinite(must(rankings[0]).engagementRate)).toBe(true);
-      // score = (1 × 5) + 1 + 5 = 11, rate = 11 / 1 = 11
-      expect(must(rankings[0]).engagementRate).toBe(11);
+      expect(must(rankings[0]).libraryPresence).toBe(1);
+      // Alone, the entity is the mean: score (1 × 5) + 1 + 5 = 11 a scene
+      expect(must(rankings[0]).engagementRate).toBeCloseTo(11, 9);
     });
   });
 
@@ -238,32 +282,29 @@ describe("RankingComputeService", () => {
         avgDuration: 1200,
         performerStats: [
           // High engagement
-          {
-            entityId: "top",
+          raw("top", {
             instanceId: "i1",
             playCount: 100,
             oCount: 20,
             playDuration: 50000,
             libraryPresence: 1,
-          },
+          }),
           // Medium engagement
-          {
-            entityId: "mid",
+          raw("mid", {
             instanceId: "i1",
             playCount: 10,
             oCount: 2,
             playDuration: 5000,
             libraryPresence: 1,
-          },
+          }),
           // Low engagement
-          {
-            entityId: "low",
+          raw("low", {
             instanceId: "i1",
             playCount: 1,
             oCount: 0,
             playDuration: 100,
             libraryPresence: 1,
-          },
+          }),
         ],
       });
 
@@ -281,14 +322,13 @@ describe("RankingComputeService", () => {
     it("assigns 100 to a single entity", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
-          {
-            entityId: "only",
+          raw("only", {
             instanceId: "i1",
             playCount: 5,
             oCount: 1,
             playDuration: 600,
             libraryPresence: 1,
-          },
+          }),
         ],
       });
 
@@ -305,35 +345,32 @@ describe("RankingComputeService", () => {
       expect(must(rankings[0]).percentileRank).toBe(0);
     });
 
-    it("handles ties — entities with same engagement rate get same percentile", async () => {
+    it("handles ties — entities with the same engagement score get the same percentile", async () => {
       // Two entities with identical stats should get the same percentile
       const txMock = setupRankingMocks({
         avgDuration: 1200,
         performerStats: [
-          {
-            entityId: "a",
+          raw("a", {
             instanceId: "i1",
             playCount: 10,
             oCount: 2,
             playDuration: 2400,
             libraryPresence: 5,
-          },
-          {
-            entityId: "b",
+          }),
+          raw("b", {
             instanceId: "i1",
             playCount: 10,
             oCount: 2,
             playDuration: 2400,
             libraryPresence: 5,
-          },
-          {
-            entityId: "c",
+          }),
+          raw("c", {
             instanceId: "i1",
             playCount: 1,
             oCount: 0,
             playDuration: 100,
             libraryPresence: 10,
-          },
+          }),
         ],
       });
 
@@ -342,11 +379,11 @@ describe("RankingComputeService", () => {
       const rankings = getWrittenRankings(txMock, "performer");
       const byId = Object.fromEntries(rankings.map((r) => [r.entityId, r]));
 
-      // a and b have identical engagement rates, so they must share the same percentile
+      // a and b have identical engagement scores, so they must share the same percentile
       expect(must(byId["a"]).percentileRank).toBe(
         must(byId["b"]).percentileRank
       );
-      // c has lower engagement rate, so lower percentile
+      // c has a lower engagement score, so a lower percentile
       expect(must(byId["c"]).percentileRank).toBeLessThan(
         must(must(byId["a"]).percentileRank)
       );
@@ -371,25 +408,23 @@ describe("RankingComputeService", () => {
     it("handles some entity types empty and others populated", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
-          {
-            entityId: "perf1",
+          raw("perf1", {
             instanceId: "i1",
             playCount: 5,
             oCount: 1,
             playDuration: 600,
             libraryPresence: 3,
-          },
+          }),
         ],
         studioStats: [], // Empty
         tagStats: [
-          {
-            entityId: "tag1",
+          raw("tag1", {
             instanceId: "i1",
             playCount: 3,
             oCount: 0,
             playDuration: 300,
             libraryPresence: 10,
-          },
+          }),
         ],
       });
 
@@ -412,34 +447,31 @@ describe("RankingComputeService", () => {
     it("computes and stores performer, studio and tag rankings, never scenes", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
-          {
-            entityId: "p1",
+          raw("p1", {
             instanceId: "i1",
             playCount: 10,
             oCount: 2,
             playDuration: 5000,
             libraryPresence: 3,
-          },
+          }),
         ],
         studioStats: [
-          {
-            entityId: "s1",
+          raw("s1", {
             instanceId: "i1",
             playCount: 8,
             oCount: 1,
             playDuration: 4000,
             libraryPresence: 5,
-          },
+          }),
         ],
         tagStats: [
-          {
-            entityId: "t1",
+          raw("t1", {
             instanceId: "i1",
             playCount: 20,
             oCount: 5,
             playDuration: 10000,
             libraryPresence: 15,
-          },
+          }),
         ],
       });
 
@@ -455,7 +487,7 @@ describe("RankingComputeService", () => {
       expect(studioRankings).toHaveLength(1);
       expect(tagRankings).toHaveLength(1);
       expect(getWrittenRankings(txMock, "scene")).toEqual([]);
-      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(4);
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(5);
       expect(mockPrisma.userEntityRanking.deleteMany).not.toHaveBeenCalledWith(
         objectContaining({ where: { userId: 1, entityType: "scene" } })
       );
@@ -464,14 +496,13 @@ describe("RankingComputeService", () => {
 
   describe("a user deleted while the recompute runs", () => {
     const performerStats = [
-      {
-        entityId: "p1",
+      raw("p1", {
         instanceId: "i1",
         playCount: 1,
         oCount: 0,
         playDuration: 60,
         libraryPresence: 1,
-      },
+      }),
     ];
 
     it("a written batch is the delete and the insert only: the foreign key to User refuses rows of a missing user", async () => {
@@ -537,7 +568,7 @@ describe("RankingComputeService", () => {
 
       await rankingComputeService.recomputeAllRankings(1);
 
-      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(4);
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(5);
       expect(most).toBe(1);
       mockPrisma.$queryRaw.mockReset();
     });
@@ -547,15 +578,15 @@ describe("RankingComputeService", () => {
     it("defaults to 1200 when no scenes have duration", async () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce([{ avgDuration: null }]) // No scenes
+        .mockResolvedValueOnce([{ opened: 1, kept: 1 }])
         .mockResolvedValueOnce([
-          {
-            entityId: "p1",
+          raw("p1", {
             instanceId: "i1",
             playCount: 0,
             oCount: 0,
             playDuration: 2400,
             libraryPresence: 1,
-          },
+          }),
         ])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
@@ -574,14 +605,13 @@ describe("RankingComputeService", () => {
     it("rounds playCount, oCount, and libraryPresence to integers before writing", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
-          {
-            entityId: "perf1",
+          raw("perf1", {
             instanceId: "inst1",
             playCount: BigInt(5),
             oCount: BigInt(3),
             playDuration: 3600.5,
             libraryPresence: BigInt(10),
-          },
+          }),
         ],
       });
 
@@ -599,14 +629,13 @@ describe("RankingComputeService", () => {
     it("handles floating-point values from SQL without BigInt conversion errors", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
-          {
-            entityId: "perf1",
+          raw("perf1", {
             instanceId: "inst1",
             playCount: 5.0000000001,
             oCount: 3.0,
             playDuration: 80.31500000000001,
             libraryPresence: 10.0000000001,
-          },
+          }),
         ],
       });
 
@@ -623,14 +652,13 @@ describe("RankingComputeService", () => {
     it("writes each ranking on its entity's instance", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
-          {
-            entityId: "perf1",
+          raw("perf1", {
             instanceId: "inst-2",
             playCount: 5,
             oCount: 1,
             playDuration: 600,
             libraryPresence: 3,
-          },
+          }),
         ],
       });
 
@@ -652,8 +680,9 @@ describe("RankingComputeService", () => {
       vi.setSystemTime(now);
     };
 
-    // One recompute is four queries: the average duration and one per type
-    const QUERIES_PER_RECOMPUTE = 4;
+    // One recompute is five queries: the average duration, the user's kept
+    // rate and one per type
+    const QUERIES_PER_RECOMPUTE = 5;
     const recomputes = () =>
       mockPrisma.$queryRaw.mock.calls.length / QUERIES_PER_RECOMPUTE;
 
@@ -817,8 +846,9 @@ describe("RankingComputeService", () => {
       release();
       await first;
 
-      // It read the average duration, then stopped before the first type
-      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+      // It read the average duration and the kept rate, then stopped before
+      // the first type
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
       expect(mockPrisma.userEntityRanking.deleteMany).not.toHaveBeenCalled();
       expect(logger.debug).toHaveBeenCalledWith(
         "Ranking recompute stopped: the user was forgotten",
@@ -829,7 +859,7 @@ describe("RankingComputeService", () => {
       await rankingComputeService.ensureFresh(109, { wait: true });
 
       expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(
-        1 + QUERIES_PER_RECOMPUTE
+        2 + QUERIES_PER_RECOMPUTE
       );
       expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledTimes(3);
     });
@@ -844,7 +874,7 @@ describe("RankingComputeService", () => {
       let performerReads = 0;
       mockPrisma.$queryRaw.mockImplementation(
         prismaImpl<typeof prisma.$queryRaw>(async (query) => {
-          if (!sqlOf(query).includes("FROM UserPerformerStats")) return [];
+          if (!isPerformerRead(query)) return [];
           performerReads++;
           if (performerReads === 1) {
             await gate;
@@ -870,9 +900,7 @@ describe("RankingComputeService", () => {
     it("a ranking batch waiting in the writer queue when forget is called writes nothing", async () => {
       mockPrisma.$queryRaw.mockImplementation(
         prismaImpl<typeof prisma.$queryRaw>((query) =>
-          sqlOf(query).includes("FROM UserPerformerStats")
-            ? [performerStats("before-import")]
-            : []
+          isPerformerRead(query) ? [performerStats("before-import")] : []
         )
       );
       // Another unit holds the writer queue, so the recompute's first batch
@@ -911,9 +939,10 @@ describe("RankingComputeService", () => {
       );
 
       const running = rankingComputeService["refresh"](113);
-      // The average duration and the performers read; the clear is queued
+      // The average duration, the kept rate and the performers read; the
+      // clear is queued
       await vi.waitFor(() => {
-        expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
+        expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(3);
       });
       rankingComputeService.forget(113);
       release();
@@ -943,5 +972,243 @@ describe("RankingComputeService", () => {
         });
       });
     });
+  });
+});
+
+/**
+ * One entity's history totals as a ranking query returns them. Unless given,
+ * the plays are recent (the decayed sums equal the totals) and every opened
+ * scene was kept.
+ */
+function raw(
+  entityId: string,
+  stats: Partial<Omit<RawEntityStats, "entityId">> = {}
+): RawEntityStats {
+  const playCount = stats.playCount ?? 1;
+  const oCount = stats.oCount ?? 0;
+  const playDuration = stats.playDuration ?? 0;
+  const openedCount = stats.openedCount ?? 1;
+  return {
+    entityId,
+    instanceId: "i1",
+    playCount,
+    oCount,
+    playDuration,
+    decayedPlayCount: playCount,
+    decayedOCount: oCount,
+    decayedPlayDuration: playDuration,
+    openedCount,
+    keptCount: openedCount,
+    libraryPresence: 1,
+    ...stats,
+  };
+}
+
+function byEntity(rows: ReturnType<typeof computeRankings>) {
+  return new Map(rows.map((r) => [r.entityId, r]));
+}
+
+describe("computeRankings", () => {
+  const inputs = { avgSceneDuration: 1000, keptBase: 0.5 };
+
+  it("ranks a one-scene entity with 3 plays below a 500-scene entity with 300 plays and 400 Os, and gives it no top affinity", () => {
+    const rows = [
+      raw("one-scene", {
+        playCount: 3,
+        playDuration: 3000,
+        libraryPresence: 1,
+      }),
+      raw("favourite", {
+        playCount: 300,
+        oCount: 400,
+        playDuration: 300_000,
+        openedCount: 320,
+        keptCount: 310,
+        libraryPresence: 500,
+      }),
+      raw("mid", {
+        playCount: 20,
+        oCount: 5,
+        playDuration: 20_000,
+        openedCount: 25,
+        keptCount: 20,
+        libraryPresence: 40,
+      }),
+      raw("barely", {
+        playCount: 1,
+        playDuration: 500,
+        openedCount: 6,
+        keptCount: 1,
+        libraryPresence: 30,
+      }),
+    ];
+
+    const ranked = byEntity(computeRankings(rows, inputs));
+
+    const oneScene = must(ranked.get("one-scene"));
+    const favourite = must(ranked.get("favourite"));
+    expect(favourite.percentileRank).toBe(100);
+    expect(oneScene.percentileRank).toBeLessThan(favourite.percentileRank);
+    const topAffinity = Math.max(
+      ...[...ranked.values()].map((r) => r.affinity)
+    );
+    expect(oneScene.affinity).toBeLessThan(topAffinity);
+  });
+
+  it("an entity opened 20 times and never kept gets affinity -1; one kept 13 of 13 gets a positive affinity", () => {
+    const rows = [
+      raw("dropped", {
+        playCount: 0,
+        openedCount: 20,
+        keptCount: 0,
+        libraryPresence: 20,
+      }),
+      raw("kept", {
+        playCount: 13,
+        openedCount: 13,
+        keptCount: 13,
+        libraryPresence: 13,
+      }),
+    ];
+
+    const ranked = byEntity(
+      computeRankings(rows, { ...inputs, keptBase: 0.4 })
+    );
+
+    expect(must(ranked.get("dropped")).affinity).toBe(-1);
+    expect(must(ranked.get("kept")).affinity).toBeGreaterThan(0);
+  });
+
+  it("every affinity lies in [-1, 1]", () => {
+    const rows = [
+      raw("hot", { playCount: 900, oCount: 900, libraryPresence: 1 }),
+      raw("cold", { playCount: 0, openedCount: 500, keptCount: 0 }),
+      raw("plain", { libraryPresence: 300 }),
+    ];
+
+    for (const r of computeRankings(rows, { ...inputs, keptBase: 0.9 })) {
+      expect(r.affinity).toBeGreaterThanOrEqual(-1);
+      expect(r.affinity).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("smooths each rate toward the user's mean with k = max(5, median library presence)", () => {
+    // eng = 5 × O + plays (no watch time); decayed equals it here
+    const expectRates = (
+      rows: RawEntityStats[],
+      presences: number[],
+      decayed: number[],
+      k: number
+    ) => {
+      const mu =
+        decayed.reduce((a, b) => a + b, 0) /
+        presences.reduce((a, b) => a + b, 0);
+      const ranked = computeRankings(rows, inputs);
+      rows.forEach((row, i) => {
+        const r = must(ranked.find((x) => x.entityId === row.entityId));
+        expect(r.engagementRate).toBeCloseTo(
+          (must(decayed[i]) + k * mu) / (must(presences[i]) + k),
+          9
+        );
+      });
+    };
+
+    // Median 2: k is the floor of 5
+    expectRates(
+      [
+        raw("a", { playCount: 4, libraryPresence: 1 }),
+        raw("b", { playCount: 1, oCount: 1, libraryPresence: 2 }),
+        raw("c", { playCount: 2, libraryPresence: 3 }),
+      ],
+      [1, 2, 3],
+      [4, 6, 2],
+      5
+    );
+    // Median of 10, 20, 30, 40 is 25
+    expectRates(
+      [
+        raw("a", { playCount: 40, libraryPresence: 10 }),
+        raw("b", { playCount: 10, libraryPresence: 20 }),
+        raw("c", { playCount: 3, oCount: 1, libraryPresence: 30 }),
+        raw("d", { playCount: 1, libraryPresence: 40 }),
+      ],
+      [10, 20, 30, 40],
+      [40, 10, 8, 1],
+      25
+    );
+  });
+
+  it("weights each play by its decay: the decayed sums drive the rate, the totals the engagement score", () => {
+    const [recent, old] = [
+      raw("recent", { playCount: 4, libraryPresence: 10 }),
+      raw("old", {
+        playCount: 4,
+        decayedPlayCount: 1,
+        libraryPresence: 10,
+      }),
+    ];
+    const ranked = byEntity(computeRankings([must(recent), must(old)], inputs));
+
+    expect(must(ranked.get("recent")).engagementScore).toBe(4);
+    expect(must(ranked.get("old")).engagementScore).toBe(4);
+    expect(must(ranked.get("old")).engagementRate).toBeLessThan(
+      must(ranked.get("recent")).engagementRate
+    );
+  });
+
+  it("ties in engagement score share a percentile", () => {
+    const rows = [
+      raw("a", { playCount: 10, oCount: 2, libraryPresence: 5 }),
+      raw("b", { playCount: 10, oCount: 2, libraryPresence: 50 }),
+      raw("c", { playCount: 1, libraryPresence: 1 }),
+    ];
+
+    const ranked = byEntity(computeRankings(rows, inputs));
+
+    expect(must(ranked.get("a")).percentileRank).toBe(100);
+    expect(must(ranked.get("b")).percentileRank).toBe(100);
+    expect(must(ranked.get("c")).percentileRank).toBe(0);
+  });
+
+  it("reads bigint and float columns as numbers, and the Int ones rounded", () => {
+    const [r] = computeRankings(
+      [
+        raw("p", {
+          playCount: BigInt(5),
+          oCount: 3.0000000001,
+          playDuration: BigInt(2000),
+          decayedPlayCount: 5,
+          decayedOCount: 3,
+          decayedPlayDuration: 2000,
+          openedCount: BigInt(7),
+          keptCount: 4.9999999999,
+          libraryPresence: BigInt(10),
+        }),
+      ],
+      inputs
+    );
+
+    const ranking = must(r);
+    expect(ranking.playCount).toBe(5);
+    expect(ranking.oCount).toBe(3);
+    expect(ranking.openedCount).toBe(7);
+    expect(ranking.keptCount).toBe(5);
+    expect(ranking.libraryPresence).toBe(10);
+    // 5 × 3 + 2000 / 1000 + 5
+    expect(ranking.engagementScore).toBeCloseTo(22, 6);
+  });
+
+  it("a user who kept nothing anywhere has no kept signal: keptBase 0 reads as no lift", () => {
+    const [r] = computeRankings(
+      [raw("p", { playCount: 0, openedCount: 3, keptCount: 0 })],
+      { ...inputs, keptBase: 0 }
+    );
+
+    expect(Number.isFinite(must(r).affinity)).toBe(true);
+    expect(must(r).affinity).toBe(0);
+  });
+
+  it("returns nothing for no rows", () => {
+    expect(computeRankings([], inputs)).toEqual([]);
   });
 });
