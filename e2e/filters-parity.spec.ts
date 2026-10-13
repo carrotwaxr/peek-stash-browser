@@ -110,7 +110,15 @@ test.describe("Filters in step with Stash", () => {
       const includedRef = `${included.id}:${included.instanceId}`;
       const excludedRef = `${excluded.id}:${excluded.instanceId}`;
 
-      const page = await context.newPage();
+      let page = await context.newPage();
+      // Under the Vite dev server each full load of the app fetches some 430
+      // modules, and after a handful in one tab Chromium refuses the page's
+      // requests (ERR_INSUFFICIENT_RESOURCES) and it stays blank: the loads
+      // after the reload each get a tab of their own
+      const reopen = async () => {
+        await page.close();
+        page = await context.newPage();
+      };
       const list = new ListPage(page);
       await list.goto("/scenes");
       await list.waitForResults("Scene");
@@ -204,6 +212,7 @@ test.describe("Filters in step with Stash", () => {
         page.getByRole("button", { name: `Views: ${viewName}` })
       ).toBeVisible();
 
+      await reopen();
       const fromPreset = page.waitForResponse(
         (r) =>
           new URL(r.url()).pathname === "/api/library/scenes" &&
@@ -228,6 +237,7 @@ test.describe("Filters in step with Stash", () => {
 
       // 5. With the filters cleared, loading it from the Views menu sends
       // them again and names it in the URL
+      await reopen();
       await page.goto("/scenes?filters=none");
       await expect(
         page.getByRole("button", { name: "Views", exact: true })
