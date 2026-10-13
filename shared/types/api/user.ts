@@ -8,6 +8,7 @@
  */
 import { ENTITY_KINDS } from "../filters/criteria.js";
 import type { FilterPins, ListPins } from "../filters/pins.js";
+import type { RecommendationPreferences } from "../recommendationPreferences.js";
 
 // Dates are ISO 8601 strings: that is what JSON carries.
 
@@ -160,6 +161,7 @@ export interface GetUserSettingsResponse {
     cardDisplaySettings: CardDisplaySettings;
     landingPagePreference: LandingPagePreference;
     lightboxDoubleTapAction: string;
+    recommendationPreferences: RecommendationPreferences;
   };
 }
 
@@ -186,6 +188,7 @@ export interface UpdateUserSettingsBody {
   cardDisplaySettings?: CardDisplaySettings;
   landingPagePreference?: LandingPagePreference | null;
   lightboxDoubleTapAction?: string;
+  recommendationPreferences?: RecommendationPreferences;
 }
 
 export interface UpdateUserSettingsResponse {
@@ -201,6 +204,7 @@ export interface UpdateUserSettingsResponse {
     cardDisplaySettings: CardDisplaySettings;
     landingPagePreference: LandingPagePreference;
     lightboxDoubleTapAction: string;
+    recommendationPreferences: RecommendationPreferences;
   };
 }
 
