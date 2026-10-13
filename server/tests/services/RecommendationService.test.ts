@@ -4,6 +4,7 @@
  * were (a stamp, one query), keyed by user, day, allowed instances and
  * recommendation preferences.
  */
+import { DEFAULT_RECOMMENDATION_PREFERENCES } from "@peek/shared-types/recommendationPreferences.js";
 import type {
   PerformerRating,
   SceneRating,
@@ -422,9 +423,18 @@ describe("RecommendationService", () => {
       scene("unwatched", A, ["p1"]),
     ]);
 
+    // The final scores, before the day's shuffle within each window
+    const { scored } = await recommendationService["score"](
+      USER,
+      [A],
+      DEFAULT_RECOMMENDATION_PREFERENCES
+    );
+    const final = new Map(scored.map((s) => [s.id, s.final]));
     const ranked = await recommendationService.getRankedRefs(USER, [A]);
 
-    expect(keys(ranked.refs)).toEqual([`unwatched:${A}`, `old:${A}`]);
+    expect([...final.keys()].sort()).toEqual(["old", "unwatched"]);
+    expect(must(final.get("old"))).toBeLessThan(must(final.get("unwatched")));
+    expect(keys(ranked.refs).sort()).toEqual([`old:${A}`, `unwatched:${A}`]);
   });
 
   it("one scored scene ranks it (a score range of zero)", async () => {

@@ -8,6 +8,9 @@ import {
   type AffinityInput,
   type EntityAffinity,
   LEAD_WEIGHT,
+  PARTNER_MULT_MAX,
+  PARTNER_MULT_MIN,
+  PARTNER_STRENGTH,
   type RatingRow,
   STUDIO_WEIGHT,
   type SceneScoringContext,
@@ -289,42 +292,57 @@ describe("RecommendationScoringService", () => {
   describe("scoreScene", () => {
     const favoriteF = rating("f1", null, true);
 
-    it("a liked partner raises a favorite lead's scene, a disliked one lowers it, within 0.4 and 1.6", () => {
+    it("a liked partner raises a favorite lead's scene and a disliked one lowers it, by the partners' mean, within 0.4 and 1.6", () => {
+      const liked = ["liked", "liked2", "liked3", "liked4", "liked5", "liked6"];
       const affinity = buildEntityAffinity(
         affinityInput({
           performerRatings: [
             favoriteF,
-            rating("liked", 100),
-            rating("liked2", 100),
-            rating("disliked", 0),
-            rating("disliked2", 0),
-            rating("disliked3", 0),
+            ...liked.map((id) => rating(id, 75)),
+            rating("loved", 100),
+            rating("disliked", 25),
+            rating("hated", 0),
+            rating("hated2", 0),
           ],
         })
       );
       const { extra, prefs } = femaleLeads({
         f1: "FEMALE",
-        liked: "MALE",
-        liked2: "MALE",
+        ...Object.fromEntries(liked.map((id) => [id, "MALE"])),
+        loved: "MALE",
         neutral: "MALE",
         disliked: "MALE",
-        disliked2: "MALE",
-        disliked3: "MALE",
+        hated: "MALE",
+        hated2: "MALE",
       });
       const ctx = context(affinity, extra, prefs);
       const score = (partners: string[]) =>
         scoreScene(scene("s", { performerIds: ["f1", ...partners] }), ctx);
 
+      expect(PARTNER_STRENGTH).toBe(0.6);
+      // A partner with no affinity is not in the mean
       expect(score(["neutral"])).toBeCloseTo(LEAD_WEIGHT, 10);
-      expect(score(["liked"])).toBeCloseTo(LEAD_WEIGHT * 1.5, 10);
-      expect(score(["disliked"])).toBeCloseTo(LEAD_WEIGHT * 0.5, 10);
-      expect(score(["liked", "liked2"])).toBeCloseTo(LEAD_WEIGHT * 1.6, 10);
-      expect(score(["disliked", "disliked2", "disliked3"])).toBeCloseTo(
-        LEAD_WEIGHT * 0.4,
+      expect(score(["liked", "neutral"])).toBeCloseTo(
+        LEAD_WEIGHT * (1 + 0.6 * 0.5),
         10
       );
-      expect(score(["liked"])).toBeGreaterThan(score(["neutral"]));
-      expect(score(["disliked"])).toBeLessThan(score(["neutral"]));
+      expect(score(["disliked"])).toBeCloseTo(
+        LEAD_WEIGHT * (1 - 0.6 * 0.5),
+        10
+      );
+      // Five more partners liked as much change nothing
+      expect(score(liked)).toBeCloseTo(score(["liked"]), 10);
+      // A liked and a disliked partner average out
+      expect(score(["liked", "disliked"])).toBeCloseTo(LEAD_WEIGHT, 10);
+      // The bounds: a loved partner, and hated ones however many
+      expect(score(["loved"])).toBeCloseTo(LEAD_WEIGHT * PARTNER_MULT_MAX, 10);
+      expect(score(["hated", "hated2"])).toBeCloseTo(
+        LEAD_WEIGHT * PARTNER_MULT_MIN,
+        10
+      );
+      expect(score(["loved", ...liked])).toBeLessThanOrEqual(
+        LEAD_WEIGHT * PARTNER_MULT_MAX + 1e-9
+      );
     });
 
     it('a scene without a partner gets 0.35 under "less" unless every lead is a favorite', () => {
