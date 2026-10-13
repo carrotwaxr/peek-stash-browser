@@ -11,6 +11,7 @@ import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import { readRecommendationPreferences } from "@peek/shared-types/recommendationPreferences.js";
 import prisma from "../prisma/singleton.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
+import { rawDate } from "../utils/rawDate.js";
 import { KEPT_MIN_SECONDS } from "./RankingComputeService.js";
 import { tagIdf } from "./RecommendationScoringService.js";
 import type { SimilarSceneCandidate } from "./StashEntityService.js";
@@ -167,10 +168,9 @@ export async function applyWatchFactor(
   const factors = new Map<string, number>();
   for (const row of rows) {
     if (Number(row.kept) !== 1) continue;
-    const playedAt =
-      row.lastPlayedAt === null ? Number.NaN : +new Date(row.lastPlayedAt);
+    const playedAt = rawDate(row.lastPlayedAt);
     const recent =
-      !Number.isNaN(playedAt) && now - playedAt < RECENT_DAYS * DAY_MS;
+      playedAt !== null && now - playedAt.getTime() < RECENT_DAYS * DAY_MS;
     factors.set(
       entityKey(row.sceneId, row.instanceId),
       recent ? RECENT_KEPT_FACTOR : EARLIER_KEPT_FACTOR

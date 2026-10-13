@@ -92,6 +92,37 @@ describe("StashEntityService.getScenesForScoring", () => {
     });
   });
 
+  it("reads a last-played time stored as epoch milliseconds or as text as a Date", async () => {
+    const at = Date.UTC(2026, 8, 1);
+    const row = (id: string, lastPlayedAt: unknown) => ({
+      id,
+      stashInstanceId: "inst-a",
+      studioId: null,
+      performerIds: null,
+      tagIds: null,
+      inheritedTagIds: null,
+      oCount: 0n,
+      lastPlayedAt,
+      hasHistory: 1n,
+      kept: 1n,
+    });
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([
+      row("number", at),
+      row("text", "2026-09-01T00:00:00.000Z"),
+      row("unreadable", "yesterday-ish"),
+    ]);
+
+    const result = await stashEntityService.getScenesForScoring(USER, [
+      "inst-a",
+    ]);
+
+    expect(result.map((s) => s.lastPlayedAt)).toEqual([
+      new Date(at),
+      new Date(at),
+      null,
+    ]);
+  });
+
   it("applies the user's exclusions, allowed instances and watch history in SQL", async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
 
