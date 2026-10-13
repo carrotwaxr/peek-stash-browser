@@ -24,7 +24,11 @@ export const MAX_IGNORED_TAGS = 200;
 export interface RecommendationPreferences {
   /** "Performers I follow"; [] = everyone is a lead, no partner logic */
   leadGenders: PerformerGender[];
-  /** "Partners who matter"; disjoint from leadGenders */
+  /**
+   * "Partners who matter"; disjoint from leadGenders. A performer of neither
+   * list counts as a lead (half weight in Recommended, a Top Performer in
+   * My Stats).
+   */
   partnerGenders: PerformerGender[];
   /** "Scenes without a partner": "less" = less often unless every lead is a favorite */
   noPartnerScenes: (typeof NO_PARTNER_SCENES)[number];

@@ -340,6 +340,29 @@ describeWithDb("User Stats by (id, instance) (integration)", () => {
       expect(mostOdPerformer).toMatchObject({ name: "A-13", oCount: 2 });
     });
 
+    it("a performer of neither a lead nor a partner gender stays among the performers, as Recommended scores them as a lead", async () => {
+      await setPreferences({
+        leadGenders: ["FEMALE"],
+        partnerGenders: ["MALE"],
+      });
+      const key = { id_stashInstanceId: { id: "13", stashInstanceId: A } };
+      await prisma.stashPerformer.update({
+        where: key,
+        data: { gender: "NON_BINARY" },
+      });
+      try {
+        const { topPerformers, topPartners } = await statsFor();
+
+        expect(topPerformers.map((p) => p.name)).toEqual(["B-12", "A-13"]);
+        expect(topPartners).toEqual([]);
+      } finally {
+        await prisma.stashPerformer.update({
+          where: key,
+          data: { gender: "MALE" },
+        });
+      }
+    });
+
     it("an ignored tag is absent from Top Tags on its own instance only", async () => {
       await setPreferences({});
       const all = await statsFor();
