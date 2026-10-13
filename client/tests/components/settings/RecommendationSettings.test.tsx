@@ -7,10 +7,17 @@ import {
   DEFAULT_RECOMMENDATION_PREFERENCES,
   type RecommendationPreferences,
 } from "@peek/shared-types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { within as rtlWithin } from "@testing-library/react";
 import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
+import { flushPromises } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api";
 import { invalidateExclusionDependents } from "@/api/invalidateExclusionDependents";
@@ -222,6 +229,43 @@ describe("RecommendationSettings", () => {
 
     await waitFor(() => expect(mockApiPut).toHaveBeenCalled());
     expect(sent()).toEqual(prefs({ ignoredTagIds: ["3:a", "7:a"] }));
+  });
+
+  it("two quick changes save one after the other, the second built on the first", async () => {
+    let finishFirst: (value: unknown) => void = () => undefined;
+    mockApiPut.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFirst = resolve;
+        })
+    );
+    await renderSection({ leadGenders: ["FEMALE"] });
+
+    fireEvent.click(partner("Male"));
+    fireEvent.click(partner("Trans male"));
+
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalledTimes(1));
+    await act(flushPromises);
+    // The second waits for the first to settle
+    expect(mockApiPut).toHaveBeenCalledTimes(1);
+    expect(sent(0)).toEqual(
+      prefs({ leadGenders: ["FEMALE"], partnerGenders: ["MALE"] })
+    );
+
+    await act(() => {
+      finishFirst({ success: true });
+      return flushPromises();
+    });
+
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalledTimes(2));
+    expect(sent(1)).toEqual(
+      prefs({
+        leadGenders: ["FEMALE"],
+        partnerGenders: ["MALE", "TRANSGENDER_MALE"],
+      })
+    );
+    await waitFor(() => expect(partner("Trans male")).toBeChecked());
+    expect(partner("Male")).toBeChecked();
   });
 
   it("a refused save shows an error toast and does not refresh Recommended", async () => {
