@@ -58,9 +58,11 @@ describe("ranking forget order", () => {
       table.deleteMany.mockResolvedValue({ count: 1 });
     }
     mockPrisma.userEntityRanking.createMany.mockResolvedValue({ count: 1 });
-    // The average duration, then one performer to rank from the old history
+    // The average duration, the user's kept rate, then one performer to rank
+    // from the old history
     mockPrisma.$queryRaw
       .mockResolvedValueOnce([{ avgDuration: 600 }])
+      .mockResolvedValueOnce([{ opened: 4, kept: 3 }])
       .mockResolvedValueOnce([
         {
           entityId: "p1",
@@ -68,6 +70,11 @@ describe("ranking forget order", () => {
           playCount: 3,
           oCount: 1,
           playDuration: 1200,
+          decayedPlayCount: 3,
+          decayedOCount: 1,
+          decayedPlayDuration: 1200,
+          openedCount: 4,
+          keptCount: 3,
           libraryPresence: 4,
         },
       ])
