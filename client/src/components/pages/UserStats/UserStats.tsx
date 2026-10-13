@@ -60,21 +60,18 @@ const EngagementInfoContent = () => (
 const TopContentInfoContent = () => (
   <div className="text-sm max-w-xs">
     <p className="mb-2">
-      Entities ranked by your personal engagement. Engagement score = (O-count
-      &times; 5) + watch duration + play count, divided by how often the entity
-      appears in your library.
-    </p>
-    <p className="mb-2">
-      Percentile rank shows where each entity falls among all your engaged
-      entities (100 = top, 0 = bottom). Performer, studio and tag rankings are
-      recalculated at most once an hour; scenes are ranked each time this page
-      loads.
+      Ranked by your engagement: O count &times; 5, plus time watched (in
+      average scene lengths), plus plays. &apos;Top 5%&apos; means the entity is
+      in the top 5% of everything you&apos;ve engaged with. Performer, studio
+      and tag rankings refresh at most hourly; scenes rank each time the page
+      loads. With performer choices set in Settings, partners get their own
+      list.
     </p>
     <p className="font-semibold mb-1">Sort Options</p>
     <ul className="space-y-1">
       <li>
-        <span className="font-medium">Engagement:</span> Percentile rank as
-        described above.
+        <span className="font-medium">Engagement:</span> Highest engagement
+        score first, as described above.
       </li>
       <li>
         <span className="font-medium">O-Count:</span> Total Os for scenes
@@ -238,6 +235,16 @@ const UserStats = () => {
                   sortBy={sortBy}
                   onSortChange={setSortBy}
                 />
+                {data.topPartners.length > 0 && (
+                  <TopList
+                    key={`partners-${sortBy}`}
+                    title="Top Partners"
+                    items={data.topPartners}
+                    entityType="performer"
+                    sortBy={sortBy}
+                    onSortChange={setSortBy}
+                  />
+                )}
                 <TopList
                   key={`studios-${sortBy}`}
                   title="Top Studios"

@@ -60,4 +60,20 @@ describe("TopList", () => {
 
     expect(links()).toEqual([[expect.stringContaining("Five"), "/scene/5"]]);
   });
+
+  it.each([
+    [100, "Top 1%"],
+    [75, "Top 25%"],
+    [0, "Top 100%"],
+  ])("a score of %i reads %s", (score, label) => {
+    renderWithProviders(
+      <TopList
+        title="Top Scenes"
+        entityType="scene"
+        items={[{ ...entry("5", "inst-a", ""), title: "Five", score }]}
+      />
+    );
+
+    expect(screen.getByText(new RegExp(`^${label}`))).toBeInTheDocument();
+  });
 });
