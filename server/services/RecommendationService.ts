@@ -9,8 +9,8 @@
  * affinity (a tag or studio with none inherits a decayed share of its
  * parent's). A scene scores by its leads (the performers of the user's lead
  * genders; everyone when none is chosen), its partners (a multiplier), its
- * studio, its tags (rarer tags weigh more, inherited ones less, ignored ones
- * not at all) and its own rating, times what its watch history keeps of it
+ * studio, its tags (rarer on their own instance weigh more, inherited ones
+ * less, ignored ones not at all) and its own rating, times what its watch history keeps of it
  * under the user's discovery mode: a scene played today scores 0, an
  * abandoned one less, a kept one more as it ages and by its O count. The
  * rules live in `RecommendationScoringService`.
@@ -65,6 +65,7 @@ import {
   watchMultiplier,
 } from "./RecommendationScoringService.js";
 import { stashEntityService } from "./StashEntityService.js";
+import { liveSceneCounts } from "./liveSceneCounts.js";
 
 /** How many ranked scenes are kept per user */
 export const RANKED_LIMIT = RECOMMENDED_LIMIT;
@@ -293,6 +294,9 @@ export class RecommendationService {
         : new Map<string, string>();
     const { tagParents, tagDf } = await readTags(allowedInstanceIds);
     const studioParents = await readStudioParents(allowedInstanceIds);
+    // A tag's rarity is its share of its own instance's live scenes, as
+    // Scenes Like This weighs it, not of the scenes this user may see
+    const sceneCounts = await liveSceneCounts(allowedInstanceIds);
     const scenes = await stashEntityService.getScenesForScoring(userId, [
       ...allowedInstanceIds,
     ]);
@@ -346,7 +350,7 @@ export class RecommendationService {
       prefs,
       genders,
       tagDf,
-      sceneCount: scoringScenes.length,
+      sceneCounts,
       ignoredTags,
     };
 
