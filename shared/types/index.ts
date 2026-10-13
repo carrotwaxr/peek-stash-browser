@@ -30,6 +30,21 @@ export {
   assertEntityRef,
 } from "./instanceAwareId.js";
 
+// Recommendation preferences
+export {
+  PERFORMER_GENDERS,
+  NO_PARTNER_SCENES,
+  DISCOVERY_MODES,
+  MAX_IGNORED_TAGS,
+  DEFAULT_RECOMMENDATION_PREFERENCES,
+  readRecommendationPreferences,
+  validateRecommendationPreferences,
+} from "./recommendationPreferences.js";
+export type {
+  PerformerGender,
+  RecommendationPreferences,
+} from "./recommendationPreferences.js";
+
 // VR projections
 export { VR_PROJECTIONS } from "./vr.js";
 export type { VrProjection, VrSource, SceneVr } from "./vr.js";

@@ -1,4 +1,7 @@
-import type { GetUserSettingsResponse } from "@peek/shared-types";
+import {
+  DEFAULT_RECOMMENDATION_PREFERENCES,
+  type GetUserSettingsResponse,
+} from "@peek/shared-types";
 
 type UserSettings = GetUserSettingsResponse["settings"];
 
@@ -20,6 +23,7 @@ export const userSettingsResponse = (
     cardDisplaySettings: null,
     landingPagePreference: { pages: ["home"], randomize: false },
     lightboxDoubleTapAction: "favorite",
+    recommendationPreferences: DEFAULT_RECOMMENDATION_PREFERENCES,
     ...overrides,
   },
 });
