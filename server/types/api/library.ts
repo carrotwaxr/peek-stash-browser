@@ -59,13 +59,3 @@ export type {
   FindImagesRequest,
   FindImagesResponse,
 } from "@peek/shared-types/api/library.js";
-
-/**
- * Scene recommendation scoring intermediate type
- */
-export interface ScoredSceneId {
-  id: string;
-  instanceId: string;
-  score: number;
-  oCounter: number;
-}

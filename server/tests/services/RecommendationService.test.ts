@@ -1,23 +1,47 @@
 /**
  * RecommendationService: one ranked list per user, kept while the user's
  * ratings, plays, hidden items and rankings and the scene sync are as they
- * were (a stamp, one query), keyed by user, day and allowed instances.
+ * were (a stamp, one query), keyed by user, day, allowed instances and
+ * recommendation preferences.
  */
-import type { PerformerRating, UserEntityRanking } from "@prisma/client";
+import type {
+  PerformerRating,
+  SceneRating,
+  TagRating,
+  User,
+  UserEntityRanking,
+} from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import { hasAnyCriteria } from "../../services/RecommendationScoringService.js";
-import { recommendationService } from "../../services/RecommendationService.js";
+import type * as scoringModule from "../../services/RecommendationScoringService.js";
 import {
-  type SceneForScoring,
-  stashEntityService,
-} from "../../services/StashEntityService.js";
+  type LibraryScoringScene,
+  buildEntityAffinity,
+  hasAnyCriteria,
+  scoreScene,
+} from "../../services/RecommendationScoringService.js";
+import { recommendationService } from "../../services/RecommendationService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
   () => import("../helpers/prismaSingletonMock.js")
+);
+
+// The real scoring, watched: what compute hands it is the wiring under test
+vi.mock(
+  "../../services/RecommendationScoringService.js",
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof scoringModule>();
+    return {
+      ...actual,
+      buildEntityAffinity: vi.fn(actual.buildEntityAffinity),
+      scoreScene: vi.fn(actual.scoreScene),
+    };
+  }
 );
 
 vi.mock("../../services/StashEntityService.js", () => ({
@@ -37,6 +61,8 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockScoring = vi.mocked(stashEntityService.getScenesForScoring);
+const mockAffinity = vi.mocked(buildEntityAffinity);
+const mockScoreScene = vi.mocked(scoreScene);
 
 const USER = 7;
 const A = "inst-a";
@@ -53,22 +79,67 @@ const stampRow = (overrides: Partial<Record<string, string>> = {}) => ({
   ...overrides,
 });
 
+interface RawRows {
+  stamp?: Partial<Record<string, string>>;
+  genders?: Array<{ id: string; stashInstanceId: string; gender: string }>;
+  tags?: Array<{
+    id: string;
+    stashInstanceId: string;
+    sceneCountAll: number;
+    parentId: string | null;
+  }>;
+  studios?: Array<{ id: string; stashInstanceId: string; parentId: string }>;
+}
+
+/** Answers each raw statement by the table it reads */
+function rawRows(rows: RawRows = {}) {
+  mockPrisma.$queryRawUnsafe.mockImplementation(
+    prismaImpl((sql: string) => {
+      if (sql.includes("SyncState")) return [stampRow(rows.stamp)];
+      if (sql.includes("FROM StashPerformer")) return rows.genders ?? [];
+      if (sql.includes("FROM StashTag")) return rows.tags ?? [];
+      if (sql.includes("FROM StashStudio")) return rows.studios ?? [];
+      throw new Error(`unexpected statement: ${sql}`);
+    })
+  );
+}
+
+/** The raw statements sent that read `table`, as [sql, ...params] */
+const statementsReading = (table: string) =>
+  mockPrisma.$queryRawUnsafe.mock.calls.filter(([sql]) =>
+    sql.includes(`FROM ${table}`)
+  );
+
+/** The user's stored preferences */
+function storedPreferences(value: User["recommendationPreferences"]) {
+  mockPrisma.user.findUnique.mockResolvedValue(
+    partialRow<User>({ recommendationPreferences: value })
+  );
+}
+
 const scene = (
   id: string,
   instanceId: string,
   performerIds: string[],
-  extra: Partial<SceneForScoring> = {}
-): SceneForScoring => ({
+  extra: Partial<LibraryScoringScene> = {}
+): LibraryScoringScene => ({
   id,
   instanceId,
   studioId: null,
   performerIds,
   tagIds: [],
-  oCounter: 0,
-  playCount: 0,
+  inheritedTagIds: [],
+  oCount: 0,
+  kept: false,
+  hasHistory: false,
   lastPlayedAt: null,
   ...extra,
 });
+
+/** The input of the one affinity build */
+const affinityInput = () => must(mockAffinity.mock.calls[0])[0];
+/** The context of the first scene scored */
+const scoringContext = () => must(mockScoreScene.mock.calls[0])[1];
 
 const favoritePerformer = (performerId: string, instanceId: string) =>
   partialRow<PerformerRating>({
@@ -84,7 +155,8 @@ const keys = (refs: ReadonlyArray<{ id: string; instanceId: string }>) =>
 beforeEach(() => {
   vi.clearAllMocks();
   recommendationService.clear();
-  mockPrisma.$queryRawUnsafe.mockResolvedValue([stampRow()]);
+  rawRows();
+  storedPreferences(null);
   mockPrisma.performerRating.findMany.mockResolvedValue([
     favoritePerformer("p1", A),
   ]);
@@ -120,8 +192,9 @@ describe("RecommendationService", () => {
     expect(third).toBe(first);
     expect(mockScoring).toHaveBeenCalledTimes(1);
     expect(mockPrisma.performerRating.findMany).toHaveBeenCalledTimes(1);
-    // The stamp is read for every page
-    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(3);
+    // The stamp and the preferences are read for every page
+    expect(statementsReading("SyncState")).toHaveLength(3);
+    expect(mockPrisma.user.findUnique).toHaveBeenCalledTimes(3);
   });
 
   it("reads the stamp for the user only", async () => {
@@ -146,7 +219,7 @@ describe("RecommendationService", () => {
     ["scene sync", { sync: "s1" }],
   ])("a changed %s recomputes", async (_what, change) => {
     await recommendationService.getRankedRefs(USER, [A]);
-    mockPrisma.$queryRawUnsafe.mockResolvedValue([stampRow(change)]);
+    rawRows({ stamp: change });
     mockScoring.mockResolvedValue([scene("s3", A, ["p1"])]);
 
     const ranked = await recommendationService.getRankedRefs(USER, [A]);
@@ -337,11 +410,13 @@ describe("RecommendationService", () => {
   it("drops a scene played today and ranks one played a month ago below an unwatched one", async () => {
     mockScoring.mockResolvedValue([
       scene("recent", A, ["p1"], {
-        playCount: 1,
+        kept: true,
+        hasHistory: true,
         lastPlayedAt: new Date(Date.now() - 60 * 60 * 1000),
       }),
       scene("old", A, ["p1"], {
-        playCount: 1,
+        kept: true,
+        hasHistory: true,
         lastPlayedAt: new Date(Date.now() - 30 * DAY_MS),
       }),
       scene("unwatched", A, ["p1"]),
@@ -368,6 +443,199 @@ describe("RecommendationService", () => {
     const ranked = await recommendationService.getRankedRefs(USER, [A]);
 
     expect(ranked.refs).toHaveLength(500);
+  });
+
+  it("a preference change recomputes; unchanged preferences reuse the list", async () => {
+    const first = await recommendationService.getRankedRefs(USER, [A]);
+    expect(await recommendationService.getRankedRefs(USER, [A])).toBe(first);
+
+    storedPreferences({ discovery: "rewatch" });
+    const changed = await recommendationService.getRankedRefs(USER, [A]);
+    const again = await recommendationService.getRankedRefs(USER, [A]);
+
+    expect(changed).not.toBe(first);
+    expect(again).toBe(changed);
+    expect(mockScoring).toHaveBeenCalledTimes(2);
+    expect(scoringContext().prefs.discovery).toBe("balanced");
+    expect(must(mockScoreScene.mock.lastCall)[1].prefs.discovery).toBe(
+      "rewatch"
+    );
+  });
+
+  it("reads the user's own preferences, leniently", async () => {
+    storedPreferences({ discovery: "sometimes", leadGenders: ["FEMALE", 3] });
+
+    await recommendationService.getRankedRefs(USER, [A]);
+
+    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: USER },
+      select: { recommendationPreferences: true },
+    });
+    expect(scoringContext().prefs).toMatchObject({
+      discovery: "balanced",
+      leadGenders: ["FEMALE"],
+    });
+  });
+
+  it("ignored tags reach the affinity and the scoring as entity keys, on their own instance only", async () => {
+    storedPreferences({ ignoredTagIds: [`t1:${A}`] });
+    mockPrisma.performerRating.findMany.mockResolvedValue([]);
+    mockPrisma.tagRating.findMany.mockResolvedValue(
+      [A, B].map((instanceId) =>
+        partialRow<TagRating>({
+          tagId: "t1",
+          instanceId,
+          favorite: true,
+          rating: null,
+        })
+      )
+    );
+    mockScoring.mockResolvedValue([
+      scene("s1", A, [], { tagIds: ["t1"] }),
+      scene("s2", B, [], { tagIds: ["t1"] }),
+    ]);
+
+    const ranked = await recommendationService.getRankedRefs(USER, [A, B]);
+
+    const ignored = new Set([entityKey("t1", A)]);
+    expect(affinityInput().ignoredTags).toEqual(ignored);
+    expect(scoringContext().ignoredTags).toEqual(ignored);
+    expect(keys(ranked.refs)).toEqual([`s2:${B}`]);
+  });
+
+  it("reads no genders without lead genders", async () => {
+    await recommendationService.getRankedRefs(USER, [A]);
+
+    expect(statementsReading("StashPerformer")).toHaveLength(0);
+    expect(scoringContext().genders.size).toBe(0);
+  });
+
+  it("with lead genders, reads the live performers' genders on the allowed instances", async () => {
+    storedPreferences({
+      leadGenders: ["FEMALE"],
+      partnerGenders: ["MALE"],
+      noPartnerScenes: "less",
+    });
+    rawRows({
+      genders: [
+        { id: "p1", stashInstanceId: A, gender: "FEMALE" },
+        { id: "p2", stashInstanceId: A, gender: "MALE" },
+        { id: "p1", stashInstanceId: B, gender: "MALE" },
+      ],
+    });
+
+    await recommendationService.getRankedRefs(USER, [A, B]);
+
+    const [sql, ...params] = must(statementsReading("StashPerformer")[0]);
+    expect(sql).toContain("deletedAt IS NULL");
+    expect(sql).toContain("gender IS NOT NULL");
+    expect(params).toEqual([A, B]);
+    expect(scoringContext().genders).toEqual(
+      new Map([
+        [entityKey("p1", A), "FEMALE"],
+        [entityKey("p2", A), "MALE"],
+        [entityKey("p1", B), "MALE"],
+      ])
+    );
+  });
+
+  it("tag frequencies and the tag and studio parents, on the tag's own instance, reach the scoring", async () => {
+    rawRows({
+      tags: [
+        { id: "t1", stashInstanceId: A, sceneCountAll: 4, parentId: "t0" },
+        { id: "t1", stashInstanceId: A, sceneCountAll: 4, parentId: "t9" },
+        { id: "t0", stashInstanceId: A, sceneCountAll: 10, parentId: null },
+        { id: "t1", stashInstanceId: B, sceneCountAll: 2, parentId: null },
+      ],
+      studios: [{ id: "st1", stashInstanceId: A, parentId: "st0" }],
+    });
+    // A favorite parent tag reaches a scene of its child only through the tree
+    mockPrisma.performerRating.findMany.mockResolvedValue([]);
+    mockPrisma.tagRating.findMany.mockResolvedValue([
+      partialRow<TagRating>({
+        tagId: "t0",
+        instanceId: A,
+        favorite: true,
+        rating: null,
+      }),
+    ]);
+    mockScoring.mockResolvedValue([
+      scene("child", A, [], { tagIds: ["t1"] }),
+      scene("elsewhere", B, [], { tagIds: ["t1"] }),
+    ]);
+
+    const ranked = await recommendationService.getRankedRefs(USER, [A, B]);
+
+    const input = affinityInput();
+    expect(input.tagParents).toEqual(
+      new Map([[entityKey("t1", A), [entityKey("t0", A), entityKey("t9", A)]]])
+    );
+    expect(input.studioParents).toEqual(
+      new Map([[entityKey("st1", A), entityKey("st0", A)]])
+    );
+    expect(scoringContext().tagDf).toEqual(
+      new Map([
+        [entityKey("t1", A), 4],
+        [entityKey("t0", A), 10],
+        [entityKey("t1", B), 2],
+      ])
+    );
+    expect(scoringContext().sceneCount).toBe(2);
+    expect(keys(ranked.refs)).toEqual([`child:${A}`]);
+    for (const table of ["StashTag", "StashStudio"]) {
+      const [sql, ...params] = must(statementsReading(table)[0], table);
+      expect(sql).toContain("deletedAt IS NULL");
+      expect(params).toEqual([A, B]);
+    }
+    expect(must(statementsReading("StashTag")[0])[0]).toContain("json_valid");
+  });
+
+  it("the user's scene ratings mark the scored scenes the affinity learns from", async () => {
+    mockPrisma.performerRating.findMany.mockResolvedValue([]);
+    mockPrisma.sceneRating.findMany.mockResolvedValue([
+      partialRow<SceneRating>({
+        sceneId: "s1",
+        instanceId: A,
+        favorite: true,
+        rating: null,
+      }),
+      // The same id on the other instance is another scene, not scored here
+      partialRow<SceneRating>({
+        sceneId: "s2",
+        instanceId: B,
+        favorite: false,
+        rating: 90,
+      }),
+    ]);
+
+    await recommendationService.getRankedRefs(USER, [A]);
+
+    expect(
+      affinityInput().ratedScenes.map((s) => [s.id, s.favorite, s.rating])
+    ).toEqual([["s1", true, null]]);
+  });
+
+  it("a user with only abandoned opens and no ratings gets an empty list with no ranked entities", async () => {
+    mockPrisma.performerRating.findMany.mockResolvedValue([]);
+    // Opens shorter than two minutes push each entity's affinity below 0
+    mockPrisma.userEntityRanking.findMany.mockResolvedValue(
+      ["performer", "studio", "tag"].map((entityType) =>
+        partialRow<UserEntityRanking>({
+          entityId: "x1",
+          instanceId: A,
+          entityType,
+          affinity: -0.2,
+        })
+      )
+    );
+
+    const ranked = await recommendationService.getRankedRefs(USER, [A]);
+
+    expect(ranked.refs).toEqual([]);
+    expect(ranked.criteria.rankedEntities).toBe(0);
+    expect(hasAnyCriteria(ranked.criteria)).toBe(false);
+    expect(mockScoring).not.toHaveBeenCalled();
+    expect(statementsReading("StashTag")).toHaveLength(0);
   });
 
   it("keeps the 100 most recently used users' lists", async () => {
