@@ -294,7 +294,7 @@ describe("UserStatsAggregationService", () => {
       });
     });
 
-    it("a scene ranked alone has percentile 0, as a stored ranking alone does", async () => {
+    it("a scene ranked alone has percentile 100, as a stored ranking alone does", async () => {
       answer({
         topScenes: [
           {
@@ -314,7 +314,9 @@ describe("UserStatsAggregationService", () => {
 
       const { topScenes } = await stats();
 
-      expect(topScenes.map((s) => [s.score, s.imageUrl])).toEqual([[0, null]]);
+      expect(topScenes.map((s) => [s.score, s.imageUrl])).toEqual([
+        [100, null],
+      ]);
     });
   });
 
