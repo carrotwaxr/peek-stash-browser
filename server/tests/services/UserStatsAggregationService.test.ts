@@ -387,7 +387,7 @@ describe("UserStatsAggregationService", () => {
       expect(statementFor("h.oCounter AS count")[0]).not.toContain("x.gender");
     });
 
-    it("with leads FEMALE and partners MALE Top Performers keeps leads (or no gender), Top Partners only MALE, Most O'd Performer a lead", async () => {
+    it("with leads FEMALE and partners MALE Top Performers keeps everyone but partners (other genders and no gender too), Top Partners only MALE, Most O'd Performer not a partner", async () => {
       preferences({
         leadGenders: ["FEMALE"],
         partnerGenders: ["MALE"],
@@ -400,13 +400,15 @@ describe("UserStatsAggregationService", () => {
 
       const [leads, partners] = performerLists();
       const [leadSql, ...leadParams] = must(leads);
-      expect(leadSql).toContain("AND (x.gender IN (?) OR x.gender IS NULL)");
+      expect(leadSql).toContain(
+        "AND (x.gender IS NULL OR x.gender NOT IN (?))"
+      );
       expect(leadParams).toEqual([
         USER,
         USER,
         "performer",
         ...ALLOWED,
-        "FEMALE",
+        "MALE",
         10,
       ]);
       const [partnerSql, ...partnerParams] = must(partners);
@@ -423,8 +425,10 @@ describe("UserStatsAggregationService", () => {
       const [highlight, ...highlightParams] = statementFor(
         "h.oCounter AS count"
       );
-      expect(highlight).toContain("AND (x.gender IN (?) OR x.gender IS NULL)");
-      expect(highlightParams).toEqual([USER, USER, ...ALLOWED, "FEMALE"]);
+      expect(highlight).toContain(
+        "AND (x.gender IS NULL OR x.gender NOT IN (?))"
+      );
+      expect(highlightParams).toEqual([USER, USER, ...ALLOWED, "MALE"]);
     });
 
     it("maps Top Partners rows like Top Performers", async () => {
@@ -438,14 +442,35 @@ describe("UserStatsAggregationService", () => {
       ]);
     });
 
-    it("with leads set and no partners Top Partners is empty with no statement, and Top Performers is still filtered", async () => {
+    it("with leads set and no partners Top Partners is empty with no statement, and Top Performers and Most O'd Performer hold every gender", async () => {
       preferences({ leadGenders: ["FEMALE"], partnerGenders: [] });
 
       const result = await stats();
 
       expect(result.topPartners).toEqual([]);
       expect(performerLists()).toHaveLength(1);
-      expect(must(performerLists()[0])[0]).toContain("x.gender IN (?)");
+      expect(must(performerLists()[0])[0]).not.toContain("x.gender");
+      expect(statementFor("h.oCounter AS count")[0]).not.toContain("x.gender");
+    });
+
+    it("with two partner genders both are left out of the leads and both make partners", async () => {
+      preferences({
+        leadGenders: ["FEMALE"],
+        partnerGenders: ["MALE", "TRANSGENDER_MALE"],
+      });
+
+      await stats();
+
+      const [leads, partners] = performerLists();
+      const [leadSql, ...leadParams] = must(leads);
+      expect(leadSql).toContain(
+        "AND (x.gender IS NULL OR x.gender NOT IN (?, ?))"
+      );
+      expect(leadParams).toEqual(
+        expect.arrayContaining(["MALE", "TRANSGENDER_MALE"])
+      );
+      const [partnerSql] = must(partners);
+      expect(partnerSql).toContain("AND x.gender IN (?, ?)");
     });
   });
 
