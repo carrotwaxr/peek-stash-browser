@@ -9,6 +9,7 @@ import { useSaveTableColumns } from "../../../hooks/useTableColumns";
 import { showError, showSuccess } from "../../../utils/toast";
 import { StatusMessage } from "../../ui/index";
 import CardDisplaySettings from "../CardDisplaySettings";
+import RecommendationSettings from "../RecommendationSettings";
 import TableColumnSettings from "../TableColumnSettings";
 
 type ViewPreferenceKey = keyof Pick<
@@ -236,6 +237,17 @@ const CustomizationTab = () => {
         }}
       >
         <CardDisplaySettings />
+      </div>
+
+      {/* Recommendations */}
+      <div
+        className="p-6 rounded-lg border"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--border-color)",
+        }}
+      >
+        <RecommendationSettings />
       </div>
 
       {/* Table columns (the ones each table saves) */}

@@ -192,6 +192,35 @@ describe("UserStats", () => {
     ).toBe(false);
   });
 
+  describe("Top Partners", () => {
+    const partner = {
+      id: "9",
+      instanceId: "a",
+      name: "Pat Partner",
+      imageUrl: null,
+      playDuration: 60,
+      playCount: 2,
+      oCount: 0,
+      score: 90,
+    };
+
+    it("shows the list when the answer has partners", () => {
+      renderStats({
+        ...response({ totalPlayCount: 3 }),
+        topPartners: [partner],
+      });
+
+      expect(screen.getByText("Top Partners")).toBeTruthy();
+      expect(screen.getByText("Pat Partner")).toBeTruthy();
+    });
+
+    it("leaves the list out when there are none", () => {
+      renderStats(response({ totalPlayCount: 3 }));
+
+      expect(screen.queryByText("Top Partners")).toBeNull();
+    });
+  });
+
   describe("the Most Viewed Image card", () => {
     const mostViewedImage = {
       id: "12",

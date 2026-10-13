@@ -102,7 +102,7 @@ const TopList = ({
 
     const playCount = `${item.playCount ?? 0} plays`;
     const oCount = item.oCount > 0 ? `${item.oCount} Os` : null;
-    const engagement = `Top ${Math.round(item.score ?? 0)}%`;
+    const engagement = `Top ${Math.max(1, 100 - Math.round(item.score ?? 0))}%`;
 
     // Build parts with sort-relevant stat first
     const parts = [];
