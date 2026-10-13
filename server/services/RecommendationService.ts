@@ -27,24 +27,24 @@
  * small ids, and a favorite on one says nothing about the other.
  */
 import { RECOMMENDED_LIMIT } from "@peek/shared-types/filters/index.js";
+import { DEFAULT_RECOMMENDATION_PREFERENCES } from "@peek/shared-types/recommendationPreferences.js";
 import prisma from "../prisma/singleton.js";
 import type { ScoredSceneId } from "../types/api/index.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { SeededRandom, generateDailySeed } from "../utils/seededRandom.js";
 import {
-  type EntityRankingData,
-  IMPLICIT_MIN_PERCENTILE,
-  type LightweightEntityPreferences,
-  type SceneRatingInput,
+  type AffinityInput,
+  type RatingRow,
+  type SceneScoringContext,
   type ScoringScene,
   type UserCriteriaCounts,
-  buildDerivedWeightsFromScoringData,
-  buildImplicitWeightsFromRankings,
+  buildEntityAffinity,
   countUserCriteria,
   diversifyByScoreTier,
   hasAnyCriteria,
-  scoreScoringDataByPreferences,
+  scoreScene,
+  watchMultiplier,
 } from "./RecommendationScoringService.js";
 import { stashEntityService } from "./StashEntityService.js";
 
@@ -95,16 +95,6 @@ const STAMP_SQL = `
     (SELECT COUNT(*) || ':' || COALESCE(MAX(lastFullSyncActual), '') || ':' || COALESCE(MAX(lastIncrementalSyncActual), '')
       FROM SyncState WHERE entityType = 'scene') AS sync
 `;
-
-const HIGHLY_RATED = 80;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** What every per-user rating row holds */
-interface RatingRow {
-  instanceId: string;
-  favorite: boolean;
-  rating: number | null;
-}
 
 export class RecommendationService {
   /** Insertion order is the LRU order: the oldest entry comes first */
@@ -209,22 +199,20 @@ export class RecommendationService {
           entityId: true,
           instanceId: true,
           entityType: true,
-          engagementRate: true,
-          percentileRank: true,
+          affinity: true,
         },
       }),
     ]);
 
-    // A user who only watches has no ratings or favorites, but their most
-    // engaged performers, studios and tags are criteria all the same
+    // A user who only watches has no ratings or favorites, but the
+    // performers, studios and tags their viewing likes are criteria all the
+    // same
     const criteria = countUserCriteria(
       performerRatings,
       studioRatings,
       tagRatings,
       sceneRatings,
-      engagementRankings.filter(
-        (r) => r.percentileRank >= IMPLICIT_MIN_PERCENTILE
-      ).length
+      engagementRankings.filter((r) => r.affinity > 0).length
     );
     if (!hasAnyCriteria(criteria)) {
       return { refs: [], criteria };
@@ -234,61 +222,66 @@ export class RecommendationService {
       ...allowedInstanceIds,
     ]);
 
-    const sets = <T extends RatingRow>(rows: T[], id: (row: T) => string) => ({
-      favorites: new Set(
-        rows
-          .filter((r) => r.favorite)
-          .map((r) => entityKey(id(r), r.instanceId))
-      ),
-      highlyRated: new Set(
-        rows
-          .filter((r) => r.rating !== null && r.rating >= HIGHLY_RATED)
-          .map((r) => entityKey(id(r), r.instanceId))
-      ),
+    // Task 5 reads the genders, tag frequencies, hierarchies and the
+    // user's preferences; until then every performer is a lead
+    const sceneRating = new Map(
+      sceneRatings.map((r) => [entityKey(r.sceneId, r.instanceId), r])
+    );
+    const scoringScenes: ScoringScene[] = scenes.map((s) => {
+      const own = sceneRating.get(entityKey(s.id, s.instanceId));
+      return {
+        id: s.id,
+        instanceId: s.instanceId,
+        studioId: s.studioId,
+        performerIds: s.performerIds,
+        tagIds: s.tagIds,
+        inheritedTagIds: [],
+        oCount: s.oCounter,
+        kept: s.playCount > 0 || s.oCounter > 0,
+        hasHistory: s.playCount > 0 || s.lastPlayedAt !== null,
+        lastPlayedAt: s.lastPlayedAt,
+        rating: own?.rating ?? null,
+        favorite: own?.favorite ?? false,
+      };
     });
-    const performers = sets(performerRatings, (r) => r.performerId);
-    const studios = sets(studioRatings, (r) => r.studioId);
-    const tags = sets(tagRatings, (r) => r.tagId);
 
-    const sceneRatingsForDerived: SceneRatingInput[] = sceneRatings.map(
-      (r) => ({
-        sceneId: r.sceneId,
+    const ratingRows = <T extends Omit<RatingRow, "id">>(
+      rows: readonly T[],
+      id: (row: T) => string
+    ): RatingRow[] =>
+      rows.map((r) => ({
+        id: id(r),
         instanceId: r.instanceId,
         rating: r.rating,
         favorite: r.favorite,
-      })
-    );
-    const sceneByKey = new Map(
-      scenes.map((s) => [entityKey(s.id, s.instanceId), s])
-    );
-    const { derivedPerformerWeights, derivedStudioWeights, derivedTagWeights } =
-      buildDerivedWeightsFromScoringData(sceneRatingsForDerived, (ref) =>
-        sceneByKey.get(entityKey(ref.id, ref.instanceId))
-      );
-
-    const rankingData: EntityRankingData[] = engagementRankings;
-    const {
-      implicitPerformerWeights,
-      implicitStudioWeights,
-      implicitTagWeights,
-    } = buildImplicitWeightsFromRankings(rankingData, IMPLICIT_MIN_PERCENTILE);
-
-    const prefs: LightweightEntityPreferences = {
-      favoritePerformers: performers.favorites,
-      highlyRatedPerformers: performers.highlyRated,
-      favoriteStudios: studios.favorites,
-      highlyRatedStudios: studios.highlyRated,
-      favoriteTags: tags.favorites,
-      highlyRatedTags: tags.highlyRated,
-      derivedPerformerWeights,
-      derivedStudioWeights,
-      derivedTagWeights,
-      implicitPerformerWeights,
-      implicitStudioWeights,
-      implicitTagWeights,
+      }));
+    const ignoredTags = new Set<string>();
+    const input: AffinityInput = {
+      performerRatings: ratingRows(performerRatings, (r) => r.performerId),
+      studioRatings: ratingRows(studioRatings, (r) => r.studioId),
+      tagRatings: ratingRows(tagRatings, (r) => r.tagId),
+      ratedScenes: scoringScenes.filter((s) => s.rating !== null || s.favorite),
+      rankings: engagementRankings.flatMap((r) =>
+        r.entityType === "performer" ||
+        r.entityType === "studio" ||
+        r.entityType === "tag"
+          ? [{ ...r, entityType: r.entityType }]
+          : []
+      ),
+      tagParents: new Map(),
+      studioParents: new Map(),
+      ignoredTags,
+    };
+    const ctx: SceneScoringContext = {
+      affinity: buildEntityAffinity(input),
+      prefs: DEFAULT_RECOMMENDATION_PREFERENCES,
+      genders: new Map(),
+      tagDf: new Map(),
+      sceneCount: scoringScenes.length,
+      ignoredTags,
     };
 
-    const scored = scoreScenes(scenes, prefs);
+    const scored = scoreScenes(scoringScenes, ctx);
     scored.sort((a, b) => b.score - a.score);
 
     // Variety within score bands, in an order that holds for the day (no
@@ -314,43 +307,25 @@ export class RecommendationService {
 }
 
 /**
- * Each scene's final score: its preference score, when it has one, moved by
- * its watch status (never watched +30, not for two weeks +20, in the last
- * two weeks -10, today -30) and scaled by its O count; only positive
- * scores are kept.
+ * Each scene's final score: its preference score times its watch
+ * multiplier; only positive scores are kept.
  */
 function scoreScenes(
   scenes: readonly ScoringScene[],
-  prefs: LightweightEntityPreferences
+  ctx: SceneScoringContext
 ): ScoredSceneId[] {
   const now = Date.now();
   const scored: ScoredSceneId[] = [];
   for (const scene of scenes) {
-    const baseScore = scoreScoringDataByPreferences(scene, prefs);
-    if (baseScore === 0) continue;
-
-    let adjustedScore = baseScore;
-    if (scene.playCount === 0) {
-      adjustedScore += 30;
-    } else if (scene.lastPlayedAt) {
-      const daysSinceWatched = (now - scene.lastPlayedAt.getTime()) / DAY_MS;
-      if (daysSinceWatched > 14) {
-        adjustedScore += 20;
-      } else if (daysSinceWatched >= 1) {
-        adjustedScore -= 10;
-      } else {
-        adjustedScore -= 30;
-      }
-    }
-
-    const engagementMultiplier = 1.0 + Math.min(scene.oCounter, 10) * 0.03;
-    const finalScore = adjustedScore * engagementMultiplier;
+    const score = scoreScene(scene, ctx);
+    if (score <= 0) continue;
+    const finalScore = score * watchMultiplier(scene, ctx.prefs.discovery, now);
     if (finalScore > 0) {
       scored.push({
         id: scene.id,
         instanceId: scene.instanceId,
         score: finalScore,
-        oCounter: scene.oCounter,
+        oCounter: scene.oCount,
       });
     }
   }

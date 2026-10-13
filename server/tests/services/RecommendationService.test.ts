@@ -6,12 +6,12 @@
 import type { PerformerRating, UserEntityRanking } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import {
-  type ScoringScene,
-  hasAnyCriteria,
-} from "../../services/RecommendationScoringService.js";
+import { hasAnyCriteria } from "../../services/RecommendationScoringService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
+import {
+  type SceneForScoring,
+  stashEntityService,
+} from "../../services/StashEntityService.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
@@ -57,8 +57,8 @@ const scene = (
   id: string,
   instanceId: string,
   performerIds: string[],
-  extra: Partial<ScoringScene> = {}
-): ScoringScene => ({
+  extra: Partial<SceneForScoring> = {}
+): SceneForScoring => ({
   id,
   instanceId,
   studioId: null,
@@ -274,29 +274,26 @@ describe("RecommendationService", () => {
     expect(mockScoring).not.toHaveBeenCalled();
   });
 
-  it("a user with no ratings but rankings at or above the 50th percentile has criteria and a scored list", async () => {
+  it("a user with no ratings but rankings with a positive affinity has criteria and a scored list", async () => {
     mockPrisma.performerRating.findMany.mockResolvedValue([]);
     mockPrisma.userEntityRanking.findMany.mockResolvedValue([
       partialRow<UserEntityRanking>({
         entityId: "p1",
         instanceId: A,
         entityType: "performer",
-        engagementRate: 1,
-        percentileRank: 100,
+        affinity: 0.8,
       }),
       partialRow<UserEntityRanking>({
         entityId: "p2",
         instanceId: A,
         entityType: "performer",
-        engagementRate: 0.2,
-        percentileRank: 50,
+        affinity: 0.1,
       }),
       partialRow<UserEntityRanking>({
         entityId: "p3",
         instanceId: A,
         entityType: "performer",
-        engagementRate: 0.1,
-        percentileRank: 49,
+        affinity: -0.4,
       }),
     ]);
     mockScoring.mockResolvedValue([
@@ -313,15 +310,20 @@ describe("RecommendationService", () => {
     expect(mockPrisma.userEntityRanking.findMany).toHaveBeenCalledTimes(1);
   });
 
-  it("rankings all below the 50th percentile still mean no criteria", async () => {
+  it("rankings with no positive affinity still mean no criteria", async () => {
     mockPrisma.performerRating.findMany.mockResolvedValue([]);
     mockPrisma.userEntityRanking.findMany.mockResolvedValue([
       partialRow<UserEntityRanking>({
         entityId: "p1",
         instanceId: A,
         entityType: "performer",
-        engagementRate: 0.1,
-        percentileRank: 49,
+        affinity: -0.3,
+      }),
+      partialRow<UserEntityRanking>({
+        entityId: "p2",
+        instanceId: A,
+        entityType: "performer",
+        affinity: 0,
       }),
     ]);
 
@@ -332,7 +334,7 @@ describe("RecommendationService", () => {
     expect(mockScoring).not.toHaveBeenCalled();
   });
 
-  it("marks a scene played today below zero and one played a month ago below an unwatched one", async () => {
+  it("drops a scene played today and ranks one played a month ago below an unwatched one", async () => {
     mockScoring.mockResolvedValue([
       scene("recent", A, ["p1"], {
         playCount: 1,
