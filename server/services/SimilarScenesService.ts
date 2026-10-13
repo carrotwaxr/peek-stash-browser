@@ -7,8 +7,6 @@
  * `StashEntityService.getSimilarSceneCandidates` as JSON; the watch factor
  * reorders its top candidates before the page is cut.
  */
-import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
-import { readRecommendationPreferences } from "@peek/shared-types/recommendationPreferences.js";
 import prisma from "../prisma/singleton.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { rawDate } from "../utils/rawDate.js";
@@ -16,6 +14,10 @@ import { KEPT_MIN_SECONDS } from "./RankingComputeService.js";
 import { tagIdf } from "./RecommendationScoringService.js";
 import type { SimilarSceneCandidate } from "./StashEntityService.js";
 import { liveSceneCounts } from "./liveSceneCounts.js";
+import {
+  ignoredTagKeys,
+  readUserRecommendationPreferences,
+} from "./userRecommendationPreferences.js";
 
 /** A seed performer the viewer follows, or one with no partner logic */
 export const SIMILAR_PERFORMER_WEIGHT = 3;
@@ -64,7 +66,7 @@ export async function getSimilarWeights(
 
   // Four light reads (a scene's junction rows, one user row, one indexed
   // count), independent of each other: sent together
-  const [performerRows, tagRows, user, sceneCounts] = await Promise.all([
+  const [performerRows, tagRows, prefs, sceneCounts] = await Promise.all([
     prisma.scenePerformer.findMany({
       where: { sceneId: id, sceneInstanceId: instanceId },
       select: { performerId: true, performer: { select: { gender: true } } },
@@ -73,20 +75,11 @@ export async function getSimilarWeights(
       where: { sceneId: id, sceneInstanceId: instanceId },
       select: { tagId: true, tag: { select: { sceneCountAll: true } } },
     }),
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { recommendationPreferences: true },
-    }),
+    readUserRecommendationPreferences(userId),
     liveSceneCounts([instanceId]),
   ]);
-  const prefs = readRecommendationPreferences(user?.recommendationPreferences);
 
-  const ignored = new Set(
-    prefs.ignoredTagIds.flatMap((value) => {
-      const ref = parseEntityRef(value);
-      return ref.instanceId ? [entityKey(ref.id, ref.instanceId)] : [];
-    })
-  );
+  const ignored = ignoredTagKeys(prefs);
   const keepsPartners = prefs.leadGenders.length > 0;
   const partnerGenders: readonly string[] = prefs.partnerGenders;
 
