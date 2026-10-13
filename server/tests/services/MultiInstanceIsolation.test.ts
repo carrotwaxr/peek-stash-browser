@@ -1,17 +1,18 @@
 // server/tests/services/MultiInstanceIsolation.test.ts
+import { DEFAULT_RECOMMENDATION_PREFERENCES } from "@peek/shared-types/recommendationPreferences.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import {
-  IMPLICIT_PERFORMER_WEIGHT,
-  type LightweightEntityPreferences,
-  PERFORMER_FAVORITE_WEIGHT,
-  STUDIO_FAVORITE_WEIGHT,
-  TAG_SCENE_FAVORITE_WEIGHT,
-  scoreScoringDataByPreferences,
+  type AffinityInput,
+  LEAD_WEIGHT,
+  type RatingRow,
+  STUDIO_WEIGHT,
+  type ScoringScene,
+  TAG_WEIGHT,
+  buildEntityAffinity,
+  scoreScene,
 } from "../../services/RecommendationScoringService.js";
-import type { SceneScoringData } from "../../types/index.js";
-import { entityKey } from "../../utils/entityRef.js";
 import { must } from "../helpers/must.js";
 import { prismaImpl } from "../helpers/prismaMock.js";
 
@@ -45,19 +46,32 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 
-const createEmptyPrefs = (): LightweightEntityPreferences => ({
-  favoritePerformers: new Set(),
-  highlyRatedPerformers: new Set(),
-  favoriteStudios: new Set(),
-  highlyRatedStudios: new Set(),
-  favoriteTags: new Set(),
-  highlyRatedTags: new Set(),
-  derivedPerformerWeights: new Map(),
-  derivedStudioWeights: new Map(),
-  derivedTagWeights: new Map(),
-  implicitPerformerWeights: new Map(),
-  implicitStudioWeights: new Map(),
-  implicitTagWeights: new Map(),
+/** The scene's score with only these affinity inputs */
+const scoreWith = (scene: ScoringScene, input: Partial<AffinityInput>) =>
+  scoreScene(scene, {
+    affinity: buildEntityAffinity({
+      performerRatings: [],
+      studioRatings: [],
+      tagRatings: [],
+      ratedScenes: [],
+      rankings: [],
+      tagParents: new Map(),
+      studioParents: new Map(),
+      ignoredTags: new Set(),
+      ...input,
+    }),
+    prefs: DEFAULT_RECOMMENDATION_PREFERENCES,
+    genders: new Map(),
+    tagDf: new Map(),
+    sceneCount: 0,
+    ignoredTags: new Set(),
+  });
+
+const favorite = (id: string, instanceId: string): RatingRow => ({
+  id,
+  instanceId,
+  rating: null,
+  favorite: true,
 });
 
 describe("Multi-Instance Isolation", () => {
@@ -70,78 +84,68 @@ describe("Multi-Instance Isolation", () => {
     const INST_B = "inst-b";
 
     // The same performer, studio and tag ids on both instances
-    const sceneFromA: SceneScoringData = {
-      id: "scene1",
-      instanceId: INST_A,
+    const onInstance = (id: string, instanceId: string): ScoringScene => ({
+      id,
+      instanceId,
       studioId: "studio1",
       performerIds: ["12"],
       tagIds: ["tag1"],
-      oCounter: 0,
-    };
-
-    const sceneFromB: SceneScoringData = {
-      id: "scene2",
-      instanceId: INST_B,
-      studioId: "studio1",
-      performerIds: ["12"],
-      tagIds: ["tag1"],
-      oCounter: 0,
-    };
+      inheritedTagIds: [],
+      oCount: 0,
+      kept: false,
+      hasHistory: false,
+      lastPlayedAt: null,
+      rating: null,
+      favorite: false,
+    });
+    const sceneFromA = onInstance("scene1", INST_A);
+    const sceneFromB = onInstance("scene2", INST_B);
 
     it("favoriting performer 12 on A boosts no scene on B", () => {
-      const prefs = createEmptyPrefs();
-      prefs.favoritePerformers.add(entityKey("12", INST_A));
+      const input = { performerRatings: [favorite("12", INST_A)] };
 
-      const scoreA = scoreScoringDataByPreferences(sceneFromA, prefs);
-      const scoreB = scoreScoringDataByPreferences(sceneFromB, prefs);
-
-      expect(scoreA).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT, 2);
-      expect(scoreB).toBe(0);
+      expect(scoreWith(sceneFromA, input)).toBeCloseTo(LEAD_WEIGHT, 10);
+      expect(scoreWith(sceneFromB, input)).toBe(0);
     });
 
     it("favorite studio from instance A does not boost scenes from instance B", () => {
-      const prefs = createEmptyPrefs();
-      prefs.favoriteStudios.add(entityKey("studio1", INST_A));
+      const input = { studioRatings: [favorite("studio1", INST_A)] };
 
-      const scoreA = scoreScoringDataByPreferences(sceneFromA, prefs);
-      const scoreB = scoreScoringDataByPreferences(sceneFromB, prefs);
-
-      expect(scoreA).toBe(STUDIO_FAVORITE_WEIGHT);
-      expect(scoreB).toBe(0);
+      expect(scoreWith(sceneFromA, input)).toBeCloseTo(STUDIO_WEIGHT, 10);
+      expect(scoreWith(sceneFromB, input)).toBe(0);
     });
 
     it("favorites from both instances correctly boost their respective scenes", () => {
-      const prefs = createEmptyPrefs();
-      prefs.favoritePerformers.add(entityKey("12", INST_A));
-      prefs.favoritePerformers.add(entityKey("12", INST_B));
+      const input = {
+        performerRatings: [favorite("12", INST_A), favorite("12", INST_B)],
+      };
 
-      const scoreA = scoreScoringDataByPreferences(sceneFromA, prefs);
-      const scoreB = scoreScoringDataByPreferences(sceneFromB, prefs);
-
-      expect(scoreA).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT, 2);
-      expect(scoreB).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT, 2);
+      expect(scoreWith(sceneFromA, input)).toBeCloseTo(LEAD_WEIGHT, 10);
+      expect(scoreWith(sceneFromB, input)).toBeCloseTo(LEAD_WEIGHT, 10);
     });
 
-    it("derived and implicit weights stay on their instance", () => {
-      const prefs = createEmptyPrefs();
-      // A rated scene on A gave its performer, studio and tag a weight of 1
-      prefs.derivedPerformerWeights.set(entityKey("12", INST_A), 1);
-      prefs.derivedStudioWeights.set(entityKey("studio1", INST_A), 1);
-      prefs.derivedTagWeights.set(entityKey("tag1", INST_A), 1);
-      // Watch history on A ranked performer 12 there
-      prefs.implicitPerformerWeights.set(entityKey("12", INST_A), 1);
+    it("rated-scene and ranking affinity stay on their instance", () => {
+      const input: Partial<AffinityInput> = {
+        // A scene on A rated 100: S = 0.25 for its performer, studio and tag
+        ratedScenes: [{ ...onInstance("scene0", INST_A), rating: 100 }],
+        // Watch history on A likes performer 12 there
+        rankings: [
+          {
+            entityType: "performer",
+            entityId: "12",
+            instanceId: INST_A,
+            affinity: 1,
+          },
+        ],
+      };
 
-      const scoreA = scoreScoringDataByPreferences(sceneFromA, prefs);
-      const scoreB = scoreScoringDataByPreferences(sceneFromB, prefs);
-
-      expect(scoreA).toBeCloseTo(
-        PERFORMER_FAVORITE_WEIGHT +
-          STUDIO_FAVORITE_WEIGHT +
-          TAG_SCENE_FAVORITE_WEIGHT +
-          IMPLICIT_PERFORMER_WEIGHT,
-        6
+      expect(scoreWith(sceneFromA, input)).toBeCloseTo(
+        LEAD_WEIGHT * (0.6 * 0.25 + 0.6) +
+          STUDIO_WEIGHT * 0.6 * 0.25 +
+          TAG_WEIGHT * 0.6 * 0.25,
+        10
       );
-      expect(scoreB).toBe(0);
+      expect(scoreWith(sceneFromB, input)).toBe(0);
     });
   });
 
