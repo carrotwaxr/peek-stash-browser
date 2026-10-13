@@ -6,6 +6,8 @@ import { recommendationService } from "../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { getSceneVr } from "../../services/SceneVrService.js";
 import {
+  SIMILAR_CANDIDATE_LIMIT,
+  SIMILAR_LIST_LIMIT,
   applyWatchFactor,
   getSimilarWeights,
 } from "../../services/SimilarScenesService.js";
@@ -140,13 +142,14 @@ export const findScenes = async (
  * "Scenes like this": scenes on the seed's instance sharing its performers
  * (3 points each, 1.5 for a partner under the viewer's preferences), studio
  * (2) or direct tags (1.5 times the tag's rarity each, none for an ignored
- * tag), most shared first. The top 500 are then weighed by what the viewer
- * watched: kept within 14 days 0.3, kept earlier 0.7.
+ * tag), most shared first. The top 1,500 are then weighed by what the
+ * viewer watched (kept within 14 days 0.3, kept earlier 0.7) and the best
+ * 500 of them make the list.
  *
  * The seed is resolved through the user's own access check (404 when it is
  * hidden, restricted, deleted or on an instance the user doesn't see), the
  * candidates come from one SQL query with the exclusion anti-join (at most
- * 500), and the requested page is fetched by (id, instance) refs through the
+ * 1,500), and the requested page is fetched by (id, instance) refs through the
  * scene builder, which applies the exclusions and allowed instances again.
  */
 export const findSimilarScenes = async (
@@ -183,10 +186,15 @@ export const findSimilarScenes = async (
     { id, instanceId },
     userId,
     weights,
-    500
+    SIMILAR_CANDIDATE_LIMIT
   );
-  // What the viewer already kept sinks, before the page is cut
-  const candidates = await applyWatchFactor(userId, ranked);
+  // What the viewer already kept sinks, before the list is cut: reading
+  // more candidates than the list keeps lets unwatched ones from below the
+  // first 500 rise past recently watched ones
+  const candidates = (await applyWatchFactor(userId, ranked)).slice(
+    0,
+    SIMILAR_LIST_LIMIT
+  );
 
   // The page's refs, in candidate order (weight desc, date desc from SQL)
   const startIndex = (page - 1) * perPage;
