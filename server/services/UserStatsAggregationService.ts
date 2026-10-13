@@ -14,10 +14,11 @@
  *   - Raw engagement: (oCount × 5) + (normalizedDuration) + (playCount)
  *   - Percentile of the raw engagement among all entities the user has
  *     engaged with (100 = top), which a list shows as its score
- *   The viewer's recommendation preferences split the performers: with lead
- *   genders set, Top Performers and Most O'd Performer keep the leads (or a
- *   performer with no gender) and Top Partners holds the partner genders;
- *   Top Tags leaves out their ignored tags.
+ *   The viewer's recommendation preferences split the performers: with
+ *   partner genders set, Top Partners holds the partner genders and Top
+ *   Performers and Most O'd Performer everyone else (a lead gender, another
+ *   gender or none, as Recommended counts them as leads); Top Tags leaves
+ *   out their ignored tags.
  * - Top scenes are ranked here, from the watch history, with the same
  *   weights and percentile (a scene's library presence is 1): 50 ms at 200k
  *   scenes for a user with 17k watched scenes, where storing them cost each
@@ -124,15 +125,17 @@ const placeholders = (values: readonly string[]) =>
   values.map(() => "?").join(", ");
 
 /**
- * The condition on the joined performer `x` that keeps leads: the lead
- * genders, or no gender. None when leads are not set (everyone is a lead).
+ * The condition on the joined performer `x` that keeps leads: everyone who
+ * is not a partner (a lead gender, another gender, no gender), as Recommended
+ * scores a performer of another gender as a lead at half weight. None when
+ * the viewer has no partner genders (everyone is a lead).
  */
 function leadClause(prefs: RecommendationPreferences): SqlFragment | undefined {
-  const { leadGenders } = prefs;
-  if (leadGenders.length === 0) return undefined;
+  const { partnerGenders } = prefs;
+  if (partnerGenders.length === 0) return undefined;
   return {
-    sql: `(x.gender IN (${placeholders(leadGenders)}) OR x.gender IS NULL)`,
-    params: [...leadGenders],
+    sql: `(x.gender IS NULL OR x.gender NOT IN (${placeholders(partnerGenders)}))`,
+    params: [...partnerGenders],
   };
 }
 
@@ -732,8 +735,8 @@ class UserStatsAggregationService {
   }
 
   /**
-   * The performer with the most Os across their scenes: a lead when the
-   * viewer follows some genders (`lead` is that condition)
+   * The performer with the most Os across their scenes: not a partner when
+   * the viewer has partner genders (`lead` is that condition)
    */
   private async getPerformerHighlight(
     userId: number,

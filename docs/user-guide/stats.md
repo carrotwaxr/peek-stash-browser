@@ -39,7 +39,7 @@ Ranked lists show your top 10 most-engaged entities:
 - **Top Studios** — By engagement score
 - **Top Tags** — By engagement score. Tags you ignore in the same settings are left out.
 
-With **Performers I follow** set, Top Performers lists the performers you follow (and performers with no gender). Partners get their own list.
+With **Partners who matter** set, partners get their own list and Top Performers lists everyone else: the performers you follow, performers of other genders and performers with no gender, as Recommended counts them.
 
 Refresh (the circular arrow at the top of the page) recomputes your Top lists from your latest plays; it can take a few seconds. Without it, the lists are recomputed when they are an hour old.
 
