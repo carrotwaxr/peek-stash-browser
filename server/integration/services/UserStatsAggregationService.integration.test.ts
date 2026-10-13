@@ -264,7 +264,32 @@ describeWithDb("User Stats by (id, instance) (integration)", () => {
     ]);
   });
 
-  it("a top list orders by the engagement score, not the percentile", async () => {
+  it("a top list's score is the rank among what the viewer sees, not the stored percentile", async () => {
+    // Stored 100 and 50; the hidden, deleted and unnamed rankings between
+    // them take no place
+    const { topPerformers, topTags } = await statsFor();
+
+    expect(topPerformers.map((p) => [p.name, p.score])).toEqual([
+      ["B-12", 100],
+      ["A-13", 0],
+    ]);
+    expect(topTags.map((t) => [t.name, t.score])).toEqual([
+      ["B-20", 100],
+      ["B-21", 50],
+      ["A-20", 0],
+    ]);
+  });
+
+  it("a lone entity the viewer sees reads 100, whatever else was ranked", async () => {
+    const { topPerformers, topTags } = await statsFor([A]);
+
+    expect(topPerformers.map((p) => [p.name, p.score])).toEqual([
+      ["A-13", 100],
+    ]);
+    expect(topTags.map((t) => [t.name, t.score])).toEqual([["A-20", 100]]);
+  });
+
+  it("a top list orders by the engagement score, not the stored percentile", async () => {
     const ranking = {
       userId_instanceId_entityType_entityId: {
         userId: u,
@@ -281,8 +306,8 @@ describeWithDb("User Stats by (id, instance) (integration)", () => {
       const { topPerformers } = await statsFor();
 
       expect(topPerformers.map((p) => [p.name, p.score])).toEqual([
-        ["A-13", 50],
-        ["B-12", 100],
+        ["A-13", 100],
+        ["B-12", 0],
       ]);
     } finally {
       await prisma.userEntityRanking.update({
@@ -377,6 +402,33 @@ describeWithDb("User Stats by (id, instance) (integration)", () => {
       expect(ignored.topTags.map((t) => [t.name, t.instanceId])).toEqual([
         ["B-21", B],
         ["A-20", A],
+      ]);
+    });
+
+    it("an ignored, most played tag takes no percentile from the others", async () => {
+      await setPreferences({ ignoredTagIds: [`20:${B}`] });
+
+      const { topTags } = await statsFor();
+
+      expect(topTags.map((t) => [t.name, t.score])).toEqual([
+        ["B-21", 100],
+        ["A-20", 0],
+      ]);
+    });
+
+    it("leads and partners are each ranked among their own list", async () => {
+      await setPreferences({
+        leadGenders: ["FEMALE"],
+        partnerGenders: ["MALE"],
+      });
+
+      const { topPerformers, topPartners } = await statsFor();
+
+      expect(topPerformers.map((p) => [p.name, p.score])).toEqual([
+        ["B-12", 100],
+      ]);
+      expect(topPartners.map((p) => [p.name, p.score])).toEqual([
+        ["A-13", 100],
       ]);
     });
   });
