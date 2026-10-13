@@ -20,6 +20,7 @@ import type { SceneScoringRow } from "../types/internal/queryRows.js";
 import type { EntityRef } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
+import { rawDate } from "../utils/rawDate.js";
 import {
   type SceneStreamSource,
   buildSceneStreams,
@@ -151,7 +152,7 @@ class StashEntityService {
       oCount: Number(row.oCount),
       kept: Number(row.kept) === 1,
       hasHistory: Number(row.hasHistory) === 1,
-      lastPlayedAt: row.lastPlayedAt,
+      lastPlayedAt: rawDate(row.lastPlayedAt),
     }));
 
     logger.debug("getScenesForScoring", {
