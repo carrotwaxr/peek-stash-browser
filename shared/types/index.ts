@@ -18,7 +18,6 @@ export type {
   NormalizedGallery,
   ImageListItem,
   WithInstanceId,
-  SceneScoringData,
 } from "./entities.js";
 
 // Instance-aware composite key types

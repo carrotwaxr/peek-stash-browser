@@ -2,16 +2,28 @@
  * Recommended scenes: one ranked list per user, scored once per change.
  *
  * Scoring reads every scene the user can see (`getScenesForScoring`: the
- * exclusions, the allowed instances and the watch data applied in SQL),
- * weighs each by the user's favorites, ratings, rated scenes and engagement
- * rankings, and keeps the diversified top 500 as (id, instance) refs, about
- * 50 KB. The list is reused while the user's stamp is unchanged: one query
+ * exclusions, the allowed instances and the watch data applied in SQL) and
+ * keeps the varied top 500 as (id, instance) refs, about 50 KB. Each
+ * performer, studio and tag gets one affinity in [-1, 1] from the user's
+ * favorites and ratings, the rated scenes it is in and its ranking's
+ * affinity (a tag or studio with none inherits a decayed share of its
+ * parent's). A scene scores by its leads (the performers of the user's lead
+ * genders; everyone when none is chosen), its partners (a multiplier), its
+ * studio, its tags (rarer tags weigh more, inherited ones less, ignored ones
+ * not at all) and its own rating, times what its watch history keeps of it
+ * under the user's discovery mode: a scene played today scores 0, an
+ * abandoned one less, a kept one more as it ages and by its O count. The
+ * rules live in `RecommendationScoringService`.
+ *
+ * The list is reused while the user's stamp is unchanged: one query
  * (about 3 ms at 200k scenes) over the count and newest change of the
  * user's four rating tables, watch history, rankings and scene exclusions,
  * and the scene sync state. A rating, favorite, play, hide, restriction,
  * ranking recompute or scene sync changes it and the next page rescores.
- * The cache key also carries the day (the daily shuffle seed) and the
- * allowed instances, so a new day or an instance selection change rescores.
+ * The cache key also carries the day (the daily shuffle seed), the allowed
+ * instances and the user's recommendation preferences (one small read per
+ * page), so a new day, an instance selection change or a preference change
+ * rescores.
  *
  * Rankings are refreshed (at most once an hour) by page 1 of the
  * Recommended list, which waits for a recompute, by login and by the stats
@@ -27,11 +39,17 @@
  * small ids, and a favorite on one says nothing about the other.
  */
 import { RECOMMENDED_LIMIT } from "@peek/shared-types/filters/index.js";
-import { DEFAULT_RECOMMENDATION_PREFERENCES } from "@peek/shared-types/recommendationPreferences.js";
+import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
+import {
+  type RecommendationPreferences,
+  readRecommendationPreferences,
+} from "@peek/shared-types/recommendationPreferences.js";
 import prisma from "../prisma/singleton.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { SeededRandom, generateDailySeed } from "../utils/seededRandom.js";
+import { instanceClause } from "../utils/sqlClauses.js";
+import { jsonListOrEmpty } from "../utils/sqlJson.js";
 import {
   type AffinityInput,
   type RatingRow,
@@ -61,7 +79,7 @@ export interface RankedRecommendations {
 }
 
 interface CacheEntry {
-  /** userId, the day's seed and the allowed instances */
+  /** userId, the day's seed, the allowed instances and the preferences */
   key: string;
   stamp: string;
   result: Promise<RankedRecommendations>;
@@ -108,10 +126,12 @@ export class RecommendationService {
     userId: number,
     allowedInstanceIds: readonly string[]
   ): Promise<RankedRecommendations> {
+    const prefs = await this.readPreferences(userId);
     const key = [
       userId,
       generateDailySeed(userId),
       [...allowedInstanceIds].sort().join(","),
+      preferencesKey(prefs),
     ].join("|");
     const stamp = await this.readStamp(userId);
 
@@ -123,7 +143,7 @@ export class RecommendationService {
       return known.result;
     }
 
-    const result = this.compute(userId, allowedInstanceIds);
+    const result = this.compute(userId, allowedInstanceIds, prefs);
     const entry: CacheEntry = { key, stamp, result };
     this.entries.delete(userId);
     this.entries.set(userId, entry);
@@ -154,6 +174,17 @@ export class RecommendationService {
     this.entries.clear();
   }
 
+  /** The user's recommendation preferences, defaults for anything unreadable */
+  private async readPreferences(
+    userId: number
+  ): Promise<RecommendationPreferences> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { recommendationPreferences: true },
+    });
+    return readRecommendationPreferences(user?.recommendationPreferences);
+  }
+
   private async readStamp(userId: number): Promise<string> {
     const rows = await prisma.$queryRawUnsafe<StampRow[]>(
       STAMP_SQL,
@@ -178,31 +209,69 @@ export class RecommendationService {
 
   private async compute(
     userId: number,
-    allowedInstanceIds: readonly string[]
+    allowedInstanceIds: readonly string[],
+    prefs: RecommendationPreferences
   ): Promise<RankedRecommendations> {
     const startTime = Date.now();
+    const { criteria, scored, sceneCount } = await this.score(
+      userId,
+      allowedInstanceIds,
+      prefs
+    );
 
-    const [
-      performerRatings,
-      studioRatings,
-      tagRatings,
-      sceneRatings,
-      engagementRankings,
-    ] = await Promise.all([
-      prisma.performerRating.findMany({ where: { userId } }),
-      prisma.studioRating.findMany({ where: { userId } }),
-      prisma.tagRating.findMany({ where: { userId } }),
-      prisma.sceneRating.findMany({ where: { userId } }),
-      prisma.userEntityRanking.findMany({
-        where: { userId, entityType: { in: ["performer", "studio", "tag"] } },
-        select: {
-          entityId: true,
-          instanceId: true,
-          entityType: true,
-          affinity: true,
-        },
-      }),
-    ]);
+    // The best scenes with variety across leads and studios, in an order
+    // that holds for the day (no duplicates across pages) and changes with it
+    const diversified = pickVaried(
+      scored,
+      RANKED_LIMIT,
+      new SeededRandom(generateDailySeed(userId))
+    );
+    const refs = diversified.map(({ id, instanceId }) => ({ id, instanceId }));
+
+    logger.debug("Recommendations scored", {
+      userId,
+      ms: Date.now() - startTime,
+      scenes: sceneCount,
+      scored: scored.length,
+      kept: refs.length,
+    });
+
+    return { refs, criteria };
+  }
+
+  /**
+   * Every scene the user can see with a positive final score, unordered,
+   * and the user's criteria; no scene is read when the user has none.
+   * The statements run in turn: several are heavy at 200k scenes.
+   */
+  private async score(
+    userId: number,
+    allowedInstanceIds: readonly string[],
+    prefs: RecommendationPreferences
+  ): Promise<{
+    criteria: UserCriteriaCounts;
+    scored: ScoredScene[];
+    sceneCount: number;
+  }> {
+    const performerRatings = await prisma.performerRating.findMany({
+      where: { userId },
+    });
+    const studioRatings = await prisma.studioRating.findMany({
+      where: { userId },
+    });
+    const tagRatings = await prisma.tagRating.findMany({ where: { userId } });
+    const sceneRatings = await prisma.sceneRating.findMany({
+      where: { userId },
+    });
+    const engagementRankings = await prisma.userEntityRanking.findMany({
+      where: { userId, entityType: { in: ["performer", "studio", "tag"] } },
+      select: {
+        entityId: true,
+        instanceId: true,
+        entityType: true,
+        affinity: true,
+      },
+    });
 
     // A user who only watches has no ratings or favorites, but the
     // performers, studios and tags their viewing likes are criteria all the
@@ -215,31 +284,26 @@ export class RecommendationService {
       engagementRankings.filter((r) => r.affinity > 0).length
     );
     if (!hasAnyCriteria(criteria)) {
-      return { refs: [], criteria };
+      return { criteria, scored: [], sceneCount: 0 };
     }
 
+    const genders =
+      prefs.leadGenders.length > 0
+        ? await readGenders(allowedInstanceIds)
+        : new Map<string, string>();
+    const { tagParents, tagDf } = await readTags(allowedInstanceIds);
+    const studioParents = await readStudioParents(allowedInstanceIds);
     const scenes = await stashEntityService.getScenesForScoring(userId, [
       ...allowedInstanceIds,
     ]);
 
-    // Task 5 reads the genders, tag frequencies, hierarchies and the
-    // user's preferences; until then every performer is a lead
     const sceneRating = new Map(
       sceneRatings.map((r) => [entityKey(r.sceneId, r.instanceId), r])
     );
     const scoringScenes: ScoringScene[] = scenes.map((s) => {
       const own = sceneRating.get(entityKey(s.id, s.instanceId));
       return {
-        id: s.id,
-        instanceId: s.instanceId,
-        studioId: s.studioId,
-        performerIds: s.performerIds,
-        tagIds: s.tagIds,
-        inheritedTagIds: [],
-        oCount: s.oCounter,
-        kept: s.playCount > 0 || s.oCounter > 0,
-        hasHistory: s.playCount > 0 || s.lastPlayedAt !== null,
-        lastPlayedAt: s.lastPlayedAt,
+        ...s,
         rating: own?.rating ?? null,
         favorite: own?.favorite ?? false,
       };
@@ -255,7 +319,12 @@ export class RecommendationService {
         rating: r.rating,
         favorite: r.favorite,
       }));
-    const ignoredTags = new Set<string>();
+    const ignoredTags = new Set(
+      prefs.ignoredTagIds.flatMap((value) => {
+        const { id, instanceId } = parseEntityRef(value);
+        return instanceId ? [entityKey(id, instanceId)] : [];
+      })
+    );
     const input: AffinityInput = {
       performerRatings: ratingRows(performerRatings, (r) => r.performerId),
       studioRatings: ratingRows(studioRatings, (r) => r.studioId),
@@ -268,40 +337,114 @@ export class RecommendationService {
           ? [{ ...r, entityType: r.entityType }]
           : []
       ),
-      tagParents: new Map(),
-      studioParents: new Map(),
+      tagParents,
+      studioParents,
       ignoredTags,
     };
     const ctx: SceneScoringContext = {
       affinity: buildEntityAffinity(input),
-      prefs: DEFAULT_RECOMMENDATION_PREFERENCES,
-      genders: new Map(),
-      tagDf: new Map(),
+      prefs,
+      genders,
+      tagDf,
       sceneCount: scoringScenes.length,
       ignoredTags,
     };
 
-    const scored = scoreScenes(scoringScenes, ctx);
-
-    // The best scenes with variety across leads and studios, in an order
-    // that holds for the day (no duplicates across pages) and changes with it
-    const diversified = pickVaried(
-      scored,
-      RANKED_LIMIT,
-      new SeededRandom(generateDailySeed(userId))
-    );
-    const refs = diversified.map(({ id, instanceId }) => ({ id, instanceId }));
-
-    logger.debug("Recommendations scored", {
-      userId,
-      ms: Date.now() - startTime,
-      scenes: scenes.length,
-      scored: scored.length,
-      kept: refs.length,
-    });
-
-    return { refs, criteria };
+    return {
+      criteria,
+      scored: scoreScenes(scoringScenes, ctx),
+      sceneCount: scoringScenes.length,
+    };
   }
+}
+
+/**
+ * The preferences as a cache-key part: the lists sorted, since their order
+ * changes no score
+ */
+function preferencesKey(prefs: RecommendationPreferences): string {
+  return JSON.stringify({
+    leadGenders: [...prefs.leadGenders].sort(),
+    partnerGenders: [...prefs.partnerGenders].sort(),
+    noPartnerScenes: prefs.noPartnerScenes,
+    discovery: prefs.discovery,
+    ignoredTagIds: [...prefs.ignoredTagIds].sort(),
+  });
+}
+
+/** Each live performer's gender on the allowed instances, by entityKey */
+async function readGenders(
+  allowedInstanceIds: readonly string[]
+): Promise<Map<string, string>> {
+  const instances = instanceClause("p", allowedInstanceIds);
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{ id: string; stashInstanceId: string; gender: string }>
+  >(
+    `SELECT p.id, p.stashInstanceId, p.gender FROM StashPerformer p
+      WHERE p.deletedAt IS NULL AND p.gender IS NOT NULL AND ${instances.sql}`,
+    ...instances.params
+  );
+  return new Map(
+    rows.map((r) => [entityKey(r.id, r.stashInstanceId), r.gender])
+  );
+}
+
+/**
+ * The live tags on the allowed instances: each one's parents (on its own
+ * instance) and how many scenes carry it, directly or inherited, by
+ * entityKey. One row per tag and parent.
+ */
+async function readTags(allowedInstanceIds: readonly string[]): Promise<{
+  tagParents: Map<string, string[]>;
+  tagDf: Map<string, number>;
+}> {
+  const instances = instanceClause("t", allowedInstanceIds);
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{
+      id: string;
+      stashInstanceId: string;
+      sceneCountAll: number | bigint;
+      parentId: string | number | null;
+    }>
+  >(
+    `SELECT t.id, t.stashInstanceId, t.sceneCountAll, p.value AS parentId
+      FROM StashTag t
+      LEFT JOIN json_each(${jsonListOrEmpty("t.parentIds")}) p
+      WHERE t.deletedAt IS NULL AND ${instances.sql}`,
+    ...instances.params
+  );
+  const tagParents = new Map<string, string[]>();
+  const tagDf = new Map<string, number>();
+  for (const row of rows) {
+    const key = entityKey(row.id, row.stashInstanceId);
+    tagDf.set(key, Number(row.sceneCountAll));
+    if (row.parentId === null) continue;
+    const parent = entityKey(String(row.parentId), row.stashInstanceId);
+    const parents = tagParents.get(key);
+    if (parents) parents.push(parent);
+    else tagParents.set(key, [parent]);
+  }
+  return { tagParents, tagDf };
+}
+
+/** Each live studio's parent on its own instance, by entityKey */
+async function readStudioParents(
+  allowedInstanceIds: readonly string[]
+): Promise<Map<string, string>> {
+  const instances = instanceClause("st", allowedInstanceIds);
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{ id: string; stashInstanceId: string; parentId: string }>
+  >(
+    `SELECT st.id, st.stashInstanceId, st.parentId FROM StashStudio st
+      WHERE st.deletedAt IS NULL AND st.parentId IS NOT NULL AND ${instances.sql}`,
+    ...instances.params
+  );
+  return new Map(
+    rows.map((r) => [
+      entityKey(r.id, r.stashInstanceId),
+      entityKey(r.parentId, r.stashInstanceId),
+    ])
+  );
 }
 
 interface ScoredScene {

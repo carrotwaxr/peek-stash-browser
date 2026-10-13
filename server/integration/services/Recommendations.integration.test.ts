@@ -19,7 +19,6 @@ import prisma from "../../prisma/singleton.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
-import { userStatsService } from "../../services/UserStatsService.js";
 import {
   reqFor,
   resFor,
@@ -308,7 +307,7 @@ describe("Recommended scenes (integration)", () => {
     });
     expect(await rankedKeys(viewer, instances)).toEqual([`${SAME}:${A}`]);
 
-    // A ranking recompute: performer SAME on B now ranks in the top half
+    // A ranking recompute: the viewer's watching now likes performer SAME on B
     await prisma.userEntityRanking.create({
       data: {
         userId: viewer.id,
@@ -317,6 +316,7 @@ describe("Recommended scenes (integration)", () => {
         entityId: SAME,
         engagementRate: 1,
         percentileRank: 100,
+        affinity: 0.5,
       },
     });
     expect(await rankedKeys(viewer, instances)).toEqual([
@@ -378,11 +378,12 @@ describe("Recommended scenes (integration)", () => {
     expect(after).not.toBe(before);
   });
 
-  it("a viewer who only saved activity on three scenes gets a non-empty Recommended page after the stats recompute", async () => {
+  it("a viewer who only watched three scenes gets a Recommended page from the rankings of their watching", async () => {
     const viewer = await createViewer("access_it_rec_watch_only");
     const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     // No ratings or favorites: three plays of scenes with performers SAME and
-    // VISIBLE_A on A (SAME is on SAME and GLOBAL, VISIBLE_A on SAME and EXTRA)
+    // VISIBLE_A on A (SAME is on SAME, GLOBAL and NEW, VISIBLE_A on SAME and
+    // EXTRA)
     await prisma.watchHistory.createMany({
       data: [SAME, GLOBAL, EXTRA].map((sceneId) => ({
         userId: viewer.id,
@@ -393,19 +394,15 @@ describe("Recommended scenes (integration)", () => {
         lastPlayedAt: monthAgo,
       })),
     });
-    expect((await recommended(viewer, 1, 24)).scenes).toEqual([]);
 
-    // What the stats page does: the stats from the history, then the rankings
-    await userStatsService.rebuildAllStatsForUser(viewer.id);
-    await rankingComputeService.recomputeAllRankings(viewer.id);
-    recommendationService.forget(viewer.id);
-
+    // Page 1 waits for a ranking recompute, which reads the watch history
     const body = await recommended(viewer, 1, 24);
-    expect(body.scenes.length).toBeGreaterThan(0);
+
     expect(body.count).toBe(body.scenes.length);
-    // VISIBLE_A ranks in the top half (its two plays over two library scenes
-    // beat SAME's over four), so its two scenes are listed; SAME ranks below
-    // the 50th percentile, so GLOBAL, which only it is on, is not
+    // VISIBLE_A's two plays over its two scenes lift it above the viewer's
+    // mean (an affinity above 0), so its two scenes are listed, watched a
+    // month ago; SAME's two plays over its three scenes do not (0), so
+    // GLOBAL, which only it is on, scores nothing
     expect(body.scenes.map(key).sort()).toEqual([
       `${SAME}:${A}`,
       `${EXTRA}:${A}`,
@@ -519,6 +516,200 @@ describe("Recommended scenes (integration)", () => {
         ids: [`${SAME}:${A}`],
       });
       expect(refused.status).toBe(400);
+    });
+  });
+
+  describe("scoring by affinity, roles and discovery", () => {
+    // Scored in process, each scene's final score read before the day's
+    // shuffle: every scene is on A, each viewer a user of its own
+    const STUDIO = "7700101";
+    const FAV = "7700111"; // female, favorited
+    const NOBODY = "7700112"; // female, no affinity
+    const LEAD_1 = "7700113"; // female, rated
+    const LEAD_2 = "7700114"; // female, rated
+    const PARTNER = "7700115"; // male, no affinity
+    const S_FAV = "7700121";
+    const S_NOBODY = "7700122";
+    const S_TODAY = "7700123";
+    const S_WATCHED = "7700124";
+    const S_SOLO = "7700125";
+    const S_MIXED = "7700126";
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    let scorer = 0;
+    async function createScorer(): Promise<number> {
+      scorer += 1;
+      const user = await prisma.user.create({
+        data: {
+          username: `access_it_rec_score_${scorer}`,
+          password: "not-a-real-hash",
+          role: "USER",
+        },
+      });
+      // Every scene here is in the studio the viewer rates 80
+      await prisma.studioRating.create({
+        data: { userId: user.id, studioId: STUDIO, instanceId: A, rating: 80 },
+      });
+      return user.id;
+    }
+
+    /** Each scored scene's final score on A, by id; an unscored scene is absent */
+    async function finals(userId: number): Promise<Map<string, number>> {
+      const prefs = await recommendationService["readPreferences"](userId);
+      const { scored } = await recommendationService["score"](
+        userId,
+        [A],
+        prefs
+      );
+      return new Map(scored.map((s) => [s.id, s.final]));
+    }
+
+    const final = (scores: Map<string, number>, id: string) =>
+      must(scores.get(id), `the final score of ${id}`);
+
+    beforeAll(async () => {
+      await prisma.stashStudio.create({
+        data: { id: STUDIO, stashInstanceId: A, name: "A-studio" },
+      });
+      await prisma.stashPerformer.createMany({
+        data: [
+          [FAV, "FEMALE"],
+          [NOBODY, "FEMALE"],
+          [LEAD_1, "FEMALE"],
+          [LEAD_2, "FEMALE"],
+          [PARTNER, "MALE"],
+        ].map(([id, gender]) => ({
+          id: must(id),
+          stashInstanceId: A,
+          name: `A-${must(id)}`,
+          gender: must(gender),
+        })),
+      });
+      const cast: Array<[string, string[]]> = [
+        [S_FAV, [FAV]],
+        [S_NOBODY, [NOBODY]],
+        [S_TODAY, [FAV]],
+        [S_WATCHED, [FAV]],
+        [S_SOLO, [LEAD_1]],
+        [S_MIXED, [LEAD_2, PARTNER]],
+      ];
+      await prisma.stashScene.createMany({
+        data: cast.map(([id]) => ({
+          id,
+          stashInstanceId: A,
+          title: `A-${id}`,
+          studioId: STUDIO,
+        })),
+      });
+      await prisma.scenePerformer.createMany({
+        data: cast.flatMap(([sceneId, performers]) =>
+          performers.map((performerId) => ({
+            sceneId,
+            sceneInstanceId: A,
+            performerId,
+            performerInstanceId: A,
+          }))
+        ),
+      });
+    }, 60000);
+
+    it("a favorite performer's unwatched scene ranks above a scene of a performer with no affinity", async () => {
+      const viewer = await createScorer();
+      await favoritePerformer(viewer, FAV, A);
+
+      const scores = await finals(viewer);
+
+      expect(final(scores, S_FAV)).toBeGreaterThan(final(scores, S_NOBODY));
+      const ranked = await recommendationService.getRankedRefs(viewer, [A]);
+      expect(ranked.refs.map(key)).toContain(`${S_FAV}:${A}`);
+    });
+
+    it("a scene played today is not recommended", async () => {
+      const viewer = await createScorer();
+      await favoritePerformer(viewer, FAV, A);
+      await prisma.watchHistory.create({
+        data: {
+          userId: viewer,
+          instanceId: A,
+          sceneId: S_TODAY,
+          playCount: 1,
+          playDuration: 600,
+          lastPlayedAt: new Date(),
+        },
+      });
+
+      const scores = await finals(viewer);
+
+      expect(scores.has(S_TODAY)).toBe(false);
+      expect(scores.has(S_FAV)).toBe(true);
+      const ranked = await recommendationService.getRankedRefs(viewer, [A]);
+      expect(ranked.refs.map(key)).not.toContain(`${S_TODAY}:${A}`);
+    });
+
+    it("rewatch moves a favorite scene watched over 60 days ago, with an O, above an unwatched one that new keeps it below", async () => {
+      const viewer = await createScorer();
+      await favoritePerformer(viewer, FAV, A);
+      await prisma.watchHistory.create({
+        data: {
+          userId: viewer,
+          instanceId: A,
+          sceneId: S_WATCHED,
+          playCount: 1,
+          oCount: 1,
+          playDuration: 600,
+          lastPlayedAt: new Date(Date.now() - 90 * DAY_MS),
+        },
+      });
+      const setDiscovery = (discovery: string) =>
+        prisma.user.update({
+          where: { id: viewer },
+          data: { recommendationPreferences: { discovery } },
+        });
+
+      await setDiscovery("new");
+      const asNew = await finals(viewer);
+      const listedNew = await recommendationService.getRankedRefs(viewer, [A]);
+      await setDiscovery("rewatch");
+      const asRewatch = await finals(viewer);
+      const listedRewatch = await recommendationService.getRankedRefs(viewer, [
+        A,
+      ]);
+
+      expect(final(asNew, S_WATCHED)).toBeLessThan(final(asNew, S_FAV));
+      expect(final(asRewatch, S_WATCHED)).toBeGreaterThan(
+        final(asRewatch, S_FAV)
+      );
+      // The preference is part of the list's key: the change rescored
+      expect(listedRewatch).not.toBe(listedNew);
+    });
+
+    it("following women with men as partners, a solo scene of performers who are not favorites ranks below a comparable scene with a partner", async () => {
+      const viewer = await createScorer();
+      for (const performerId of [LEAD_1, LEAD_2]) {
+        await prisma.performerRating.create({
+          data: { userId: viewer, performerId, instanceId: A, rating: 80 },
+        });
+      }
+
+      // Without roles, the partner is one more lead with no affinity
+      const everyone = await finals(viewer);
+      expect(final(everyone, S_SOLO)).toBeCloseTo(final(everyone, S_MIXED), 6);
+
+      await prisma.user.update({
+        where: { id: viewer },
+        data: {
+          recommendationPreferences: {
+            leadGenders: ["FEMALE"],
+            partnerGenders: ["MALE"],
+            noPartnerScenes: "less",
+            discovery: "balanced",
+            ignoredTagIds: [],
+          },
+        },
+      });
+      const roles = await finals(viewer);
+
+      expect(final(roles, S_SOLO)).toBeLessThan(final(roles, S_MIXED));
     });
   });
 });
