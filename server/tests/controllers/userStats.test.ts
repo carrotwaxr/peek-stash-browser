@@ -57,6 +57,7 @@ const SAMPLE_STATS: UserStatsResponse = {
   },
   topScenes: [],
   topPerformers: [],
+  topPartners: [],
   topStudios: [],
   topTags: [],
   mostWatchedScene: null,
