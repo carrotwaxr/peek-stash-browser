@@ -13,6 +13,7 @@ import prisma from "../../prisma/singleton.js";
 import {
   type RawEntityStats,
   computeRankings,
+  percentileRank,
   rankingComputeService,
 } from "../../services/RankingComputeService.js";
 import { dbWrite } from "../../utils/dbWrite.js";
@@ -336,13 +337,8 @@ describe("RankingComputeService", () => {
 
       const rankings = getWrittenRankings(txMock, "performer");
       expect(rankings).toHaveLength(1);
-      // Single entity: (n - 0 - 1) / max(n - 1, 1) = 0 / 1 = 0 → actually 0
-      // Formula: 100 * (1 - 0 - 1) / max(0, 1) = 0
-      // Wait, let's check: n=1, i=0: 100 * (1 - 0 - 1) / max(0, 1) = 100 * 0 / 1 = 0
-      // Hmm, that means a single entity gets 0, not 100. Let me verify...
-      // Actually looking at the code: Math.round((100 * (n - i - 1)) / Math.max(n - 1, 1))
-      // n=1, i=0: 100 * (1 - 0 - 1) / max(0, 1) = 100 * 0 / 1 = 0
-      expect(must(rankings[0]).percentileRank).toBe(0);
+      // One alone is the top, not the last
+      expect(must(rankings[0]).percentileRank).toBe(100);
     });
 
     it("handles ties — entities with the same engagement score get the same percentile", async () => {
@@ -1010,6 +1006,16 @@ function raw(
 function byEntity(rows: ReturnType<typeof computeRankings>) {
   return new Map(rows.map((r) => [r.entityId, r]));
 }
+
+describe("percentileRank", () => {
+  it("is 100 for the first, 0 for the last of several, and 100 for one alone", () => {
+    expect(percentileRank(0, 1)).toBe(100);
+    expect(percentileRank(0, 3)).toBe(100);
+    expect(percentileRank(1, 3)).toBe(50);
+    expect(percentileRank(2, 3)).toBe(0);
+    expect(percentileRank(1, 2)).toBe(0);
+  });
+});
 
 describe("computeRankings", () => {
   const inputs = { avgSceneDuration: 1000, keptBase: 0.5 };
