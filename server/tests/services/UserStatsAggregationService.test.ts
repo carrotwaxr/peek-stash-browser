@@ -134,7 +134,8 @@ describe("UserStatsAggregationService", () => {
             playCount: 3,
             playDuration: 100.6,
             oCount: 1,
-            percentileRank: 100,
+            position: 1n,
+            total: 1n,
           },
         ],
       });
@@ -151,8 +152,18 @@ describe("UserStatsAggregationService", () => {
       expect(sql).toContain(
         "WHERE r.userId = ? AND r.entityType = ? AND e.id IS NULL AND x.stashInstanceId IN (?, ?)"
       );
+      // Ranked among the rows kept, then the page taken in the sort's order
       expect(sql).toContain(
-        "ORDER BY r.engagementScore DESC, r.entityId, r.instanceId LIMIT ?"
+        "RANK() OVER (ORDER BY r.engagementScore DESC) AS position, COUNT(*) OVER () AS total"
+      );
+      expect(sql).toContain(
+        "SELECT * FROM ranked ORDER BY engagementScore DESC, id, instanceId LIMIT ?"
+      );
+      expect(sql).toContain(
+        "CROSS JOIN StashPerformer x ON x.id = top.id AND x.stashInstanceId = top.instanceId"
+      );
+      expect(sql).toContain(
+        "ORDER BY top.engagementScore DESC, top.id, top.instanceId"
       );
       expect(params).toEqual([USER, USER, "performer", ...ALLOWED, 10]);
       expect(topPerformers).toEqual([
@@ -198,9 +209,9 @@ describe("UserStatsAggregationService", () => {
 
   describe("sorts", () => {
     it.each([
-      ["engagement", "r.engagementScore", "engagement"],
-      ["oCount", "r.oCount", "oCount"],
-      ["playCount", "r.playCount", "playCount"],
+      ["engagement", "engagementScore", "engagement"],
+      ["oCount", "oCount", "oCount"],
+      ["playCount", "playCount", "playCount"],
     ] as const)(
       "%s orders the rankings by %s and the scenes by %s",
       async (sortBy, rankingColumn, sceneColumn) => {
@@ -216,7 +227,14 @@ describe("UserStatsAggregationService", () => {
             `the ${type} top list`
           );
           expect(sql).toContain(
-            `ORDER BY ${rankingColumn} DESC, r.entityId, r.instanceId LIMIT ?`
+            `SELECT * FROM ranked ORDER BY ${rankingColumn} DESC, id, instanceId LIMIT ?`
+          );
+          expect(sql).toContain(
+            `ORDER BY top.${rankingColumn} DESC, top.id, top.instanceId`
+          );
+          // Whatever the sort, the score is the rank by engagement
+          expect(sql).toContain(
+            "RANK() OVER (ORDER BY r.engagementScore DESC) AS position"
           );
         }
         const [scenes] = statementFor("WITH engaged");
@@ -320,6 +338,35 @@ describe("UserStatsAggregationService", () => {
     });
   });
 
+  describe("top list scores", () => {
+    it("are each entity's rank by engagement among the rows the list keeps; one alone is 100", async () => {
+      const row = (id: string, position: bigint, total: bigint) => ({
+        id,
+        instanceId: "inst-a",
+        name: id,
+        imagePath: null,
+        playCount: 1,
+        playDuration: 10,
+        oCount: 1,
+        position,
+        total,
+      });
+      answer({
+        studio: [row("a", 1n, 3n), row("b", 1n, 3n), row("c", 3n, 3n)],
+        tag: [row("t", 1n, 1n)],
+      });
+
+      const { topStudios, topTags } = await stats();
+
+      expect(topStudios.map((s) => [s.id, s.score])).toEqual([
+        ["a", 100],
+        ["b", 100],
+        ["c", 0],
+      ]);
+      expect(topTags.map((t) => [t.id, t.score])).toEqual([["t", 100]]);
+    });
+  });
+
   describe("totals", () => {
     it("sum the visible scenes and images, bigint sums as numbers, image Os added to scene Os", async () => {
       answer({
@@ -365,7 +412,9 @@ describe("UserStatsAggregationService", () => {
       playCount: 1,
       playDuration: 10,
       oCount: 1,
-      percentileRank: 50,
+      // Second of three: percentile 50
+      position: 2n,
+      total: 3n,
     });
 
     /** The top-list statements for performers, in the order they were sent */
@@ -505,6 +554,24 @@ describe("UserStatsAggregationService", () => {
         "inst-a",
         10,
       ]);
+    });
+
+    it("the ignored tags are left out before the ranking, so they take no percentile", async () => {
+      preferences({ ignoredTagIds: ["3:inst-a"] });
+
+      await stats();
+
+      const [sql] = must(
+        statements().find(
+          ([text, ...params]) =>
+            text.includes("FROM UserEntityRanking r") && params.includes("tag")
+        )
+      );
+      // In the ranked rows' WHERE, before the page is taken from them
+      expect(sql.indexOf("NOT ((x.id")).toBeGreaterThan(
+        sql.indexOf("RANK() OVER")
+      );
+      expect(sql.indexOf("NOT ((x.id")).toBeLessThan(sql.indexOf("top AS ("));
     });
 
     it("the other lists do not exclude tags", async () => {
