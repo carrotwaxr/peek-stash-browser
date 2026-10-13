@@ -65,11 +65,12 @@ const ALWAYS_CURRENT: StillCurrent = () => true;
 
 /**
  * The percentile of the entity at `index` (0 = the most engaged) among
- * `count`: 100 for the first, 0 for the last (and for one alone). Entities
- * tied with the one before them take its index.
+ * `count`: 100 for the first (and for one alone), 0 for the last of several.
+ * Entities tied with the one before them take its index.
  */
 export function percentileRank(index: number, count: number): number {
-  return Math.round((100 * (count - index - 1)) / Math.max(count - 1, 1));
+  if (count <= 1) return 100;
+  return Math.round((100 * (count - index - 1)) / (count - 1));
 }
 
 /** One user's last recompute, kept for the life of the process */
