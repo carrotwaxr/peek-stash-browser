@@ -67,7 +67,7 @@ Each top list ranks by one engagement score:
 
 The score uses all of your history. A performer, studio or tag scores from every scene of theirs that you played, watched or had an O on.
 
-**Top 5%** means the entry is in the top 5% of everything you have engaged with of that kind: a performer in the top 5% of the performers you have engaged with. The ranking compares an entry with everything you have engaged with on every Stash server in your scope, including servers you have deselected, although the lists only show what you can see.
+**Top 5%** means the entry is in the top 5% of what that list ranks: a performer in Top Performers is in the top 5% of the performers you have engaged with that the list can show. Hidden and restricted entries, servers you have deselected, tags you ignore and, with partners set, the other list's performers take no place in the ranking. An entry alone in its list is in the top 1%.
 
 The rankings refresh at most once an hour (see [Refreshing Stats](#refreshing-stats)). The same viewing also feeds [Recommended](recommendations.md#how-it-works), which weighs recent viewing more than old viewing. These lists do not: they rank by your whole history.
 
