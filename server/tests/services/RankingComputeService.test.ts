@@ -977,8 +977,8 @@ describe("RankingComputeService", () => {
 
 /**
  * One entity's history totals as a ranking query returns them. Unless given,
- * the plays are recent (the decayed sums equal the totals) and every opened
- * scene was kept.
+ * the plays and opens are recent (the decayed sums equal the totals) and
+ * every opened scene was kept.
  */
 function raw(
   entityId: string,
@@ -988,6 +988,7 @@ function raw(
   const oCount = stats.oCount ?? 0;
   const playDuration = stats.playDuration ?? 0;
   const openedCount = stats.openedCount ?? 1;
+  const keptCount = stats.keptCount ?? openedCount;
   return {
     entityId,
     instanceId: "i1",
@@ -998,7 +999,9 @@ function raw(
     decayedOCount: oCount,
     decayedPlayDuration: playDuration,
     openedCount,
-    keptCount: openedCount,
+    keptCount,
+    decayedOpened: openedCount,
+    decayedKept: keptCount,
     libraryPresence: 1,
     ...stats,
   };
@@ -1077,6 +1080,60 @@ describe("computeRankings", () => {
 
     expect(must(ranked.get("dropped")).affinity).toBe(-1);
     expect(must(ranked.get("kept")).affinity).toBeGreaterThan(0);
+  });
+
+  it("an entity the user pressed O on is never disliked: 11 Os and 7 kept of 69 opens gives an affinity of at least 0", () => {
+    const rows = [
+      raw("oed", {
+        playCount: 10,
+        oCount: 11,
+        playDuration: 20_000,
+        openedCount: 69,
+        keptCount: 7,
+        libraryPresence: 76,
+      }),
+      // The same skips without an O
+      raw("skipped", {
+        playCount: 10,
+        playDuration: 20_000,
+        openedCount: 69,
+        keptCount: 7,
+        libraryPresence: 76,
+      }),
+      raw("others", { playCount: 30, libraryPresence: 10 }),
+    ];
+
+    const ranked = byEntity(
+      computeRankings(rows, { ...inputs, keptBase: 0.6 })
+    );
+
+    expect(must(ranked.get("skipped")).affinity).toBeLessThan(0);
+    expect(must(ranked.get("oed")).affinity).toBe(0);
+  });
+
+  it("undated or old skips move the affinity less than recent ones", () => {
+    // Ten skips each; the undated ones decay to 0.25 an open
+    const skips = { playCount: 0, openedCount: 10, keptCount: 0 };
+    const rows = [
+      raw("recent", { ...skips, libraryPresence: 10 }),
+      raw("undated", {
+        ...skips,
+        decayedOpened: 2.5,
+        decayedKept: 0,
+        libraryPresence: 10,
+      }),
+    ];
+
+    const ranked = byEntity(
+      computeRankings(rows, { ...inputs, keptBase: 0.6 })
+    );
+
+    const recent = must(ranked.get("recent")).affinity;
+    const undated = must(ranked.get("undated")).affinity;
+    expect(recent).toBeLessThan(undated);
+    expect(undated).toBeLessThan(0);
+    // The raw counts are kept for display
+    expect(must(ranked.get("undated")).openedCount).toBe(10);
   });
 
   it("every affinity lies in [-1, 1]", () => {
