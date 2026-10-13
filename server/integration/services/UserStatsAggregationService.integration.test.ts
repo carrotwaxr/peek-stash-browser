@@ -63,6 +63,7 @@ async function removeRows(): Promise<void> {
   await prisma.stashScene.deleteMany({ where });
   await prisma.stashPerformer.deleteMany({ where });
   await prisma.stashImage.deleteMany({ where });
+  await prisma.stashTag.deleteMany({ where });
 }
 
 async function seed(): Promise<void> {
@@ -71,6 +72,8 @@ async function seed(): Promise<void> {
     id,
     stashInstanceId: instance,
     name: `${instance === A ? "A" : "B"}-${id}`,
+    // 12 is a woman and 13 a man, on both
+    gender: id === "12" ? "FEMALE" : "MALE",
     imagePath: `/performer/${id}/image?side=${instance}`,
     ...(gone ? { deletedAt } : {}),
   });
@@ -92,7 +95,20 @@ async function seed(): Promise<void> {
     ...(gone ? { deletedAt } : {}),
   });
   await prisma.stashScene.createMany({
-    data: [scene("5", B), scene("7", B), scene("5", A), scene("6", A, true)],
+    data: [
+      scene("5", B),
+      scene("7", B),
+      scene("9", B),
+      scene("5", A),
+      scene("6", A, true),
+    ],
+  });
+  await prisma.stashTag.createMany({
+    data: [
+      { id: "20", stashInstanceId: B, name: "B-20" },
+      { id: "21", stashInstanceId: B, name: "B-21" },
+      { id: "20", stashInstanceId: A, name: "A-20" },
+    ],
   });
   await prisma.stashImage.createMany({
     data: [
@@ -161,6 +177,8 @@ async function seed(): Promise<void> {
         playCount: 1,
         playDuration: 50,
       },
+      // Opened and never played: a history row, not a watched scene
+      { userId: u, instanceId: B, sceneId: "9" },
     ],
   });
   await prisma.imageViewHistory.createMany({
@@ -182,13 +200,16 @@ async function seed(): Promise<void> {
     entityId: string,
     instanceId: string,
     percentileRank: number,
-    oCount: number
+    oCount: number,
+    entityType = "performer"
   ) => ({
     userId: u,
     instanceId,
-    entityType: "performer",
+    entityType,
     entityId,
     percentileRank,
+    // The list orders by this
+    engagementScore: percentileRank,
     oCount,
     playCount: 1,
   });
@@ -202,6 +223,9 @@ async function seed(): Promise<void> {
       // Written before the instance was carried: it names no entity
       ranking("13", "", 70, 7),
       ranking("13", A, 50, 2),
+      ranking("20", B, 100, 1, "tag"),
+      ranking("21", B, 60, 1, "tag"),
+      ranking("20", A, 40, 1, "tag"),
     ],
   });
 }
@@ -238,6 +262,100 @@ describeWithDb("User Stats by (id, instance) (integration)", () => {
       ["B-12", B],
       ["A-13", A],
     ]);
+  });
+
+  it("a top list orders by the engagement score, not the percentile", async () => {
+    const ranking = {
+      userId_instanceId_entityType_entityId: {
+        userId: u,
+        instanceId: A,
+        entityType: "performer",
+        entityId: "13",
+      },
+    };
+    await prisma.userEntityRanking.update({
+      where: ranking,
+      data: { engagementScore: 500 },
+    });
+    try {
+      const { topPerformers } = await statsFor();
+
+      expect(topPerformers.map((p) => [p.name, p.score])).toEqual([
+        ["A-13", 50],
+        ["B-12", 100],
+      ]);
+    } finally {
+      await prisma.userEntityRanking.update({
+        where: ranking,
+        data: { engagementScore: 50 },
+      });
+    }
+  });
+
+  describe("with recommendation preferences", () => {
+    const setPreferences = (value: object) =>
+      prisma.user.update({
+        where: { id: u },
+        data: { recommendationPreferences: value },
+      });
+
+    afterAll(async () => {
+      await setPreferences({});
+    });
+
+    it("with the defaults Top Partners is empty and Top Performers holds every gender", async () => {
+      await setPreferences({});
+
+      const { topPerformers, topPartners } = await statsFor();
+
+      expect(topPartners).toEqual([]);
+      expect(topPerformers.map((p) => p.name)).toEqual(["B-12", "A-13"]);
+    });
+
+    it("leads FEMALE and partners MALE: no man among the performers or the most O'd, only men among the partners", async () => {
+      await setPreferences({
+        leadGenders: ["FEMALE"],
+        partnerGenders: ["MALE"],
+      });
+
+      const { topPerformers, topPartners, mostOdPerformer } = await statsFor();
+
+      expect(topPerformers.map((p) => p.name)).toEqual(["B-12"]);
+      expect(topPartners.map((p) => [p.name, p.instanceId])).toEqual([
+        ["A-13", A],
+      ]);
+      expect(mostOdPerformer).toMatchObject({ name: "B-12" });
+    });
+
+    it("leads MALE: the most O'd performer is the man although a woman has more Os", async () => {
+      await setPreferences({
+        leadGenders: ["MALE"],
+        partnerGenders: ["FEMALE"],
+      });
+
+      const { topPerformers, topPartners, mostOdPerformer } = await statsFor();
+
+      expect(topPerformers.map((p) => p.name)).toEqual(["A-13"]);
+      expect(topPartners.map((p) => p.name)).toEqual(["B-12"]);
+      expect(mostOdPerformer).toMatchObject({ name: "A-13", oCount: 2 });
+    });
+
+    it("an ignored tag is absent from Top Tags on its own instance only", async () => {
+      await setPreferences({});
+      const all = await statsFor();
+      expect(all.topTags.map((t) => [t.name, t.instanceId])).toEqual([
+        ["B-20", B],
+        ["B-21", B],
+        ["A-20", A],
+      ]);
+
+      await setPreferences({ ignoredTagIds: [`20:${B}`] });
+      const ignored = await statsFor();
+      expect(ignored.topTags.map((t) => [t.name, t.instanceId])).toEqual([
+        ["B-21", B],
+        ["A-20", A],
+      ]);
+    });
   });
 
   it("scene 5 hidden on instance A leaves instance B's scene 5 in the engagement totals, and a deleted scene counts nothing", async () => {

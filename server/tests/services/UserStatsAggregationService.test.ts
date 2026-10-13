@@ -14,7 +14,7 @@ import {
 } from "../../services/UserStatsAggregationService.js";
 import { toProxyUrl } from "../../utils/proxyUrl.js";
 import { must } from "../helpers/must.js";
-import { prismaImpl } from "../helpers/prismaMock.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -41,6 +41,13 @@ interface Answers {
   mostOdPerformer?: unknown[];
   /** The Library counts, by the table each statement counts */
   library?: Partial<Record<string, number | bigint>>;
+}
+
+/** The viewer's stored recommendation preferences (NULL is the defaults) */
+function preferences(value: unknown): void {
+  mockPrisma.user.findUnique.mockResolvedValue(
+    partialRow({ recommendationPreferences: value as never })
+  );
 }
 
 const flat = (sql: string) => sql.replace(/\s+/g, " ").trim();
@@ -110,6 +117,7 @@ describe("UserStatsAggregationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     answer({});
+    preferences(null);
     // The average scene duration, read by RankingComputeService
     mockPrisma.$queryRaw.mockResolvedValue([{ avgDuration: AVERAGE_DURATION }]);
   });
@@ -144,7 +152,7 @@ describe("UserStatsAggregationService", () => {
         "WHERE r.userId = ? AND r.entityType = ? AND e.id IS NULL AND x.stashInstanceId IN (?, ?)"
       );
       expect(sql).toContain(
-        "ORDER BY r.percentileRank DESC, r.entityId, r.instanceId LIMIT ?"
+        "ORDER BY r.engagementScore DESC, r.entityId, r.instanceId LIMIT ?"
       );
       expect(params).toEqual([USER, USER, "performer", ...ALLOWED, 10]);
       expect(topPerformers).toEqual([
@@ -190,7 +198,7 @@ describe("UserStatsAggregationService", () => {
 
   describe("sorts", () => {
     it.each([
-      ["engagement", "r.percentileRank", "engagement"],
+      ["engagement", "r.engagementScore", "engagement"],
       ["oCount", "r.oCount", "oCount"],
       ["playCount", "r.playCount", "playCount"],
     ] as const)(
@@ -336,11 +344,168 @@ describe("UserStatsAggregationService", () => {
       // One row per (scene, instance) the viewer watched: two servers'
       // same id count twice
       const [scenes] = statementFor("AS uniqueScenesWatched");
-      expect(scenes).toContain("COUNT(*) AS uniqueScenesWatched");
+      expect(scenes).toContain(
+        "SUM(CASE WHEN w.playCount > 0 OR w.oCount > 0 THEN 1 ELSE 0 END), 0) AS uniqueScenesWatched"
+      );
       const [images] = statementFor("AS totalImagesViewed");
       expect(images).toContain(
         "FROM ImageViewHistory iv CROSS JOIN StashImage x ON x.id = iv.imageId AND x.stashInstanceId = iv.instanceId"
       );
+    });
+  });
+
+  describe("leads and partners", () => {
+    const row = (id: string, name: string) => ({
+      id,
+      instanceId: "inst-a",
+      name,
+      imagePath: null,
+      playCount: 1,
+      playDuration: 10,
+      oCount: 1,
+      percentileRank: 50,
+    });
+
+    /** The top-list statements for performers, in the order they were sent */
+    const performerLists = () =>
+      statements().filter(
+        ([sql, ...params]) =>
+          sql.includes("FROM UserEntityRanking r") &&
+          params.includes("performer")
+      );
+
+    it("with the default preferences Top Performers holds every gender and Top Partners is empty, with no statement", async () => {
+      answer({ performer: [row("1", "One")] });
+
+      const result = await stats();
+
+      expect(result.topPartners).toEqual([]);
+      expect(result.topPerformers.map((p) => p.id)).toEqual(["1"]);
+      expect(performerLists()).toHaveLength(1);
+      const [sql] = must(performerLists()[0]);
+      expect(sql).not.toContain("x.gender");
+      expect(statementFor("h.oCounter AS count")[0]).not.toContain("x.gender");
+    });
+
+    it("with leads FEMALE and partners MALE Top Performers keeps leads (or no gender), Top Partners only MALE, Most O'd Performer a lead", async () => {
+      preferences({
+        leadGenders: ["FEMALE"],
+        partnerGenders: ["MALE"],
+        noPartnerScenes: "normal",
+        discovery: "balanced",
+        ignoredTagIds: [],
+      });
+
+      await stats();
+
+      const [leads, partners] = performerLists();
+      const [leadSql, ...leadParams] = must(leads);
+      expect(leadSql).toContain("AND (x.gender IN (?) OR x.gender IS NULL)");
+      expect(leadParams).toEqual([
+        USER,
+        USER,
+        "performer",
+        ...ALLOWED,
+        "FEMALE",
+        10,
+      ]);
+      const [partnerSql, ...partnerParams] = must(partners);
+      expect(partnerSql).toContain("AND x.gender IN (?)");
+      expect(partnerSql).not.toContain("x.gender IS NULL");
+      expect(partnerParams).toEqual([
+        USER,
+        USER,
+        "performer",
+        ...ALLOWED,
+        "MALE",
+        10,
+      ]);
+      const [highlight, ...highlightParams] = statementFor(
+        "h.oCounter AS count"
+      );
+      expect(highlight).toContain("AND (x.gender IN (?) OR x.gender IS NULL)");
+      expect(highlightParams).toEqual([USER, USER, ...ALLOWED, "FEMALE"]);
+    });
+
+    it("maps Top Partners rows like Top Performers", async () => {
+      preferences({ leadGenders: ["FEMALE"], partnerGenders: ["MALE"] });
+      answer({ performer: [row("9", "Nine")] });
+
+      const result = await stats();
+
+      expect(result.topPartners.map((p) => [p.id, p.name, p.score])).toEqual([
+        ["9", "Nine", 50],
+      ]);
+    });
+
+    it("with leads set and no partners Top Partners is empty with no statement, and Top Performers is still filtered", async () => {
+      preferences({ leadGenders: ["FEMALE"], partnerGenders: [] });
+
+      const result = await stats();
+
+      expect(result.topPartners).toEqual([]);
+      expect(performerLists()).toHaveLength(1);
+      expect(must(performerLists()[0])[0]).toContain("x.gender IN (?)");
+    });
+  });
+
+  describe("ignored tags", () => {
+    it("Top Tags leaves out each ignored (id, instance) pair, bound", async () => {
+      preferences({ ignoredTagIds: ["3:inst-a", "3:inst-b", "4:inst-a"] });
+
+      await stats();
+
+      const tags = must(
+        statements().find(
+          ([sql, ...params]) =>
+            sql.includes("FROM UserEntityRanking r") && params.includes("tag")
+        )
+      );
+      const [sql, ...params] = tags;
+      expect(sql).toContain(
+        "AND NOT ((x.id = ? AND x.stashInstanceId = ?) OR (x.id = ? AND x.stashInstanceId = ?) OR (x.id = ? AND x.stashInstanceId = ?))"
+      );
+      expect(params).toEqual([
+        USER,
+        USER,
+        "tag",
+        ...ALLOWED,
+        "3",
+        "inst-a",
+        "3",
+        "inst-b",
+        "4",
+        "inst-a",
+        10,
+      ]);
+    });
+
+    it("the other lists do not exclude tags", async () => {
+      preferences({ ignoredTagIds: ["3:inst-a"] });
+
+      await stats();
+
+      for (const type of ["performer", "studio"]) {
+        const [sql] = must(
+          statements().find(
+            ([text, ...params]) =>
+              text.includes("FROM UserEntityRanking r") && params.includes(type)
+          )
+        );
+        expect(sql).not.toContain("NOT ((x.id");
+      }
+    });
+
+    it("with none ignored Top Tags has no exclusion", async () => {
+      await stats();
+
+      const [sql] = must(
+        statements().find(
+          ([text, ...params]) =>
+            text.includes("FROM UserEntityRanking r") && params.includes("tag")
+        )
+      );
+      expect(sql).not.toContain("NOT ((x.id");
     });
   });
 
