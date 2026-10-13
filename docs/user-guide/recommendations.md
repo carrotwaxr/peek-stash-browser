@@ -4,16 +4,37 @@ Get personalized scene suggestions based on your favorites, ratings and what you
 
 ## How It Works
 
-Peek learns your preferences from your activity:
+Peek learns your taste from what you do, then scores every scene you can see and lists the best 500 on the **Recommended** page. It also uses your taste to order **Scenes Like This** on a scene's page. You can tune it under [Recommendation settings](#recommendation-settings).
 
-- **Favorited performers** - Scenes featuring performers you've favorited
-- **Highly-rated performers** - Scenes with performers you've rated 8.0 or higher
-- **Favorited studios** - Scenes from studios you've favorited
-- **Highly-rated studios** - Scenes from studios you've rated 8.0 or higher
-- **Favorited tags** - Scenes with tags you've favorited
-- **Highly-rated tags** - Scenes with tags you've rated 8.0 or higher
-- **Scene ratings** - Scenes sharing performers, studios and tags with scenes you've rated 4.0 or higher, or favorited
-- **Watch history** - Scenes with the performers, studios and tags you watch most (the top half by how much you engage with them), even if you never rate or favorite anything
+### What counts
+
+- **Favorites and ratings** of performers, studios and tags. A high rating counts for, and a low rating counts against: below 5.0 pushes a performer, studio or tag down, and a scene with one scores lower.
+- **Scenes you rate or favorite.** Their performers, studio and tags gain (or lose, for a low rating). A favorited scene with no rating counts as a good one.
+- **What you watch, and how much.** Os count the most, then time watched, then plays. You do not need to rate or favorite anything for this to work.
+- **Scenes you open and leave quickly.** A scene you leave within two minutes, with no play and no O, counts a little against its performers, studios and tags. It never counts against someone you have had an O with.
+- **Recent viewing counts more.** What you watched in the last three months weighs the most, and viewing from years ago weighs a quarter as much.
+
+### Performers with few scenes
+
+A performer you watched once is not assumed to be a top favorite. Peek weighs a performer's viewing against how many scenes they have and against your average, so it takes repeated engagement to rank a performer high. The same goes for studios and tags.
+
+### Tags
+
+- **Rare tags say more about your taste than common ones.** A tag on most of the library tells Peek little. A tag on a few scenes tells it a lot.
+- **Favorites reach down.** A favorite tag also lifts its sub-tags, and a favorite studio lifts its sub-studios, a little less for each step down. A sub-tag you rate or watch yourself uses its own score.
+- **Inherited tags count too.** Tags a scene gets from its performers or its studio count, a bit less than tags on the scene itself.
+- **Ignored tags count for nothing.** See [Recommendation settings](#recommendation-settings).
+
+### Scenes you already watched
+
+- A scene you watched today is left out.
+- Scenes you watched recently sit lower. The longer ago, the less they are held back.
+- Scenes you opened and abandoned sit lower too.
+- Scenes you have not seen are not held back at all. Your **Recommend** setting changes how strongly these rules apply.
+
+### Variety
+
+No single performer or studio fills the list. Each time a performer or studio is picked, more scenes with them score a little less, so the top 500 mixes them.
 
 The more you rate, favorite and watch, the better your recommendations become!
 
@@ -28,7 +49,7 @@ Click **Recommended** in the navigation menu to see your top 500 scenes, best ma
 - A **search box**, the **filter bar** with its chips, **+ Filter**, **Advanced** and your pins, and **Views**
 - **Sorts**: every scene sort, with **Recommended** (the rank) first and chosen to start with
 
-The list stays the same while you page through it, so a scene never appears on two pages. It is scored again when your ratings, favorites, plays or hidden items change, when the library syncs, and each new day (the order within a score band is shuffled daily). Hidden and restricted scenes are never listed or counted, and every page is full.
+The list stays the same while you page through it, so a scene never appears on two pages. It is scored again when your ratings, favorites, plays, hidden items or [recommendation settings](#recommendation-settings) change, when the library syncs, and each new day. The top 500 is picked for variety, and nearby scenes trade places once a day. Hidden and restricted scenes are never listed or counted, and every page is full.
 
 #### Filters, Search and Views on Recommended
 
@@ -48,6 +69,14 @@ When viewing a scene, the sidebar shows related recommendations:
 
 The scene page's **Similar Scenes** tab (and the sidebar, which shows its first page) lists scenes that share the scene's performers, studio or tags, the closest matches first. Only scenes from the same server as the scene you are viewing are listed, and never a scene you can't see: hidden and restricted scenes are left out of the list and its count.
 
+How it ranks:
+
+- A shared **performer** counts the most. A shared **studio** counts next, and shared **tags** add to it.
+- **Rare tags weigh more.** A tag on a few scenes counts for more than a tag on most of the library.
+- **Partners count half.** If you chose partners under [Recommendation settings](#recommendation-settings), a shared partner counts half as much as a shared performer you follow.
+- **Ignored tags count nothing.**
+- **Scenes you just watched sit lower.** A scene you watched in the last two weeks drops further than one you watched earlier. Scenes you only opened still show in full.
+
 ## Building Your Profile
 
 ### Getting Started
@@ -55,7 +84,7 @@ The scene page's **Similar Scenes** tab (and the sidebar, which shows its first 
 If you're new to Peek, you'll see a message explaining how to get recommendations:
 
 1. **Favorite performers** you enjoy
-2. **Rate scenes** you watch (4.0 or higher counts, and higher counts for more)
+2. **Rate scenes** you watch (the higher the rating, the more it counts)
 3. **Favorite studios** that consistently produce content you like
 4. **Favorite tags** for your preferred categories
 
@@ -82,10 +111,11 @@ Rate scenes you watch, even if just quickly:
 
 Ratings run from 0 to 10.
 
-- **4.0 or higher** = Scenes similar to this will be recommended, and the higher the rating the more it counts
-- **Below 4.0** = Won't negatively affect recommendations, but won't boost similar content
-- A favorited scene with no rating counts as an 8.5
-- A performer, studio or tag you rate **8.0 or higher** counts as highly rated
+- **Above 5.0** = Scenes like this are recommended more, and the higher the rating the more it counts
+- **Below 5.0** = Scenes like this are recommended less, and the lower the rating the more it counts against
+- **5.0** = Neutral
+- A favorited scene with no rating counts as a good one
+- A performer, studio or tag you rate counts the same way: high lifts it, low sinks it
 
 ### Favorite Strategically
 
@@ -105,26 +135,52 @@ Recommendations can surface scenes you might have missed:
 
 ## How Recommendations Are Scored
 
-Scenes are scored based on multiple factors:
+Every performer, studio and tag gets a score for you, from strongly liked to strongly disliked. It comes from your favorites and ratings, the scenes you rated, and what you watch. Then each scene is scored from its parts:
 
-| Factor | Weight |
-|--------|--------|
-| Favorited performer in scene | High |
-| Highly-rated performer in scene | Medium-High |
-| Performer from scenes you rated or favorited | Medium-High |
-| Performer you watch a lot | Medium-High |
-| Favorited studio | Medium |
-| Highly-rated studio | Medium |
-| Studio from scenes you rated or favorited | Medium |
-| Studio you watch a lot | Medium |
-| Favorited tags (each) | Low-Medium |
-| Highly-rated tags (each) | Low |
-| Tags from scenes you rated or favorited | Low-Medium |
-| Tags you watch a lot | Low |
+| Part of the scene | How much it counts |
+|-------------------|--------------------|
+| Performers you follow | Most |
+| Your own rating of the scene | High |
+| Studio | Medium |
+| Tags (the five best count) | Medium |
+| Partners | Raise or lower the whole score |
 
-Scenes matching multiple criteria score higher and appear first.
+Then how you watched the scene changes its score: a scene you watched today drops out, and recent or abandoned scenes sit lower.
 
-Matches of the same kind have diminishing returns: a scene with four of your favorite performers scores higher than one with a single favorite, but not four times higher. A scene's score also depends on how you rated the scenes the match comes from, so a performer from a scene you rated 9.0 counts for more than one from a scene you rated 4.5. What you watch counts for the performers, studios and tags in the top half of your viewing, by how much you engage with each relative to how much of the library they fill.
+- **More favorite performers help, with diminishing returns.** A scene with four favorite performers scores higher than one with a single favorite, but not four times higher.
+- **Dislikes count.** A performer, studio or tag you rate low pulls a scene down.
+- **Your own rating of a scene counts.** A scene you rated high scores higher, and one you rated low scores lower.
+- **Rare tags beat common ones**, and tags a scene gets from its performers or studio count a bit less than its own.
+
+## Recommendation settings
+
+**Location:** Settings > Customization > Recommendations
+
+Five settings tune Recommended and Scenes Like This. My Stats follows your performer choices and ignored tags too. They are for you alone, and a change takes effect right away.
+
+| Setting | What it does |
+|---------|--------------|
+| **Performers I follow** | The genders you want scenes about. Leave all unticked to treat every performer alike. |
+| **Partners who matter** | Genders whose presence makes a scene better or worse for you, rather than counting as someone you follow. Needs at least one gender under Performers I follow. |
+| **Scenes without a partner** | **Show normally**, or **Show less often, unless every performer is a favorite**. Needs at least one partner gender. |
+| **Recommend** | **Mostly new scenes**, **A balance** or **Favorites again**. |
+| **Tags that aren't about taste** | Tags to ignore. Pick technical or bookkeeping tags, such as resolution or upscaled tags. |
+
+### Example: the partner makes or breaks the scene
+
+If you follow female performers but the male partner makes or breaks a scene for you, tick **Female** under **Performers I follow** and **Male** under **Partners who matter**. A partner you like lifts a scene, one you dislike sinks it, and several partners count as their average, not their number. Set **Scenes without a partner** to **Show less often**, and girl/girl scenes drop down unless every performer is a favorite.
+
+### Recommend
+
+- **Mostly new scenes** holds back scenes you have watched the most. Scenes you have not seen lead.
+- **A balance** (the default) holds back scenes you watched recently, and lets older favorites come back as time passes.
+- **Favorites again** brings scenes you have watched and enjoyed back sooner, and gives scenes with many Os a lift. Unseen scenes are held back a little.
+
+In every mode, a scene you watched today is left out.
+
+### Tags that aren't about taste
+
+Some tags describe the file, not the scene. Add tags like a resolution tag or an upscaled tag here, and Peek ignores them. They do not lift or sink a scene in Recommended, they carry no weight in Scenes Like This, and they are left out of Top Tags on [My Stats](stats.md).
 
 ## Excluding Scenes
 
@@ -141,7 +197,7 @@ Already seen a recommendation? Don't want to see it again?
 | Personalized | Yes | No |
 | Based on ratings | Yes | No |
 | Surfaces old content | Yes | Yes |
-| Repeatable | Mostly (the same preferences give the same scores; the order within a score band is reshuffled each day) | No (different each session) |
+| Repeatable | Mostly (the same preferences give the same scores; nearby scenes trade places once a day) | No (different each session) |
 
 Use **Recommendations** when you want curated content. Use **Random** when you want to discover without preferences.
 
@@ -151,7 +207,7 @@ Use **Recommendations** when you want curated content. Use **Random** when you w
 
 This appears when you haven't rated, favorited or watched enough content (watching alone is enough once Peek has ranked what you watch most, which takes a little while after you start):
 
-1. Browse scenes and rate some 4.0 or higher
+1. Browse scenes and rate some above 5.0
 2. Favorite a few performers you enjoy
 3. Return to Recommendations
 
@@ -163,9 +219,10 @@ Recommended filters and searches within your top 500 recommendations, not the wh
 
 If you're seeing the same scenes:
 
-1. Hide scenes you've already watched
-2. Rate more scenes to expand your profile
-3. Favorite more diverse performers/tags
+1. Set **Recommend** to **Mostly new scenes** under [Recommendation settings](#recommendation-settings)
+2. Hide scenes you've already watched
+3. Rate more scenes to expand your profile
+4. Favorite more diverse performers/tags
 
 ### Recommendations don't match my taste
 
@@ -173,7 +230,8 @@ Your recommendation profile might need tuning:
 
 1. Review your favorites (click the heart on an item's card or page to remove any accidental favorite)
 2. Rate more scenes to give the algorithm more data
-3. Remember: ratings of 4.0 or higher strongly influence results
+3. Rate scenes you dislike low. Ratings below 5.0 push similar scenes down
+4. Check your [Recommendation settings](#recommendation-settings): the performers you follow, your partners and your ignored tags
 
 ## Next Steps
 
