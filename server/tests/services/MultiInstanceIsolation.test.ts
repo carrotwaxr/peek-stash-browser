@@ -63,7 +63,7 @@ const scoreWith = (scene: ScoringScene, input: Partial<AffinityInput>) =>
     prefs: DEFAULT_RECOMMENDATION_PREFERENCES,
     genders: new Map(),
     tagDf: new Map(),
-    sceneCount: 0,
+    sceneCounts: new Map(),
     ignoredTags: new Set(),
   });
 

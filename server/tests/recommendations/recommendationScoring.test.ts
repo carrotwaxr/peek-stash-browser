@@ -77,7 +77,7 @@ const context = (
   prefs: { ...DEFAULT_RECOMMENDATION_PREFERENCES, ...prefs },
   genders: new Map(),
   tagDf: new Map(),
-  sceneCount: 0,
+  sceneCounts: new Map(),
   ignoredTags: new Set(),
   ...extra,
 });
@@ -421,7 +421,7 @@ describe("RecommendationScoringService", () => {
         })
       );
       const ctx = context(affinity, {
-        sceneCount: 100,
+        sceneCounts: new Map([[A, 100]]),
         tagDf: new Map([
           [k("common"), 45],
           [k("rare"), 5],
@@ -436,6 +436,33 @@ describe("RecommendationScoringService", () => {
         10
       );
       expect(rare).toBeCloseTo(TAG_WEIGHT * (Math.log(20) / Math.log(100)), 10);
+    });
+
+    it("a tag's rarity reads its own instance's live scene count", () => {
+      const affinity = buildEntityAffinity(
+        affinityInput({
+          tagRatings: [rating("t1", 100), rating("t1", 100, false, B)],
+        })
+      );
+      // The same share of scenes on each, among 100 scenes on A and 1,000 on B
+      const ctx = context(affinity, {
+        sceneCounts: new Map([
+          [A, 100],
+          [B, 1000],
+        ]),
+        tagDf: new Map([
+          [k("t1"), 10],
+          [k("t1", B), 100],
+        ]),
+      });
+
+      expect(scoreScene(scene("s", { tagIds: ["t1"] }), ctx)).toBeCloseTo(
+        TAG_WEIGHT * (Math.log(10) / Math.log(100)),
+        10
+      );
+      expect(
+        scoreScene(scene("s", { instanceId: B, tagIds: ["t1"] }), ctx)
+      ).toBeCloseTo(TAG_WEIGHT * (Math.log(10) / Math.log(1000)), 10);
     });
 
     it("tagIdf: clamped to [0.05, 1], 1 for a tiny library or a missing df", () => {
