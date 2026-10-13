@@ -15,7 +15,6 @@ import {
   TAG_WEIGHT,
   buildEntityAffinity,
   countUserCriteria,
-  diversifyByScoreTier,
   hasAnyCriteria,
   sceneTopLead,
   scoreScene,
@@ -23,7 +22,6 @@ import {
   watchMultiplier,
 } from "../../services/RecommendationScoringService.js";
 import { entityKey } from "../../utils/entityRef.js";
-import { SeededRandom } from "../../utils/seededRandom.js";
 
 const A = "inst-a";
 const B = "inst-b";
@@ -680,40 +678,6 @@ describe("RecommendationScoringService", () => {
 
     it("returns true when only ranked entities exist (watching, no ratings)", () => {
       expect(hasAnyCriteria({ ...none, rankedEntities: 2 })).toBe(true);
-    });
-  });
-
-  describe("diversifyByScoreTier", () => {
-    it("returns a single scored scene", () => {
-      expect(
-        diversifyByScoreTier([{ id: "1", score: 35 }], new SeededRandom(42))
-      ).toEqual([{ id: "1", score: 35 }]);
-    });
-
-    it("keeps every scene when all scores are equal", () => {
-      const scored = ["1", "2", "3", "4", "5"].map((id) => ({ id, score: 35 }));
-
-      const ids = diversifyByScoreTier(scored, new SeededRandom(42)).map(
-        (s) => s.id
-      );
-
-      // One tier, shuffled by the seed
-      expect(ids).toEqual(["1", "2", "4", "5", "3"]);
-    });
-
-    it("puts a lower score band after a higher one", () => {
-      const scored = [
-        { id: "100", score: 100 },
-        { id: "99", score: 99 },
-        { id: "10", score: 10 },
-      ];
-
-      const ids = diversifyByScoreTier(scored, new SeededRandom(42)).map(
-        (s) => s.id
-      );
-
-      expect([...ids].sort()).toEqual(["10", "100", "99"]);
-      expect(ids[ids.length - 1]).toBe("10");
     });
   });
 });
