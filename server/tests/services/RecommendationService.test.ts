@@ -90,6 +90,8 @@ interface RawRows {
     parentId: string | null;
   }>;
   studios?: Array<{ id: string; stashInstanceId: string; parentId: string }>;
+  /** Live scenes per instance */
+  sceneCounts?: Array<{ instanceId: string; n: bigint }>;
 }
 
 /** Answers each raw statement by the table it reads */
@@ -100,6 +102,7 @@ function rawRows(rows: RawRows = {}) {
       if (sql.includes("FROM StashPerformer")) return rows.genders ?? [];
       if (sql.includes("FROM StashTag")) return rows.tags ?? [];
       if (sql.includes("FROM StashStudio")) return rows.studios ?? [];
+      if (sql.includes("FROM StashScene")) return rows.sceneCounts ?? [];
       throw new Error(`unexpected statement: ${sql}`);
     })
   );
@@ -590,7 +593,6 @@ describe("RecommendationService", () => {
         [entityKey("t1", B), 2],
       ])
     );
-    expect(scoringContext().sceneCount).toBe(2);
     expect(keys(ranked.refs)).toEqual([`child:${A}`]);
     for (const table of ["StashTag", "StashStudio"]) {
       const [sql, ...params] = must(statementsReading(table)[0], table);
@@ -598,6 +600,62 @@ describe("RecommendationService", () => {
       expect(params).toEqual([A, B]);
     }
     expect(must(statementsReading("StashTag")[0])[0]).toContain("json_valid");
+  });
+
+  it("each instance's live scene count is read once, on the allowed instances, and reaches the scoring", async () => {
+    rawRows({
+      sceneCounts: [
+        { instanceId: A, n: 1000n },
+        { instanceId: B, n: 40n },
+      ],
+    });
+
+    await recommendationService.getRankedRefs(USER, [A, B]);
+
+    expect(statementsReading("StashScene")).toHaveLength(1);
+    const [sql, ...params] = must(statementsReading("StashScene")[0]);
+    expect(sql).toContain("deletedAt IS NULL");
+    expect(sql).toContain("GROUP BY");
+    expect(params).toEqual([A, B]);
+    expect(scoringContext().sceneCounts).toEqual(
+      new Map([
+        [A, 1000],
+        [B, 40],
+      ])
+    );
+  });
+
+  it("a user who sees few scenes still weighs a tag by its rarity on its instance", async () => {
+    // The user sees 2 scenes of A's 1,000; the tag is on 100 of them
+    rawRows({
+      sceneCounts: [{ instanceId: A, n: 1000n }],
+      tags: [
+        { id: "t1", stashInstanceId: A, sceneCountAll: 100, parentId: null },
+      ],
+    });
+    mockPrisma.performerRating.findMany.mockResolvedValue([]);
+    mockPrisma.tagRating.findMany.mockResolvedValue([
+      partialRow<TagRating>({
+        tagId: "t1",
+        instanceId: A,
+        favorite: true,
+        rating: null,
+      }),
+    ]);
+    mockScoring.mockResolvedValue([
+      scene("s1", A, [], { tagIds: ["t1"] }),
+      scene("s2", A, []),
+    ]);
+
+    await recommendationService.getRankedRefs(USER, [A]);
+
+    const tagged = must(
+      mockScoreScene.mock.results.find(
+        (_, i) => must(mockScoreScene.mock.calls[i])[0].id === "s1"
+      )
+    );
+    // ln(1000 / 100) / ln(1000) = 1/3, not the 0.05 floor of N = 2
+    expect(tagged.value).toBeCloseTo(1.5 * (1 / 3), 10);
   });
 
   it("the user's scene ratings mark the scored scenes the affinity learns from", async () => {

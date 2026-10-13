@@ -168,10 +168,10 @@ export interface SceneScoringContext {
   prefs: RecommendationPreferences;
   /** Performer entityKey -> gender; no entry means unknown */
   genders: Map<string, string>;
-  /** Tag entityKey -> how many scenes carry it */
+  /** Tag entityKey -> how many live scenes on its instance carry it */
   tagDf: Map<string, number>;
-  /** Scenes in the library the user sees */
-  sceneCount: number;
+  /** Instance id -> its live scenes: the N of a tag's rarity on that instance */
+  sceneCounts: Map<string, number>;
   /** entityKeys */
   ignoredTags: Set<string>;
 }
@@ -426,6 +426,7 @@ function leadScore(leads: readonly Lead[], ctx: SceneScoringContext): number {
 
 function tagScore(scene: ScoringScene, ctx: SceneScoringContext): number {
   const inst = scene.instanceId;
+  const n = ctx.sceneCounts.get(inst) ?? 0;
   const share = new Map<string, number>();
   for (const id of scene.inheritedTagIds) {
     share.set(entityKey(id, inst), INHERITED_TAG_SHARE);
@@ -438,7 +439,7 @@ function tagScore(scene: ScoringScene, ctx: SceneScoringContext): number {
     if (ctx.ignoredTags.has(key)) continue;
     const a = ctx.affinity.tag.get(key) ?? 0;
     if (a === 0) continue;
-    const c = a * tagIdf(ctx.tagDf.get(key) ?? 1, ctx.sceneCount) * s;
+    const c = a * tagIdf(ctx.tagDf.get(key) ?? 1, n) * s;
     if (c > 0) positives.push(c);
     else negative += c;
   }
