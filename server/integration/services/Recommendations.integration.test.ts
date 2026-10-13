@@ -19,6 +19,7 @@ import prisma from "../../prisma/singleton.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import { readUserRecommendationPreferences } from "../../services/userRecommendationPreferences.js";
 import {
   reqFor,
   resFor,
@@ -555,7 +556,7 @@ describe("Recommended scenes (integration)", () => {
 
     /** Each scored scene's final score on A, by id; an unscored scene is absent */
     async function finals(userId: number): Promise<Map<string, number>> {
-      const prefs = await recommendationService["readPreferences"](userId);
+      const prefs = await readUserRecommendationPreferences(userId);
       const { scored } = await recommendationService["score"](
         userId,
         [A],

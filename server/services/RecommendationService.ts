@@ -39,11 +39,7 @@
  * small ids, and a favorite on one says nothing about the other.
  */
 import { RECOMMENDED_LIMIT } from "@peek/shared-types/filters/index.js";
-import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
-import {
-  type RecommendationPreferences,
-  readRecommendationPreferences,
-} from "@peek/shared-types/recommendationPreferences.js";
+import type { RecommendationPreferences } from "@peek/shared-types/recommendationPreferences.js";
 import prisma from "../prisma/singleton.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
@@ -66,6 +62,10 @@ import {
 } from "./RecommendationScoringService.js";
 import { stashEntityService } from "./StashEntityService.js";
 import { liveSceneCounts } from "./liveSceneCounts.js";
+import {
+  ignoredTagKeys,
+  readUserRecommendationPreferences,
+} from "./userRecommendationPreferences.js";
 
 /** How many ranked scenes are kept per user */
 export const RANKED_LIMIT = RECOMMENDED_LIMIT;
@@ -127,7 +127,7 @@ export class RecommendationService {
     userId: number,
     allowedInstanceIds: readonly string[]
   ): Promise<RankedRecommendations> {
-    const prefs = await this.readPreferences(userId);
+    const prefs = await readUserRecommendationPreferences(userId);
     const key = [
       userId,
       generateDailySeed(userId),
@@ -173,17 +173,6 @@ export class RecommendationService {
   /** Forgets every list (tests) */
   clear(): void {
     this.entries.clear();
-  }
-
-  /** The user's recommendation preferences, defaults for anything unreadable */
-  private async readPreferences(
-    userId: number
-  ): Promise<RecommendationPreferences> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { recommendationPreferences: true },
-    });
-    return readRecommendationPreferences(user?.recommendationPreferences);
   }
 
   private async readStamp(userId: number): Promise<string> {
@@ -323,12 +312,7 @@ export class RecommendationService {
         rating: r.rating,
         favorite: r.favorite,
       }));
-    const ignoredTags = new Set(
-      prefs.ignoredTagIds.flatMap((value) => {
-        const { id, instanceId } = parseEntityRef(value);
-        return instanceId ? [entityKey(id, instanceId)] : [];
-      })
-    );
+    const ignoredTags = ignoredTagKeys(prefs);
     const input: AffinityInput = {
       performerRatings: ratingRows(performerRatings, (r) => r.performerId),
       studioRatings: ratingRows(studioRatings, (r) => r.studioId),
