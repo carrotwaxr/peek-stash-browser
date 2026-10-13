@@ -24,6 +24,7 @@ model User {
   filterPresets           Json? // Object with keys: scene, performer, studio, tag, group, gallery - each containing array of saved presets
   defaultFilterPresets    Json? // Object with keys: scene, performer, studio, tag, group, gallery - values are preset IDs
   filterPins              Json? // { [list]: { fields: string[], filters: PinnedFilter[] } }; a list missing from it shows the seeded defaults (shared/types/filters/pins.ts)
+  recommendationPreferences Json? // RecommendationPreferences (shared/types/recommendationPreferences.ts); NULL = the defaults
   unitPreference          String? @default("metric") // "metric" or "imperial" for measurement display
   tableColumnDefaults     Json? // Object with keys: scene, performer, studio, tag, group, gallery, image - each containing {visible: string[], order: string[]}
   cardDisplaySettings     Json? // Object with per-entity-type card display toggles: {scene: {showCodeOnCard, showDescriptionOnCard, ...}, performer: {...}, ...}
@@ -473,6 +474,9 @@ model UserEntityRanking {
   playCount    Int   @default(0)
   playDuration Float @default(0) // seconds
   oCount       Int   @default(0)
+  openedCount  Int   @default(0) // scenes of the entity the user opened
+  keptCount    Int   @default(0) // of those, the ones played or O'd
+  affinity     Float @default(0) // implicit like (+) or dislike (-) in [-1, 1], for Recommended
 
   // Computed ranking data
   engagementScore  Float @default(0) // Raw weighted score: (oCount × 5) + (normalizedDuration) + (playCount)

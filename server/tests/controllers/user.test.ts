@@ -7,6 +7,10 @@
  * (saved filter presets): save, save changes, rename, delete and set as
  * default, written compare-and-set.
  */
+import {
+  DEFAULT_RECOMMENDATION_PREFERENCES,
+  type RecommendationPreferences,
+} from "@peek/shared-types/recommendationPreferences.js";
 import type { CustomTheme, User, UserContentRestriction } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import * as fs from "fs";
@@ -205,6 +209,52 @@ describe("User Controller", () => {
       expect(body.settings.carouselPreferences.length).toBeGreaterThan(0);
     });
 
+    describe("recommendationPreferences", () => {
+      it("answers the defaults for a user whose column is NULL", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          partialRow<User>({
+            id: 2,
+            username: "testuser",
+            role: "USER",
+            recommendationPreferences: null,
+          })
+        );
+        const req = reqFor(getUserSettings, { user: USER });
+        const res = resFor(getUserSettings);
+        await getUserSettings(req, res);
+        expect(res._getOkBody().settings.recommendationPreferences).toEqual(
+          DEFAULT_RECOMMENDATION_PREFERENCES
+        );
+        const query = must(
+          mockPrisma.user.findUnique.mock.calls[0],
+          "findUnique call"
+        )[0];
+        expect(query.select).toHaveProperty("recommendationPreferences", true);
+      });
+
+      it("answers a stored value read leniently", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          partialRow<User>({
+            id: 2,
+            username: "testuser",
+            role: "USER",
+            recommendationPreferences: {
+              leadGenders: ["FEMALE", "ALIEN"],
+              discovery: "new",
+            },
+          })
+        );
+        const req = reqFor(getUserSettings, { user: USER });
+        const res = resFor(getUserSettings);
+        await getUserSettings(req, res);
+        expect(res._getOkBody().settings.recommendationPreferences).toEqual({
+          ...DEFAULT_RECOMMENDATION_PREFERENCES,
+          leadGenders: ["FEMALE"],
+          discovery: "new",
+        });
+      });
+    });
+
     describe("theme", () => {
       const settingsRow = (theme: string | null) =>
         partialRow<User>({ id: 2, username: "testuser", role: "USER", theme });
@@ -387,6 +437,85 @@ describe("User Controller", () => {
           "update call"
         )[0];
         expect(query.data).toEqual({ theme: null });
+      });
+    });
+
+    describe("recommendationPreferences", () => {
+      const VALID: RecommendationPreferences = {
+        leadGenders: ["FEMALE"],
+        partnerGenders: ["MALE"],
+        noPartnerScenes: "less",
+        discovery: "rewatch",
+        ignoredTagIds: ["5:inst-a"],
+      };
+
+      async function putPreferences(value: unknown) {
+        const req = reqFor(updateUserSettings, {
+          body: malformed({ recommendationPreferences: value }),
+          user: USER,
+        });
+        const res = resFor(updateUserSettings);
+        await updateUserSettings(req, res);
+        return res;
+      }
+
+      it("saves a valid value and answers it", async () => {
+        mockPrisma.user.update.mockResolvedValue(
+          partialRow<User>({
+            id: 2,
+            recommendationPreferences: { ...VALID },
+          })
+        );
+        const res = await putPreferences(VALID);
+        expect(res._getStatus()).toBe(200);
+        expect(res._getOkBody().settings.recommendationPreferences).toEqual(
+          VALID
+        );
+        const query = must(
+          mockPrisma.user.update.mock.calls[0],
+          "update call"
+        )[0];
+        expect(query.data).toEqual({ recommendationPreferences: VALID });
+      });
+
+      it("an invalid value answers 400 and writes nothing", async () => {
+        const res = await putPreferences({
+          ...VALID,
+          partnerGenders: ["FEMALE"],
+        });
+        expect(res._getStatus()).toBe(400);
+        expect(res._getErrorBody().error).toEqual(expect.any(String));
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      });
+
+      it("an invalid value blocks the other fields of the same PUT", async () => {
+        const req = reqFor(updateUserSettings, {
+          body: malformed({
+            minimumPlayPercent: 30,
+            recommendationPreferences: { ...VALID, discovery: "wild" },
+          }),
+          user: USER,
+        });
+        const res = resFor(updateUserSettings);
+        await updateUserSettings(req, res);
+        expect(res._getStatus()).toBe(400);
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      });
+
+      it("a PUT without the field leaves the column alone", async () => {
+        mockPrisma.user.update.mockResolvedValue(
+          partialRow<User>({ id: 2, recommendationPreferences: null })
+        );
+        const res = await putPreferences(undefined);
+        expect(res._getStatus()).toBe(200);
+        expect(res._getOkBody().settings.recommendationPreferences).toEqual(
+          DEFAULT_RECOMMENDATION_PREFERENCES
+        );
+        const query = must(
+          mockPrisma.user.update.mock.calls[0],
+          "update call"
+        )[0];
+        expect(query.data).not.toHaveProperty("recommendationPreferences");
       });
     });
 

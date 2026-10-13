@@ -15,6 +15,10 @@ import {
   presetArtifactType,
 } from "@peek/shared-types/presetContexts.js";
 import {
+  readRecommendationPreferences,
+  validateRecommendationPreferences,
+} from "@peek/shared-types/recommendationPreferences.js";
+import {
   isBuiltInThemeKey,
   parseCustomThemeKey,
 } from "@peek/shared-types/themes.js";
@@ -219,6 +223,7 @@ export const getUserSettings = async (
       cardDisplaySettings: true,
       landingPagePreference: true,
       lightboxDoubleTapAction: true,
+      recommendationPreferences: true,
     },
   });
 
@@ -253,6 +258,9 @@ export const getUserSettings = async (
           randomize: false,
         },
       lightboxDoubleTapAction: user.lightboxDoubleTapAction ?? "favorite",
+      recommendationPreferences: readRecommendationPreferences(
+        user.recommendationPreferences
+      ),
     },
   });
 };
@@ -295,6 +303,7 @@ export const updateUserSettings = async (
     cardDisplaySettings,
     landingPagePreference,
     lightboxDoubleTapAction,
+    recommendationPreferences,
   } = req.body;
 
   // Validate values
@@ -546,6 +555,21 @@ export const updateUserSettings = async (
     }
   }
 
+  // Validate recommendationPreferences if provided
+  let validRecommendationPreferences:
+    | ReturnType<typeof readRecommendationPreferences>
+    | undefined;
+  if (recommendationPreferences !== undefined) {
+    const checked = validateRecommendationPreferences(
+      recommendationPreferences
+    );
+    if (!checked.ok) {
+      res.status(400).json({ error: checked.error });
+      return;
+    }
+    validRecommendationPreferences = checked.value;
+  }
+
   // Validate theme if provided: null clears it, anything else must be a
   // built-in key or one of the target user's own custom themes
   if (theme !== undefined && theme !== null) {
@@ -587,6 +611,9 @@ export const updateUserSettings = async (
       ...(lightboxDoubleTapAction !== undefined && {
         lightboxDoubleTapAction,
       }),
+      ...(validRecommendationPreferences !== undefined && {
+        recommendationPreferences: validRecommendationPreferences as never,
+      }),
     },
     select: {
       id: true,
@@ -602,6 +629,7 @@ export const updateUserSettings = async (
       cardDisplaySettings: true,
       landingPagePreference: true,
       lightboxDoubleTapAction: true,
+      recommendationPreferences: true,
     },
   });
 
@@ -632,6 +660,9 @@ export const updateUserSettings = async (
         },
       lightboxDoubleTapAction:
         updatedUser.lightboxDoubleTapAction ?? "favorite",
+      recommendationPreferences: readRecommendationPreferences(
+        updatedUser.recommendationPreferences
+      ),
     },
   });
 };
