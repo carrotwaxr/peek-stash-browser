@@ -15,7 +15,11 @@ import type {
   StashTag,
 } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
-import type { NormalizedScene, SceneStream } from "../types/index.js";
+import type {
+  NormalizedScene,
+  SceneScoringData,
+  SceneStream,
+} from "../types/index.js";
 import type { SceneScoringRow } from "../types/internal/queryRows.js";
 import type { EntityRef } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
@@ -28,7 +32,6 @@ import {
 import { instanceColumnClause } from "../utils/sqlClauses.js";
 import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
-import type { ScoringScene } from "./RecommendationScoringService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import {
   galleryRef,
@@ -38,6 +41,15 @@ import {
 } from "./query/nestedRefs.js";
 
 /** One "Scenes like this" candidate: a scene on the seed's instance. */
+/**
+ * One scene as `getScenesForScoring` returns it: its ids (all on the
+ * scene's instance) and the user's watch data on it.
+ */
+export interface SceneForScoring extends SceneScoringData {
+  playCount: number;
+  lastPlayedAt: Date | null;
+}
+
 export interface SimilarSceneCandidate {
   sceneId: string;
   instanceId: string;
@@ -104,7 +116,7 @@ class StashEntityService {
   async getScenesForScoring(
     userId: number,
     allowedInstanceIds: string[]
-  ): Promise<ScoringScene[]> {
+  ): Promise<SceneForScoring[]> {
     const startTime = Date.now();
     const instanceFilter = instanceColumnClause(
       "s.stashInstanceId",
@@ -132,7 +144,7 @@ class StashEntityService {
       ...instanceFilter.params
     );
 
-    const result: ScoringScene[] = rows.map((row) => ({
+    const result: SceneForScoring[] = rows.map((row) => ({
       id: row.id,
       instanceId: row.stashInstanceId,
       studioId: row.studioId,
