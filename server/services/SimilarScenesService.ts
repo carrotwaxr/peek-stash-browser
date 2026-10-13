@@ -14,6 +14,7 @@ import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { KEPT_MIN_SECONDS } from "./RankingComputeService.js";
 import { tagIdf } from "./RecommendationScoringService.js";
 import type { SimilarSceneCandidate } from "./StashEntityService.js";
+import { liveSceneCounts } from "./liveSceneCounts.js";
 
 /** A seed performer the viewer follows, or one with no partner logic */
 export const SIMILAR_PERFORMER_WEIGHT = 3;
@@ -51,18 +52,23 @@ export async function getSimilarWeights(
 ): Promise<SimilarWeights> {
   const { id, instanceId } = seed;
 
-  const performerRows = await prisma.scenePerformer.findMany({
-    where: { sceneId: id, sceneInstanceId: instanceId },
-    select: { performerId: true, performer: { select: { gender: true } } },
-  });
-  const tagRows = await prisma.sceneTag.findMany({
-    where: { sceneId: id, sceneInstanceId: instanceId },
-    select: { tagId: true, tag: { select: { sceneCountAll: true } } },
-  });
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { recommendationPreferences: true },
-  });
+  // Four light reads (a scene's junction rows, one user row, one indexed
+  // count), independent of each other: sent together
+  const [performerRows, tagRows, user, sceneCounts] = await Promise.all([
+    prisma.scenePerformer.findMany({
+      where: { sceneId: id, sceneInstanceId: instanceId },
+      select: { performerId: true, performer: { select: { gender: true } } },
+    }),
+    prisma.sceneTag.findMany({
+      where: { sceneId: id, sceneInstanceId: instanceId },
+      select: { tagId: true, tag: { select: { sceneCountAll: true } } },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { recommendationPreferences: true },
+    }),
+    liveSceneCounts([instanceId]),
+  ]);
   const prefs = readRecommendationPreferences(user?.recommendationPreferences);
 
   const ignored = new Set(
@@ -83,19 +89,13 @@ export async function getSimilarWeights(
       : SIMILAR_PERFORMER_WEIGHT,
   ]);
 
-  const wanted = tagRows.filter(
-    (row) => !ignored.has(entityKey(row.tagId, instanceId))
-  );
-  let tags: Array<[string, number]> = [];
-  if (wanted.length > 0) {
-    const sceneCount = await prisma.stashScene.count({
-      where: { stashInstanceId: instanceId, deletedAt: null },
-    });
-    tags = wanted.map((row): [string, number] => [
+  const sceneCount = sceneCounts.get(instanceId) ?? 0;
+  const tags = tagRows
+    .filter((row) => !ignored.has(entityKey(row.tagId, instanceId)))
+    .map((row): [string, number] => [
       row.tagId,
       SIMILAR_TAG_WEIGHT * tagIdf(row.tag.sceneCountAll, sceneCount),
     ]);
-  }
 
   return { performers, studio: SIMILAR_STUDIO_WEIGHT, tags };
 }

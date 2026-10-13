@@ -39,10 +39,10 @@ import {
   resFor,
   testUser,
 } from "../../helpers/controllerTestUtils.js";
-import { objectContaining } from "../../helpers/matchers.js";
+import { objectContaining, stringContaining } from "../../helpers/matchers.js";
 import { createMockScene } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
-import { partialRow } from "../../helpers/prismaMock.js";
+import { partialRow, prismaImpl } from "../../helpers/prismaMock.js";
 
 // ---------------------------------------------------------------------------
 // Mocks — must precede imports of the module under test
@@ -678,6 +678,8 @@ describe("findSimilarScenes", () => {
       tags?: Array<{ id: string; df: number }>;
       scenes?: number;
       prefs?: unknown;
+      /** The viewer's history of the candidates */
+      history?: unknown[];
     }) => {
       mockPrisma.scenePerformer.findMany.mockResolvedValue(
         (opts.performers ?? []).map((p) =>
@@ -693,7 +695,13 @@ describe("findSimilarScenes", () => {
           >({ tagId: t.id, tag: { sceneCountAll: t.df } } as never)
         )
       );
-      mockPrisma.stashScene.count.mockResolvedValue(opts.scenes ?? 1000);
+      mockPrisma.$queryRawUnsafe.mockImplementation(
+        prismaImpl((sql: string) =>
+          sql.includes("FROM StashScene s")
+            ? [{ instanceId: "inst-a", n: BigInt(opts.scenes ?? 1000) }]
+            : (opts.history ?? [])
+        )
+      );
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow<Awaited<ReturnType<typeof prisma.user.findUnique>>>({
           recommendationPreferences: opts.prefs ?? null,
@@ -790,14 +798,87 @@ describe("findSimilarScenes", () => {
     it("the weights use the live scene count of the seed's instance", async () => {
       seedRows({ tags: [{ id: "t", df: 10 }], scenes: 200 });
       await run();
-      expect(mockPrisma.stashScene.count).toHaveBeenCalledWith({
-        where: { stashInstanceId: "inst-a", deletedAt: null },
-      });
+      const [sql, ...params] = must(
+        mockPrisma.$queryRawUnsafe.mock.calls.find(([text]) =>
+          text.includes("FROM StashScene s")
+        ),
+        "the scene count"
+      );
+      expect(sql).toContain("s.deletedAt IS NULL");
+      expect(sql).toContain("GROUP BY s.stashInstanceId");
+      expect(params).toEqual(["inst-a"]);
       expect(weightsPassed().tags).toEqual([["t", 1.5 * tagIdf(10, 200)]]);
     });
 
+    it("the seed's performers, tags, the viewer's preferences and the scene count are read together", async () => {
+      seedRows({ tags: [{ id: "t", df: 10 }] });
+      let finishPerformers: (rows: []) => void = () => undefined;
+      mockPrisma.scenePerformer.findMany.mockImplementation(
+        prismaImpl(
+          () =>
+            new Promise<[]>((resolve) => {
+              finishPerformers = resolve;
+            })
+        )
+      );
+
+      const done = run();
+      await vi.waitFor(() =>
+        expect(mockPrisma.scenePerformer.findMany).toHaveBeenCalled()
+      );
+      // All four started while the first is still unanswered
+      expect(mockPrisma.sceneTag.findMany).toHaveBeenCalled();
+      expect(mockPrisma.user.findUnique).toHaveBeenCalled();
+      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
+        stringContaining("FROM StashScene s"),
+        "inst-a"
+      );
+      finishPerformers([]);
+      await done;
+      expect(weightsPassed().tags).toEqual([["t", 1.5 * tagIdf(10, 1000)]]);
+    });
+
     it("a candidate kept 3 days ago drops below an otherwise equal unwatched one", async () => {
-      seedRows({});
+      const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+      seedRows({
+        history: [
+          // kept 3 days ago: 5 * 0.3
+          {
+            sceneId: "watched",
+            instanceId: "inst-a",
+            kept: 1n,
+            lastPlayedAt: daysAgo(3),
+          },
+          // kept long ago: 5 * 0.7
+          {
+            sceneId: "old",
+            instanceId: "inst-a",
+            kept: 1n,
+            lastPlayedAt: daysAgo(40),
+          },
+          // kept with no date: 5 * 0.7
+          {
+            sceneId: "seen",
+            instanceId: "inst-a",
+            kept: 1,
+            lastPlayedAt: null,
+          },
+          // not kept (skipped): unchanged
+          {
+            sceneId: "fresh",
+            instanceId: "inst-a",
+            kept: 0,
+            lastPlayedAt: daysAgo(1),
+          },
+          // the same id on another instance is not the candidate's history
+          {
+            sceneId: "heavy",
+            instanceId: "inst-b",
+            kept: 1,
+            lastPlayedAt: daysAgo(1),
+          },
+        ],
+      });
       const candidate = (sceneId: string, weight: number, date: string) => ({
         sceneId,
         instanceId: "inst-a",
@@ -810,39 +891,6 @@ describe("findSimilarScenes", () => {
         candidate("old", 5, "2025-01-05"),
         candidate("seen", 5, "2025-01-03"),
         candidate("heavy", 8, "2025-01-02"),
-      ]);
-      const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
-      mockPrisma.$queryRawUnsafe.mockResolvedValue([
-        // kept 3 days ago: 5 * 0.3
-        {
-          sceneId: "watched",
-          instanceId: "inst-a",
-          kept: 1n,
-          lastPlayedAt: daysAgo(3),
-        },
-        // kept long ago: 5 * 0.7
-        {
-          sceneId: "old",
-          instanceId: "inst-a",
-          kept: 1n,
-          lastPlayedAt: daysAgo(40),
-        },
-        // kept with no date: 5 * 0.7
-        { sceneId: "seen", instanceId: "inst-a", kept: 1, lastPlayedAt: null },
-        // not kept (skipped): unchanged
-        {
-          sceneId: "fresh",
-          instanceId: "inst-a",
-          kept: 0,
-          lastPlayedAt: daysAgo(1),
-        },
-        // the same id on another instance is not the candidate's history
-        {
-          sceneId: "heavy",
-          instanceId: "inst-b",
-          kept: 1,
-          lastPlayedAt: daysAgo(1),
-        },
       ]);
       mockSceneQueryBuilder.getByRefs.mockImplementation(({ refs }) =>
         Promise.resolve(
@@ -862,7 +910,12 @@ describe("findSimilarScenes", () => {
       ]);
       expect(res._getOkBody().count).toBe(5);
       // The history is read for the candidates, bound by the viewer
-      const call = mockPrisma.$queryRawUnsafe.mock.calls[0] ?? [];
+      const call = must(
+        mockPrisma.$queryRawUnsafe.mock.calls.find(([text]) =>
+          text.includes("FROM json_each(?) j")
+        ),
+        "the history read"
+      );
       expect(call).toContain(testUser().id);
       expect(call).toContain(KEPT_MIN_SECONDS);
     });
