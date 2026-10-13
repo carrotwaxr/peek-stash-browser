@@ -43,8 +43,11 @@ export const SELF_WEIGHT = 2;
 export const OTHER_LEAD_SHARE = 0.5;
 /** Each further positive lead counts this much of the one before */
 export const LEAD_DECAY = 0.5;
-/** A partner multiplies the score by 1 + this * their affinity */
-export const PARTNER_STRENGTH = 0.5;
+/**
+ * The partners multiply the score by 1 + this * the mean affinity of those
+ * with one: a partner makes or breaks a scene, and more of them add nothing
+ */
+export const PARTNER_STRENGTH = 0.6;
 /** The partners' multiplier stays within these bounds */
 export const PARTNER_MULT_MIN = 0.4;
 export const PARTNER_MULT_MAX = 1.6;
@@ -465,11 +468,23 @@ export function scoreScene(
     TAG_WEIGHT * tagScore(scene, ctx) +
     SELF_WEIGHT * self;
 
-  let partnerMult = 1;
-  for (const key of partners) {
-    partnerMult *= 1 + PARTNER_STRENGTH * (affinity.performer.get(key) ?? 0);
-  }
-  partnerMult = clamp(partnerMult, PARTNER_MULT_MIN, PARTNER_MULT_MAX);
+  // The partners with an affinity: their mean, so their number counts for
+  // nothing; without one the multiplier is 1
+  const partnerAffinities = partners.flatMap((key) => {
+    const a = affinity.performer.get(key) ?? 0;
+    return a === 0 ? [] : [a];
+  });
+  const partnerMult =
+    partnerAffinities.length === 0
+      ? 1
+      : clamp(
+          1 +
+            (PARTNER_STRENGTH *
+              partnerAffinities.reduce((sum, a) => sum + a, 0)) /
+              partnerAffinities.length,
+          PARTNER_MULT_MIN,
+          PARTNER_MULT_MAX
+        );
 
   const noPartnerMult =
     prefs.partnerGenders.length > 0 &&
