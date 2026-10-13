@@ -565,29 +565,123 @@ export function hasAnyCriteria(counts: UserCriteriaCounts): boolean {
   );
 }
 
-/**
- * Add variety to a ranked list while keeping its rough order: the scores fall
- * into 10 bands (10% of the range each), highest first, and each band is
- * shuffled with `rng`. When every score is equal (range 0, one scored scene
- * included) all scenes share the first band.
- */
-export function diversifyByScoreTier<T extends { score: number }>(
-  scored: readonly T[], // sorted by score, highest first
-  rng: SeededRandom
-): T[] {
-  const first = scored[0];
-  const last = scored[scored.length - 1];
-  if (!first || !last) return [];
-  const range = first.score - last.score;
-  const tierSize = range / 10;
-  const tiers: T[][] = Array.from({ length: 10 }, () => []);
-  for (const s of scored) {
-    // One tier when every score is equal: no division by zero
-    const index =
-      range > 0
-        ? Math.min(9, Math.floor((first.score - s.score) / tierSize))
-        : 0;
-    tiers[index]?.push(s);
+/** Scenes shuffled together in one window of the final order */
+export const PICK_WINDOW = 20;
+/** Value kept per earlier pick with the same top lead */
+export const LEAD_REPEAT_FACTOR = 0.85;
+/** Value kept per earlier pick from the same studio */
+export const STUDIO_REPEAT_FACTOR = 0.92;
+
+interface HeapEntry {
+  index: number;
+  value: number;
+}
+
+/** Whether `a` comes out of the heap before `b`: higher value, then earlier index */
+function pops(a: HeapEntry, b: HeapEntry): boolean {
+  return a.value > b.value || (a.value === b.value && a.index < b.index);
+}
+
+/** A binary max-heap of entries, ordered by `pops` */
+class MaxHeap {
+  private readonly items: HeapEntry[] = [];
+
+  get size(): number {
+    return this.items.length;
   }
-  return tiers.flatMap((tier) => rng.shuffle(tier));
+
+  peek(): HeapEntry | undefined {
+    return this.items[0];
+  }
+
+  push(entry: HeapEntry): void {
+    const items = this.items;
+    items.push(entry);
+    let i = items.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      const p = items[parent] as HeapEntry;
+      if (!pops(entry, p)) break;
+      items[i] = p;
+      i = parent;
+    }
+    items[i] = entry;
+  }
+
+  pop(): HeapEntry | undefined {
+    const items = this.items;
+    const top = items[0];
+    const last = items.pop();
+    if (top === undefined || last === undefined) return top;
+    if (items.length === 0) return top;
+    let i = 0;
+    for (;;) {
+      const left = 2 * i + 1;
+      if (left >= items.length) break;
+      const right = left + 1;
+      let child = left;
+      if (
+        right < items.length &&
+        pops(items[right] as HeapEntry, items[left] as HeapEntry)
+      ) {
+        child = right;
+      }
+      const c = items[child] as HeapEntry;
+      if (!pops(c, last)) break;
+      items[i] = c;
+      i = child;
+    }
+    items[i] = last;
+    return top;
+  }
+}
+
+/**
+ * Pick up to `limit` scenes, best first, with variety: each pick's value is
+ * its `final` times LEAD_REPEAT_FACTOR for every earlier pick with the same
+ * `topLead` and STUDIO_REPEAT_FACTOR for every earlier pick from the same
+ * `studio` (null adds no penalty). Values only fall as picks accumulate, so a
+ * heap of last-computed values is re-checked lazily: pop, recompute, accept if
+ * it still beats the next entry, else push it back. Ties go to the earlier
+ * input. The picks are then shuffled with `rng` within consecutive windows of
+ * PICK_WINDOW, so the order holds for the day and changes with the seed.
+ */
+export function pickVaried<
+  T extends { final: number; topLead: string | null; studio: string | null },
+>(scored: readonly T[], limit: number, rng: SeededRandom): T[] {
+  const heap = new MaxHeap();
+  scored.forEach((s, index) => heap.push({ index, value: s.final }));
+
+  const leadCounts = new Map<string, number>();
+  const studioCounts = new Map<string, number>();
+  const picked: T[] = [];
+  const target = Math.min(limit, scored.length);
+
+  while (picked.length < target) {
+    const entry = heap.pop();
+    if (!entry) break;
+    const s = scored[entry.index] as T;
+    const value =
+      s.final *
+      LEAD_REPEAT_FACTOR ** (s.topLead ? (leadCounts.get(s.topLead) ?? 0) : 0) *
+      STUDIO_REPEAT_FACTOR **
+        (s.studio ? (studioCounts.get(s.studio) ?? 0) : 0);
+    const current = { index: entry.index, value };
+    const next = heap.peek();
+    if (next && !pops(current, next)) {
+      heap.push(current);
+      continue;
+    }
+    picked.push(s);
+    if (s.topLead)
+      leadCounts.set(s.topLead, (leadCounts.get(s.topLead) ?? 0) + 1);
+    if (s.studio)
+      studioCounts.set(s.studio, (studioCounts.get(s.studio) ?? 0) + 1);
+  }
+
+  for (let start = 0; start < picked.length; start += PICK_WINDOW) {
+    const window = rng.shuffle(picked.slice(start, start + PICK_WINDOW));
+    picked.splice(start, window.length, ...window);
+  }
+  return picked;
 }
