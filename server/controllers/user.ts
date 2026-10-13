@@ -22,6 +22,7 @@ import {
   isBuiltInThemeKey,
   parseCustomThemeKey,
 } from "@peek/shared-types/themes.js";
+import type { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import * as fs from "fs";
@@ -556,9 +557,9 @@ export const updateUserSettings = async (
   }
 
   // Validate recommendationPreferences if provided
-  let validRecommendationPreferences:
-    | ReturnType<typeof readRecommendationPreferences>
-    | undefined;
+  // The validated value is plain JSON (lists of strings, strings), stored
+  // as it is
+  let validRecommendationPreferences: Prisma.InputJsonObject | undefined;
   if (recommendationPreferences !== undefined) {
     const checked = validateRecommendationPreferences(
       recommendationPreferences
@@ -567,7 +568,7 @@ export const updateUserSettings = async (
       res.status(400).json({ error: checked.error });
       return;
     }
-    validRecommendationPreferences = checked.value;
+    validRecommendationPreferences = { ...checked.value };
   }
 
   // Validate theme if provided: null clears it, anything else must be a
@@ -612,7 +613,7 @@ export const updateUserSettings = async (
         lightboxDoubleTapAction,
       }),
       ...(validRecommendationPreferences !== undefined && {
-        recommendationPreferences: validRecommendationPreferences as never,
+        recommendationPreferences: validRecommendationPreferences,
       }),
     },
     select: {
