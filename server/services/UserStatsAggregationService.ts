@@ -26,12 +26,7 @@
  * - Totals and highlights read the history and per-user stats directly.
  * - The Library counts are counted per request, as the lists count.
  */
-import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
-import {
-  MAX_IGNORED_TAGS,
-  type RecommendationPreferences,
-  readRecommendationPreferences,
-} from "@peek/shared-types/recommendationPreferences.js";
+import type { RecommendationPreferences } from "@peek/shared-types/recommendationPreferences.js";
 import prisma from "../prisma/singleton.js";
 import type {
   EngagementStats,
@@ -57,6 +52,10 @@ import {
   percentileRank,
   rankingComputeService,
 } from "./RankingComputeService.js";
+import {
+  ignoredTagRefs,
+  readUserRecommendationPreferences,
+} from "./userRecommendationPreferences.js";
 
 /**
  * Valid sort options for top lists
@@ -154,20 +153,19 @@ function partnerClause(
   };
 }
 
-/** The viewer's ignored tags as one bound exclusion, none when there are none */
+/**
+ * The viewer's ignored tags as one bound exclusion (at most
+ * MAX_IGNORED_TAGS pairs), none when there are none
+ */
 function ignoredTagsClause(
   prefs: RecommendationPreferences
 ): SqlFragment | undefined {
-  const params: SqlParam[] = [];
-  const terms: string[] = [];
-  for (const value of prefs.ignoredTagIds.slice(0, MAX_IGNORED_TAGS)) {
-    const { id, instanceId } = parseEntityRef(value);
-    if (id === "" || instanceId === undefined || instanceId === "") continue;
-    terms.push("(x.id = ? AND x.stashInstanceId = ?)");
-    params.push(id, instanceId);
-  }
-  if (terms.length === 0) return undefined;
-  return { sql: `NOT (${terms.join(" OR ")})`, params };
+  const refs = ignoredTagRefs(prefs);
+  if (refs.length === 0) return undefined;
+  return {
+    sql: `NOT (${refs.map(() => "(x.id = ? AND x.stashInstanceId = ?)").join(" OR ")})`,
+    params: refs.flatMap((ref) => [ref.id, ref.instanceId]),
+  };
 }
 
 /** Where each highlight reads its count, and the entity it names */
@@ -341,7 +339,7 @@ class UserStatsAggregationService {
     options: UserStatsOptions
   ): Promise<UserStatsResponse> {
     const { sortBy = "engagement", allowedInstanceIds } = options;
-    const prefs = await this.readPreferences(userId);
+    const prefs = await readUserRecommendationPreferences(userId);
 
     // One statement after another: sent together, they contend for the
     // pool's connections and the disk (at 200k scenes, for a user with 17k
@@ -419,17 +417,6 @@ class UserStatsAggregationService {
       mostOdScene,
       mostOdPerformer,
     };
-  }
-
-  /** The viewer's recommendation preferences, defaults for anything unreadable */
-  private async readPreferences(
-    userId: number
-  ): Promise<RecommendationPreferences> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { recommendationPreferences: true },
-    });
-    return readRecommendationPreferences(user?.recommendationPreferences);
   }
 
   /**
