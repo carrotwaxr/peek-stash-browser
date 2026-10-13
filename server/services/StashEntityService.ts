@@ -165,40 +165,55 @@ class StashEntityService {
 
   /**
    * The candidates for "Scenes like this": up to maxCandidates scenes on
-   * the seed's instance that share a performer (3 points each), its studio
-   * (2) or a tag (1 each) with the seed, live, and not excluded for the
-   * user, sorted by total weight, then date, then id.
+   * the seed's instance that share a performer, its studio or a tag with
+   * the seed, live, and not excluded for the user, sorted by total weight,
+   * then date, then id. A shared performer or tag counts its entry in
+   * `weights` (a tag or performer not in the list counts nothing), the
+   * studio `weights.studio`; the weights add up.
    *
    * Every branch joins within the seed's instance, so the candidates are
    * all on it and the seed's own access check covers the allowed
-   * instances. The exclusions are an anti-join on UserExcludedEntity, never
-   * a bound list: a user with 100k excluded scenes costs nothing extra.
+   * instances. The weighted lists drive their branch (`json_each` as the
+   * outer loop, CROSS JOIN, then the junction's tag or performer index).
+   * The exclusions are an anti-join on UserExcludedEntity, never a bound
+   * list: a user with 100k excluded scenes costs nothing extra.
    */
   async getSimilarSceneCandidates(
     seed: EntityRef,
     userId: number,
+    weights: {
+      performers: Array<[string, number]>;
+      studio: number;
+      tags: Array<[string, number]>;
+    },
     maxCandidates: number = 500
   ): Promise<SimilarSceneCandidate[]> {
     const startTime = Date.now();
 
     const sql = `
-      WITH candidates AS (
-        SELECT sp2.sceneId, sp2.sceneInstanceId AS inst, 3 AS weight
-        FROM ScenePerformer sp1
-        JOIN ScenePerformer sp2 ON sp2.performerId = sp1.performerId AND sp2.performerInstanceId = sp1.performerInstanceId
-        WHERE sp1.sceneId = ? AND sp1.sceneInstanceId = ?
+      WITH pw AS (
+        SELECT json_extract(value, '$[0]') AS performerId, CAST(json_extract(value, '$[1]') AS REAL) AS weight
+        FROM json_each(?)
+      ), tw AS (
+        SELECT json_extract(value, '$[0]') AS tagId, CAST(json_extract(value, '$[1]') AS REAL) AS weight
+        FROM json_each(?)
+      ), candidates AS (
+        SELECT sp.sceneId, sp.sceneInstanceId AS inst, pw.weight
+        FROM pw
+        CROSS JOIN ScenePerformer sp ON sp.performerId = pw.performerId
+          AND sp.performerInstanceId = ? AND sp.sceneInstanceId = ?
         UNION ALL
-        SELECT s2.id, s2.stashInstanceId, 2
+        SELECT s2.id, s2.stashInstanceId, CAST(? AS REAL)
         FROM StashScene s1
         JOIN StashScene s2 ON s2.studioId = s1.studioId AND s2.stashInstanceId = s1.stashInstanceId
         WHERE s1.id = ? AND s1.stashInstanceId = ? AND s1.studioId IS NOT NULL
         UNION ALL
-        SELECT st2.sceneId, st2.sceneInstanceId, 1
-        FROM SceneTag st1
-        JOIN SceneTag st2 ON st2.tagId = st1.tagId AND st2.tagInstanceId = st1.tagInstanceId
-        WHERE st1.sceneId = ? AND st1.sceneInstanceId = ?
+        SELECT st.sceneId, st.sceneInstanceId, tw.weight
+        FROM tw
+        CROSS JOIN SceneTag st ON st.tagId = tw.tagId
+          AND st.tagInstanceId = ? AND st.sceneInstanceId = ?
       ), scored AS (
-        SELECT sceneId, inst, SUM(weight) AS totalWeight FROM candidates
+        SELECT sceneId, inst, CAST(SUM(weight) AS REAL) AS totalWeight FROM candidates
         WHERE NOT (sceneId = ? AND inst = ?)
         GROUP BY sceneId, inst
       )
@@ -208,7 +223,7 @@ class StashEntityService {
       LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = c.sceneId
         AND (e.instanceId = '' OR e.instanceId = c.inst)
       WHERE e.id IS NULL
-      ORDER BY c.totalWeight DESC, s.date DESC, s.id
+      ORDER BY ROUND(c.totalWeight, 9) DESC, s.date DESC, s.id, s.stashInstanceId
       LIMIT ?
     `;
 
@@ -217,16 +232,19 @@ class StashEntityService {
       Array<{
         sceneId: string;
         instanceId: string;
-        totalWeight: bigint; // SUM of integers
+        totalWeight: number; // always REAL: Prisma types a column by its first row
         date: string | null;
       }>
     >(
       sql,
-      id,
+      JSON.stringify(weights.performers),
+      JSON.stringify(weights.tags),
+      instanceId,
       instanceId, // performers
+      weights.studio,
       id,
       instanceId, // studio
-      id,
+      instanceId,
       instanceId, // tags
       id,
       instanceId, // never the seed itself
@@ -237,7 +255,7 @@ class StashEntityService {
     const result = rows.map((row) => ({
       sceneId: row.sceneId,
       instanceId: row.instanceId,
-      weight: Number(row.totalWeight),
+      weight: row.totalWeight,
       date: row.date,
     }));
 

@@ -5,6 +5,10 @@ import { hasAnyCriteria } from "../../services/RecommendationScoringService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { getSceneVr } from "../../services/SceneVrService.js";
+import {
+  applyWatchFactor,
+  getSimilarWeights,
+} from "../../services/SimilarScenesService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import type {
   AmbiguousLookupResponse,
@@ -134,7 +138,10 @@ export const findScenes = async (
 
 /**
  * "Scenes like this": scenes on the seed's instance sharing its performers
- * (3 points each), studio (2) or tags (1 each), most shared first.
+ * (3 points each, 1.5 for a partner under the viewer's preferences), studio
+ * (2) or direct tags (1.5 times the tag's rarity each, none for an ignored
+ * tag), most shared first. The top 500 are then weighed by what the viewer
+ * watched: kept within 14 days 0.3, kept earlier 0.7.
  *
  * The seed is resolved through the user's own access check (404 when it is
  * hidden, restricted, deleted or on an instance the user doesn't see), the
@@ -171,11 +178,15 @@ export const findSimilarScenes = async (
     return;
   }
 
-  const candidates = await stashEntityService.getSimilarSceneCandidates(
+  const weights = await getSimilarWeights({ id, instanceId }, userId);
+  const ranked = await stashEntityService.getSimilarSceneCandidates(
     { id, instanceId },
     userId,
+    weights,
     500
   );
+  // What the viewer already kept sinks, before the page is cut
+  const candidates = await applyWatchFactor(userId, ranked);
 
   // The page's refs, in candidate order (weight desc, date desc from SQL)
   const startIndex = (page - 1) * perPage;
