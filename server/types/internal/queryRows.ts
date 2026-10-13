@@ -94,7 +94,8 @@ export interface SceneScoringRow {
   inheritedTagIds: string | null;
   /** The viewer's O count: COALESCE over an integer, so a bigint */
   oCount: number | bigint;
-  lastPlayedAt: Date | null;
+  /** A Date from the DATETIME column; read through `rawDate` all the same */
+  lastPlayedAt: Date | number | string | null;
   /** 0 or 1, computed: a bigint */
   hasHistory: number | bigint;
   /** 0 or 1, computed: a bigint */
