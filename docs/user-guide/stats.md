@@ -26,17 +26,20 @@ The hero section at the top displays your cumulative activity:
 | **Watch Time** | Total time spent watching scenes |
 | **Play Count** | Number of plays. A watch counts as one play once you have watched the Minimum Play Percent of the scene (20% by default; change it in Settings → User Preferences → Playback) |
 | **O Count** | Combined O counter increments across scenes and images |
-| **Scenes Watched** | Unique scenes watched and percentage of library coverage |
+| **Scenes Watched** | Unique scenes you played or had an O on, and the percentage of your library they cover. A scene you only opened does not count. |
 | **Images Viewed** | Unique images viewed |
 
 ## Top Lists
 
-Four ranked lists show your top 10 most-engaged entities:
+Ranked lists show your top 10 most-engaged entities:
 
 - **Top Scenes** — By engagement score
 - **Top Performers** — By engagement score
+- **Top Partners** — By engagement score. It appears when you choose partners under Settings > Customization > Recommendations (see [Recommendation settings](recommendations.md#recommendation-settings)).
 - **Top Studios** — By engagement score
-- **Top Tags** — By engagement score
+- **Top Tags** — By engagement score. Tags you ignore in the same settings are left out.
+
+With **Performers I follow** set, Top Performers lists the performers you follow (and performers with no gender). Partners get their own list.
 
 Refresh (the circular arrow at the top of the page) recomputes your Top lists from your latest plays; it can take a few seconds. Without it, the lists are recomputed when they are an hour old.
 
@@ -50,19 +53,23 @@ Use the sort toggle to change how top lists are ranked:
 | **O Count** | Total O counter increments, watch duration, play count |
 | **Play Count** | Total plays, watch duration, O count |
 
-Changing the sort updates all four lists simultaneously.
+Changing the sort updates every top list at once.
 
 ### How Engagement Scores Work
 
-Engagement scores combine multiple signals to reflect your actual preferences:
+Each top list ranks by one engagement score:
 
-- **O count** is weighted most heavily — it's the strongest signal of preference
-- **Watch duration** is normalized against average scene length
-- **Play count** adds a straightforward popularity measure
+**O count × 5, plus time watched (in average scene lengths), plus plays.**
 
-Scores are then normalized by how many scenes feature each entity. A performer who appears in 5 scenes but has high engagement ranks higher than one in 500 scenes with moderate engagement. This prevents entities that simply appear frequently from dominating the rankings.
+- **O count** counts the most. It is the strongest sign of what you like.
+- **Time watched** is measured against the average scene length in your library, so a long watch counts for more than a short one.
+- **Plays** add one each.
 
-Percentile ranks show where each entity falls relative to all others — "Top 92%" means that entity is in your 92nd percentile of engagement. The ranking compares an entity with everything you have engaged with on every Stash server in your scope, including servers you have deselected, although the lists only show what you can see.
+The score uses all of your history. A performer, studio or tag scores from every scene of theirs that you played, watched or had an O on.
+
+**Top 5%** means the entry is in the top 5% of everything you have engaged with of that kind: a performer in the top 5% of the performers you have engaged with. The ranking compares an entry with everything you have engaged with on every Stash server in your scope, including servers you have deselected, although the lists only show what you can see.
+
+The rankings refresh at most once an hour (see [Refreshing Stats](#refreshing-stats)). The same viewing also feeds [Recommended](recommendations.md#how-it-works), which weighs recent viewing more than old viewing. These lists do not: they rank by your whole history.
 
 ## Highlights
 
@@ -71,7 +78,7 @@ Four highlight cards showcase your single best-of entries:
 - **Most Watched Scene** — Highest play count
 - **Most Viewed Image** — Highest view count. Click the card to open the image in the viewer right on the Stats page (only an image you can still see opens).
 - **Most O'd Scene** — Highest O count
-- **Most O'd Performer** — Highest O count across all their scenes
+- **Most O'd Performer** — Highest O count across all their scenes. With **Performers I follow** set, only performers you follow count (and performers with no gender).
 
 ## Refreshing Stats
 
