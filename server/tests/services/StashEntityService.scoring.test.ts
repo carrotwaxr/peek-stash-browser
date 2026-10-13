@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 // Import after mocking
+import { KEPT_MIN_SECONDS } from "../../services/RankingComputeService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { must } from "../helpers/must.js";
 
@@ -24,7 +25,7 @@ describe("StashEntityService.getScenesForScoring", () => {
     await stashEntityService.getScenesForScoring(USER, ["inst-a"]);
 
     const [sql] = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
-    expect(sql).toContain("COALESCE(wh.oCount, 0) AS oCounter");
+    expect(sql).toContain("COALESCE(wh.oCount, 0) AS oCount");
     expect(sql).not.toContain("s.oCounter");
   });
 
@@ -35,21 +36,25 @@ describe("StashEntityService.getScenesForScoring", () => {
         id: "scene-1",
         stashInstanceId: "inst-a",
         studioId: "studio-1",
-        oCounter: 5n,
         performerIds: "perf-1,perf-2",
         tagIds: "tag-1,tag-2,tag-3",
-        playCount: 3,
+        inheritedTagIds: "tag-9",
+        oCount: 5n,
         lastPlayedAt,
+        hasHistory: 1n,
+        kept: 1n,
       },
       {
         id: "scene-2",
         stashInstanceId: "inst-b",
         studioId: null,
-        oCounter: 0n,
         performerIds: null,
         tagIds: "tag-1",
-        playCount: null,
+        inheritedTagIds: null,
+        oCount: 0n,
         lastPlayedAt: null,
+        hasHistory: 0n,
+        kept: 0n,
       },
     ];
 
@@ -67,8 +72,10 @@ describe("StashEntityService.getScenesForScoring", () => {
       studioId: "studio-1",
       performerIds: ["perf-1", "perf-2"],
       tagIds: ["tag-1", "tag-2", "tag-3"],
-      oCounter: 5,
-      playCount: 3,
+      inheritedTagIds: ["tag-9"],
+      oCount: 5,
+      kept: true,
+      hasHistory: true,
       lastPlayedAt,
     });
     expect(result[1]).toEqual({
@@ -77,8 +84,10 @@ describe("StashEntityService.getScenesForScoring", () => {
       studioId: null,
       performerIds: [],
       tagIds: ["tag-1"],
-      oCounter: 0,
-      playCount: 0,
+      inheritedTagIds: [],
+      oCount: 0,
+      kept: false,
+      hasHistory: false,
       lastPlayedAt: null,
     });
   });
@@ -97,7 +106,24 @@ describe("StashEntityService.getScenesForScoring", () => {
       "LEFT JOIN WatchHistory wh ON wh.userId = ? AND wh.instanceId = s.stashInstanceId AND wh.sceneId = s.id"
     );
     expect(sql).toContain("s.stashInstanceId IN (?)");
-    expect(params).toEqual([USER, USER, "inst-a"]);
+    expect(params).toEqual([KEPT_MIN_SECONDS, USER, USER, "inst-a"]);
+  });
+
+  it("reads the inherited tags from their junction and counts a kept scene as the rankings do", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+    await stashEntityService.getScenesForScoring(USER, ["inst-a"]);
+
+    const [sql] = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
+    expect(sql).toContain("FROM SceneInheritedTag it");
+    expect(sql).toContain(
+      "it.sceneId = s.id AND it.sceneInstanceId = s.stashInstanceId"
+    );
+    expect(sql).not.toContain("inheritedTagIds)");
+    expect(sql).toContain("wh.id IS NOT NULL AS hasHistory");
+    expect(sql).toContain(
+      "wh.playCount > 0 OR wh.oCount > 0 OR wh.playDuration >= ?"
+    );
   });
 
   it("matches no scene when the user has no allowed instance", async () => {

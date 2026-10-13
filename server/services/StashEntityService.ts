@@ -15,11 +15,7 @@ import type {
   StashTag,
 } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
-import type {
-  NormalizedScene,
-  SceneScoringData,
-  SceneStream,
-} from "../types/index.js";
+import type { NormalizedScene, SceneStream } from "../types/index.js";
 import type { SceneScoringRow } from "../types/internal/queryRows.js";
 import type { EntityRef } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
@@ -32,6 +28,8 @@ import {
 import { instanceColumnClause } from "../utils/sqlClauses.js";
 import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
+import { KEPT_MIN_SECONDS } from "./RankingComputeService.js";
+import type { LibraryScoringScene } from "./RecommendationScoringService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import {
   galleryRef,
@@ -41,15 +39,6 @@ import {
 } from "./query/nestedRefs.js";
 
 /** One "Scenes like this" candidate: a scene on the seed's instance. */
-/**
- * One scene as `getScenesForScoring` returns it: its ids (all on the
- * scene's instance) and the user's watch data on it.
- */
-export interface SceneForScoring extends SceneScoringData {
-  playCount: number;
-  lastPlayedAt: Date | null;
-}
-
 export interface SimilarSceneCandidate {
   sceneId: string;
   instanceId: string;
@@ -107,16 +96,18 @@ class StashEntityService {
   /**
    * The scoring input for Recommended: every live scene the user can see
    * (the exclusion join with the instance, the allowed instances) with its
-   * studio, performer and tag ids and the user's watch data on it, so the
-   * scoring pass in memory reads nothing else. The junction ids come from
-   * two correlated covering-index subqueries rather than a join of both
+   * studio, performer, tag and inherited tag ids and the user's watch data
+   * on it, so the scoring pass in memory reads nothing else. A scene is
+   * kept when the user played it, pressed O on it or watched
+   * KEPT_MIN_SECONDS of it, as the rankings count it. The junction ids come
+   * from correlated covering-index subqueries rather than a join of the
    * junctions (a performer-by-tag cross product per scene): 0.1 s against
    * 0.27 s on prod and 0.9 s against 2.4 s at 200k scenes.
    */
   async getScenesForScoring(
     userId: number,
     allowedInstanceIds: string[]
-  ): Promise<SceneForScoring[]> {
+  ): Promise<LibraryScoringScene[]> {
     const startTime = Date.now();
     const instanceFilter = instanceColumnClause(
       "s.stashInstanceId",
@@ -124,12 +115,16 @@ class StashEntityService {
     );
 
     const sql = `
-      SELECT s.id, s.stashInstanceId, s.studioId, COALESCE(wh.oCount, 0) AS oCounter,
+      SELECT s.id, s.stashInstanceId, s.studioId,
         (SELECT group_concat(sp.performerId) FROM ScenePerformer sp
           WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId) AS performerIds,
         (SELECT group_concat(st.tagId) FROM SceneTag st
           WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId) AS tagIds,
-        wh.playCount, wh.lastPlayedAt
+        (SELECT group_concat(it.tagId) FROM SceneInheritedTag it
+          WHERE it.sceneId = s.id AND it.sceneInstanceId = s.stashInstanceId) AS inheritedTagIds,
+        COALESCE(wh.oCount, 0) AS oCount, wh.lastPlayedAt,
+        wh.id IS NOT NULL AS hasHistory,
+        COALESCE(wh.playCount > 0 OR wh.oCount > 0 OR wh.playDuration >= ?, 0) AS kept
       FROM StashScene s
       LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id
         AND (e.instanceId = '' OR e.instanceId = s.stashInstanceId)
@@ -139,19 +134,23 @@ class StashEntityService {
 
     const rows = await prisma.$queryRawUnsafe<SceneScoringRow[]>(
       sql,
+      KEPT_MIN_SECONDS,
       userId,
       userId,
       ...instanceFilter.params
     );
 
-    const result: SceneForScoring[] = rows.map((row) => ({
+    const ids = (list: string | null) => (list ? list.split(",") : []);
+    const result: LibraryScoringScene[] = rows.map((row) => ({
       id: row.id,
       instanceId: row.stashInstanceId,
       studioId: row.studioId,
-      performerIds: row.performerIds ? row.performerIds.split(",") : [],
-      tagIds: row.tagIds ? row.tagIds.split(",") : [],
-      oCounter: Number(row.oCounter),
-      playCount: row.playCount ?? 0,
+      performerIds: ids(row.performerIds),
+      tagIds: ids(row.tagIds),
+      inheritedTagIds: ids(row.inheritedTagIds),
+      oCount: Number(row.oCount),
+      kept: Number(row.kept) === 1,
+      hasHistory: Number(row.hasHistory) === 1,
       lastPlayedAt: row.lastPlayedAt,
     }));
 

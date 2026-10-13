@@ -453,16 +453,3 @@ export interface ImageListItem {
 
 /** Entity with instanceId, for nested entities within scenes/galleries */
 export type WithInstanceId<T> = T & { instanceId: string };
-
-/**
- * Lightweight scene data for scoring operations.
- * Contains only IDs needed for similarity/recommendation scoring.
- */
-export interface SceneScoringData {
-  id: string;
-  instanceId: string;
-  studioId: string | null;
-  performerIds: string[];
-  tagIds: string[];
-  oCounter: number;
-}
