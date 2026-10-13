@@ -21,7 +21,10 @@ import {
 } from "../../../controllers/library/scenes.js";
 import prisma from "../../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../../services/EntityAccessService.js";
-import rankingComputeService from "../../../services/RankingComputeService.js";
+import rankingComputeService, {
+  KEPT_MIN_SECONDS,
+} from "../../../services/RankingComputeService.js";
+import { tagIdf } from "../../../services/RecommendationScoringService.js";
 import { recommendationService } from "../../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { getSceneVr } from "../../../services/SceneVrService.js";
@@ -39,6 +42,7 @@ import {
 import { objectContaining } from "../../helpers/matchers.js";
 import { createMockScene } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
+import { partialRow } from "../../helpers/prismaMock.js";
 
 // ---------------------------------------------------------------------------
 // Mocks — must precede imports of the module under test
@@ -80,6 +84,7 @@ vi.mock("../../../services/EntityAccessService.js", () => ({
 }));
 
 vi.mock("../../../services/RankingComputeService.js", () => ({
+  KEPT_MIN_SECONDS: 120,
   default: {
     ensureFresh: vi.fn().mockResolvedValue(undefined),
   },
@@ -529,6 +534,10 @@ describe("findSimilarScenes", () => {
     mockResolveInstance.mockResolvedValue("inst-a");
     mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue([]);
     mockSceneQueryBuilder.getByRefs.mockResolvedValue([]);
+    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
+    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
   });
 
   it("returns 401 when user is not authenticated", async () => {
@@ -587,6 +596,11 @@ describe("findSimilarScenes", () => {
     ).toHaveBeenCalledWith(
       { id: "101", instanceId: "inst-a" },
       testUser().id,
+      {
+        performers: [],
+        studio: 2,
+        tags: [],
+      },
       500
     );
   });
@@ -656,6 +670,202 @@ describe("findSimilarScenes", () => {
       "c2:inst-a",
     ]);
     expect(body.count).toBe(2);
+  });
+
+  describe("weights and watch state", () => {
+    const seedRows = (opts: {
+      performers?: Array<{ id: string; gender: string | null }>;
+      tags?: Array<{ id: string; df: number }>;
+      scenes?: number;
+      prefs?: unknown;
+    }) => {
+      mockPrisma.scenePerformer.findMany.mockResolvedValue(
+        (opts.performers ?? []).map((p) =>
+          partialRow<
+            Awaited<ReturnType<typeof prisma.scenePerformer.findMany>>[number]
+          >({ performerId: p.id, performer: { gender: p.gender } } as never)
+        )
+      );
+      mockPrisma.sceneTag.findMany.mockResolvedValue(
+        (opts.tags ?? []).map((t) =>
+          partialRow<
+            Awaited<ReturnType<typeof prisma.sceneTag.findMany>>[number]
+          >({ tagId: t.id, tag: { sceneCountAll: t.df } } as never)
+        )
+      );
+      mockPrisma.stashScene.count.mockResolvedValue(opts.scenes ?? 1000);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow<Awaited<ReturnType<typeof prisma.user.findUnique>>>({
+          recommendationPreferences: opts.prefs ?? null,
+        })
+      );
+    };
+
+    const run = async () => {
+      const req = reqFor(findSimilarScenes, {
+        params: { id: "101" },
+        user: testUser(),
+        query: { page: "1", instanceId: "inst-a" },
+      });
+      const res = resFor(findSimilarScenes);
+      await findSimilarScenes(req, res);
+      return res;
+    };
+
+    const weightsPassed = () =>
+      must(mockStashEntityService.getSimilarSceneCandidates.mock.calls[0])[2];
+
+    it("a rare tag weighs more than a common one", async () => {
+      seedRows({
+        tags: [
+          { id: "rare", df: 50 },
+          { id: "common", df: 450 },
+        ],
+      });
+      await run();
+      const tags = new Map(weightsPassed().tags);
+      expect(tags.get("rare")).toBeCloseTo(1.5 * tagIdf(50, 1000), 9);
+      expect(tags.get("common")).toBeCloseTo(1.5 * tagIdf(450, 1000), 9);
+      // One rare tag beats two common ones
+      expect(must(tags.get("rare"))).toBeGreaterThan(
+        2 * must(tags.get("common"))
+      );
+    });
+
+    it("with default preferences every performer weighs 3", async () => {
+      seedRows({
+        performers: [
+          { id: "m", gender: "MALE" },
+          { id: "f", gender: "FEMALE" },
+          { id: "x", gender: null },
+        ],
+      });
+      await run();
+      expect(weightsPassed().performers).toEqual([
+        ["m", 3],
+        ["f", 3],
+        ["x", 3],
+      ]);
+    });
+
+    it("a partner of the viewer's leads weighs 1.5", async () => {
+      seedRows({
+        performers: [
+          { id: "m", gender: "MALE" },
+          { id: "f", gender: "FEMALE" },
+          { id: "x", gender: null },
+        ],
+        prefs: { leadGenders: ["FEMALE"], partnerGenders: ["MALE"] },
+      });
+      await run();
+      expect(weightsPassed().performers).toEqual([
+        ["m", 1.5],
+        ["f", 3],
+        ["x", 3],
+      ]);
+    });
+
+    it("partner genders without leads change nothing", async () => {
+      seedRows({
+        performers: [{ id: "m", gender: "MALE" }],
+        prefs: { leadGenders: [], partnerGenders: ["MALE"] },
+      });
+      await run();
+      expect(weightsPassed().performers).toEqual([["m", 3]]);
+    });
+
+    it("an ignored tag adds nothing, on the seed's instance only", async () => {
+      seedRows({
+        tags: [
+          { id: "t1", df: 10 },
+          { id: "t2", df: 10 },
+          { id: "t3", df: 10 },
+        ],
+        prefs: { ignoredTagIds: ["t1:inst-a", "t2:inst-b"] },
+      });
+      await run();
+      expect(weightsPassed().tags.map(([id]) => id)).toEqual(["t2", "t3"]);
+    });
+
+    it("the weights use the live scene count of the seed's instance", async () => {
+      seedRows({ tags: [{ id: "t", df: 10 }], scenes: 200 });
+      await run();
+      expect(mockPrisma.stashScene.count).toHaveBeenCalledWith({
+        where: { stashInstanceId: "inst-a", deletedAt: null },
+      });
+      expect(weightsPassed().tags).toEqual([["t", 1.5 * tagIdf(10, 200)]]);
+    });
+
+    it("a candidate kept 3 days ago drops below an otherwise equal unwatched one", async () => {
+      seedRows({});
+      const candidate = (sceneId: string, weight: number, date: string) => ({
+        sceneId,
+        instanceId: "inst-a",
+        weight,
+        date,
+      });
+      mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue([
+        candidate("watched", 5, "2025-01-09"),
+        candidate("fresh", 5, "2025-01-01"),
+        candidate("old", 5, "2025-01-05"),
+        candidate("seen", 5, "2025-01-03"),
+        candidate("heavy", 8, "2025-01-02"),
+      ]);
+      const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([
+        // kept 3 days ago: 5 * 0.3
+        {
+          sceneId: "watched",
+          instanceId: "inst-a",
+          kept: 1n,
+          lastPlayedAt: daysAgo(3),
+        },
+        // kept long ago: 5 * 0.7
+        {
+          sceneId: "old",
+          instanceId: "inst-a",
+          kept: 1n,
+          lastPlayedAt: daysAgo(40),
+        },
+        // kept with no date: 5 * 0.7
+        { sceneId: "seen", instanceId: "inst-a", kept: 1, lastPlayedAt: null },
+        // not kept (skipped): unchanged
+        {
+          sceneId: "fresh",
+          instanceId: "inst-a",
+          kept: 0,
+          lastPlayedAt: daysAgo(1),
+        },
+        // the same id on another instance is not the candidate's history
+        {
+          sceneId: "heavy",
+          instanceId: "inst-b",
+          kept: 1,
+          lastPlayedAt: daysAgo(1),
+        },
+      ]);
+      mockSceneQueryBuilder.getByRefs.mockImplementation(({ refs }) =>
+        Promise.resolve(
+          refs.map((r) => createMockScene({ id: r.id, instanceId: "inst-a" }))
+        )
+      );
+
+      const res = await run();
+
+      // heavy 8, fresh 5, then old and seen 3.5 (newer date first), watched 1.5
+      expect(res._getOkBody().scenes.map((s) => s.id)).toEqual([
+        "heavy",
+        "fresh",
+        "old",
+        "seen",
+        "watched",
+      ]);
+      expect(res._getOkBody().count).toBe(5);
+      // The history is read for the candidates, bound by the viewer
+      const call = mockPrisma.$queryRawUnsafe.mock.calls[0] ?? [];
+      expect(call).toContain(testUser().id);
+      expect(call).toContain(KEPT_MIN_SECONDS);
+    });
   });
 
   it.each([
