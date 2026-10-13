@@ -29,7 +29,6 @@
 import { RECOMMENDED_LIMIT } from "@peek/shared-types/filters/index.js";
 import { DEFAULT_RECOMMENDATION_PREFERENCES } from "@peek/shared-types/recommendationPreferences.js";
 import prisma from "../prisma/singleton.js";
-import type { ScoredSceneId } from "../types/api/index.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { SeededRandom, generateDailySeed } from "../utils/seededRandom.js";
@@ -41,8 +40,9 @@ import {
   type UserCriteriaCounts,
   buildEntityAffinity,
   countUserCriteria,
-  diversifyByScoreTier,
   hasAnyCriteria,
+  pickVaried,
+  sceneTopLead,
   scoreScene,
   watchMultiplier,
 } from "./RecommendationScoringService.js";
@@ -282,17 +282,15 @@ export class RecommendationService {
     };
 
     const scored = scoreScenes(scoringScenes, ctx);
-    scored.sort((a, b) => b.score - a.score);
 
-    // Variety within score bands, in an order that holds for the day (no
-    // duplicates across pages) and changes with it
-    const diversified = diversifyByScoreTier(
+    // The best scenes with variety across leads and studios, in an order
+    // that holds for the day (no duplicates across pages) and changes with it
+    const diversified = pickVaried(
       scored,
+      RANKED_LIMIT,
       new SeededRandom(generateDailySeed(userId))
     );
-    const refs = diversified
-      .slice(0, RANKED_LIMIT)
-      .map(({ id, instanceId }) => ({ id, instanceId }));
+    const refs = diversified.map(({ id, instanceId }) => ({ id, instanceId }));
 
     logger.debug("Recommendations scored", {
       userId,
@@ -306,6 +304,14 @@ export class RecommendationService {
   }
 }
 
+interface ScoredScene {
+  id: string;
+  instanceId: string;
+  final: number;
+  topLead: string | null;
+  studio: string | null;
+}
+
 /**
  * Each scene's final score: its preference score times its watch
  * multiplier; only positive scores are kept.
@@ -313,19 +319,22 @@ export class RecommendationService {
 function scoreScenes(
   scenes: readonly ScoringScene[],
   ctx: SceneScoringContext
-): ScoredSceneId[] {
+): ScoredScene[] {
   const now = Date.now();
-  const scored: ScoredSceneId[] = [];
+  const scored: ScoredScene[] = [];
   for (const scene of scenes) {
     const score = scoreScene(scene, ctx);
     if (score <= 0) continue;
-    const finalScore = score * watchMultiplier(scene, ctx.prefs.discovery, now);
-    if (finalScore > 0) {
+    const final = score * watchMultiplier(scene, ctx.prefs.discovery, now);
+    if (final > 0) {
       scored.push({
         id: scene.id,
         instanceId: scene.instanceId,
-        score: finalScore,
-        oCounter: scene.oCount,
+        final,
+        topLead: sceneTopLead(scene, ctx),
+        studio: scene.studioId
+          ? entityKey(scene.studioId, scene.instanceId)
+          : null,
       });
     }
   }
