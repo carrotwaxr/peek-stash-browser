@@ -1,5 +1,6 @@
-import { useId } from "react";
+import { useId, useRef } from "react";
 import {
+  type GetUserSettingsResponse,
   PERFORMER_GENDERS,
   type PerformerGender,
   type RecommendationPreferences,
@@ -11,6 +12,7 @@ import {
   useUserSettings,
 } from "../../api/hooks/useUserSettings";
 import { invalidateExclusionDependents } from "../../api/invalidateExclusionDependents";
+import { queryKeys } from "../../api/queryKeys";
 import { showError } from "../../utils/toast";
 import SearchableSelect from "../ui/SearchableSelect";
 
@@ -161,16 +163,25 @@ function SelectField<T extends string>({
   );
 }
 
+type Change = (
+  current: RecommendationPreferences
+) => Partial<RecommendationPreferences>;
+
 /**
  * How Recommended, Scenes Like This and My Stats are tuned for this user.
  * Every change saves the whole preferences object (the server takes no
- * partial one), then refreshes what the preferences shape.
+ * partial one), then refreshes what the preferences shape. Saves go one at
+ * a time, each built from the cached preferences when its turn comes, so
+ * two quick changes both land and a slower first save cannot overwrite the
+ * second.
  */
 const RecommendationSettings = () => {
   const queryClient = useQueryClient();
   const { data } = useUserSettings();
   const save = useUpdateUserSettings();
   const tagsId = useId();
+  /** The last save queued: the next one starts once it settles */
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
 
   // The tab holds back its sections until the settings load; a save before
   // then would replace the stored preferences with defaults
@@ -178,36 +189,51 @@ const RecommendationSettings = () => {
   if (!prefs) return null;
   const { leadGenders, partnerGenders } = prefs;
 
-  const update = async (change: Partial<RecommendationPreferences>) => {
-    try {
-      await save.mutateAsync({
-        recommendationPreferences: { ...prefs, ...change },
-      });
-    } catch (err) {
-      showError(getErrorMessage(err, "Failed to save recommendation settings"));
-      return;
-    }
-    await invalidateExclusionDependents(queryClient);
+  const update = async (change: Change) => {
+    const saved = queue.current.then(async () => {
+      // The cache holds every earlier save (each patches it as it starts)
+      const latest = queryClient.getQueryData<GetUserSettingsResponse>(
+        queryKeys.user.settings()
+      )?.settings.recommendationPreferences;
+      if (!latest) return false;
+      try {
+        await save.mutateAsync({
+          recommendationPreferences: { ...latest, ...change(latest) },
+        });
+        return true;
+      } catch (err) {
+        showError(
+          getErrorMessage(err, "Failed to save recommendation settings")
+        );
+        return false;
+      }
+    });
+    queue.current = saved;
+    if (await saved) await invalidateExclusionDependents(queryClient);
   };
 
   const toggleLead = (gender: PerformerGender, checked: boolean) => {
-    const next = checked
-      ? [...leadGenders, gender]
-      : leadGenders.filter((g) => g !== gender);
-    // A partner needs a followed performer, and a gender is only one of them
-    void update({
-      leadGenders: next,
-      partnerGenders:
-        next.length === 0 ? [] : partnerGenders.filter((g) => g !== gender),
+    void update((current) => {
+      const next = checked
+        ? [...current.leadGenders, gender]
+        : current.leadGenders.filter((g) => g !== gender);
+      // A partner needs a followed performer, and a gender is only one of them
+      return {
+        leadGenders: next,
+        partnerGenders:
+          next.length === 0
+            ? []
+            : current.partnerGenders.filter((g) => g !== gender),
+      };
     });
   };
 
   const togglePartner = (gender: PerformerGender, checked: boolean) => {
-    void update({
+    void update((current) => ({
       partnerGenders: checked
-        ? [...partnerGenders, gender]
-        : partnerGenders.filter((g) => g !== gender),
-    });
+        ? [...current.partnerGenders, gender]
+        : current.partnerGenders.filter((g) => g !== gender),
+    }));
   };
 
   return (
@@ -243,13 +269,15 @@ const RecommendationSettings = () => {
           value={prefs.noPartnerScenes}
           options={NO_PARTNER_OPTIONS}
           disabled={partnerGenders.length === 0}
-          onChange={(noPartnerScenes) => void update({ noPartnerScenes })}
+          onChange={(noPartnerScenes) =>
+            void update(() => ({ noPartnerScenes }))
+          }
         />
         <SelectField
           label="Recommend"
           value={prefs.discovery}
           options={DISCOVERY_OPTIONS}
-          onChange={(discovery) => void update({ discovery })}
+          onChange={(discovery) => void update(() => ({ discovery }))}
         />
         <div>
           <label
@@ -266,9 +294,9 @@ const RecommendationSettings = () => {
             multi
             value={prefs.ignoredTagIds}
             onChange={(ids) =>
-              void update({
+              void update(() => ({
                 ignoredTagIds: Array.isArray(ids) ? ids : ids ? [ids] : [],
-              })
+              }))
             }
             placeholder="Pick tags to ignore..."
           />
