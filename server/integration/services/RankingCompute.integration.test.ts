@@ -8,11 +8,12 @@
  *   SX and tag TX are soft-deleted, and on live scene 6
  * - rank-it-a: performer Y on live scenes 7 and 8, which U opened and
  *   abandoned (no play, no O); performer D on live scenes 9 (played today)
- *   and 10 (last played 800 days ago)
+ *   and 10 (last played 800 days ago); performer K on live scene 11, which
+ *   U watched 150 s of without a play
  * - rank-it-b: performer P, under another name, on scene 1
  *
  * User U has stats rows for P, X, S, SX, T and TX, and watch history on A's
- * scenes 1, 4 and 6 to 10 and B's scene 1; the rankings are computed from
+ * scenes 1, 4 and 6 to 11 and B's scene 1; the rankings are computed from
  * the history. Every seeded row is deleted before the file ends.
  *
  * Scenes are ranked when the stats page reads them, from the watch history;
@@ -39,6 +40,7 @@ const T = "7830201";
 const TX = "7830202";
 const Y = "7830003";
 const D = "7830004";
+const K = "7830005";
 const SCENE = (n: number) => `783030${n}`;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -80,6 +82,7 @@ async function seed(): Promise<void> {
       named(X, A, "Rank deleted performer", true),
       named(Y, A, "Rank abandoned performer"),
       named(D, A, "Rank decayed performer"),
+      named(K, A, "Rank partly watched performer"),
     ],
   });
   await prisma.stashStudio.createMany({
@@ -101,7 +104,7 @@ async function seed(): Promise<void> {
     data: [
       ...[1, 2, 3, 4, 5].map((n) => scene(n, A, S)),
       scene(6, A, SX),
-      ...[7, 8, 9, 10].map((n) => scene(n, A, null)),
+      ...[7, 8, 9, 10, 11].map((n) => scene(n, A, null)),
       scene(1, B, null),
     ],
   });
@@ -130,6 +133,7 @@ async function seed(): Promise<void> {
         [8, Y],
         [9, D],
         [10, D],
+        [11, K],
       ].map(([n, performerId]) => ({
         sceneId: SCENE(Number(n)),
         sceneInstanceId: A,
@@ -225,6 +229,8 @@ async function seed(): Promise<void> {
         playCount: 2,
         lastPlayedAt: new Date(Date.now() - 800 * DAY_MS),
       },
+      // Two and a half minutes watched, short of a play
+      { userId: u, instanceId: A, sceneId: SCENE(11), playDuration: 150 },
     ],
   });
 }
@@ -255,12 +261,12 @@ describeWithDb("Ranking compute (integration)", () => {
   it("a soft-deleted performer gets no ranking and never shows in top performers", async () => {
     const performers = await rankingsOf("performer");
     expect([...performers.keys()].sort()).toEqual(
-      [`${D}:${A}`, `${P}:${A}`, `${P}:${B}`, `${Y}:${A}`].sort()
+      [`${D}:${A}`, `${K}:${A}`, `${P}:${A}`, `${P}:${B}`, `${Y}:${A}`].sort()
     );
 
     const stats = await statsOf(u);
     expect(stats.topPerformers.map((p) => p.id)).not.toContain(X);
-    expect(stats.topPerformers).toHaveLength(4);
+    expect(stats.topPerformers).toHaveLength(5);
   });
 
   it("the top list names A's performer, not B's same id", async () => {
@@ -291,6 +297,19 @@ describeWithDb("Ranking compute (integration)", () => {
     expect(kept.openedCount).toBe(1);
     expect(kept.keptCount).toBe(1);
     expect(kept.affinity).toBeGreaterThan(abandoned.affinity);
+  });
+
+  it("a 150 s watch without a play counts as kept; a 30 s one does not", async () => {
+    const performers = await rankingsOf("performer");
+    const partly = must(performers.get(`${K}:${A}`));
+
+    expect(partly.playCount).toBe(0);
+    expect(partly.openedCount).toBe(1);
+    expect(partly.keptCount).toBe(1);
+    expect(must(performers.get(`${Y}:${A}`)).keptCount).toBe(0);
+    expect(partly.affinity).toBeGreaterThan(
+      must(performers.get(`${Y}:${A}`)).affinity
+    );
   });
 
   it("a play last made 800 days ago, or never dated, counts a quarter in the decayed sums", async () => {
