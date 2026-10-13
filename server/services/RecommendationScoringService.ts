@@ -129,6 +129,9 @@ export interface ScoringScene {
   favorite: boolean;
 }
 
+/** A scene as the library query reads it, before the user's own rating */
+export type LibraryScoringScene = Omit<ScoringScene, "rating" | "favorite">;
+
 export interface AffinityInput {
   performerRatings: RatingRow[];
   studioRatings: RatingRow[];

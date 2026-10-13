@@ -365,9 +365,6 @@ export type {
 // Proxy controller types
 export type { ProxyOptions } from "./proxy.js";
 
-// Recommendation scoring (server-internal)
-export type { ScoredSceneId } from "./library.js";
-
 // Playlist endpoint types
 export type {
   PlaylistItemWithScene,
