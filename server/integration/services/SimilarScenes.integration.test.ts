@@ -14,6 +14,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { applyWatchFactor } from "../../services/SimilarScenesService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -37,6 +38,13 @@ const T = "7820301";
 
 let u: number;
 let v: number;
+
+/** The weights the controller computes for default preferences */
+const weightsFor = (performer: string, tag?: string) => ({
+  performers: [[performer, 3]] as Array<[string, number]>,
+  studio: 2,
+  tags: tag ? ([[tag, 1.5]] as Array<[string, number]>) : [],
+});
 
 const keys = (rows: Array<{ sceneId: string; instanceId: string }>) =>
   rows.map((row) => `${row.sceneId}:${row.instanceId}`);
@@ -157,6 +165,7 @@ describeWithDb("Similar scenes (integration)", () => {
     const candidates = await stashEntityService.getSimilarSceneCandidates(
       { id: SEED, instanceId: A },
       u,
+      weightsFor(P, T),
       500
     );
     expect(keys(candidates)).toEqual([`${C_PERF}:${A}`, `${C_STUDIO}:${A}`]);
@@ -166,6 +175,7 @@ describeWithDb("Similar scenes (integration)", () => {
     const fromA = await stashEntityService.getSimilarSceneCandidates(
       { id: SEED, instanceId: A },
       v,
+      weightsFor(P, T),
       500
     );
     expect(keys(fromA)).toEqual([
@@ -173,11 +183,12 @@ describeWithDb("Similar scenes (integration)", () => {
       `${C_STUDIO}:${A}`,
       `${C_TAG}:${A}`,
     ]);
-    expect(fromA.map((c) => c.weight)).toEqual([3, 2, 1]);
+    expect(fromA.map((c) => c.weight)).toEqual([3, 2, 1.5]);
 
     const fromB = await stashEntityService.getSimilarSceneCandidates(
       { id: SEED, instanceId: B },
       v,
+      weightsFor(Q),
       500
     );
     expect(keys(fromB).sort()).toEqual([`${C_PERF}:${B}`, `${B_ONLY}:${B}`]);
@@ -187,6 +198,7 @@ describeWithDb("Similar scenes (integration)", () => {
     const candidates = await stashEntityService.getSimilarSceneCandidates(
       { id: SEED, instanceId: A },
       u,
+      weightsFor(P, T),
       500
     );
     expect(candidates).toHaveLength(2);
@@ -215,6 +227,7 @@ describeWithDb("Similar scenes (integration)", () => {
       const candidates = await stashEntityService.getSimilarSceneCandidates(
         { id: SEED, instanceId },
         v,
+        weightsFor(instanceId === A ? P : Q, instanceId === A ? T : undefined),
         500
       );
       expect(candidates.map((c) => c.sceneId)).not.toContain(SEED);
@@ -225,6 +238,7 @@ describeWithDb("Similar scenes (integration)", () => {
     const candidates = await stashEntityService.getSimilarSceneCandidates(
       { id: SEED, instanceId: A },
       v,
+      weightsFor(P, T),
       500
     );
     expect(candidates.map((c) => c.sceneId)).not.toContain(DELETED);
@@ -234,6 +248,7 @@ describeWithDb("Similar scenes (integration)", () => {
     const candidates = await stashEntityService.getSimilarSceneCandidates(
       { id: SEED, instanceId: A },
       v,
+      weightsFor(P, T),
       500
     );
     const copies = candidates.filter((c) => c.sceneId === C_PERF);
@@ -246,6 +261,36 @@ describeWithDb("Similar scenes (integration)", () => {
       allowedInstanceIds: [A, B],
     });
     expect(scenes.map((s) => `${s.id}:${s.instanceId}`)).toEqual([
+      `${C_PERF}:${A}`,
+    ]);
+  });
+  it("what the viewer kept sinks, by the history of that instance's scene", async () => {
+    const candidates = await stashEntityService.getSimilarSceneCandidates(
+      { id: SEED, instanceId: A },
+      v,
+      weightsFor(P, T),
+      500
+    );
+    // C_PERF 3, C_STUDIO 2, C_TAG 1.5. The viewer kept C_PERF two days ago
+    // here (3 * 0.3 = 0.9), and C_STUDIO on the other instance only.
+    await prisma.watchHistory.createMany({
+      data: [
+        {
+          userId: v,
+          instanceId: A,
+          sceneId: C_PERF,
+          playCount: 1,
+          lastPlayedAt: new Date(Date.now() - 2 * 86_400_000),
+        },
+        { userId: v, instanceId: B, sceneId: C_STUDIO, oCount: 2 },
+        // skipped: not kept
+        { userId: v, instanceId: A, sceneId: C_TAG, playDuration: 30 },
+      ],
+    });
+    const sunk = await applyWatchFactor(v, candidates);
+    expect(keys(sunk)).toEqual([
+      `${C_STUDIO}:${A}`,
+      `${C_TAG}:${A}`,
       `${C_PERF}:${A}`,
     ]);
   });
