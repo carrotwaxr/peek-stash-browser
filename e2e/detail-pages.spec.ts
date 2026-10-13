@@ -1,5 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 import { ListPage } from "./pages/ListPage";
+import { mustOk } from "./support/api";
 import { requireData } from "./support/data";
 import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
@@ -448,44 +449,48 @@ test.describe("Detail Pages", () => {
   test("a statistic on a performer page scrolls down to its tab", async ({
     page,
   }) => {
-    await page.goto("/performers");
-    await expect(page.getByPlaceholder("Search...")).toBeVisible({
-      timeout: 10_000,
-    });
-
-    const performerLinks = page.locator('a[href*="/performer/"]');
-    const hasPerformers = await performerLinks
-      .first()
-      .waitFor({ state: "visible", timeout: 10_000 })
-      .then(
-        () => true,
-        () => false
-      );
-    requireData(hasPerformers, "performers");
-
     // The count beside "Images:" is a button only when the performer has
-    // images, so open the first listed performer that has some.
-    const hrefs = [
-      ...new Set(
-        await performerLinks.evaluateAll((links) =>
-          links.map((a) => a.getAttribute("href") ?? "")
-        )
-      ),
-    ].slice(0, 10);
-    const stat = page.getByText("Images:", { exact: true });
-    const statButton = stat.locator("..").getByRole("button");
-    let found = false;
-    for (const href of hrefs) {
-      await page.goto(href);
-      await expect(page.getByText("Scenes:", { exact: true })).toBeVisible({
-        timeout: 10_000,
-      });
-      if ((await statButton.count()) > 0) {
-        found = true;
+    // images, so find one through the page's own counts and open only its
+    // page. Opening candidates one by one would load the app in full each
+    // time: under the Vite dev server that is some 450 modules a load, and
+    // after four or five Chromium refuses the page's requests
+    // (ERR_INSUFFICIENT_RESOURCES) before it collects the old pages.
+    const listed = await mustOk(
+      await page.request.post("/api/library/performers", {
+        data: { filter: { per_page: 50, sort: "name", direction: "ASC" } },
+      }),
+      "the performers list"
+    );
+    const performers = (
+      (await listed.json()) as {
+        findPerformers: { performers: { id: string; instanceId: string }[] };
+      }
+    ).findPerformers.performers;
+    requireData(performers[0], "performers");
+    let subject: { id: string; instanceId: string } | undefined;
+    for (const performer of performers) {
+      const counts = await mustOk(
+        await page.request.get(
+          `/api/library/performers/${encodeURIComponent(performer.id)}/counts?instanceId=${encodeURIComponent(performer.instanceId)}`
+        ),
+        `performer ${performer.id}'s counts`
+      );
+      if (
+        ((await counts.json()) as { counts: { images: number } }).counts
+          .images > 0
+      ) {
+        subject = performer;
         break;
       }
     }
-    requireData(found, "listed performers with images");
+    const target = requireData(subject, "performers with images");
+
+    await page.goto(
+      `/performer/${encodeURIComponent(target.id)}?instance=${encodeURIComponent(target.instanceId)}`
+    );
+    const stat = page.getByText("Images:", { exact: true });
+    const statButton = stat.locator("..").getByRole("button");
+    await expect(statButton).toBeVisible({ timeout: 10_000 });
 
     await stat.scrollIntoViewIfNeeded();
     const before = await page.evaluate(() => window.scrollY);
