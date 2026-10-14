@@ -1106,7 +1106,9 @@ const GALLERY_MEMBER_ID_FETCHERS: Record<
  * entities a cleanup soft-deleted), by type in SYNC_ORDER. One statement
  * per linked type: each source's ids are bound as one JSON list that drives
  * the junction's reverse index (or the column's index), and each linked id
- * is then looked up by primary key.
+ * is then looked up by primary key. Each id comes back once, however many
+ * sources it links to (a scene in three deleted groups): Stash refuses an
+ * `ids` list that repeats one ("duplicate id found").
  */
 async function linkedTo(
   instanceId: string,
@@ -1139,7 +1141,7 @@ async function linkedTo(
     }
     if (arms.length === 0) continue;
     const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-      `SELECT l.id AS id FROM (${arms.join("\nUNION\n")}) l
+      `SELECT DISTINCT l.id AS id FROM (${arms.join("\nUNION\n")}) l
        CROSS JOIN "${table}" e ON e."id" = l.id AND e."stashInstanceId" = ?
        WHERE e."deletedAt" IS NULL`,
       ...params,
