@@ -451,13 +451,21 @@ interface StashRequest {
 type IdsVariable = string | readonly string[] | null | undefined;
 const idList = (ids: IdsVariable) => (ids == null ? undefined : [ids].flat());
 
-/** One page of `rows` as `filter` asks for it, narrowed to `ids` when given */
+/**
+ * One page of `rows` as `filter` asks for it, narrowed to `ids` when given.
+ * An id list that repeats an id is refused, as Stash refuses it
+ * (`validateIDList` in internal/api/input.go).
+ */
 function page<T extends { id: string }>(
   rows: readonly T[],
   filter: FindFilterType | null | undefined,
   ids: IdsVariable
 ): { count: number; items: T[] } {
   const wanted = idList(ids);
+  const repeated = wanted?.find((id, i) => wanted.indexOf(id) !== i);
+  if (repeated !== undefined) {
+    throw new Error(`validating ids: duplicate id found: ${repeated}`);
+  }
   const matching = wanted
     ? rows.filter((row) => wanted.includes(row.id))
     : rows;
@@ -1362,6 +1370,54 @@ describeWithDb(
         `1@${JN_A}`,
         `2@${JN_A}`,
       ]);
+    });
+
+    it("groups deleted in Stash: a scene in several of them is fetched again once", async () => {
+      const groupLibrary = (
+        groupIds: string[],
+        sceneGroups: Record<string, string[]>
+      ) =>
+        library({
+          group: groupIds.map((id) => groupRow(id, [])),
+          scene: Object.entries(sceneGroups).map(([id, groups]) =>
+            sceneRow(id, { groups })
+          ),
+        });
+      await writeLibrary(
+        JN_A,
+        groupLibrary(["1", "2", "3"], { "1": ["1", "2", "3"], "2": ["2"] })
+      );
+      await markSynced(JN_A);
+      const requests = stubStashLibrary(
+        JN_A,
+        groupLibrary(["3"], { "1": ["3"], "2": [] })
+      );
+
+      const results = await stashSyncService["syncInstance"](
+        JN_A,
+        "incremental",
+        newRun()
+      );
+
+      expect(requests).toHaveLength(1);
+      const request = must(requests[0], "the refetch");
+      expect({ ...request, ids: [...request.ids].sort() }).toEqual({
+        op: "findScenes",
+        ids: ["1", "2"],
+      });
+      expect(
+        must(
+          results.find((r) => r.entityType === "scene"),
+          "the scene result"
+        ).error
+      ).toBeUndefined();
+      const links = await prisma.$queryRawUnsafe<
+        Array<{ sceneId: string; groupId: string }>
+      >(
+        `SELECT "sceneId", "groupId" FROM "SceneGroup" WHERE "sceneInstanceId" = ? ORDER BY 1, 2`,
+        JN_A
+      );
+      expect(links.map((l) => `${l.sceneId}:${l.groupId}`)).toEqual(["1:3"]);
     });
 
     it("a scene whose studio was deleted in Stash loses the studio on the next sync", async () => {

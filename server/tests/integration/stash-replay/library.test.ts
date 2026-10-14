@@ -108,6 +108,18 @@ describe("queryList", () => {
     expect(listIds(byTagIds, "tags")).toEqual(["100002"]);
   });
 
+  it("an ids list that repeats an id is refused, as Stash refuses it", () => {
+    const library = fixtureLibrary();
+
+    expect(() =>
+      queryList(library, "FindScenesCompact", "findScenes", {
+        ids: ["100002", "100004", "100002"],
+      })
+    ).toThrow(
+      "stash-replay refuses FindScenesCompact as Stash does: validating ids: duplicate id found: 100002"
+    );
+  });
+
   it("updated_at GREATER_THAN compares wall-clock time like Stash", () => {
     const library = fixtureLibrary();
     const newerThan = (value: string) =>

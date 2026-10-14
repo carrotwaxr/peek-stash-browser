@@ -278,6 +278,21 @@ function narrowByIds(
   return entities.filter((entity) => wanted.has(entity.id));
 }
 
+/**
+ * Stash refuses an `ids` list that repeats an id (`validateIDList` in
+ * internal/api/input.go), so the replay does too, and the run fails.
+ */
+function refuseRepeatedIds(operation: string, value: unknown): void {
+  if (!Array.isArray(value)) return;
+  const ids = value.map((id: unknown) => String(id));
+  const repeated = ids.find((id, i) => ids.indexOf(id) !== i);
+  if (repeated !== undefined) {
+    throw new ReplayUnsupported(
+      `stash-replay refuses ${operation} as Stash does: validating ids: duplicate id found: ${repeated}`
+    );
+  }
+}
+
 /** The filters whose `galleries` criterion the replay evaluates. */
 const GALLERY_CRITERION_ARGUMENTS = new Set(["image_filter", "scene_filter"]);
 
@@ -417,6 +432,7 @@ export function queryList(
   for (const [name, value] of Object.entries(args)) {
     if (value === undefined || value === null || name === "filter") continue;
     if (name === "ids" || name === INT_ID_ARGS[type]) {
+      if (name === "ids") refuseRepeatedIds(operation, value);
       matched = narrowByIds(matched, value, name, unsupported);
     } else if (name === FILTER_ARGS[type]) {
       matched = applyCriteria(matched, value, name, unsupported);
