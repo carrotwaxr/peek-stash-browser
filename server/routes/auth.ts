@@ -84,13 +84,15 @@ router.post("/login", authRateLimiter, async (req, res) => {
       id: true,
       username: true,
       password: true,
+      disabled: true,
+      plexOnly: true,
       role: true,
       landingPagePreference: true,
       setupCompleted: true,
     },
   });
 
-  if (!user) {
+  if (!user || user.disabled || user.plexOnly) {
     recordFailedAttempt(username, clientIp);
     res.status(401).json({ error: "Invalid credentials" });
     return;
@@ -175,7 +177,7 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { username },
-    select: { id: true, recoveryKeyHash: true },
+    select: { id: true, recoveryKeyHash: true, disabled: true, plexOnly: true },
   });
 
   if (!user) {
@@ -184,7 +186,9 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
     return;
   }
 
-  res.json({ hasRecoveryKey: !!user.recoveryKeyHash });
+  res.json({
+    hasRecoveryKey: !user.disabled && !user.plexOnly && !!user.recoveryKeyHash,
+  });
 });
 
 // Forgot password - verify recovery key and set new password
@@ -216,12 +220,14 @@ router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { username },
-    select: { id: true, recoveryKeyHash: true },
+    select: { id: true, recoveryKeyHash: true, disabled: true, plexOnly: true },
   });
 
   // Compared by hash: dashes and case in the input don't matter
   if (
     !user?.recoveryKeyHash ||
+    user.disabled ||
+    user.plexOnly ||
     !recoveryKeyMatches(recoveryKey, user.recoveryKeyHash)
   ) {
     res.status(401).json({ error: "Invalid username or recovery key" });

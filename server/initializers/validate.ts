@@ -1,3 +1,4 @@
+import { plexConfig } from "../services/PlexAuthService.js";
 import { getConfigDir } from "../utils/configDir.js";
 import { logger } from "../utils/logger.js";
 import { parseTrustedAddresses } from "../utils/proxyAuthTrust.js";
@@ -11,6 +12,7 @@ import { emptyToNull } from "../utils/sqlHelpers.js";
  * with environment variables used only for backward-compatible migration.
  */
 export const validateStartup = () => {
+  plexConfig();
   logger.info("=".repeat(60));
   logger.info("Peek Server Starting");
   logger.info("=".repeat(60));

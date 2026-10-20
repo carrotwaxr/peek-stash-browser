@@ -4,6 +4,7 @@ import { LOGIN_MESSAGE_STORAGE_KEY, REDIRECT_STORAGE_KEY } from "../../api";
 import { getLandingPage } from "../../constants/navigation";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../themes/useTheme";
+import PlexSignIn from "../auth/PlexSignIn";
 import Button from "../ui/Button";
 
 const Login = () => {
@@ -171,6 +172,7 @@ const Login = () => {
             </Link>
           </div>
         </form>
+        <PlexSignIn />
       </div>
     </div>
   );

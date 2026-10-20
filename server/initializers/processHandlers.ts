@@ -1,4 +1,5 @@
 import type { Server } from "http";
+import { stopPlexSync } from "../jobs/plexSync.js";
 import { disconnectComputeClient } from "../prisma/computeClient.js";
 import prisma from "../prisma/singleton.js";
 import { downloadJobQueue } from "../services/DownloadJobQueue.js";
@@ -68,6 +69,7 @@ export function isShuttingDown(): boolean {
 
 /** Disconnects both Prisma clients; never rejects. */
 export async function closeResources(): Promise<void> {
+  await stopPlexSync();
   await Promise.all([
     prisma.$disconnect().catch(() => undefined),
     disconnectComputeClient(),
@@ -125,6 +127,7 @@ export async function gracefulShutdown(
 
   // 2. No new requests; the ones in flight get the grace period
   if (httpServer) await closeHttpServer(httpServer);
+  await stopPlexSync();
   // A request that was running at the signal may have started or queued a
   // sync since; abort again so the release starts nothing
   stashSyncService.abort();

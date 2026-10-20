@@ -46,6 +46,7 @@ import {
   exclusionComputationService,
 } from "../services/ExclusionComputationService.js";
 import { bumpUser, forgetUser } from "../services/LibraryStamp.js";
+import { protectLocalRecovery } from "../services/LocalRecoveryService.js";
 import { setUserPassword } from "../services/PasswordService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import { rankingComputeService } from "../services/RankingComputeService.js";
@@ -146,7 +147,7 @@ import type {
   UpdateUserSettingsResponse,
   UpdateUserStashInstancesBody,
 } from "../types/api/user.js";
-import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
+import { dbWriteTransaction } from "../utils/dbWrite.js";
 import { userDownloadsDir } from "../utils/downloadPaths.js";
 import { type EntityRef, compositeKey, entityKey } from "../utils/entityRef.js";
 import { pinsOf, validateListPins } from "../utils/filterPins.js";
@@ -738,7 +739,7 @@ export const getRecoveryKey = async (
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { recoveryKeyHash: true },
+    select: { recoveryKeyHash: true, plexOnly: true },
   });
 
   if (!user) {
@@ -746,7 +747,7 @@ export const getRecoveryKey = async (
     return;
   }
 
-  res.json({ hasRecoveryKey: !!user.recoveryKeyHash });
+  res.json({ hasRecoveryKey: !user.plexOnly && !!user.recoveryKeyHash });
 };
 
 /**
@@ -770,7 +771,7 @@ export const regenerateRecoveryKey = async (
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { password: true },
+    select: { password: true, plexOnly: true },
   });
 
   if (!user) {
@@ -779,7 +780,8 @@ export const regenerateRecoveryKey = async (
   }
 
   // 400, not 401: the client treats 401 as a lost session
-  const validPassword = await bcrypt.compare(currentPassword, user.password);
+  const validPassword =
+    !user.plexOnly && (await bcrypt.compare(currentPassword, user.password));
   if (!validPassword) {
     res.status(400).json({ error: "Current password is incorrect" });
     return;
@@ -937,9 +939,10 @@ export const deleteUser = async (
   // library the heaviest user (42k rows: 18k plays, 6k stats and rankings,
   // 5k exclusions) held the lock 0.15 to 0.44 s, and 0.46 to 0.56 s with
   // its exclusions raised to 181k, so one unit is enough.
-  await dbWriteBatch("user.delete", [
-    prisma.user.delete({ where: { id: userIdInt } }),
-  ]);
+  await dbWriteTransaction("user.delete", async (tx) => {
+    await protectLocalRecovery(tx, userIdInt);
+    await tx.user.delete({ where: { id: userIdInt } });
+  });
   rankingComputeService.forget(userIdInt);
   recommendationService.forget(userIdInt);
   forgetUser(userIdInt);
@@ -988,15 +991,18 @@ export const updateUserRole = async (
   }
 
   // Update user role
-  const updatedUser = await prisma.user.update({
-    where: { id: userIdInt },
-    data: { role },
-    select: {
-      id: true,
-      username: true,
-      role: true,
-      updatedAt: true,
-    },
+  const updatedUser = await dbWriteTransaction("user.role", async (tx) => {
+    if (role === "USER") await protectLocalRecovery(tx, userIdInt);
+    return tx.user.update({
+      where: { id: userIdInt },
+      data: { role },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        updatedAt: true,
+      },
+    });
   });
 
   // Restrictions apply by role (item 13): promotion drops the restricted
@@ -2500,6 +2506,12 @@ export const adminRegenerateRecoveryKey = async (
   }
 
   // Only the hash is stored; the admin passes the key on
+  if (user.plexOnly) {
+    res
+      .status(403)
+      .json({ error: "Plex-only accounts cannot use local recovery" });
+    return;
+  }
   const newKey = generateRecoveryKey();
   await prisma.user.update({
     where: { id: userIdInt },
@@ -2743,18 +2755,23 @@ export const completeSetup = async (
   // Mark setup as complete and issue the first recovery key. The
   // conditional update issues at most one key per user: a repeated call
   // leaves the saved key alone and returns none.
+  const account = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { plexOnly: true },
+  });
   const key = generateRecoveryKey();
   const { count } = await prisma.user.updateMany({
     where: { id: userId, setupCompleted: false },
     data: {
       setupCompleted: true,
       setupCompletedAt: new Date(),
-      recoveryKeyHash: hashRecoveryKey(key),
+      recoveryKeyHash: account?.plexOnly ? null : hashRecoveryKey(key),
     },
   });
 
   res.json({
     success: true,
-    recoveryKey: count === 1 ? formatRecoveryKey(key) : null,
+    recoveryKey:
+      count === 1 && !account?.plexOnly ? formatRecoveryKey(key) : null,
   });
 };

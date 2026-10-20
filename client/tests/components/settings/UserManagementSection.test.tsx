@@ -16,6 +16,10 @@ import type * as ApiModule from "../../../src/api";
 import UserManagementTab from "../../../src/components/settings/tabs/UserManagementTab";
 import { ShortcutScopeProvider } from "../../../src/contexts/ShortcutScopeContext";
 
+vi.mock("../../../src/components/settings/PlexAdminSection", () => ({
+  default: () => null,
+}));
+
 const api = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPut: vi.fn(),

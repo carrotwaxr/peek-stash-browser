@@ -288,11 +288,11 @@ describe("initializeDatabase", () => {
     expect(vi.mocked(execFile)).toHaveBeenCalledExactlyOnceWith(
       process.execPath,
       [
-        stringContaining("prisma/build/index.js"),
+        stringContaining(path.join("prisma", "build", "index.js")),
         "migrate",
         "deploy",
         "--schema",
-        stringContaining("prisma/schema.prisma"),
+        stringContaining(path.join("prisma", "schema.prisma")),
       ],
       objectContaining({}),
       anyOf(Function)

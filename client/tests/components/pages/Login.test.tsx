@@ -9,6 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Login from "@/components/pages/Login";
 import { useAuth } from "@/hooks/useAuth";
 
+vi.mock("@/components/auth/PlexSignIn", () => ({ default: () => null }));
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(() => ({ login: vi.fn() })),
 }));

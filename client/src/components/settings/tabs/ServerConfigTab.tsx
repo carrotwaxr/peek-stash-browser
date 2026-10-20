@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import packageJson from "../../../../package.json";
+import PlexServerSection from "../PlexServerSection";
 import ServerStatsSection from "../ServerStatsSection";
 import StashInstanceSection from "../StashInstanceSection";
 import SyncSettingsSection from "../SyncSettingsSection";
@@ -15,6 +16,7 @@ const ServerConfigTab = () => {
     <div className="space-y-6">
       {/* Stash Instance Section */}
       <StashInstanceSection />
+      <PlexServerSection />
 
       {/* Sync Settings and Status Section */}
       <SyncSettingsSection syncStarts={syncStarts} />

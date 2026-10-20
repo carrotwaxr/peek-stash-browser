@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
 import { libraryStampFor } from "../services/LibraryStamp.js";
+import { plexAccessAllowed } from "../services/PlexAuthService.js";
 import {
   getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
@@ -16,6 +17,7 @@ import {
   isTrustedAddress,
   proxyPeerAddress,
 } from "../utils/proxyAuthTrust.js";
+import { secureRequestCookie } from "../utils/secureRequestCookie.js";
 
 // Token expires after 2 hours, but we refresh it if older than 1 hour
 // This gives users a 1-hour inactivity window before session expires
@@ -55,10 +57,17 @@ export interface AuthenticatedRequest extends Request {
  */
 export const generateToken = (
   user: { id: number; username: string; role: string },
-  authTime: number = nowSeconds()
+  authTime: number = nowSeconds(),
+  authProvider?: "plex"
 ) =>
   jwt.sign(
-    { id: user.id, username: user.username, role: user.role, authTime },
+    {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      authTime,
+      ...(authProvider ? { authProvider } : {}),
+    },
     getJwtSecret(),
     { expiresIn: `${TOKEN_EXPIRY_HOURS}h` }
   );
@@ -69,7 +78,7 @@ export const generateToken = (
 export const setTokenCookie = (res: Response, token: string) => {
   res.cookie("token", token, {
     httpOnly: true,
-    secure: process.env.SECURE_COOKIES === "true",
+    secure: secureRequestCookie(res.req),
     sameSite: "strict",
     maxAge: TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
   });
@@ -82,6 +91,7 @@ export const verifyToken = (token: string) => {
     role: string;
     iat?: number;
     authTime?: number;
+    authProvider?: "plex";
   };
 };
 
@@ -191,6 +201,11 @@ const authenticateUser = async (
     return await authenticateToken(req, res, next);
   }
 
+  if (!(await plexAccessAllowed(user.id))) {
+    res.status(401).json({ error: "Account access revoked" });
+    return;
+  }
+
   if (
     shouldLogOnce(compositeKey("proxy-auth-signin", user.username), ONE_HOUR_MS)
   ) {
@@ -246,6 +261,11 @@ export const authenticateToken = async (
   }
   const { passwordChangedAt, ...requestUser } = user;
 
+  if (!(await plexAccessAllowed(user.id, decoded.authProvider === "plex"))) {
+    res.status(401).json({ error: "Account access revoked" });
+    return;
+  }
+
   // A password change or reset ends every session issued before it, and a
   // session ends 30 days after its password sign-in even while in use
   if (
@@ -264,7 +284,8 @@ export const authenticateToken = async (
       // Keep the sign-in time, so refreshing never extends the 30 days
       const newToken = generateToken(
         { id: user.id, username: user.username, role: user.role },
-        decoded.authTime ?? decoded.iat
+        decoded.authTime ?? decoded.iat,
+        decoded.authProvider
       );
       setTokenCookie(res, newToken);
     }

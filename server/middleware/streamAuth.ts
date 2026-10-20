@@ -21,6 +21,7 @@
  */
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import prisma from "../prisma/singleton.js";
+import { plexAccessAllowed } from "../services/PlexAuthService.js";
 import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
 import {
   STREAM_LINK_TTL_SECONDS,
@@ -138,7 +139,7 @@ async function verifySignedRequest(
     where: { id: Number(uid) },
     select: { id: true, username: true, role: true, passwordChangedAt: true },
   });
-  if (!user) {
+  if (!user || !(await plexAccessAllowed(user.id, false, true))) {
     invalid(res);
     return;
   }

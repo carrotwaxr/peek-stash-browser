@@ -1486,6 +1486,17 @@ describe("User Controller", () => {
   // ─── deleteUser ───
 
   describe("deleteUser", () => {
+    it("refuses to delete the last enabled local recovery administrator", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 3, role: "ADMIN", disabled: false, plexOnly: false })
+      );
+      mockPrisma.user.count.mockResolvedValue(0);
+      const req = reqFor(deleteUser, { params: { userId: "3" }, user: ADMIN });
+      await expect(deleteUser(req, resFor(deleteUser))).rejects.toThrow(
+        "Keep a local administrator"
+      );
+      expect(mockPrisma.user.delete).not.toHaveBeenCalled();
+    });
     // No test here touches the real downloads folder
     let rm: MockInstance<typeof fs.promises.rm>;
     beforeEach(() => {
@@ -1553,7 +1564,7 @@ describe("User Controller", () => {
       expect(mockPrisma.userEntityRanking.deleteMany).not.toHaveBeenCalled();
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       const [ops] = must(mockPrisma.$transaction.mock.calls[0]);
-      expect(Array.isArray(ops) ? ops.length : 0).toBe(1);
+      expect(typeof ops).toBe("function");
     });
 
     it("drops the deleted user from the ranking and Recommended caches, after the delete", async () => {
@@ -1641,6 +1652,25 @@ describe("User Controller", () => {
   // ─── updateUserRole ───
 
   describe("updateUserRole", () => {
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockReset();
+      mockPrisma.user.count.mockReset();
+    });
+    it("refuses to demote the last enabled local recovery administrator", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 3, role: "ADMIN", disabled: false, plexOnly: false })
+      );
+      mockPrisma.user.count.mockResolvedValue(0);
+      const req = reqFor(updateUserRole, {
+        params: { userId: "3" },
+        body: { role: "USER" },
+        user: ADMIN,
+      });
+      await expect(updateUserRole(req, resFor(updateUserRole))).rejects.toThrow(
+        "Keep a local administrator"
+      );
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
     it("returns 403 when non-admin", async () => {
       const req = reqFor(updateUserRole, {
         body: { role: "ADMIN" },

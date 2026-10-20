@@ -14,6 +14,7 @@ import { formatDate } from "../../utils/date";
 import { Button, Paper } from "../ui/index";
 import CreateUserModal from "./CreateUserModal";
 import GroupModal from "./GroupModal";
+import PlexAdminSection from "./PlexAdminSection";
 import SyncFromStashModal from "./SyncFromStashModal";
 import UserEditModal from "./UserEditModal";
 
@@ -217,6 +218,7 @@ const UserManagementSection = ({
   return (
     <>
       {/* User Groups Section */}
+      <PlexAdminSection onUsersChanged={onUsersChanged} />
       <Paper className="mb-6">
         <Paper.Header>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">

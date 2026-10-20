@@ -3,6 +3,8 @@
 # client/src/components/video-player/plugins/ still reaches the build.
 
 # Secrets and user data
+.plex-key
+**/.plex-key
 **/.env
 **/.env.*
 .peek-data
@@ -57,3 +59,7 @@ plugins
 # OS files
 **/.DS_Store
 **/Thumbs.db
+
+# Persisted Plex instance settings belong in appdata
+**/plex-settings.json
+**/plex-settings.json.*.tmp

@@ -13,10 +13,12 @@ import {
 } from "../../../api";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
+import PlexAccountSection from "../PlexAccountSection";
 
 const COPY_FAILED = "Copy failed: the key is selected, press Ctrl+C";
 
 const AccountTab = () => {
+  const [plexOnly, setPlexOnly] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -124,8 +126,11 @@ const AccountTab = () => {
     }
   };
 
+  if (plexOnly) return <PlexAccountSection onPlexOnly={setPlexOnly} />;
+
   return (
     <div className="space-y-6">
+      <PlexAccountSection onPlexOnly={setPlexOnly} />
       {/* Change Password Section */}
       <form onSubmit={(e) => void changePassword(e)}>
         <div

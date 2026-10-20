@@ -404,3 +404,7 @@ Check:
 
 - [Quick Start Guide](quick-start.md)
 - [Troubleshooting](troubleshooting.md)
+
+## Plex sign-in
+
+Optional Plex authentication is available in this custom build. See [Plex sign-in](plex-authentication.md) for approval, account linking, reverse proxy configuration, and deployment.

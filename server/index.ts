@@ -15,6 +15,7 @@ import { hashLegacyRecoveryKeys } from "./initializers/recoveryKeys.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
 import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
+import { schedulePlexSync } from "./jobs/plexSync.js";
 import { configureSQLite } from "./prisma/singleton.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
 import { stashInstanceManager } from "./services/StashInstanceManager.js";
@@ -75,6 +76,7 @@ const main = async () => {
 
   // Schedule background jobs
   scheduleDownloadCleanup();
+  schedulePlexSync();
 
   // Only initialize cache if we have Stash instances configured
   if (stashConfig.needsSetup) {

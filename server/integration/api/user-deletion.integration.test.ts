@@ -4,7 +4,8 @@
  * Every table with a `userId` column holds per-user data. The list is read
  * from the database, so a table added later fails the first check here
  * until the test seeds it, and the delete is then proven for it too. Every
- * one cascades from User through a foreign key, so `deleteUser` deletes only
+ * one cascades from User through a foreign key, except the global Plex
+ * allowlist, whose userId is cleared while approval survives. `deleteUser` deletes only
  * the user. UserPerformerStats, UserStudioStats, UserTagStats and
  * UserEntityRanking had no key before `20260930000100`; data migration 008
  * deleted the rows earlier deletes had left behind there.
@@ -80,6 +81,10 @@ function seeders(
 ): Record<string, () => Promise<unknown>> {
   const entity = { userId, instanceId };
   return {
+    PlexIdentity: () =>
+      prisma.plexIdentity.create({
+        data: { accountId: String(900000000 + userId), approved: true, userId },
+      }),
     CustomTheme: () =>
       prisma.customTheme.create({
         data: { userId, name: "user-delete-it", config: {} },
@@ -220,6 +225,11 @@ describe("Deleting a user (integration)", () => {
     // then every userId row of theirs and of the orphan ids
     const ids = [...createdUserIds, ...orphanIds];
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    await prisma.plexIdentity.deleteMany({
+      where: {
+        accountId: { in: createdUserIds.map((id) => String(900000000 + id)) },
+      },
+    });
     for (const table of await userIdTables()) {
       for (const id of ids) {
         await prisma.$executeRawUnsafe(

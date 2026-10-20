@@ -47,6 +47,8 @@ export function userRow(overrides: Partial<User> = {}): User {
     id: 1,
     username: "testuser",
     password: "hashed-password",
+    disabled: false,
+    plexOnly: false,
     role: "USER",
     createdAt: EPOCH,
     updatedAt: EPOCH,

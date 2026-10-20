@@ -42,6 +42,7 @@ import libraryStudiosRoutes from "../routes/library/studios.js";
 import libraryTagsRoutes from "../routes/library/tags.js";
 import mergeReconciliationRoutes from "../routes/mergeReconciliation.js";
 import playlistRoutes from "../routes/playlist.js";
+import plexAuthRoutes from "../routes/plexAuth.js";
 import ratingsRoutes from "../routes/ratings.js";
 import setupRoutes from "../routes/setup.js";
 import syncRoutes from "../routes/sync.js";
@@ -127,6 +128,7 @@ export const setupAPI = () => {
 
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);
+  app.use("/api/auth/plex", plexAuthRoutes);
 
   // Setup wizard routes (mixed - some public for initial setup, some protected for settings)
   app.use("/api/setup", setupRoutes);
