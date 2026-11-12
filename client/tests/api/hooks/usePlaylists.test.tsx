@@ -15,6 +15,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as clientModule from "@/api/client";
 import {
   useAddScenesToPlaylist,
+  useCleanPlaylists,
+  useDeletePlaylists,
   useDuplicatePlaylist,
   useMovePlaylistItem,
   usePlaylist,
@@ -264,6 +266,24 @@ const MUTATIONS = [
     path: "/playlists/7/items/remove-unavailable",
     body: undefined,
     answer: { removed: 1 },
+  },
+  {
+    name: "useCleanPlaylists",
+    useIt: useCleanPlaylists,
+    variables: { playlistIds: [7, 8] },
+    method: mockApiPost,
+    path: "/playlists/clean",
+    body: { playlistIds: [7, 8] },
+    answer: { removed: 3, playlists: 2 },
+  },
+  {
+    name: "useDeletePlaylists",
+    useIt: useDeletePlaylists,
+    variables: { playlistIds: [7, 8] },
+    method: mockApiPost,
+    path: "/playlists/delete-many",
+    body: { playlistIds: [7, 8] },
+    answer: { deleted: 2 },
   },
 ] as const;
 

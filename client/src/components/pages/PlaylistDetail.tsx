@@ -246,6 +246,8 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
   const isOwner = data?.isOwner ?? false;
   // Only the owner is told about the items they cannot see (owner answer 1)
   const unavailableItems = isOwner ? (data?.unavailableItems ?? 0) : 0;
+  // Only what Remove deleted takes out: items whose scene Stash no longer has
+  const removableItems = isOwner ? (data?.removableItems ?? 0) : 0;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -439,11 +441,11 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
         );
       } else {
         showInfo(
-          "No deleted scenes to remove: the unavailable items are hidden, restricted or on servers you don't use"
+          "No deleted scenes to remove: the items you can't see are hidden, restricted or on servers you don't use"
         );
       }
     } catch {
-      showError("Failed to remove unavailable items");
+      showError("Failed to remove deleted items");
     }
   };
 
@@ -897,14 +899,14 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
                   <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                     {totalItems} {totalItems === 1 ? "video" : "videos"}
                   </p>
-                  {unavailableItems > 0 && (
+                  {removableItems > 0 && (
                     <>
                       <span
                         className="text-sm"
                         style={{ color: "var(--status-warning)" }}
-                        title="Items you can't play here: deleted from Stash, hidden, restricted or on a server you don't use"
+                        title="Items whose scene was deleted from Stash"
                       >
-                        {unavailableItems} unavailable
+                        {removableItems} deleted from Stash
                       </span>
                       <Button
                         onClick={() => setRemoveUnavailableConfirmOpen(true)}
@@ -912,7 +914,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
                         size="sm"
                         disabled={removeUnavailableMutation.isPending}
                       >
-                        Remove unavailable
+                        Remove deleted
                       </Button>
                     </>
                   )}
@@ -1201,7 +1203,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
         isOpen={removeUnavailableConfirmOpen}
         onClose={() => setRemoveUnavailableConfirmOpen(false)}
         onConfirm={() => void removeUnavailable()}
-        title="Remove unavailable"
+        title="Remove deleted"
         message={
           <>
             <p>

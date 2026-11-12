@@ -1159,19 +1159,20 @@ describe("PlaylistDetail Save as playlist order", () => {
   });
 });
 
-describe("PlaylistDetail unavailable items", () => {
+describe("PlaylistDetail items deleted from Stash", () => {
   const items = range(1, 3);
 
-  it("an owner with unavailable items sees '3 unavailable' and Remove unavailable, which posts to the remove-unavailable route", async () => {
+  it("an owner with items deleted from Stash sees '3 deleted from Stash' and Remove deleted, which posts to the remove-unavailable route", async () => {
     serve({
-      page: () => playlistPage(items, { unavailableItems: 3 }),
+      page: () =>
+        playlistPage(items, { unavailableItems: 5, removableItems: 3 }),
       queue: queueOf(items),
       permissions: {},
     });
     renderPage();
 
-    expect(await screen.findByText("3 unavailable")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Remove unavailable" }));
+    expect(await screen.findByText("3 deleted from Stash")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove deleted" }));
     const dialog = screen.getByRole("dialog");
     // It removes only what is deleted from Stash, and says so
     expect(dialog).toHaveTextContent("deleted from Stash");
@@ -1193,11 +1194,28 @@ describe("PlaylistDetail unavailable items", () => {
     );
   });
 
-  it("a recipient sees nothing about unavailable items", async () => {
+  it("an owner whose unavailable items are only hidden or restricted sees no Remove deleted", async () => {
+    serve({
+      page: () =>
+        playlistPage(items, { unavailableItems: 3, removableItems: 0 }),
+      queue: queueOf(items),
+      permissions: {},
+    });
+    renderPage();
+    await screen.findByText("Scene 1");
+
+    expect(screen.queryByText(/deleted from Stash/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove deleted" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("a recipient sees nothing about deleted or unavailable items", async () => {
     serve({
       page: () =>
         playlistPage(items, {
           unavailableItems: 3,
+          removableItems: 2,
           isOwner: false,
           accessLevel: "shared",
         }),
@@ -1207,9 +1225,11 @@ describe("PlaylistDetail unavailable items", () => {
     renderPage();
     await screen.findByText("Scene 1");
 
-    expect(screen.queryByText(/unavailable/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Remove unavailable" })
+      screen.queryByText(/unavailable|deleted from Stash/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove deleted" })
     ).not.toBeInTheDocument();
   });
 });

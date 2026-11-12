@@ -7,9 +7,12 @@ import type {
   AddSceneToPlaylistResponse,
   AddScenesToPlaylistRequest,
   AddScenesToPlaylistResponse,
+  BulkPlaylistIdsRequest,
+  CleanPlaylistsResponse,
   CreatePlaylistRequest,
   CreatePlaylistResponse,
   DeletePlaylistResponse,
+  DeletePlaylistsResponse,
   DuplicatePlaylistResponse,
   GetPlaylistQueueResponse,
   GetPlaylistResponse,
@@ -104,6 +107,14 @@ export const updatePlaylist = (
 
 export const deletePlaylist = (playlistId: number) =>
   apiDelete<DeletePlaylistResponse>(`/playlists/${playlistId}`);
+
+/** Remove the items deleted from Stash from several of the user's playlists */
+export const cleanPlaylists = (body: BulkPlaylistIdsRequest) =>
+  apiPost<CleanPlaylistsResponse>("/playlists/clean", body);
+
+/** Delete several of the user's playlists, with their items and shares */
+export const deletePlaylists = (body: BulkPlaylistIdsRequest) =>
+  apiPost<DeletePlaylistsResponse>("/playlists/delete-many", body);
 
 export const addSceneToPlaylist = (
   playlistId: number,

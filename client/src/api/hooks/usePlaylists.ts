@@ -1,5 +1,6 @@
 import type {
   AddScenesToPlaylistRequest,
+  BulkPlaylistIdsRequest,
   CreatePlaylistRequest,
   SortPlaylistRequest,
   UpdatePlaylistRequest,
@@ -14,8 +15,10 @@ import {
   type PlaylistPageParams,
   type PlaylistQueueParams,
   addScenesToPlaylist,
+  cleanPlaylists,
   createPlaylist,
   deletePlaylist,
+  deletePlaylists,
   duplicatePlaylist,
   getPlaylist,
   getPlaylistQueue,
@@ -122,6 +125,20 @@ export function useDuplicatePlaylist() {
 export function useDeletePlaylist() {
   return usePlaylistMutation(({ playlistId }: { playlistId: number }) =>
     deletePlaylist(playlistId)
+  );
+}
+
+/** Delete several playlists at once (the ones the viewer owns) */
+export function useDeletePlaylists() {
+  return usePlaylistMutation((body: BulkPlaylistIdsRequest) =>
+    deletePlaylists(body)
+  );
+}
+
+/** Remove the items deleted from Stash from several playlists at once */
+export function useCleanPlaylists() {
+  return usePlaylistMutation((body: BulkPlaylistIdsRequest) =>
+    cleanPlaylists(body)
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type {
   PlaylistPreviewItem,
@@ -14,15 +14,18 @@ import {
   Share2,
 } from "lucide-react";
 import {
+  useCleanPlaylists,
   useCreatePlaylist,
   useDeletePlaylist,
+  useDeletePlaylists,
   usePlaylists,
   useSharedPlaylists,
 } from "../../api/hooks";
+import { useCardSelection } from "../../hooks/useCardSelection";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { formatDate } from "../../utils/date";
-import { showError, showSuccess } from "../../utils/toast";
+import { showError, showInfo, showSuccess } from "../../utils/toast";
 import {
   DEFAULT_PLAYLIST_SORT,
   PLAYLIST_LIST_SORTS,
@@ -33,6 +36,7 @@ import {
   sortPlaylists,
 } from "../playlists/playlistListSort";
 import {
+  BulkActionBar,
   Button,
   ConfirmDialog,
   EmptyState,
@@ -58,6 +62,47 @@ const EmptyIcon = ({ icon: Icon }: { icon: LucideIcon }) => (
 );
 
 type PlaylistView = "grid" | "list";
+
+const plural = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
+interface SelectBoxProps {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+  /** Some, not all, are selected (a header's box) */
+  indeterminate?: boolean;
+}
+
+/** A playlist's or a table's selection checkbox, in the theme's accent */
+const SelectBox = ({
+  label,
+  checked,
+  onChange,
+  indeterminate = false,
+}: SelectBoxProps) => {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label={label}
+      checked={checked}
+      onChange={onChange}
+      className="w-5 h-5 cursor-pointer"
+      style={{ accentColor: "var(--accent-primary)" }}
+    />
+  );
+};
+
+/** What the page tracks for the user's own playlists' selection */
+interface PlaylistSelection {
+  selected: ReadonlySet<number>;
+  onToggle: (playlistId: number) => void;
+}
 
 const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
@@ -144,53 +189,88 @@ const PlaylistThumbnailGrid = ({
 interface PlaylistCardProps {
   playlist: PlaylistSummary;
   onDelete: (playlist: PlaylistSummary) => void;
+  selection: PlaylistSelection;
 }
 
 /** One of the user's playlists in the grid */
-const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
+const PlaylistCard = ({ playlist, onDelete, selection }: PlaylistCardProps) => {
   const count = playlist._count.items;
+  const isSelected = selection.selected.has(playlist.id);
+  const { selectionHandlers, handleNavigationClick } = useCardSelection({
+    entity: { id: playlist.id },
+    // Once something is selected, a click on the name selects, not opens
+    selectionMode: selection.selected.size > 0,
+    onToggleSelect: () => selection.onToggle(playlist.id),
+  });
   return (
-    <Paper>
-      <Paper.Body>
-        <div className="flex gap-4">
-          <PlaylistThumbnailGrid items={playlist.items} totalCount={count} />
-          <div className="flex-1 min-w-0">
-            <Link to={`/playlist/${playlist.id}`}>
-              <h3
-                className="text-lg font-semibold mb-2 hover:underline"
-                style={{ color: "var(--text-primary)" }}
+    <div
+      className="relative rounded-lg"
+      style={
+        isSelected
+          ? { outline: "2px solid var(--selection-color)", outlineOffset: 2 }
+          : undefined
+      }
+      {...selectionHandlers}
+    >
+      <div
+        className="absolute top-2 left-2 z-10 rounded p-1"
+        style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+      >
+        <SelectBox
+          label={`Select ${playlist.name}`}
+          checked={isSelected}
+          onChange={() => selection.onToggle(playlist.id)}
+        />
+      </div>
+      <Paper>
+        <Paper.Body>
+          <div className="flex gap-4">
+            <PlaylistThumbnailGrid
+              items={playlist.items}
+              totalCount={count}
+              placeholder
+            />
+            <div className="flex-1 min-w-0">
+              <Link
+                to={`/playlist/${playlist.id}`}
+                onClick={handleNavigationClick}
               >
-                {playlist.name}
-              </h3>
-            </Link>
-            {playlist.description ? (
-              <p
-                className="text-sm mb-4 line-clamp-2"
-                style={{ color: "var(--text-secondary)" }}
+                <h3
+                  className="text-lg font-semibold mb-2 hover:underline"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {playlist.name}
+                </h3>
+              </Link>
+              {playlist.description ? (
+                <p
+                  className="text-sm mb-4 line-clamp-2"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {playlist.description}
+                </p>
+              ) : null}
+              <div
+                className="flex items-center justify-between text-sm"
+                style={{ color: "var(--text-muted)" }}
               >
-                {playlist.description}
-              </p>
-            ) : null}
-            <div
-              className="flex items-center justify-between text-sm"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <span>
-                {count} {count === 1 ? "video" : "videos"}
-              </span>
-              <Button
-                onClick={() => onDelete(playlist)}
-                variant="destructive"
-                size="sm"
-                className="px-3 py-1"
-              >
-                Delete
-              </Button>
+                <span>
+                  {count} {count === 1 ? "video" : "videos"}
+                </span>
+                <Button
+                  onClick={() => onDelete(playlist)}
+                  variant="destructive"
+                  size="sm"
+                  className="px-3 py-1"
+                >
+                  Delete
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </Paper.Body>
-    </Paper>
+        </Paper.Body>
+      </Paper>
+    </div>
   );
 };
 
@@ -260,126 +340,160 @@ const cellClass = "py-2 px-4 align-middle";
 const PlaylistTable = ({
   rows,
   shared,
+  selection,
+  onToggleAll,
 }: {
   rows: PlaylistRow[];
   shared: boolean;
-}) => (
-  <div
-    className="rounded-lg border overflow-x-auto"
-    style={{
-      backgroundColor: "var(--bg-card)",
-      borderColor: "var(--border-color)",
-    }}
-  >
-    <table className="w-full">
-      <thead>
-        <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-          <th
-            className={headerClass}
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Name
-          </th>
-          {shared && (
-            <th
-              className={headerClass}
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Shared by
-            </th>
-          )}
-          <th
-            className={headerClass}
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Videos
-          </th>
-          {!shared && (
-            <th
-              className={headerClass}
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Deleted from Stash
-            </th>
-          )}
-          {!shared && (
-            <th
-              className={headerClass}
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Created
-            </th>
-          )}
-          <th
-            className={headerClass}
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Last changed
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr
-            key={row.id}
-            style={{ borderBottom: "1px solid var(--border-color)" }}
-          >
-            <td className={cellClass}>
-              <div className="flex items-center gap-3">
-                <PlaylistThumbnailGrid
-                  items={row.thumbnails}
-                  totalCount={row.count}
-                  sizeClass="w-12 h-12"
-                  placeholder
+  /** The user's own playlists can be selected; shared ones cannot */
+  selection?: PlaylistSelection;
+  onToggleAll?: () => void;
+}) => {
+  const selectedCount = selection
+    ? rows.filter((row) => selection.selected.has(row.id)).length
+    : 0;
+  return (
+    <div
+      className="rounded-lg border overflow-x-auto"
+      style={{
+        backgroundColor: "var(--bg-card)",
+        borderColor: "var(--border-color)",
+      }}
+    >
+      <table className="w-full">
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+            {selection && (
+              <th className={`${headerClass} w-10`}>
+                <SelectBox
+                  label="Select all playlists"
+                  checked={rows.length > 0 && selectedCount === rows.length}
+                  indeterminate={
+                    selectedCount > 0 && selectedCount < rows.length
+                  }
+                  onChange={() => onToggleAll?.()}
                 />
-                <Link
-                  to={`/playlist/${row.id}`}
-                  className="font-medium hover:underline"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  {row.name}
-                </Link>
-              </div>
-            </td>
+              </th>
+            )}
+            <th
+              className={headerClass}
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Name
+            </th>
             {shared && (
-              <td className={cellClass} style={{ color: "var(--text-muted)" }}>
-                {row.owner}
-              </td>
-            )}
-            <td
-              className={cellClass}
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {row.count}
-            </td>
-            {!shared && (
-              <td
-                className={cellClass}
+              <th
+                className={headerClass}
                 style={{ color: "var(--text-secondary)" }}
               >
-                {row.removable > 0 ? row.removable : ""}
-              </td>
+                Shared by
+              </th>
             )}
-            {!shared && (
-              <td
-                className={cellClass}
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {formatDate(row.createdAt, { empty: "" })}
-              </td>
-            )}
-            <td
-              className={cellClass}
+            <th
+              className={headerClass}
               style={{ color: "var(--text-secondary)" }}
             >
-              {formatDate(row.lastChangedAt, { empty: "" })}
-            </td>
+              Videos
+            </th>
+            {!shared && (
+              <th
+                className={headerClass}
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Deleted from Stash
+              </th>
+            )}
+            {!shared && (
+              <th
+                className={headerClass}
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Created
+              </th>
+            )}
+            <th
+              className={headerClass}
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Last changed
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={row.id}
+              style={{ borderBottom: "1px solid var(--border-color)" }}
+            >
+              {selection && (
+                <td className={cellClass}>
+                  <SelectBox
+                    label={`Select ${row.name}`}
+                    checked={selection.selected.has(row.id)}
+                    onChange={() => selection.onToggle(row.id)}
+                  />
+                </td>
+              )}
+              <td className={cellClass}>
+                <div className="flex items-center gap-3">
+                  <PlaylistThumbnailGrid
+                    items={row.thumbnails}
+                    totalCount={row.count}
+                    sizeClass="w-12 h-12"
+                    placeholder
+                  />
+                  <Link
+                    to={`/playlist/${row.id}`}
+                    className="font-medium hover:underline"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {row.name}
+                  </Link>
+                </div>
+              </td>
+              {shared && (
+                <td
+                  className={cellClass}
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {row.owner}
+                </td>
+              )}
+              <td
+                className={cellClass}
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {row.count}
+              </td>
+              {!shared && (
+                <td
+                  className={cellClass}
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {row.removable > 0 ? row.removable : ""}
+                </td>
+              )}
+              {!shared && (
+                <td
+                  className={cellClass}
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {formatDate(row.createdAt, { empty: "" })}
+                </td>
+              )}
+              <td
+                className={cellClass}
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {formatDate(row.lastChangedAt, { empty: "" })}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 interface PlaylistToolbarProps {
   search: string;
@@ -464,6 +578,10 @@ const Playlists = () => {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
+  const cleanPlaylistsMutation = useCleanPlaylists();
+  const deletePlaylistsMutation = useDeletePlaylists();
+  const [cleanConfirmOpen, setCleanConfirmOpen] = useState(false);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [playlistToDelete, setPlaylistToDelete] =
     useState<PlaylistSummary | null>(null);
@@ -572,6 +690,85 @@ const Playlists = () => {
       sortDirection
     );
   }, [sharedPlaylists, search, sortField, sortDirection]);
+
+  // The selection belongs to what the page shows: a new tab, search or sort
+  // starts it over (state adjusted during render, so no frame shows ids the
+  // page no longer lists)
+  const selectionContext = [activeTab, search, sortField, sortDirection].join(
+    "\0"
+  );
+  const [selectionState, setSelectionState] = useState({
+    context: selectionContext,
+    ids: new Set<number>(),
+  });
+  if (selectionState.context !== selectionContext) {
+    setSelectionState({ context: selectionContext, ids: new Set() });
+  }
+  const selectedIds = selectionState.ids;
+  const selectedRows = isShared
+    ? []
+    : ownRows.filter((row) => selectedIds.has(row.id));
+  const clearSelection = () =>
+    setSelectionState({ context: selectionContext, ids: new Set() });
+  const toggleSelected = (playlistId: number) => {
+    const ids = new Set(selectedIds);
+    if (!ids.delete(playlistId)) ids.add(playlistId);
+    setSelectionState({ context: selectionContext, ids });
+  };
+  const selectAllShown = () =>
+    setSelectionState({
+      context: selectionContext,
+      ids: new Set(ownRows.map((row) => row.id)),
+    });
+  const toggleAllShown = () =>
+    selectedRows.length === ownRows.length
+      ? clearSelection()
+      : selectAllShown();
+  const selection: PlaylistSelection = {
+    selected: selectedIds,
+    onToggle: toggleSelected,
+  };
+
+  const removableTotal = selectedRows.reduce(
+    (sum, row) => sum + row.removable,
+    0
+  );
+  const cleanablePlaylists = selectedRows.filter((row) => row.removable > 0);
+
+  const confirmClean = async () => {
+    try {
+      const { removed, playlists: changed } =
+        await cleanPlaylistsMutation.mutateAsync({
+          playlistIds: selectedRows.map((row) => row.id),
+        });
+      if (removed > 0) {
+        showSuccess(
+          `Removed ${plural(removed, "item", "items")} from ${plural(changed, "playlist", "playlists")}`
+        );
+      } else {
+        showInfo("Nothing deleted from Stash was left to remove");
+      }
+      clearSelection();
+    } catch {
+      showError("Failed to clean the playlists");
+    } finally {
+      setCleanConfirmOpen(false);
+    }
+  };
+
+  const confirmBulkDelete = async () => {
+    try {
+      const { deleted } = await deletePlaylistsMutation.mutateAsync({
+        playlistIds: selectedRows.map((row) => row.id),
+      });
+      showSuccess(`Deleted ${plural(deleted, "playlist", "playlists")}`);
+      clearSelection();
+    } catch {
+      showError("Failed to delete the playlists");
+    } finally {
+      setBulkDeleteConfirmOpen(false);
+    }
+  };
 
   const createPlaylist = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -703,7 +900,12 @@ const Playlists = () => {
               {ownRows.length === 0 ? (
                 noMatches
               ) : view === "list" ? (
-                <PlaylistTable rows={ownRows} shared={false} />
+                <PlaylistTable
+                  rows={ownRows}
+                  shared={false}
+                  selection={selection}
+                  onToggleAll={toggleAllShown}
+                />
               ) : (
                 <div className={GRID_CLASS}>
                   {ownRows.map((row) => (
@@ -711,6 +913,7 @@ const Playlists = () => {
                       key={row.id}
                       playlist={row.playlist}
                       onDelete={handleDeleteClick}
+                      selection={selection}
                     />
                   ))}
                 </div>
@@ -822,6 +1025,75 @@ const Playlists = () => {
           </div>
         </form>
       </Modal>
+
+      {selectedRows.length > 0 && (
+        <BulkActionBar
+          selectedCount={selectedRows.length}
+          countLabel="selected"
+          onClearSelection={clearSelection}
+          onSelectAll={selectAllShown}
+          selectAllCount={ownRows.length}
+          actions={
+            <>
+              <Button
+                onClick={() => setCleanConfirmOpen(true)}
+                variant="secondary"
+                size="sm"
+                disabled={removableTotal === 0}
+                title={
+                  removableTotal === 0
+                    ? "Nothing deleted from Stash in the selection"
+                    : "Remove the items deleted from Stash"
+                }
+              >
+                Clean
+              </Button>
+              <Button
+                onClick={() => setBulkDeleteConfirmOpen(true)}
+                variant="destructive"
+                size="sm"
+                aria-label="Delete selected playlists"
+              >
+                Delete
+              </Button>
+            </>
+          }
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={cleanConfirmOpen}
+        onClose={() => setCleanConfirmOpen(false)}
+        onConfirm={() => void confirmClean()}
+        title="Clean playlists"
+        message={
+          <>
+            <p>
+              Remove {plural(removableTotal, "item", "items")} deleted from
+              Stash from{" "}
+              {plural(cleanablePlaylists.length, "playlist", "playlists")}?
+            </p>
+            <p className="mt-2">
+              Hidden or restricted scenes, and scenes on servers you don&apos;t
+              use, stay. Removed items can&apos;t come back.
+            </p>
+          </>
+        }
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmStyle="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={bulkDeleteConfirmOpen}
+        onClose={() => setBulkDeleteConfirmOpen(false)}
+        onConfirm={() => void confirmBulkDelete()}
+        title="Delete playlists"
+        message={`Delete ${plural(selectedRows.length, "playlist", "playlists")}? This cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmStyle="danger"
+      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

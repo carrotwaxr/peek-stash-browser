@@ -6,6 +6,7 @@ import type {
   PlaylistSummary,
 } from "@peek/shared-types";
 import {
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -390,7 +391,9 @@ describe("Playlists page", () => {
         .getAllByRole("columnheader")
         .map((h) => h.textContent);
 
+      // The first column holds each row's checkbox
       expect(headers).toEqual([
+        "",
         "Name",
         "Videos",
         "Deleted from Stash",
@@ -402,6 +405,7 @@ describe("Playlists page", () => {
       // Apple: 9 videos, 4 deleted from Stash; the others show none
       const apple = within(must(rows[1])).getAllByRole("cell");
       expect(apple.map((c) => c.textContent)).toEqual([
+        "",
         "Apple",
         "9",
         "4",
@@ -409,7 +413,7 @@ describe("Playlists page", () => {
         "Feb 1, 2026",
       ]);
       expect(
-        must(within(must(rows[0])).getAllByRole("cell")[2]).textContent
+        must(within(must(rows[0])).getAllByRole("cell")[3]).textContent
       ).toBe("");
     });
 
@@ -497,5 +501,241 @@ describe("Playlists page", () => {
         ]);
       });
     });
+  });
+});
+
+describe("Playlists page selection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    playlists = [
+      {
+        ...summary(11, "Alpha", 20),
+        removableItems: 10,
+        lastChangedAt: "2026-04-01T00:00:00.000Z",
+      },
+      {
+        ...summary(12, "Bravo", 8),
+        removableItems: 3,
+        lastChangedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        ...summary(13, "Charlie", 5),
+        removableItems: 1,
+        lastChangedAt: "2026-02-01T00:00:00.000Z",
+      },
+      {
+        ...summary(14, "Delta", 2),
+        lastChangedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    shared = [];
+    serve();
+  });
+
+  function renderPage(url = "/playlists") {
+    return render(
+      <MemoryRouterWithQuery initialEntries={[url]}>
+        <Playlists />
+        <LocationProbe />
+      </MemoryRouterWithQuery>
+    );
+  }
+
+  const box = (name: string) =>
+    screen.getByRole("checkbox", { name: `Select ${name}` });
+
+  /** The ids a bulk call sent, in ascending order */
+  function sentIds(path: string): number[] {
+    const call = mockApiPost.mock.calls.find(([to]) => to === path);
+    const body = must(call)[1] as { playlistIds: number[] };
+    return [...body.playlistIds].sort((a, b) => a - b);
+  }
+
+  it("each card has a checkbox, and checking two shows the bar with Clean and Delete", async () => {
+    renderPage();
+    await screen.findByText("Alpha");
+    expect(screen.queryByText("selected")).toBeNull();
+
+    fireEvent.click(box("Alpha"));
+    fireEvent.click(box("Bravo"));
+
+    expect(await screen.findByText("selected")).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Clean" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Delete selected playlists" })
+    ).toBeTruthy();
+    expect(box("Alpha")).toBeChecked();
+    expect(box("Charlie")).not.toBeChecked();
+  });
+
+  it("each list row has a checkbox and the header's selects every row", async () => {
+    renderPage("/playlists?view=list");
+    await screen.findByText("Alpha");
+
+    fireEvent.click(box("Delta"));
+    expect(screen.getByText("selected")).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select all playlists" })
+    );
+    for (const name of ["Alpha", "Bravo", "Charlie", "Delta"]) {
+      expect(box(name)).toBeChecked();
+    }
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select all playlists" })
+    );
+    expect(screen.queryByText("selected")).toBeNull();
+  });
+
+  it("Select All selects every playlist the search shows", async () => {
+    renderPage("/playlists?q=a");
+    // "a" matches Alpha, Bravo, Charlie and Delta; narrow it to two
+    fireEvent.change(
+      await screen.findByPlaceholderText("Search playlists..."),
+      {
+        target: { value: "ha" },
+      }
+    );
+    await waitFor(() => expect(shownNames()).toEqual(["Alpha", "Charlie"]));
+
+    fireEvent.click(box("Alpha"));
+    fireEvent.click(screen.getByRole("button", { name: "Select All (2)" }));
+
+    expect(box("Charlie")).toBeChecked();
+    expect(screen.getByText("2")).toBeTruthy();
+  });
+
+  it("Clean confirms the removable total, posts the ids, toasts and clears", async () => {
+    mockApiPost.mockResolvedValue({ removed: 14, playlists: 3 });
+    renderPage();
+    await screen.findByText("Alpha");
+    fireEvent.click(box("Alpha"));
+    fireEvent.click(box("Bravo"));
+    fireEvent.click(box("Charlie"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Clean" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(
+      "Remove 14 items deleted from Stash from 3 playlists?"
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+    await waitFor(() =>
+      expect(showSuccess).toHaveBeenCalledWith(
+        "Removed 14 items from 3 playlists"
+      )
+    );
+    expect(sentIds("/playlists/clean")).toEqual([11, 12, 13]);
+    await waitFor(() => expect(screen.queryByText("selected")).toBeNull());
+    expect(box("Alpha")).not.toBeChecked();
+  });
+
+  it("Clean is disabled, and says why, when nothing in the selection is deleted from Stash", async () => {
+    renderPage();
+    await screen.findByText("Alpha");
+    fireEvent.click(box("Delta"));
+
+    const clean = screen.getByRole("button", { name: "Clean" });
+
+    expect(clean).toBeDisabled();
+    expect(clean).toHaveAttribute(
+      "title",
+      "Nothing deleted from Stash in the selection"
+    );
+  });
+
+  it("a failed clean shows the error and keeps the selection", async () => {
+    mockApiPost.mockRejectedValue(new Error("nope"));
+    renderPage();
+    await screen.findByText("Alpha");
+    fireEvent.click(box("Alpha"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Clean" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+    await waitFor(() =>
+      expect(showError).toHaveBeenCalledWith("Failed to clean the playlists")
+    );
+    expect(box("Alpha")).toBeChecked();
+  });
+
+  it("Delete confirms, posts to delete-many, toasts and clears", async () => {
+    mockApiPost.mockResolvedValue({ deleted: 2 });
+    renderPage();
+    await screen.findByText("Alpha");
+    fireEvent.click(box("Bravo"));
+    fireEvent.click(box("Delta"));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete selected playlists" })
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(
+      "Delete 2 playlists? This cannot be undone."
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(showSuccess).toHaveBeenCalledWith("Deleted 2 playlists")
+    );
+    expect(sentIds("/playlists/delete-many")).toEqual([12, 14]);
+    await waitFor(() => expect(screen.queryByText("selected")).toBeNull());
+  });
+
+  it("the Shared tab has no checkboxes", async () => {
+    shared = [
+      {
+        id: 7,
+        name: "Zulu",
+        description: null,
+        sceneCount: 2,
+        owner: { id: 2, username: "bob" },
+        sharedViaGroups: ["crew"],
+        sharedAt: "2026-01-05T00:00:00.000Z",
+        items: [],
+      },
+    ];
+    renderPage("/playlists?tab=shared");
+    await screen.findByText("Zulu");
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+
+    cleanup();
+    renderPage("/playlists?tab=shared&view=list");
+    await screen.findByText("Zulu");
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+  });
+
+  it("changing the search, the sort or the tab clears the selection", async () => {
+    renderPage();
+    await screen.findByText("Alpha");
+
+    fireEvent.click(box("Alpha"));
+    fireEvent.change(screen.getByPlaceholderText("Search playlists..."), {
+      target: { value: "a" },
+    });
+    await waitFor(() => expect(screen.queryByText("selected")).toBeNull());
+
+    fireEvent.click(box("Alpha"));
+    fireEvent.change(screen.getByLabelText("Sort by"), {
+      target: { value: "name" },
+    });
+    await waitFor(() => expect(screen.queryByText("selected")).toBeNull());
+
+    fireEvent.click(box("Alpha"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sort direction: ascending" })
+    );
+    await waitFor(() => expect(screen.queryByText("selected")).toBeNull());
+
+    fireEvent.click(box("Alpha"));
+    fireEvent.click(screen.getByRole("button", { name: /Shared with Me/ }));
+    await screen.findByText("No shared playlists");
+    fireEvent.click(screen.getByRole("button", { name: /My Playlists/ }));
+    await screen.findByText("Alpha");
+    expect(screen.queryByText("selected")).toBeNull();
+    expect(box("Alpha")).not.toBeChecked();
   });
 });

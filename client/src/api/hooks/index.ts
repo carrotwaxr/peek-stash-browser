@@ -57,6 +57,8 @@ export {
   usePlaylistQueue,
   useCreatePlaylist,
   useDeletePlaylist,
+  useDeletePlaylists,
+  useCleanPlaylists,
   useAddScenesToPlaylist,
   useMovePlaylistItem,
   useRemovePlaylistItems,
