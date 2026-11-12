@@ -69,6 +69,7 @@ import {
   showWarning,
 } from "../../utils/toast";
 import { ThemedIcon } from "../icons/index";
+import PlaylistSuggestions from "../playlist/PlaylistSuggestions";
 import PlaylistSortControl from "../playlists/PlaylistSortControl";
 import SharePlaylistModal from "../playlists/SharePlaylistModal";
 import AddToPlaylistButton from "../ui/AddToPlaylistButton";
@@ -80,6 +81,7 @@ import PageLayout from "../ui/PageLayout";
 import Pagination from "../ui/Pagination";
 import Paper from "../ui/Paper";
 import SceneListItem from "../ui/SceneListItem";
+import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 
 type Direction = "ASC" | "DESC";
 type Repeat = PlaybackQueue["repeat"];
@@ -141,6 +143,24 @@ function writeView(params: URLSearchParams, view: PlaylistView) {
   if (view.perPage !== PER_PAGE_DEFAULT) {
     next.set("per_page", String(view.perPage));
   } else next.delete("per_page");
+  return next;
+}
+
+/**
+ * A tab switch on this page: only `tab` changes, and the Suggestions page
+ * (`spage`) goes. The Items view's own keys (`sort`, `direction`, `page`,
+ * `per_page`) stay, so Items reads as it was left; `switchTabParams` would
+ * drop `sort` and `page` but not `direction`.
+ */
+function switchPlaylistTab(
+  params: URLSearchParams,
+  tabId: string,
+  defaultTab: string
+) {
+  const next = new URLSearchParams(params);
+  next.delete("spage");
+  if (tabId === defaultTab) next.delete("tab");
+  else next.set("tab", tabId);
   return next;
 }
 
@@ -217,6 +237,9 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
   const { hasMultipleInstances } = useConfig();
   const { user } = useAuth();
   const userId = user?.id;
+  const [searchParams] = useSearchParams();
+  // Items is the default tab; `tab` is read by TabNavigation too
+  const suggestionsTab = searchParams.get("tab") === "suggestions";
 
   const { sort, direction } = orderOf(view);
   const order = useMemo<PlaylistQueueParams>(
@@ -246,6 +269,8 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
   const isOwner = data?.isOwner ?? false;
   // Only the owner is told about the items they cannot see (owner answer 1)
   const unavailableItems = isOwner ? (data?.unavailableItems ?? 0) : 0;
+  // Only what Remove deleted takes out: items whose scene Stash no longer has
+  const removableItems = isOwner ? (data?.removableItems ?? 0) : 0;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -439,11 +464,11 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
         );
       } else {
         showInfo(
-          "No deleted scenes to remove: the unavailable items are hidden, restricted or on servers you don't use"
+          "No deleted scenes to remove: the items you can't see are hidden, restricted or on servers you don't use"
         );
       }
     } catch {
-      showError("Failed to remove unavailable items");
+      showError("Failed to remove deleted items");
     }
   };
 
@@ -897,14 +922,14 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
                   <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                     {totalItems} {totalItems === 1 ? "video" : "videos"}
                   </p>
-                  {unavailableItems > 0 && (
+                  {removableItems > 0 && (
                     <>
                       <span
                         className="text-sm"
                         style={{ color: "var(--status-warning)" }}
-                        title="Items you can't play here: deleted from Stash, hidden, restricted or on a server you don't use"
+                        title="Items whose scene was deleted from Stash"
                       >
-                        {unavailableItems} unavailable
+                        {removableItems} deleted from Stash
                       </span>
                       <Button
                         onClick={() => setRemoveUnavailableConfirmOpen(true)}
@@ -912,7 +937,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
                         size="sm"
                         disabled={removeUnavailableMutation.isPending}
                       >
-                        Remove unavailable
+                        Remove deleted
                       </Button>
                     </>
                   )}
@@ -945,8 +970,27 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
           )}
         </div>
 
-        {/* Scenes List */}
-        {totalItems === 0 ? (
+        <TabNavigation
+          tabs={[
+            { id: "items", label: "Items", count: totalItems },
+            {
+              id: "suggestions",
+              label: "Suggestions",
+              count: TAB_COUNT_LOADING,
+            },
+          ]}
+          defaultTab="items"
+          switchParams={switchPlaylistTab}
+          showEmpty
+        />
+
+        {suggestionsTab ? (
+          <PlaylistSuggestions
+            playlistId={playlistId}
+            playlistEmpty={totalItems === 0}
+          />
+        ) : /* Scenes List */
+        totalItems === 0 ? (
           <div className="text-center py-16">
             <div
               className="text-6xl mb-4"
@@ -1099,48 +1143,51 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
           </div>
         )}
 
-        {selectedScenes.length > 0 && !isEditing && !reorderMode && (
-          <BulkActionBar
-            selectedScenes={selectedScenes}
-            onClearSelection={handleDeselectAll}
-            onSelectAll={handleSelectAll}
-            selectAllCount={items.length}
-            actions={
-              <>
-                <AddToPlaylistButton
-                  scenes={selectedScenes}
-                  buttonText={
-                    (
-                      <span>
-                        <span className="hidden sm:inline">
-                          Add {selectedScenes.length} to Playlist
+        {!suggestionsTab &&
+          selectedScenes.length > 0 &&
+          !isEditing &&
+          !reorderMode && (
+            <BulkActionBar
+              selectedScenes={selectedScenes}
+              onClearSelection={handleDeselectAll}
+              onSelectAll={handleSelectAll}
+              selectAllCount={items.length}
+              actions={
+                <>
+                  <AddToPlaylistButton
+                    scenes={selectedScenes}
+                    buttonText={
+                      (
+                        <span>
+                          <span className="hidden sm:inline">
+                            Add {selectedScenes.length} to Playlist
+                          </span>
+                          <span className="sm:hidden">Add to Playlist</span>
                         </span>
-                        <span className="sm:hidden">Add to Playlist</span>
-                      </span>
-                    ) as unknown as string
-                  }
-                  icon={<Plus className="w-4 h-4" />}
-                  dropdownPosition="above"
-                  excludePlaylistIds={[playlist.id]}
-                  onSuccess={handleDeselectAll}
-                />
-                {isOwner && (
-                  <Button
-                    onClick={handleBulkRemoveClick}
-                    variant="destructive"
-                    size="sm"
-                    className="flex items-center gap-1.5"
-                    aria-label={`Remove ${selectedItems.length}`}
-                    title={`Remove ${plural(selectedItems.length, "scene", "scenes")} from this playlist`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Remove</span>
-                  </Button>
-                )}
-              </>
-            }
-          />
-        )}
+                      ) as unknown as string
+                    }
+                    icon={<Plus className="w-4 h-4" />}
+                    dropdownPosition="above"
+                    excludePlaylistIds={[playlist.id]}
+                    onSuccess={handleDeselectAll}
+                  />
+                  {isOwner && (
+                    <Button
+                      onClick={handleBulkRemoveClick}
+                      variant="destructive"
+                      size="sm"
+                      className="flex items-center gap-1.5"
+                      aria-label={`Remove ${selectedItems.length}`}
+                      title={`Remove ${plural(selectedItems.length, "scene", "scenes")} from this playlist`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Remove</span>
+                    </Button>
+                  )}
+                </>
+              }
+            />
+          )}
       </PageLayout>
 
       {/* Remove Scene Confirmation Dialog */}
@@ -1201,7 +1248,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
         isOpen={removeUnavailableConfirmOpen}
         onClose={() => setRemoveUnavailableConfirmOpen(false)}
         onConfirm={() => void removeUnavailable()}
-        title="Remove unavailable"
+        title="Remove deleted"
         message={
           <>
             <p>

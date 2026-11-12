@@ -239,3 +239,47 @@ describe("SceneGrid selection", () => {
     expect(pressed()).toEqual(["card-12-b", "card-13-a"]);
   });
 });
+
+describe("SceneGrid extraBulkActions", () => {
+  const scenes = ["1", "2"].map(
+    (id) => ({ id, instanceId: "a", title: id }) as NormalizedScene
+  );
+
+  it("renders the page's actions in the bulk bar before Hide, and clear empties the selection", () => {
+    render(
+      <MemoryRouterWithQuery>
+        <SceneGrid
+          scenes={scenes}
+          extraBulkActions={(selected, clear) => (
+            <button type="button" onClick={clear}>
+              {`Extra ${selected.length}`}
+            </button>
+          )}
+        />
+      </MemoryRouterWithQuery>
+    );
+    fireEvent.click(screen.getByTestId("card-1-a"));
+    fireEvent.click(screen.getByTestId("card-2-a"));
+
+    const extra = screen.getByRole("button", { name: "Extra 2" });
+    const hide = screen.getByRole("button", { name: /Hide/ });
+    expect(
+      extra.compareDocumentPosition(hide) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+
+    fireEvent.click(extra);
+
+    expect(screen.queryByRole("button", { name: /Extra/ })).toBeNull();
+  });
+
+  it("adds nothing without the prop", () => {
+    render(
+      <MemoryRouterWithQuery>
+        <SceneGrid scenes={scenes} />
+      </MemoryRouterWithQuery>
+    );
+    fireEvent.click(screen.getByTestId("card-1-a"));
+
+    expect(screen.queryByRole("button", { name: /Extra/ })).toBeNull();
+  });
+});

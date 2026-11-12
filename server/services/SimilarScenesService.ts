@@ -7,6 +7,7 @@
  * `StashEntityService.getSimilarSceneCandidates` as JSON; the watch factor
  * reorders its top candidates before the page is cut.
  */
+import type { RecommendationPreferences } from "@peek/shared-types/recommendationPreferences.js";
 import prisma from "../prisma/singleton.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { rawDate } from "../utils/rawDate.js";
@@ -52,6 +53,24 @@ export interface SimilarWeights {
 }
 
 /**
+ * What a shared performer is worth before any share: 1.5 when the viewer's
+ * preferences make them a partner (the viewer has leads and the performer's
+ * gender is a partner gender), otherwise 3. Playlist suggestions read the
+ * same rule.
+ */
+export function performerBaseWeight(
+  gender: string | null,
+  prefs: RecommendationPreferences
+): number {
+  const partnerGenders: readonly string[] = prefs.partnerGenders;
+  return prefs.leadGenders.length > 0 &&
+    gender !== null &&
+    partnerGenders.includes(gender)
+    ? SIMILAR_PARTNER_WEIGHT
+    : SIMILAR_PERFORMER_WEIGHT;
+}
+
+/**
  * The weights for a seed scene as the viewer sees it. Performers weigh 3,
  * or 1.5 when the viewer's preferences make them a partner (the viewer has
  * leads and the performer's gender is a partner gender); the studio 2; a
@@ -80,16 +99,10 @@ export async function getSimilarWeights(
   ]);
 
   const ignored = ignoredTagKeys(prefs);
-  const keepsPartners = prefs.leadGenders.length > 0;
-  const partnerGenders: readonly string[] = prefs.partnerGenders;
 
   const performers = performerRows.map((row): [string, number] => [
     row.performerId,
-    keepsPartners &&
-    row.performer.gender !== null &&
-    partnerGenders.includes(row.performer.gender)
-      ? SIMILAR_PARTNER_WEIGHT
-      : SIMILAR_PERFORMER_WEIGHT,
+    performerBaseWeight(row.performer.gender, prefs),
   ]);
 
   const sceneCount = sceneCounts.get(instanceId) ?? 0;
@@ -147,6 +160,32 @@ function compareDateDesc(a: string | null, b: string | null): number {
   return a < b ? 1 : -1;
 }
 
+const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** Date desc (nulls last), then id, then instance: the SQL's order after the weight */
+function compareAfterWeight(
+  a: SimilarSceneCandidate,
+  b: SimilarSceneCandidate
+): number {
+  return (
+    compareDateDesc(a.date, b.date) ||
+    compareText(a.sceneId, b.sceneId) ||
+    compareText(a.instanceId, b.instanceId)
+  );
+}
+
+/**
+ * The candidate query's order in memory, for lists read apart (one per
+ * instance) and merged: weight desc (float noise equal, as the SQL's
+ * `ROUND(weight, 9)`), date desc, id, instance
+ */
+export function compareCandidates(
+  a: SimilarSceneCandidate,
+  b: SimilarSceneCandidate
+): number {
+  return settle(b.weight) - settle(a.weight) || compareAfterWeight(a, b);
+}
+
 /**
  * The candidates multiplied by the viewer's watch state: kept and last
  * played under 14 days ago 0.3, kept earlier (or with no date) 0.7,
@@ -179,18 +218,7 @@ export async function applyWatchFactor(
   }));
   adjusted.sort(
     (a, b) =>
-      b.weight - a.weight ||
-      compareDateDesc(a.candidate.date, b.candidate.date) ||
-      (a.candidate.sceneId < b.candidate.sceneId
-        ? -1
-        : a.candidate.sceneId > b.candidate.sceneId
-          ? 1
-          : 0) ||
-      (a.candidate.instanceId < b.candidate.instanceId
-        ? -1
-        : a.candidate.instanceId > b.candidate.instanceId
-          ? 1
-          : 0)
+      b.weight - a.weight || compareAfterWeight(a.candidate, b.candidate)
   );
   return adjusted.map((a) => a.candidate);
 }

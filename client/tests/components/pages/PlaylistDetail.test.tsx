@@ -109,6 +109,21 @@ vi.mock("@/components/ui/AddToPlaylistButton", () => ({
   },
 }));
 
+// The Suggestions tab reads its own route; here only that it renders, and for what
+vi.mock("@/components/playlist/PlaylistSuggestions", () => ({
+  default: ({
+    playlistId,
+    playlistEmpty,
+  }: {
+    playlistId: number;
+    playlistEmpty: boolean;
+  }) => (
+    <div data-testid="suggestions-tab">
+      Suggestions of {playlistId}, empty: {String(playlistEmpty)}
+    </div>
+  ),
+}));
+
 const scene = (id: string, instanceId: string, title: string) =>
   untrusted<NormalizedScene>({ id, instanceId, title });
 
@@ -165,6 +180,7 @@ function playlistPage(
     },
     totalItems: items.length,
     unavailableItems: 0,
+    removableItems: 0,
     page: 1,
     perPage: 50,
     sort: "position",
@@ -1158,19 +1174,20 @@ describe("PlaylistDetail Save as playlist order", () => {
   });
 });
 
-describe("PlaylistDetail unavailable items", () => {
+describe("PlaylistDetail items deleted from Stash", () => {
   const items = range(1, 3);
 
-  it("an owner with unavailable items sees '3 unavailable' and Remove unavailable, which posts to the remove-unavailable route", async () => {
+  it("an owner with items deleted from Stash sees '3 deleted from Stash' and Remove deleted, which posts to the remove-unavailable route", async () => {
     serve({
-      page: () => playlistPage(items, { unavailableItems: 3 }),
+      page: () =>
+        playlistPage(items, { unavailableItems: 5, removableItems: 3 }),
       queue: queueOf(items),
       permissions: {},
     });
     renderPage();
 
-    expect(await screen.findByText("3 unavailable")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Remove unavailable" }));
+    expect(await screen.findByText("3 deleted from Stash")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove deleted" }));
     const dialog = screen.getByRole("dialog");
     // It removes only what is deleted from Stash, and says so
     expect(dialog).toHaveTextContent("deleted from Stash");
@@ -1192,11 +1209,28 @@ describe("PlaylistDetail unavailable items", () => {
     );
   });
 
-  it("a recipient sees nothing about unavailable items", async () => {
+  it("an owner whose unavailable items are only hidden or restricted sees no Remove deleted", async () => {
+    serve({
+      page: () =>
+        playlistPage(items, { unavailableItems: 3, removableItems: 0 }),
+      queue: queueOf(items),
+      permissions: {},
+    });
+    renderPage();
+    await screen.findByText("Scene 1");
+
+    expect(screen.queryByText(/deleted from Stash/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove deleted" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("a recipient sees nothing about deleted or unavailable items", async () => {
     serve({
       page: () =>
         playlistPage(items, {
           unavailableItems: 3,
+          removableItems: 2,
           isOwner: false,
           accessLevel: "shared",
         }),
@@ -1206,9 +1240,11 @@ describe("PlaylistDetail unavailable items", () => {
     renderPage();
     await screen.findByText("Scene 1");
 
-    expect(screen.queryByText(/unavailable/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Remove unavailable" })
+      screen.queryByText(/unavailable|deleted from Stash/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove deleted" })
     ).not.toBeInTheDocument();
   });
 });
@@ -1330,5 +1366,116 @@ describe("PlaylistDetail shuffle, repeat, description and owner", () => {
     for (const excluded of addButtonExclusions) {
       expect(excluded).toEqual([5]);
     }
+  });
+});
+
+describe("PlaylistDetail tabs", () => {
+  const items = range(1, 4);
+  const server = (): Server => ({
+    page: () => playlistPage(items),
+    queue: queueOf(items),
+    permissions: {},
+  });
+
+  it("shows the tabs Items and Suggestions, on Items without ?tab", async () => {
+    serve(server());
+    renderPage();
+
+    await screen.findByText("Scene 1");
+
+    expect(screen.getByRole("button", { name: /^Items/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Suggestions" })).toBeEnabled();
+    expect(screen.queryByTestId("suggestions-tab")).not.toBeInTheDocument();
+  });
+
+  it("?tab=suggestions renders the Suggestions tab, not the items", async () => {
+    serve(server());
+    renderPage("/playlist/5?tab=suggestions");
+
+    expect(await screen.findByTestId("suggestions-tab")).toHaveTextContent(
+      "Suggestions of 5, empty: false"
+    );
+    expect(screen.queryByText("Scene 1")).not.toBeInTheDocument();
+  });
+
+  it("clicking Suggestions sets ?tab=suggestions and clicking Items brings the items back", async () => {
+    serve(server());
+    renderPage();
+    await screen.findByText("Scene 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Suggestions" }));
+    expect(await screen.findByTestId("suggestions-tab")).toBeInTheDocument();
+    expect(search().get("tab")).toBe("suggestions");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Items/ }));
+    expect(await screen.findByText("Scene 1")).toBeInTheDocument();
+    expect(search().has("tab")).toBe(false);
+  });
+
+  it("switching to Suggestions and back keeps the Items view: sort, direction and page", async () => {
+    serve({
+      page: (query) =>
+        playlistPage(items, {
+          totalItems: 120,
+          page: Number(query.get("page")),
+          perPage: Number(query.get("per_page")),
+        }),
+      queue: queueOf(items),
+      permissions: {},
+    });
+    renderPage("/playlist/5?sort=title&direction=DESC&page=2");
+    await screen.findByText("Scene 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Suggestions" }));
+    expect(await screen.findByTestId("suggestions-tab")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Items/ }));
+    expect(await screen.findByText("Scene 1")).toBeInTheDocument();
+
+    expect(search().get("sort")).toBe("title");
+    expect(search().get("direction")).toBe("DESC");
+    expect(search().get("page")).toBe("2");
+    expect(search().has("tab")).toBe(false);
+    const last = must(pageRequests().at(-1), "page request");
+    expect(last.get("sort")).toBe("title");
+    expect(last.get("direction")).toBe("DESC");
+    expect(last.get("page")).toBe("2");
+  });
+
+  it("leaving Suggestions drops its page", async () => {
+    serve(server());
+    renderPage("/playlist/5?tab=suggestions&spage=3");
+    await screen.findByTestId("suggestions-tab");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Items/ }));
+
+    expect(await screen.findByText("Scene 1")).toBeInTheDocument();
+    expect(search().has("spage")).toBe(false);
+    expect(search().has("tab")).toBe(false);
+  });
+
+  it("a playlist with no items still offers Suggestions, told it is empty", async () => {
+    serve({
+      page: () => playlistPage([]),
+      queue: queueOf([]),
+      permissions: {},
+    });
+    renderPage("/playlist/5?tab=suggestions");
+
+    expect(await screen.findByTestId("suggestions-tab")).toHaveTextContent(
+      "empty: true"
+    );
+  });
+
+  it("a recipient has both tabs too", async () => {
+    serve({
+      page: () =>
+        playlistPage(items, { isOwner: false, accessLevel: "shared" }),
+      queue: queueOf(items),
+      permissions: {},
+    });
+    renderPage();
+    await screen.findByText("Scene 1");
+
+    expect(screen.getByRole("button", { name: "Suggestions" })).toBeEnabled();
   });
 });

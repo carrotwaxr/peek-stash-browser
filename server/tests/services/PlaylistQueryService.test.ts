@@ -8,16 +8,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { getVisibleEntityKeys } from "../../services/EntityAccessService.js";
 import {
+  BULK_WRITE_CHUNK,
+  DELETED_FROM_STASH_ITEM,
   appendItems,
   countUnavailableItems,
+  deletePlaylistsMany,
   duplicateVisibleItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
   loadPlaylistQueue,
+  loadPlaylistStats,
   moveItem,
   playlistsHoldingScene,
   removeUnavailableItems,
+  removeUnavailableItemsMany,
   sortPlaylistItems,
+  touchPlaylist,
 } from "../../services/PlaylistQueryService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import type { NormalizedScene } from "../../types/index.js";
@@ -426,6 +432,16 @@ describe("loadPlaylistItems with paging", () => {
   });
 });
 
+/** The `n`th raw write (from 0) stamped the playlist changed */
+function expectTouched(n: number, playlistId: number) {
+  expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(n + 1);
+  const call: unknown[] = must(mockPrisma.$executeRawUnsafe.mock.calls[n]);
+  const [sql, at, id] = call;
+  expect(sql).toBe("UPDATE Playlist SET updatedAt = ? WHERE id = ?");
+  expect(typeof at).toBe("number");
+  expect(id).toBe(playlistId);
+}
+
 describe("moveItem's order (movedOrder)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -474,6 +490,8 @@ describe("moveItem's order (movedOrder)", () => {
     expect(params).toEqual(["a", "b", USER_ID, 9]);
     const [renumber] = must(mockPrisma.$executeRawUnsafe.mock.calls[0]);
     expect(renumber).toContain("UPDATE PlaylistItem SET position = o.pos");
+    // In the same transaction, the playlist is stamped changed
+    expectTouched(1, 9);
   });
 
   it("moves an item down to the index among the others", async () => {
@@ -627,6 +645,17 @@ describe("appendItems", () => {
       9,
     ]);
     expect(typeof params[4]).toBe("number");
+    // The playlist is stamped changed, after the insert
+    expectTouched(1, 9);
+  });
+
+  it("does not stamp the playlist when nothing was added", async () => {
+    mockVisibleKeys.mockResolvedValue(new Set([entityKey("1", "a")]));
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+
+    await appendItems(9, USER_ID, [ref("1", "a")]);
+
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
   });
 
   it("writes nothing when the adder can see none of the scenes", async () => {
@@ -655,8 +684,8 @@ describe("sortPlaylistItems", () => {
     });
 
     expect(count).toBe(5);
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
     const [sql, ...params] = must(mockPrisma.$executeRawUnsafe.mock.calls[0]);
+    expectTouched(1, 9);
     expect(sql).toContain("UPDATE PlaylistItem");
     expect(sql).toContain(
       "PARTITION BY vis.v ORDER BY pi.addedAt DESC, pi.position, pi.id"
@@ -888,11 +917,162 @@ describe("removeUnavailableItems", () => {
 
     expect(await removeUnavailableItems(9)).toBe(2);
 
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
     const [sql, ...params] = must(mockPrisma.$executeRawUnsafe.mock.calls[0]);
     expect(sql).toContain("DELETE FROM PlaylistItem");
+    expect(sql).toContain(DELETED_FROM_STASH_ITEM);
     expect(sql).toContain("s.deletedAt IS NOT NULL");
     expect(sql).toContain("i.enabled = 1 AND i.firstSyncedAt IS NOT NULL");
     expect(params).toEqual([9]);
+    // The delete and the stamp are the unit's only statements
+    expectTouched(1, 9);
+  });
+
+  it("does not stamp the playlist when nothing went", async () => {
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+
+    expect(await removeUnavailableItems(9)).toBe(0);
+
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("bulk writes in chunks", () => {
+  const idsOf = (count: number) =>
+    Array.from({ length: count }, (_, i) => i + 1);
+
+  const deletedIds = (
+    args: Parameters<typeof prisma.playlist.deleteMany>[0]
+  ): number[] => {
+    const id = args?.where?.id;
+    return typeof id === "object" ? (id.in ?? []) : [];
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("writes 50 playlists to a unit", () => {
+    expect(BULK_WRITE_CHUNK).toBe(50);
+  });
+
+  it("removeUnavailableItemsMany deletes one chunk of ids a statement and sums the counts", async () => {
+    // Each playlist loses one item
+    for (const chunk of [idsOf(50), idsOf(50), idsOf(20)]) {
+      mockPrisma.$queryRawUnsafe.mockResolvedValueOnce(
+        chunk.map((playlistId) => ({ playlistId }))
+      );
+    }
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(1);
+
+    const result = await removeUnavailableItemsMany(7, idsOf(120));
+
+    expect(result).toEqual({ removed: 120, playlists: 120 });
+    const deletes = mockPrisma.$queryRawUnsafe.mock.calls.map(
+      ([, idsJson, userId]) => ({
+        count: (JSON.parse(String(idsJson)) as number[]).length,
+        userId: Number(userId),
+      })
+    );
+    expect(deletes).toEqual([
+      { count: 50, userId: 7 },
+      { count: 50, userId: 7 },
+      { count: 20, userId: 7 },
+    ]);
+    // Each chunk stamps its own playlists
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(3);
+  });
+
+  it("removeUnavailableItemsMany makes one unit of a request that fits a chunk", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+    expect(await removeUnavailableItemsMany(7, idsOf(50))).toEqual({
+      removed: 0,
+      playlists: 0,
+    });
+
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletePlaylistsMany deletes one chunk of ids a unit, for the requester only, and sums the counts", async () => {
+    // The requester owns all but one playlist of each chunk
+    for (const owned of [49, 49, 19]) {
+      mockPrisma.playlist.deleteMany.mockResolvedValueOnce({ count: owned });
+    }
+
+    const count = await deletePlaylistsMany(7, idsOf(120));
+
+    expect(count).toBe(117);
+    const calls = mockPrisma.playlist.deleteMany.mock.calls.map(([args]) => ({
+      ids: deletedIds(args),
+      userId: args?.where?.userId,
+    }));
+    expect(calls.map((c) => c.ids.length)).toEqual([50, 50, 20]);
+    expect(calls.flatMap((c) => c.ids)).toEqual(idsOf(120));
+    expect(calls.every((c) => c.userId === 7)).toBe(true);
+  });
+});
+
+describe("loadPlaylistStats", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("asks nothing for no playlists", async () => {
+    expect(await loadPlaylistStats([])).toEqual(new Map());
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("reads every playlist in one statement driven from the id list, counting what Stash deleted with the shared predicate", async () => {
+    const old = new Date("2026-01-01T00:00:00Z");
+    const added = new Date("2026-02-01T00:00:00Z");
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([
+      {
+        id: 1,
+        updatedAt: old,
+        lastAddedAt: BigInt(added.getTime()),
+        removable: 2n,
+      },
+      {
+        id: 2,
+        updatedAt: added,
+        lastAddedAt: BigInt(old.getTime()),
+        removable: 0n,
+      },
+      { id: 3, updatedAt: old, lastAddedAt: null, removable: null },
+    ]);
+
+    const stats = await loadPlaylistStats([1, 2, 3]);
+
+    expect(stats).toEqual(
+      new Map([
+        [1, { lastChangedAt: added, removableItems: 2 }],
+        [2, { lastChangedAt: added, removableItems: 0 }],
+        [3, { lastChangedAt: old, removableItems: 0 }],
+      ])
+    );
+    const [only, ...rest] = mockPrisma.$queryRawUnsafe.mock.calls;
+    expect(rest).toEqual([]);
+    const [sql, ...params] = must(only);
+    expect(sql).toContain("FROM json_each(?) j");
+    expect(sql).toContain("CROSS JOIN Playlist p ON p.id = j.value");
+    expect(sql).toContain("LEFT JOIN PlaylistItem pi ON pi.playlistId = p.id");
+    expect(sql).toContain(DELETED_FROM_STASH_ITEM);
+    expect(params).toEqual([JSON.stringify([1, 2, 3])]);
+    expect(placeholders(sql)).toBe(params.length);
+  });
+});
+
+describe("touchPlaylist", () => {
+  it("stamps the playlist with now, as epoch milliseconds", () => {
+    vi.clearAllMocks();
+    const before = Date.now();
+
+    void touchPlaylist(4);
+
+    const call: unknown[] = must(mockPrisma.$executeRawUnsafe.mock.calls[0]);
+    const [sql, at, id] = call;
+    expect(sql).toBe("UPDATE Playlist SET updatedAt = ? WHERE id = ?");
+    expect(Number(at)).toBeGreaterThanOrEqual(before);
+    expect(id).toBe(4);
   });
 });

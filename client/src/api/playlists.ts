@@ -7,13 +7,17 @@ import type {
   AddSceneToPlaylistResponse,
   AddScenesToPlaylistRequest,
   AddScenesToPlaylistResponse,
+  BulkPlaylistIdsRequest,
+  CleanPlaylistsResponse,
   CreatePlaylistRequest,
   CreatePlaylistResponse,
   DeletePlaylistResponse,
+  DeletePlaylistsResponse,
   DuplicatePlaylistResponse,
   GetPlaylistQueueResponse,
   GetPlaylistResponse,
   GetPlaylistSharesResponse,
+  GetPlaylistSuggestionsResponse,
   GetSharedPlaylistsResponse,
   GetUserPlaylistsQuery,
   GetUserPlaylistsResponse,
@@ -94,6 +98,17 @@ export const getPlaylistQueue = (
     signal
   );
 
+/** One page of the scenes a playlist suggests, best first */
+export const getPlaylistSuggestions = (
+  playlistId: number,
+  page: number,
+  signal?: AbortSignal
+) =>
+  apiGet<GetPlaylistSuggestionsResponse>(
+    `/playlists/${playlistId}/suggestions${queryString({ page })}`,
+    signal
+  );
+
 export const createPlaylist = (body: CreatePlaylistRequest) =>
   apiPost<CreatePlaylistResponse>("/playlists", body);
 
@@ -104,6 +119,14 @@ export const updatePlaylist = (
 
 export const deletePlaylist = (playlistId: number) =>
   apiDelete<DeletePlaylistResponse>(`/playlists/${playlistId}`);
+
+/** Remove the items deleted from Stash from several of the user's playlists */
+export const cleanPlaylists = (body: BulkPlaylistIdsRequest) =>
+  apiPost<CleanPlaylistsResponse>("/playlists/clean", body);
+
+/** Delete several of the user's playlists, with their items and shares */
+export const deletePlaylists = (body: BulkPlaylistIdsRequest) =>
+  apiPost<DeletePlaylistsResponse>("/playlists/delete-many", body);
 
 export const addSceneToPlaylist = (
   playlistId: number,

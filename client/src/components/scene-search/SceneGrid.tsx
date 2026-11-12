@@ -55,6 +55,14 @@ interface Props {
    * page change through `onPageChange` clears it.
    */
   selectionScope?: string;
+  /**
+   * Bulk actions of the page, shown in the bulk bar before Hide and Add to
+   * Playlist. `clear` empties the selection.
+   */
+  extraBulkActions?: (
+    selected: NormalizedScene[],
+    clear: () => void
+  ) => ReactNode;
 }
 
 const keyOf = (scene: NormalizedScene) =>
@@ -83,6 +91,7 @@ const SceneGrid = ({
   emptyDescription = "Check your media library configuration",
   enableKeyboard = true, // eslint-disable-line @typescript-eslint/no-unused-vars
   selectionScope,
+  extraBulkActions,
 }: Props) => {
   const gridRef = useRef<HTMLDivElement>(null);
   const columns = useRenderedColumns(gridRef);
@@ -230,6 +239,7 @@ const SceneGrid = ({
             selectAllCount={scenes.length}
             actions={
               <>
+                {extraBulkActions?.(selectedScenes, handleClearSelection)}
                 <Button
                   onClick={handleHideClick}
                   variant="secondary"

@@ -14,6 +14,15 @@ interface Props {
   tabs: Tab[];
   defaultTab: string;
   onTabChange?: (tabId: string) => void;
+  /**
+   * The URL a tab switch goes to, where the page keeps its own keys across
+   * tabs; `switchTabParams` (every list-owned key goes) when omitted
+   */
+  switchParams?: (
+    params: URLSearchParams,
+    tabId: string,
+    defaultTab: string
+  ) => URLSearchParams;
   showSingleTab?: boolean;
   showEmpty?: boolean;
 }
@@ -28,6 +37,7 @@ interface Props {
  *   - count === TAB_COUNT_LOADING (-1): Show tab without count badge (loading state)
  * @param {string} props.defaultTab - Default tab ID if none specified in URL
  * @param {Function} [props.onTabChange] - Optional callback when tab changes (receives tabId)
+ * @param {Function} [props.switchParams] - Optional builder of the URL a tab switch goes to
  * @param {boolean} [props.showSingleTab] - If true, show tab bar even when only one tab is visible
  * @param {boolean} [props.showEmpty] - If true, show tabs even when count is 0 (still shows count badge)
  */
@@ -35,6 +45,7 @@ const TabNavigation = ({
   tabs,
   defaultTab,
   onTabChange,
+  switchParams = switchTabParams,
   showSingleTab = false,
   showEmpty = false,
 }: Props) => {
@@ -52,7 +63,7 @@ const TabNavigation = ({
   const handleTabClick = (tabId: string) => {
     if (tabId === activeTab) return; // Already on this tab
 
-    setSearchParams(switchTabParams(searchParams, tabId, defaultTab));
+    setSearchParams(switchParams(searchParams, tabId, defaultTab));
 
     // Call optional callback
     if (onTabChange) {

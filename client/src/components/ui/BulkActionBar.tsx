@@ -3,7 +3,12 @@ import type { NormalizedScene } from "@peek/shared-types";
 import Button from "./Button";
 
 interface Props {
-  selectedScenes: NormalizedScene[];
+  /** The selected scenes; a bar over something else gives `selectedCount` */
+  selectedScenes?: NormalizedScene[] | undefined;
+  /** The count, when the selection is not scenes */
+  selectedCount?: number | undefined;
+  /** Replaces "scene"/"scenes" after the count (playlists say "selected") */
+  countLabel?: string | undefined;
   onClearSelection: () => void;
   actions: ReactNode;
   /**
@@ -21,12 +26,14 @@ interface Props {
  */
 const BulkActionBar = ({
   selectedScenes,
+  selectedCount: countOverride,
+  countLabel,
   onClearSelection,
   actions,
   onSelectAll,
   selectAllCount,
 }: Props) => {
-  const selectedCount = selectedScenes.length;
+  const selectedCount = countOverride ?? selectedScenes?.length ?? 0;
 
   // The bar is fixed to the bottom of the screen, so it covers the end of the
   // page; a spacer of the bar's own height keeps the last row (the page
@@ -68,7 +75,7 @@ const BulkActionBar = ({
                   {selectedCount}
                 </span>
                 <span className="ml-1 sm:ml-2 text-sm sm:text-base">
-                  {selectedCount === 1 ? "scene" : "scenes"}
+                  {countLabel ?? (selectedCount === 1 ? "scene" : "scenes")}
                 </span>
               </div>
 

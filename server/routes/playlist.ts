@@ -2,12 +2,15 @@ import express from "express";
 import {
   addSceneToPlaylist,
   addScenesToPlaylist,
+  cleanPlaylists,
   createPlaylist,
   deletePlaylist,
+  deletePlaylists,
   duplicatePlaylist,
   getPlaylist,
   getPlaylistQueue,
   getPlaylistShares,
+  getPlaylistSuggestions,
   getSharedPlaylists,
   getUserPlaylists,
   movePlaylistItem,
@@ -32,6 +35,11 @@ router.get("/shared", withAllowedInstances, libraryHandler(getSharedPlaylists));
 // Get all user playlists
 router.get("/", withAllowedInstances, libraryHandler(getUserPlaylists));
 
+// Clean or delete several playlists by id (the requester's own among them).
+// Registered before the /:id routes
+router.post("/clean", authenticated(cleanPlaylists));
+router.post("/delete-many", authenticated(deletePlaylists));
+
 // Get single playlist with a page of its items
 router.get("/:id", withAllowedInstances, libraryHandler(getPlaylist));
 
@@ -40,6 +48,13 @@ router.get(
   "/:id/queue",
   withAllowedInstances,
   libraryHandler(getPlaylistQueue)
+);
+
+// Scenes like the ones the playlist holds, for the owner or a recipient
+router.get(
+  "/:id/suggestions",
+  withAllowedInstances,
+  libraryHandler(getPlaylistSuggestions)
 );
 
 // Create new playlist

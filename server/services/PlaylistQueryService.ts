@@ -40,6 +40,7 @@ import type {
   PlaylistMoveQueryRow,
   PlaylistPreviewQueryRow,
   PlaylistQueueQueryRow,
+  PlaylistStatsQueryRow,
 } from "../types/internal/queryRows.js";
 import type { ParsedPlaylistItemSort } from "../types/parsedFilters.js";
 import { dbWrite, dbWriteTransaction } from "../utils/dbWrite.js";
@@ -137,7 +138,7 @@ const POSITION_ASC: ParsedPlaylistItemSort = {
  * `LEFT JOIN` keeps every item, and then `s.id IS NOT NULL` belongs with
  * `where`.
  */
-function visibleItem(
+export function visibleItem(
   userId: number,
   allowedInstanceIds: readonly string[],
   sceneJoin: "CROSS JOIN" | "LEFT JOIN" = "CROSS JOIN"
@@ -353,9 +354,14 @@ export async function appendItems(
     // epoch milliseconds, as Prisma stores a DateTime
     Date.now(),
   ];
-  const added = await dbWrite("playlist.addItems", () =>
-    prisma.$executeRawUnsafe(APPEND_ITEMS_SQL, ...params)
-  );
+  const added = await dbWrite("playlist.addItems", async () => {
+    const inserted = await prisma.$executeRawUnsafe(
+      APPEND_ITEMS_SQL,
+      ...params
+    );
+    if (inserted > 0) await touchPlaylist(playlistId);
+    return inserted;
+  });
   return { added, alreadyInPlaylist: visible.length - added, unavailable };
 }
 
@@ -420,9 +426,11 @@ WHERE PlaylistItem.id = n.itemId`;
     ...sortJoins.flatMap((j) => j.params),
   ];
 
-  return dbWrite("playlist.sort", () =>
-    prisma.$executeRawUnsafe(sql, ...params)
-  );
+  return dbWrite("playlist.sort", async () => {
+    const renumbered = await prisma.$executeRawUnsafe(sql, ...params);
+    await touchPlaylist(playlistId);
+    return renumbered;
+  });
 }
 
 /**
@@ -501,6 +509,7 @@ ORDER BY pi.position, pi.id`;
     );
     if (order === null) return false;
     await tx.$executeRawUnsafe(RENUMBER_SQL, JSON.stringify(order));
+    await tx.$executeRawUnsafe(TOUCH_PLAYLIST_SQL, Date.now(), playlistId);
     return true;
   });
 }
@@ -738,20 +747,23 @@ export async function countUnavailableItems(
 }
 
 /**
- * The items whose scene is deleted from Stash: the cached row is
- * soft-deleted, or there is none while the item's instance is enabled and
- * synced (sync purged it; a first sync has no rows yet). Items hidden,
- * restricted, or on a deselected or disabled instance are not, since they
- * may come back; nor is an item with no instance.
+ * The predicate for a playlist item `pi` whose scene is deleted from Stash:
+ * the cached row is soft-deleted, or there is none while the item's instance
+ * is enabled and synced (sync purged it; a first sync has no rows yet).
+ * Items hidden, restricted, or on a deselected or disabled instance are not,
+ * since they may come back; nor is an item with no instance. Written against
+ * the alias `pi`, for the delete and the count alike.
  */
-const REMOVE_UNAVAILABLE_SQL = `DELETE FROM PlaylistItem
-WHERE playlistId = ? AND (
-  EXISTS (SELECT 1 FROM StashScene s WHERE s.id = PlaylistItem.sceneId AND s.stashInstanceId = PlaylistItem.instanceId AND s.deletedAt IS NOT NULL)
+export const DELETED_FROM_STASH_ITEM = `(
+  EXISTS (SELECT 1 FROM StashScene s WHERE s.id = pi.sceneId AND s.stashInstanceId = pi.instanceId AND s.deletedAt IS NOT NULL)
   OR (
-    NOT EXISTS (SELECT 1 FROM StashScene s WHERE s.id = PlaylistItem.sceneId AND s.stashInstanceId = PlaylistItem.instanceId)
-    AND EXISTS (SELECT 1 FROM StashInstance i WHERE i.id = PlaylistItem.instanceId AND i.enabled = 1 AND i.firstSyncedAt IS NOT NULL)
+    NOT EXISTS (SELECT 1 FROM StashScene s WHERE s.id = pi.sceneId AND s.stashInstanceId = pi.instanceId)
+    AND EXISTS (SELECT 1 FROM StashInstance i WHERE i.id = pi.instanceId AND i.enabled = 1 AND i.firstSyncedAt IS NOT NULL)
   )
 )`;
+
+const REMOVE_UNAVAILABLE_SQL = `DELETE FROM PlaylistItem AS pi
+WHERE pi.playlistId = ? AND ${DELETED_FROM_STASH_ITEM}`;
 
 /**
  * "Remove unavailable" (owner answer, 2026-09-30): deletes the playlist's
@@ -763,7 +775,157 @@ WHERE playlistId = ? AND (
 export async function removeUnavailableItems(
   playlistId: number
 ): Promise<number> {
-  return dbWrite("playlist.removeUnavailable", () =>
-    prisma.$executeRawUnsafe(REMOVE_UNAVAILABLE_SQL, playlistId)
+  return dbWrite("playlist.removeUnavailable", async () => {
+    const removed = await prisma.$executeRawUnsafe(
+      REMOVE_UNAVAILABLE_SQL,
+      playlistId
+    );
+    if (removed > 0) await touchPlaylist(playlistId);
+    return removed;
+  });
+}
+
+/** The ids as the JSON array `json_each` reads: one bound parameter, however many */
+const PLAYLIST_IDS_JSON_SQL = "SELECT value FROM json_each(?)";
+
+/**
+ * The same delete for several playlists, limited to the requester's own
+ * (`p.userId = ?`): ids of anyone else's playlists match nothing. Answers
+ * the playlist id of each deleted item (RETURNING takes the bare column: it
+ * does not see the `pi` alias).
+ */
+const REMOVE_UNAVAILABLE_MANY_SQL = `DELETE FROM PlaylistItem AS pi
+WHERE pi.playlistId IN (
+  SELECT p.id FROM json_each(?) j CROSS JOIN Playlist p ON p.id = j.value WHERE p.userId = ?
+) AND ${DELETED_FROM_STASH_ITEM}
+RETURNING playlistId`;
+
+const TOUCH_PLAYLISTS_SQL = `UPDATE Playlist SET updatedAt = ? WHERE id IN (${PLAYLIST_IDS_JSON_SQL})`;
+
+/**
+ * Playlists a bulk write unit takes: a statement over more rows holds the
+ * write lock longer than the 1 s a unit may (see "Writes" in
+ * `.claude/rules/server-sql.md`), so a request's ids go in chunks of this
+ * size, one unit each, and user writes interleave between them.
+ */
+export const BULK_WRITE_CHUNK = 50;
+
+/** The ids (each once, in order) in groups of `BULK_WRITE_CHUNK` */
+function inChunks(playlistIds: readonly number[]): number[][] {
+  const unique = [...new Set(playlistIds)];
+  const chunks: number[][] = [];
+  for (let from = 0; from < unique.length; from += BULK_WRITE_CHUNK) {
+    chunks.push(unique.slice(from, from + BULK_WRITE_CHUNK));
+  }
+  return chunks;
+}
+
+/**
+ * "Clean" for several playlists at once: `removeUnavailableItems` over the
+ * requester's own playlists among `playlistIds` (the rest are left out, with
+ * no error). The ids go in chunks of `BULK_WRITE_CHUNK`, each one delete
+ * statement and one statement stamping the playlists that lost items as
+ * changed, in one write unit. Answers how many items went and how many
+ * playlists lost at least one.
+ */
+export async function removeUnavailableItemsMany(
+  userId: number,
+  playlistIds: readonly number[]
+): Promise<{ removed: number; playlists: number }> {
+  let removed = 0;
+  let playlists = 0;
+  for (const chunk of inChunks(playlistIds)) {
+    const idsJson = JSON.stringify(chunk);
+    const result = await dbWrite("playlist.cleanMany", async () => {
+      const deleted = await prisma.$queryRawUnsafe<{ playlistId: number }[]>(
+        REMOVE_UNAVAILABLE_MANY_SQL,
+        idsJson,
+        userId
+      );
+      const touched = [...new Set(deleted.map((row) => row.playlistId))];
+      if (touched.length > 0) {
+        await prisma.$executeRawUnsafe(
+          TOUCH_PLAYLISTS_SQL,
+          Date.now(),
+          JSON.stringify(touched)
+        );
+      }
+      return { removed: deleted.length, playlists: touched.length };
+    });
+    removed += result.removed;
+    playlists += result.playlists;
+  }
+  return { removed, playlists };
+}
+
+/**
+ * Delete several playlists at once: the requester's own among `playlistIds`
+ * go, with their items and shares (cascade); the rest are left out. The ids
+ * go in chunks of `BULK_WRITE_CHUNK`, one write unit each. Answers how many
+ * playlists went.
+ */
+export async function deletePlaylistsMany(
+  userId: number,
+  playlistIds: readonly number[]
+): Promise<number> {
+  let deleted = 0;
+  for (const chunk of inChunks(playlistIds)) {
+    const { count } = await dbWrite("playlist.deleteMany", () =>
+      prisma.playlist.deleteMany({ where: { id: { in: chunk }, userId } })
+    );
+    deleted += count;
+  }
+  return deleted;
+}
+
+const TOUCH_PLAYLIST_SQL = "UPDATE Playlist SET updatedAt = ? WHERE id = ?";
+
+/**
+ * The statement that stamps the playlist as changed now (an item add,
+ * remove, move or sort): Prisma stores a DateTime as epoch milliseconds, and
+ * raw SQL skips `@updatedAt`. Awaited inside the item write's own unit.
+ */
+export function touchPlaylist(playlistId: number) {
+  return prisma.$executeRawUnsafe(TOUCH_PLAYLIST_SQL, Date.now(), playlistId);
+}
+
+/** What the playlists page shows of one playlist */
+export interface PlaylistStats {
+  /** The later of the playlist's `updatedAt` and its newest item's `addedAt` */
+  readonly lastChangedAt: Date;
+  /** Items whose scene was deleted from Stash (`DELETED_FROM_STASH_ITEM`) */
+  readonly removableItems: number;
+}
+
+/**
+ * Each playlist's last change and removable-item count, in one statement
+ * driven from the id list: the items are aggregated per playlist, so a
+ * playlist with none still answers.
+ */
+export async function loadPlaylistStats(
+  playlistIds: readonly number[]
+): Promise<Map<number, PlaylistStats>> {
+  const stats = new Map<number, PlaylistStats>();
+  if (playlistIds.length === 0) return stats;
+  const rows = await prisma.$queryRawUnsafe<PlaylistStatsQueryRow[]>(
+    `SELECT p.id AS id, p.updatedAt AS updatedAt, MAX(pi.addedAt) AS lastAddedAt,
+  SUM(CASE WHEN ${DELETED_FROM_STASH_ITEM} THEN 1 ELSE 0 END) AS removable
+FROM json_each(?) j
+CROSS JOIN Playlist p ON p.id = j.value
+LEFT JOIN PlaylistItem pi ON pi.playlistId = p.id
+GROUP BY p.id, p.updatedAt`,
+    JSON.stringify(playlistIds)
   );
+  for (const row of rows) {
+    const lastAddedAt =
+      row.lastAddedAt === null ? null : new Date(Number(row.lastAddedAt));
+    stats.set(row.id, {
+      lastChangedAt:
+        lastAddedAt !== null && lastAddedAt > row.updatedAt
+          ? lastAddedAt
+          : row.updatedAt,
+      removableItems: Math.round(Number(row.removable ?? 0)),
+    });
+  }
+  return stats;
 }

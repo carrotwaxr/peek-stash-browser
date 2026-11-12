@@ -82,6 +82,17 @@ export interface PlaylistSummary extends Omit<
   _count: { items: number };
   /** The first four items the viewer can see, in position order */
   items: PlaylistPreviewItem[];
+  /**
+   * When the playlist last changed, as an ISO string: the later of its own
+   * `updatedAt` (rename, description, shuffle, repeat, and every item add,
+   * remove, move and sort) and its newest item's `addedAt`
+   */
+  lastChangedAt: string;
+  /**
+   * Items whose scene was deleted from Stash: what Clean and Remove deleted
+   * remove
+   */
+  removableItems: number;
 }
 
 /**
@@ -135,6 +146,11 @@ export interface GetPlaylistResponse {
    * else, who is told nothing about them
    */
   unavailableItems: number;
+  /**
+   * Items whose scene was deleted from Stash: what Clean and Remove deleted
+   * remove. The owner's count; 0 for anyone else
+   */
+  removableItems: number;
   /** The page read */
   page: number;
   perPage: number;
@@ -186,6 +202,28 @@ export interface GetPlaylistQueueQuery extends Record<
 
 export interface GetPlaylistQueueResponse {
   entries: PlaylistQueueEntry[];
+}
+
+/**
+ * GET /api/playlists/:id/suggestions
+ * Scenes like the ones the playlist holds, for anyone who can open it (the
+ * owner or a recipient), under the viewer's own exclusions: a page of 24 of
+ * at most 500, none already in the playlist
+ */
+export interface GetPlaylistSuggestionsQuery extends Record<
+  string,
+  string | undefined
+> {
+  /** From 1 (the default); anything but a positive integer answers 400 */
+  page?: string;
+}
+
+export interface GetPlaylistSuggestionsResponse {
+  scenes: NormalizedScene[];
+  /** How many suggestions there are in all */
+  count: number;
+  page: number;
+  perPage: number;
 }
 
 // =============================================================================
@@ -382,6 +420,27 @@ export interface SortPlaylistResponse {
  */
 export interface RemoveUnavailableItemsResponse {
   removed: number;
+}
+
+/**
+ * POST /api/playlists/clean and POST /api/playlists/delete-many
+ * Several playlists at once, by id (1 to BULK_PLAYLIST_LIMIT). Ids the
+ * requester does not own are left out of the work and the counts.
+ */
+export const BULK_PLAYLIST_LIMIT = 500;
+
+export interface BulkPlaylistIdsRequest {
+  playlistIds: number[];
+}
+
+/** `playlists` counts the playlists that lost at least one item */
+export interface CleanPlaylistsResponse {
+  removed: number;
+  playlists: number;
+}
+
+export interface DeletePlaylistsResponse {
+  deleted: number;
 }
 
 // =============================================================================

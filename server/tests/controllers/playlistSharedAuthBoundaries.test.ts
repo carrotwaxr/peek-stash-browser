@@ -8,6 +8,8 @@
  * - Remove a shared playlist's unavailable items
  * - Rename/update a shared playlist
  * - Delete a shared playlist
+ * - Clean or delete several playlists by id (the ids a requester does not own
+ *   are left out of the work and the counts, with no 404)
  *
  * These tests complement playlistSharedAccess.test.ts which verifies
  * shared users CAN add scenes (the intentional asymmetry documented
@@ -15,7 +17,9 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  cleanPlaylists,
   deletePlaylist,
+  deletePlaylists,
   movePlaylistItem,
   removePlaylistItems,
   removeSceneFromPlaylist,
@@ -26,8 +30,10 @@ import {
 import { ValidationError } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import {
+  deletePlaylistsMany,
   moveItem,
   removeUnavailableItems,
+  removeUnavailableItemsMany,
   sortPlaylistItems,
 } from "../../services/PlaylistQueryService.js";
 import type { SortPlaylistRequest } from "../../types/api/index.js";
@@ -56,7 +62,10 @@ vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistItems: vi.fn(() => Promise.resolve({ items: [], totalItems: 0 })),
   sortPlaylistItems: vi.fn(),
   removeUnavailableItems: vi.fn(),
+  removeUnavailableItemsMany: vi.fn(),
+  deletePlaylistsMany: vi.fn(),
   moveItem: vi.fn(),
+  touchPlaylist: vi.fn(),
 }));
 
 // Mock PermissionService
@@ -73,6 +82,8 @@ const mockPrisma = vi.mocked(prisma, true);
 const mockSortPlaylistItems = vi.mocked(sortPlaylistItems);
 const mockRemoveUnavailable = vi.mocked(removeUnavailableItems);
 const mockMoveItem = vi.mocked(moveItem);
+const mockCleanMany = vi.mocked(removeUnavailableItemsMany);
+const mockDeleteMany = vi.mocked(deletePlaylistsMany);
 
 /** User IDs: owner = 1, shared user = 2 */
 const OWNER_ID = 1;
@@ -430,6 +441,74 @@ describe("Shared playlist authorization boundaries", () => {
         success: true,
         message: "Playlist deleted",
       });
+    });
+  });
+  describe("clean and delete several - ids the requester does not own", () => {
+    it("the requester's id goes to the service, which acts on the playlists that requester owns only, and the counts leave the others out", async () => {
+      // Ids 1 (a recipient's view of the owner's playlist) and 2 (a
+      // stranger's) are in the body; the service owns the ownership filter
+      // and answers for the one playlist the requester owns
+      mockCleanMany.mockResolvedValue({ removed: 1, playlists: 1 });
+      mockDeleteMany.mockResolvedValue(1);
+
+      const cleanRes = resFor(cleanPlaylists);
+      await cleanPlaylists(
+        reqFor(cleanPlaylists, {
+          body: malformed({ playlistIds: [1, 2, 3] }),
+          user: SHARED_USER,
+        }),
+        cleanRes
+      );
+      const deleteRes = resFor(deletePlaylists);
+      await deletePlaylists(
+        reqFor(deletePlaylists, {
+          body: malformed({ playlistIds: [1, 2, 3] }),
+          user: SHARED_USER,
+        }),
+        deleteRes
+      );
+
+      expect(mockCleanMany).toHaveBeenCalledExactlyOnceWith(
+        SHARED_USER_ID,
+        [1, 2, 3]
+      );
+      expect(mockDeleteMany).toHaveBeenCalledExactlyOnceWith(
+        SHARED_USER_ID,
+        [1, 2, 3]
+      );
+      expect(cleanRes._getOkBody()).toEqual({ removed: 1, playlists: 1 });
+      expect(deleteRes._getOkBody()).toEqual({ deleted: 1 });
+      // No 404 for a mixed selection, and no write outside the service
+      expect(cleanRes.status).not.toHaveBeenCalledWith(404);
+      expect(deleteRes.status).not.toHaveBeenCalledWith(404);
+      expect(mockPrisma.playlist.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.playlistItem.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it("a selection of none the requester owns answers zero counts, not 404", async () => {
+      mockCleanMany.mockResolvedValue({ removed: 0, playlists: 0 });
+      mockDeleteMany.mockResolvedValue(0);
+
+      const cleanRes = resFor(cleanPlaylists);
+      await cleanPlaylists(
+        reqFor(cleanPlaylists, {
+          body: malformed({ playlistIds: [1] }),
+          user: SHARED_USER,
+        }),
+        cleanRes
+      );
+      const deleteRes = resFor(deletePlaylists);
+      await deletePlaylists(
+        reqFor(deletePlaylists, {
+          body: malformed({ playlistIds: [1] }),
+          user: SHARED_USER,
+        }),
+        deleteRes
+      );
+
+      expect(cleanRes._getOkBody()).toEqual({ removed: 0, playlists: 0 });
+      expect(deleteRes._getOkBody()).toEqual({ deleted: 0 });
     });
   });
 });

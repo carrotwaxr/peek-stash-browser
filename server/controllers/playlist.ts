@@ -1,4 +1,7 @@
-import { PLAYLIST_REPEAT_MODES } from "@peek/shared-types/api/playlist.js";
+import {
+  BULK_PLAYLIST_LIMIT,
+  PLAYLIST_REPEAT_MODES,
+} from "@peek/shared-types/api/playlist.js";
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import prisma from "../prisma/singleton.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
@@ -9,15 +12,20 @@ import {
 import {
   appendItems,
   countUnavailableItems,
+  deletePlaylistsMany,
   duplicateVisibleItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
   loadPlaylistQueue,
+  loadPlaylistStats,
   moveItem,
   playlistsHoldingScene,
   removeUnavailableItems,
+  removeUnavailableItemsMany,
   sortPlaylistItems,
+  touchPlaylist,
 } from "../services/PlaylistQueryService.js";
+import { getPlaylistSuggestions as loadPlaylistSuggestions } from "../services/PlaylistSuggestionService.js";
 import type {
   AddSceneToPlaylistParams,
   AddSceneToPlaylistRequest,
@@ -25,10 +33,13 @@ import type {
   AddScenesToPlaylistRequest,
   AddScenesToPlaylistResponse,
   ApiErrorResponse,
+  BulkPlaylistIdsRequest,
+  CleanPlaylistsResponse,
   CreatePlaylistRequest,
   CreatePlaylistResponse,
   DeletePlaylistParams,
   DeletePlaylistResponse,
+  DeletePlaylistsResponse,
   DuplicatePlaylistResponse,
   GetPlaylistParams,
   GetPlaylistQuery,
@@ -36,6 +47,8 @@ import type {
   GetPlaylistQueueResponse,
   GetPlaylistResponse,
   GetPlaylistSharesResponse,
+  GetPlaylistSuggestionsQuery,
+  GetPlaylistSuggestionsResponse,
   GetSharedPlaylistsResponse,
   GetUserPlaylistsQuery,
   GetUserPlaylistsResponse,
@@ -136,6 +149,7 @@ export const getUserPlaylists = async (
     allowedInstanceIds: req.allowedInstanceIds,
     playlistIds: playlists.map((p) => p.id),
   });
+  const stats = await loadPlaylistStats(playlists.map((p) => p.id));
   const holding = await holdingScene(
     playlists.map((p) => p.id),
     containsScene
@@ -144,11 +158,16 @@ export const getUserPlaylists = async (
   res.json({
     playlists: playlists.map((playlist) => {
       const preview = previews.get(playlist.id);
+      const stat = stats.get(playlist.id);
       return {
         ...playlist,
         ...(holding && { containsScene: holding.has(playlist.id) }),
         _count: { items: preview?.visibleCount ?? 0 },
         items: preview?.items ?? [],
+        lastChangedAt: (
+          stat?.lastChangedAt ?? playlist.updatedAt
+        ).toISOString(),
+        removableItems: stat?.removableItems ?? 0,
       };
     }),
   });
@@ -316,11 +335,17 @@ export const getPlaylist = async (
           playlistId,
         })
       : 0;
+  const removableItems =
+    access.level === "owner"
+      ? ((await loadPlaylistStats([playlistId])).get(playlistId)
+          ?.removableItems ?? 0)
+      : 0;
 
   res.json({
     playlist: { ...playlist, items },
     totalItems,
     unavailableItems,
+    removableItems,
     page: paging.page,
     perPage: paging.perPage,
     // The parser always seeds a random sort
@@ -366,6 +391,49 @@ export const getPlaylistQueue = async (
     sort,
   });
   res.json({ entries });
+};
+
+/**
+ * Scenes like the ones the playlist holds (PlaylistSuggestionService), a
+ * page of 24, for anyone who can open it: the owner or a recipient, each
+ * under their own exclusions. `page` is a positive integer, 1 when absent.
+ */
+export const getPlaylistSuggestions = async (
+  req: TypedLibraryRequest<
+    unknown,
+    GetPlaylistParams,
+    GetPlaylistSuggestionsQuery
+  >,
+  res: TypedResponse<GetPlaylistSuggestionsResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const playlistId = parseInt(req.params.id);
+  if (isNaN(playlistId)) {
+    res.status(400).json({ error: "Invalid playlist ID" });
+    return;
+  }
+
+  const rawPage = req.query.page ?? "1";
+  const page = /^\d+$/.test(rawPage) ? Number(rawPage) : NaN;
+  if (!Number.isSafeInteger(page) || page < 1) {
+    res.status(400).json({ error: "page must be a positive integer" });
+    return;
+  }
+
+  const access = await getPlaylistAccess(playlistId, userId);
+  if (access.level === "none") {
+    res.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+
+  res.json(
+    await loadPlaylistSuggestions({
+      userId,
+      playlistId,
+      allowedInstanceIds: req.allowedInstanceIds,
+      page,
+    })
+  );
 };
 
 const NAME_REQUIRED = "Playlist name is required";
@@ -548,6 +616,66 @@ export const deletePlaylist = async (
 };
 
 /**
+ * The playlist ids of a bulk request: 1 to BULK_PLAYLIST_LIMIT positive
+ * integers, duplicates collapsed, or null when the body is anything else.
+ * The ids are not looked up here: the service acts on the requester's own
+ * playlists among them, so a recipient's or a stranger's id is left out
+ * without an error.
+ */
+function bulkPlaylistIds(
+  body: Partial<BulkPlaylistIdsRequest>
+): number[] | null {
+  const { playlistIds }: { playlistIds?: unknown } = body;
+  if (
+    !Array.isArray(playlistIds) ||
+    playlistIds.length === 0 ||
+    playlistIds.length > BULK_PLAYLIST_LIMIT ||
+    !(playlistIds as unknown[]).every(
+      (id) => typeof id === "number" && Number.isSafeInteger(id) && id > 0
+    )
+  ) {
+    return null;
+  }
+  return [...new Set(playlistIds as number[])];
+}
+
+const BULK_IDS_ERROR = `playlistIds must be an array of 1 to ${BULK_PLAYLIST_LIMIT} playlist ids`;
+
+/**
+ * Clean several playlists at once: remove the items whose scene is deleted
+ * from Stash (as removeUnavailablePlaylistItems) from the requester's own
+ * playlists among the ids. Answers the items removed and the playlists that
+ * lost at least one.
+ */
+export const cleanPlaylists = async (
+  req: TypedAuthRequest<BulkPlaylistIdsRequest>,
+  res: TypedResponse<CleanPlaylistsResponse | ApiErrorResponse>
+) => {
+  const playlistIds = bulkPlaylistIds(req.body);
+  if (playlistIds === null) {
+    res.status(400).json({ error: BULK_IDS_ERROR });
+    return;
+  }
+  res.json(await removeUnavailableItemsMany(req.user.id, playlistIds));
+};
+
+/**
+ * Delete several playlists at once: the requester's own among the ids, with
+ * their items and shares. Answers how many went.
+ */
+export const deletePlaylists = async (
+  req: TypedAuthRequest<BulkPlaylistIdsRequest>,
+  res: TypedResponse<DeletePlaylistsResponse | ApiErrorResponse>
+) => {
+  const playlistIds = bulkPlaylistIds(req.body);
+  if (playlistIds === null) {
+    res.status(400).json({ error: BULK_IDS_ERROR });
+    return;
+  }
+  res.json({ deleted: await deletePlaylistsMany(req.user.id, playlistIds) });
+};
+
+/**
  * Add scene to playlist: owners and shared users alike (remove, move and
  * rename stay owner-only). The item takes the next position inside the
  * insert (appendItems), so two adds at once never share one.
@@ -712,11 +840,13 @@ export const removeSceneFromPlaylist = async (
 
   // Delete the item of that scene on that instance only; the same id on
   // another instance is another item
-  const { count } = await dbWrite("playlist.removeItem", () =>
-    prisma.playlistItem.deleteMany({
+  const { count } = await dbWrite("playlist.removeItem", async () => {
+    const deleted = await prisma.playlistItem.deleteMany({
       where: { playlistId, instanceId, sceneId },
-    })
-  );
+    });
+    if (deleted.count > 0) await touchPlaylist(playlistId);
+    return deleted;
+  });
 
   if (count === 0) {
     res.status(404).json({ error: "Scene not in playlist" });
@@ -835,11 +965,13 @@ export const removePlaylistItems = async (
     return;
   }
 
-  const { count } = await dbWrite("playlist.removeItems", () =>
-    prisma.playlistItem.deleteMany({
+  const { count } = await dbWrite("playlist.removeItems", async () => {
+    const deleted = await prisma.playlistItem.deleteMany({
       where: { playlistId, id: { in: ids } },
-    })
-  );
+    });
+    if (deleted.count > 0) await touchPlaylist(playlistId);
+    return deleted;
+  });
   res.json({ removed: count });
 };
 

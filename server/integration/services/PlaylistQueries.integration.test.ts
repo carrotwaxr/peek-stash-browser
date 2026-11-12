@@ -46,12 +46,17 @@ import {
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
 import {
+  BULK_WRITE_CHUNK,
   appendItems,
   countUnavailableItems,
+  deletePlaylistsMany,
   loadPlaylistItems,
   loadPlaylistPreviews,
   loadPlaylistQueue,
+  loadPlaylistStats,
   moveItem,
+  removeUnavailableItems,
+  removeUnavailableItemsMany,
 } from "../../services/PlaylistQueryService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
@@ -939,6 +944,188 @@ describe("Playlist queries (integration)", () => {
     expect(recorder.transactions()).toBe(0);
   });
 
+  describe("bulk clean and delete", () => {
+    const LONG_AGO = new Date(Date.UTC(2020, 0, 1));
+    const stamp = (playlistId: number) =>
+      prisma.$executeRawUnsafe(
+        "UPDATE Playlist SET updatedAt = ? WHERE id = ?",
+        LONG_AGO.getTime(),
+        playlistId
+      );
+    const updatedAtOf = async (playlistId: number) =>
+      (await prisma.playlist.findUniqueOrThrow({ where: { id: playlistId } }))
+        .updatedAt;
+    const sceneIdsOf = async (playlistId: number) =>
+      (
+        await prisma.playlistItem.findMany({
+          where: { playlistId },
+          orderBy: [{ position: "asc" }, { id: "asc" }],
+        })
+      ).map((i) => i.sceneId);
+
+    it("removeUnavailableItemsMany cleans the requester's playlists only, touches those that lost items, and counts them", async () => {
+      const a = await createPlaylist(owner.id, "bulk clean a", [
+        [P1, A],
+        [DELETED, A],
+        [GONE, A],
+      ]);
+      const b = await createPlaylist(owner.id, "bulk clean b", [
+        [DELETED, A],
+        [P2, A],
+      ]);
+      const untouched = await createPlaylist(owner.id, "bulk clean none", [
+        [P1, A],
+      ]);
+      const other = await createPlaylist(recipient.id, "bulk clean other", [
+        [DELETED, A],
+      ]);
+      const notRequested = await createPlaylist(
+        owner.id,
+        "bulk clean skipped",
+        [[DELETED, A]]
+      );
+      for (const id of [a, b, untouched, other, notRequested]) await stamp(id);
+
+      const recorder = recordStatements();
+      let result;
+      try {
+        result = await removeUnavailableItemsMany(owner.id, [
+          a,
+          b,
+          untouched,
+          other,
+        ]);
+      } finally {
+        recorder.restore();
+      }
+
+      expect(result).toEqual({ removed: 3, playlists: 2 });
+      expect(await sceneIdsOf(a)).toEqual([P1]);
+      expect(await sceneIdsOf(b)).toEqual([P2]);
+      expect(await sceneIdsOf(untouched)).toEqual([P1]);
+      // Another user's playlist and one not named keep their items
+      expect(await sceneIdsOf(other)).toEqual([DELETED]);
+      expect(await sceneIdsOf(notRequested)).toEqual([DELETED]);
+      for (const id of [a, b]) {
+        expect((await updatedAtOf(id)).getTime()).toBeGreaterThan(
+          LONG_AGO.getTime()
+        );
+      }
+      for (const id of [untouched, other, notRequested]) {
+        expect(await updatedAtOf(id)).toEqual(LONG_AGO);
+      }
+      // One delete statement in one unit, outside any transaction
+      expect(
+        recorder.statements.filter((st) => /^\s*DELETE\b/i.test(st.sql))
+      ).toHaveLength(1);
+      expect(recorder.transactions()).toBe(0);
+    });
+
+    it("removeUnavailableItemsMany works through more playlists than a chunk, one delete statement a chunk, and sums the counts", async () => {
+      const count = BULK_WRITE_CHUNK + 1;
+      const ids: number[] = [];
+      for (let n = 0; n < count; n++) {
+        ids.push(
+          await createPlaylist(owner.id, `bulk clean chunk ${n}`, [
+            [P1, A],
+            [DELETED, A],
+          ])
+        );
+      }
+      const other = await createPlaylist(
+        recipient.id,
+        "bulk clean chunk other",
+        [[DELETED, A]]
+      );
+
+      const recorder = recordStatements();
+      let result;
+      try {
+        result = await removeUnavailableItemsMany(owner.id, [...ids, other]);
+      } finally {
+        recorder.restore();
+      }
+
+      expect(result).toEqual({ removed: count, playlists: count });
+      for (const id of ids) expect(await sceneIdsOf(id)).toEqual([P1]);
+      expect(await sceneIdsOf(other)).toEqual([DELETED]);
+      // 52 ids make two chunks of 50 and 2: two delete statements, no transaction
+      expect(
+        recorder.statements.filter((st) => /^\s*DELETE\b/i.test(st.sql))
+      ).toHaveLength(2);
+      expect(recorder.transactions()).toBe(0);
+    });
+
+    it("removeUnavailableItemsMany leaves hidden and deselected-instance items, and answers zeros for none", async () => {
+      const playlistId = await createPlaylist(owner.id, "bulk clean keep", [
+        [P1, A],
+        [ON_OFF, OFF],
+        [SAME, B],
+      ]);
+      await stamp(playlistId);
+
+      expect(await removeUnavailableItemsMany(owner.id, [playlistId])).toEqual({
+        removed: 0,
+        playlists: 0,
+      });
+      expect(await removeUnavailableItemsMany(owner.id, [])).toEqual({
+        removed: 0,
+        playlists: 0,
+      });
+      expect(await sceneIdsOf(playlistId)).toEqual([P1, ON_OFF, SAME]);
+      expect(await updatedAtOf(playlistId)).toEqual(LONG_AGO);
+    });
+
+    it("deletePlaylistsMany deletes the requester's playlists, their items cascading, and counts only those", async () => {
+      const a = await createPlaylist(owner.id, "bulk delete a", [[P1, A]]);
+      const b = await createPlaylist(owner.id, "bulk delete b", [[P2, A]]);
+      const other = await createPlaylist(recipient.id, "bulk delete other", [
+        [P1, A],
+      ]);
+      const kept = await createPlaylist(owner.id, "bulk delete kept", [
+        [P1, A],
+      ]);
+
+      expect(await deletePlaylistsMany(owner.id, [a, b, other])).toBe(2);
+
+      expect(
+        await prisma.playlist.count({ where: { id: { in: [a, b] } } })
+      ).toBe(0);
+      expect(
+        await prisma.playlistItem.count({
+          where: { playlistId: { in: [a, b] } },
+        })
+      ).toBe(0);
+      expect(await prisma.playlist.count({ where: { id: other } })).toBe(1);
+      expect(await sceneIdsOf(other)).toEqual([P1]);
+      expect(await prisma.playlist.count({ where: { id: kept } })).toBe(1);
+      expect(await deletePlaylistsMany(owner.id, [])).toBe(0);
+    });
+
+    it("deletePlaylistsMany works through more playlists than a chunk and counts the requester's across them", async () => {
+      const count = BULK_WRITE_CHUNK + 1;
+      const ids: number[] = [];
+      for (let n = 0; n < count; n++) {
+        ids.push(
+          await createPlaylist(owner.id, `bulk delete chunk ${n}`, [[P1, A]])
+        );
+      }
+      const other = await createPlaylist(
+        recipient.id,
+        "bulk delete chunk other",
+        [[P1, A]]
+      );
+
+      const deleted = await deletePlaylistsMany(owner.id, [...ids, other]);
+
+      expect(deleted).toBe(count);
+      expect(await prisma.playlist.count({ where: { id: { in: ids } } })).toBe(
+        0
+      );
+      expect(await prisma.playlist.count({ where: { id: other } })).toBe(1);
+    });
+  });
+
   it("two adds at once get positions n and n+1", async () => {
     const playlistId = await createPlaylist(owner.id, "append race", [
       [P1, A],
@@ -1025,6 +1212,123 @@ describe("Playlist queries (integration)", () => {
     // PQ holds SAME on B, not on A
     expect(await sharedAs(`${SAME}:${A}`)).toBe(false);
   });
+  describe("last changed and removable items", () => {
+    /** Writes the playlist's updatedAt as Prisma stores it: epoch milliseconds */
+    const setUpdatedAt = (playlistId: number, at: Date) =>
+      prisma.$executeRawUnsafe(
+        "UPDATE Playlist SET updatedAt = ? WHERE id = ?",
+        at.getTime(),
+        playlistId
+      );
+    const updatedAtOf = async (playlistId: number) =>
+      (await prisma.playlist.findUniqueOrThrow({ where: { id: playlistId } }))
+        .updatedAt;
+    const LONG_AGO = new Date(Date.UTC(2020, 0, 1));
+
+    it("loadPlaylistStats counts the items Stash deleted, not the hidden ones, and answers the later of updatedAt and the newest addedAt", async () => {
+      const playlist = await prisma.playlist.create({
+        data: {
+          userId: owner.id,
+          name: "stats",
+          items: {
+            create: [
+              [P1, A], // live
+              [DELETED, A], // soft-deleted
+              [GONE, A], // no row on an enabled, synced instance
+              [X1, A], // hidden by the owner, live
+              [ON_OFF, OFF], // on the disabled instance
+            ].map(([sceneId, instanceId], position) => ({
+              sceneId: must(sceneId),
+              instanceId: must(instanceId),
+              position,
+              addedAt: new Date(Date.UTC(2026, 0, 1 + position)),
+            })),
+          },
+        },
+      });
+      const empty = await prisma.playlist.create({
+        data: { userId: owner.id, name: "stats empty" },
+      });
+
+      // updatedAt older than the newest addedAt: the item wins
+      await setUpdatedAt(playlist.id, LONG_AGO);
+      await setUpdatedAt(empty.id, LONG_AGO);
+      const stats = await loadPlaylistStats([playlist.id, empty.id]);
+      expect(stats.get(playlist.id)).toEqual({
+        lastChangedAt: new Date(Date.UTC(2026, 0, 5)),
+        removableItems: 2,
+      });
+      // No items: updatedAt, and nothing to remove
+      expect(stats.get(empty.id)).toEqual({
+        lastChangedAt: LONG_AGO,
+        removableItems: 0,
+      });
+
+      // updatedAt newer than every addedAt: the playlist wins
+      const later = new Date(Date.UTC(2027, 5, 6, 7, 8, 9));
+      await setUpdatedAt(playlist.id, later);
+      expect(
+        (await loadPlaylistStats([playlist.id])).get(playlist.id)?.lastChangedAt
+      ).toEqual(later);
+
+      expect(await loadPlaylistStats([])).toEqual(new Map());
+    });
+
+    it("an add moves the playlist's updatedAt; one that added nothing does not", async () => {
+      const playlistId = await createPlaylist(owner.id, "touch add", [[P1, A]]);
+      await setUpdatedAt(playlistId, LONG_AGO);
+
+      await appendItems(playlistId, owner.id, [{ id: P1, instanceId: A }]);
+      expect(await updatedAtOf(playlistId)).toEqual(LONG_AGO);
+
+      await appendItems(playlistId, owner.id, [{ id: P2, instanceId: A }]);
+      expect((await updatedAtOf(playlistId)).getTime()).toBeGreaterThan(
+        LONG_AGO.getTime()
+      );
+    });
+
+    it("removing the items Stash deleted moves updatedAt; removing none does not", async () => {
+      const playlistId = await createPlaylist(owner.id, "touch clean", [
+        [P1, A],
+        [DELETED, A],
+      ]);
+      await setUpdatedAt(playlistId, LONG_AGO);
+
+      expect(await removeUnavailableItems(playlistId)).toBe(1);
+      expect((await updatedAtOf(playlistId)).getTime()).toBeGreaterThan(
+        LONG_AGO.getTime()
+      );
+
+      await setUpdatedAt(playlistId, LONG_AGO);
+      expect(await removeUnavailableItems(playlistId)).toBe(0);
+      expect(await updatedAtOf(playlistId)).toEqual(LONG_AGO);
+    });
+
+    it("a move moves updatedAt", async () => {
+      const playlistId = await createPlaylist(owner.id, "touch move", [
+        [P1, A],
+        [P2, A],
+      ]);
+      await setUpdatedAt(playlistId, LONG_AGO);
+      const item = await prisma.playlistItem.findFirstOrThrow({
+        where: { playlistId, sceneId: P1, instanceId: A },
+      });
+
+      expect(
+        await moveItem(
+          playlistId,
+          owner.id,
+          await getUserAllowedInstanceIds(owner.id),
+          item.id,
+          1
+        )
+      ).toBe(true);
+      expect((await updatedAtOf(playlistId)).getTime()).toBeGreaterThan(
+        LONG_AGO.getTime()
+      );
+    });
+  });
+
   describe("view sorts", () => {
     const by = (
       field: PlaylistItemSort,
@@ -1323,7 +1627,11 @@ describe("Playlist queries (integration)", () => {
       } finally {
         recorder.restore();
       }
-      expect(writesOf(recorder)).toHaveLength(1);
+      // The renumbering, then the playlist's own stamp, in the one unit
+      const writes = writesOf(recorder);
+      expect(writes).toHaveLength(2);
+      expect(must(writes[0]).sql).toContain("UPDATE PlaylistItem");
+      expect(must(writes[1]).sql).toContain("UPDATE Playlist SET updatedAt");
       expect(recorder.transactions()).toBe(0);
 
       await prisma.playlist.delete({ where: { id: playlistId } });
