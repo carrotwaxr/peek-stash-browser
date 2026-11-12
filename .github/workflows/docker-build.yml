@@ -27,7 +27,7 @@ jobs:
   publish:
     name: Publish
     needs: smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write # creates the GitHub release; images go to Docker Hub
 

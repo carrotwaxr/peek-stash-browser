@@ -15,7 +15,7 @@ concurrency:
 jobs:
   format:
     name: Format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v7
@@ -32,7 +32,7 @@ jobs:
 
   client:
     name: Client Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: client
@@ -76,7 +76,7 @@ jobs:
 
   server:
     name: Server Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: server
@@ -126,7 +126,7 @@ jobs:
 
   audit:
     name: Dependency Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v7
@@ -156,7 +156,7 @@ jobs:
 
   e2e:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [client, server]
 
     steps:
@@ -223,7 +223,7 @@ jobs:
   # and the workflows that run the check
   changes:
     name: Changed Paths
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       upgrade-check: ${{ steps.paths.outputs.upgrade-check }}
 
@@ -266,7 +266,7 @@ jobs:
   # network, so pull requests from forks run them too.
   integration:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
