@@ -1,9 +1,10 @@
 import { useLocation } from "react-router-dom";
-import type {
-  AddScenesToPlaylistResponse,
-  GetSharedPlaylistsResponse,
-  GetUserPlaylistsResponse,
-  PlaylistSummary,
+import {
+  type AddScenesToPlaylistResponse,
+  BULK_PLAYLIST_LIMIT,
+  type GetSharedPlaylistsResponse,
+  type GetUserPlaylistsResponse,
+  type PlaylistSummary,
 } from "@peek/shared-types";
 import {
   cleanup,
@@ -683,6 +684,85 @@ describe("Playlists page selection", () => {
     );
     expect(sentIds("/playlists/delete-many")).toEqual([12, 14]);
     await waitFor(() => expect(screen.queryByText("selected")).toBeNull());
+  });
+
+  describe("a selection past the bulk limit", () => {
+    /** More playlists than one request may name */
+    const TOTAL = 501;
+    let inFlight = 0;
+    let maxInFlight = 0;
+
+    beforeEach(() => {
+      playlists = Array.from({ length: TOTAL }, (_, i) => ({
+        ...summary(100 + i, `Playlist ${i}`, 3),
+        removableItems: 1,
+      }));
+      inFlight = 0;
+      maxInFlight = 0;
+      mockApiPost.mockImplementation(async (path, body) => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await Promise.resolve();
+        inFlight--;
+        const { playlistIds } = body as { playlistIds: number[] };
+        return path === "/playlists/clean"
+          ? { removed: playlistIds.length, playlists: playlistIds.length }
+          : { deleted: playlistIds.length };
+      });
+    });
+
+    /** The ids each call to `path` sent */
+    const batches = (path: string) =>
+      mockApiPost.mock.calls
+        .filter(([to]) => to === path)
+        .map(([, body]) => (body as { playlistIds: number[] }).playlistIds);
+
+    async function selectAll() {
+      renderPage("/playlists?view=list");
+      await screen.findByText("Playlist 0");
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: "Select all playlists" })
+      );
+    }
+
+    it("Clean sends the ids in batches of the limit, in turn, and toasts the summed totals once", async () => {
+      await selectAll();
+
+      fireEvent.click(screen.getByRole("button", { name: "Clean" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+      await waitFor(() =>
+        expect(showSuccess).toHaveBeenCalledWith(
+          "Removed 501 items from 501 playlists"
+        )
+      );
+      const sent = batches("/playlists/clean");
+      expect(sent.map((ids) => ids.length)).toEqual([BULK_PLAYLIST_LIMIT, 1]);
+      expect(new Set(sent.flat()).size).toBe(TOTAL);
+      expect(maxInFlight).toBe(1);
+      expect(showSuccess).toHaveBeenCalledTimes(1);
+      expect(showError).not.toHaveBeenCalled();
+    });
+
+    it("Delete sends the ids in batches of the limit, in turn, and toasts the summed total once", async () => {
+      await selectAll();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Delete selected playlists" })
+      );
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+      await waitFor(() =>
+        expect(showSuccess).toHaveBeenCalledWith("Deleted 501 playlists")
+      );
+      const sent = batches("/playlists/delete-many");
+      expect(sent.map((ids) => ids.length)).toEqual([BULK_PLAYLIST_LIMIT, 1]);
+      expect(new Set(sent.flat()).size).toBe(TOTAL);
+      expect(maxInFlight).toBe(1);
+      expect(showSuccess).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("the Shared tab has no checkboxes", async () => {

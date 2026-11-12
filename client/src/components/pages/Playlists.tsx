@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import type {
-  PlaylistPreviewItem,
-  PlaylistSummary,
-  SharedPlaylistData,
+import {
+  BULK_PLAYLIST_LIMIT,
+  type PlaylistPreviewItem,
+  type PlaylistSummary,
+  type SharedPlaylistData,
 } from "@peek/shared-types";
 import {
   ListVideo,
@@ -62,6 +63,18 @@ const EmptyIcon = ({ icon: Icon }: { icon: LucideIcon }) => (
 );
 
 type PlaylistView = "grid" | "list";
+
+/**
+ * The ids in groups the bulk routes accept (they refuse more than
+ * `BULK_PLAYLIST_LIMIT`): Select All can hold more than one request may name
+ */
+function inBatches(ids: readonly number[]): number[][] {
+  const batches: number[][] = [];
+  for (let from = 0; from < ids.length; from += BULK_PLAYLIST_LIMIT) {
+    batches.push(ids.slice(from, from + BULK_PLAYLIST_LIMIT));
+  }
+  return batches;
+}
 
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
@@ -737,10 +750,15 @@ const Playlists = () => {
 
   const confirmClean = async () => {
     try {
-      const { removed, playlists: changed } =
-        await cleanPlaylistsMutation.mutateAsync({
-          playlistIds: selectedRows.map((row) => row.id),
+      let removed = 0;
+      let changed = 0;
+      for (const playlistIds of inBatches(selectedRows.map((row) => row.id))) {
+        const result = await cleanPlaylistsMutation.mutateAsync({
+          playlistIds,
         });
+        removed += result.removed;
+        changed += result.playlists;
+      }
       if (removed > 0) {
         showSuccess(
           `Removed ${plural(removed, "item", "items")} from ${plural(changed, "playlist", "playlists")}`
@@ -758,9 +776,13 @@ const Playlists = () => {
 
   const confirmBulkDelete = async () => {
     try {
-      const { deleted } = await deletePlaylistsMutation.mutateAsync({
-        playlistIds: selectedRows.map((row) => row.id),
-      });
+      let deleted = 0;
+      for (const playlistIds of inBatches(selectedRows.map((row) => row.id))) {
+        const result = await deletePlaylistsMutation.mutateAsync({
+          playlistIds,
+        });
+        deleted += result.deleted;
+      }
       showSuccess(`Deleted ${plural(deleted, "playlist", "playlists")}`);
       clearSelection();
     } catch {
