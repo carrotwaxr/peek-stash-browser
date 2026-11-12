@@ -22,6 +22,7 @@ import {
   duplicatePlaylist,
   getPlaylist,
   getPlaylistQueue,
+  getPlaylistSuggestions,
   getPlaylists,
   getSharedPlaylists,
   movePlaylistItem,
@@ -140,6 +141,21 @@ export function useCleanPlaylists() {
   return usePlaylistMutation((body: BulkPlaylistIdsRequest) =>
     cleanPlaylists(body)
   );
+}
+
+/**
+ * One page of the scenes a playlist suggests. The page on screen stays while
+ * the next one loads, for the same playlist only (key: ["playlists",
+ * "suggestions", playlistId, page]). Any playlist write invalidates it, so
+ * a scene just added leaves the list.
+ */
+export function usePlaylistSuggestions(playlistId: number, page: number) {
+  return useQuery({
+    queryKey: queryKeys.playlists.suggestions(playlistId, page),
+    queryFn: ({ signal }) => getPlaylistSuggestions(playlistId, page, signal),
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[2] === playlistId ? previous : undefined,
+  });
 }
 
 /** Add scenes to a playlist, in the order given */

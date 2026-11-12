@@ -17,6 +17,7 @@ import type {
   GetPlaylistQueueResponse,
   GetPlaylistResponse,
   GetPlaylistSharesResponse,
+  GetPlaylistSuggestionsResponse,
   GetSharedPlaylistsResponse,
   GetUserPlaylistsQuery,
   GetUserPlaylistsResponse,
@@ -94,6 +95,17 @@ export const getPlaylistQueue = (
       sort: params.sort,
       direction: params.direction,
     })}`,
+    signal
+  );
+
+/** One page of the scenes a playlist suggests, best first */
+export const getPlaylistSuggestions = (
+  playlistId: number,
+  page: number,
+  signal?: AbortSignal
+) =>
+  apiGet<GetPlaylistSuggestionsResponse>(
+    `/playlists/${playlistId}/suggestions${queryString({ page })}`,
     signal
   );
 

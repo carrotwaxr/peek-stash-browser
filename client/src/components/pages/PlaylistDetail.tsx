@@ -69,6 +69,7 @@ import {
   showWarning,
 } from "../../utils/toast";
 import { ThemedIcon } from "../icons/index";
+import PlaylistSuggestions from "../playlist/PlaylistSuggestions";
 import PlaylistSortControl from "../playlists/PlaylistSortControl";
 import SharePlaylistModal from "../playlists/SharePlaylistModal";
 import AddToPlaylistButton from "../ui/AddToPlaylistButton";
@@ -80,6 +81,7 @@ import PageLayout from "../ui/PageLayout";
 import Pagination from "../ui/Pagination";
 import Paper from "../ui/Paper";
 import SceneListItem from "../ui/SceneListItem";
+import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 
 type Direction = "ASC" | "DESC";
 type Repeat = PlaybackQueue["repeat"];
@@ -217,6 +219,9 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
   const { hasMultipleInstances } = useConfig();
   const { user } = useAuth();
   const userId = user?.id;
+  const [searchParams] = useSearchParams();
+  // Items is the default tab; `tab` is read by TabNavigation too
+  const suggestionsTab = searchParams.get("tab") === "suggestions";
 
   const { sort, direction } = orderOf(view);
   const order = useMemo<PlaylistQueueParams>(
@@ -947,8 +952,26 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
           )}
         </div>
 
-        {/* Scenes List */}
-        {totalItems === 0 ? (
+        <TabNavigation
+          tabs={[
+            { id: "items", label: "Items", count: totalItems },
+            {
+              id: "suggestions",
+              label: "Suggestions",
+              count: TAB_COUNT_LOADING,
+            },
+          ]}
+          defaultTab="items"
+          showEmpty
+        />
+
+        {suggestionsTab ? (
+          <PlaylistSuggestions
+            playlistId={playlistId}
+            playlistEmpty={totalItems === 0}
+          />
+        ) : /* Scenes List */
+        totalItems === 0 ? (
           <div className="text-center py-16">
             <div
               className="text-6xl mb-4"
@@ -1101,48 +1124,51 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
           </div>
         )}
 
-        {selectedScenes.length > 0 && !isEditing && !reorderMode && (
-          <BulkActionBar
-            selectedScenes={selectedScenes}
-            onClearSelection={handleDeselectAll}
-            onSelectAll={handleSelectAll}
-            selectAllCount={items.length}
-            actions={
-              <>
-                <AddToPlaylistButton
-                  scenes={selectedScenes}
-                  buttonText={
-                    (
-                      <span>
-                        <span className="hidden sm:inline">
-                          Add {selectedScenes.length} to Playlist
+        {!suggestionsTab &&
+          selectedScenes.length > 0 &&
+          !isEditing &&
+          !reorderMode && (
+            <BulkActionBar
+              selectedScenes={selectedScenes}
+              onClearSelection={handleDeselectAll}
+              onSelectAll={handleSelectAll}
+              selectAllCount={items.length}
+              actions={
+                <>
+                  <AddToPlaylistButton
+                    scenes={selectedScenes}
+                    buttonText={
+                      (
+                        <span>
+                          <span className="hidden sm:inline">
+                            Add {selectedScenes.length} to Playlist
+                          </span>
+                          <span className="sm:hidden">Add to Playlist</span>
                         </span>
-                        <span className="sm:hidden">Add to Playlist</span>
-                      </span>
-                    ) as unknown as string
-                  }
-                  icon={<Plus className="w-4 h-4" />}
-                  dropdownPosition="above"
-                  excludePlaylistIds={[playlist.id]}
-                  onSuccess={handleDeselectAll}
-                />
-                {isOwner && (
-                  <Button
-                    onClick={handleBulkRemoveClick}
-                    variant="destructive"
-                    size="sm"
-                    className="flex items-center gap-1.5"
-                    aria-label={`Remove ${selectedItems.length}`}
-                    title={`Remove ${plural(selectedItems.length, "scene", "scenes")} from this playlist`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Remove</span>
-                  </Button>
-                )}
-              </>
-            }
-          />
-        )}
+                      ) as unknown as string
+                    }
+                    icon={<Plus className="w-4 h-4" />}
+                    dropdownPosition="above"
+                    excludePlaylistIds={[playlist.id]}
+                    onSuccess={handleDeselectAll}
+                  />
+                  {isOwner && (
+                    <Button
+                      onClick={handleBulkRemoveClick}
+                      variant="destructive"
+                      size="sm"
+                      className="flex items-center gap-1.5"
+                      aria-label={`Remove ${selectedItems.length}`}
+                      title={`Remove ${plural(selectedItems.length, "scene", "scenes")} from this playlist`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Remove</span>
+                    </Button>
+                  )}
+                </>
+              }
+            />
+          )}
       </PageLayout>
 
       {/* Remove Scene Confirmation Dialog */}
