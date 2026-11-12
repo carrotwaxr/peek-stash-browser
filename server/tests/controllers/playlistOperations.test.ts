@@ -7,15 +7,20 @@
  * remove) take each scene's instance from the request; a move and a bulk
  * remove name items by item id.
  */
-import { PLAYLIST_REPEAT_MODES } from "@peek/shared-types/api/playlist.js";
+import {
+  BULK_PLAYLIST_LIMIT,
+  PLAYLIST_REPEAT_MODES,
+} from "@peek/shared-types/api/playlist.js";
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import type { Playlist, PlaylistItem, Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addSceneToPlaylist,
   addScenesToPlaylist,
+  cleanPlaylists,
   createPlaylist,
   deletePlaylist,
+  deletePlaylists,
   duplicatePlaylist,
   getPlaylist,
   getPlaylistShares,
@@ -27,6 +32,7 @@ import {
   updatePlaylistShares,
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
+import playlistRoutes from "../../routes/playlist.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import {
   getPlaylistAccess,
@@ -34,15 +40,22 @@ import {
 } from "../../services/PlaylistAccessService.js";
 import {
   appendItems,
+  deletePlaylistsMany,
   duplicateVisibleItems,
   loadPlaylistPreviews,
   loadPlaylistStats,
   moveItem,
+  removeUnavailableItemsMany,
   touchPlaylist,
 } from "../../services/PlaylistQueryService.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
 import { authenticated } from "../../utils/routeHelpers.js";
-import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import {
+  findHandler,
+  malformed,
+  reqFor,
+  resFor,
+} from "../helpers/controllerTestUtils.js";
 import {
   type PlaylistShareWithGroup,
   userPermissions,
@@ -77,6 +90,8 @@ vi.mock("../../services/PlaylistQueryService.js", () => ({
   duplicateVisibleItems: vi.fn(),
   appendItems: vi.fn(),
   moveItem: vi.fn(),
+  removeUnavailableItemsMany: vi.fn(),
+  deletePlaylistsMany: vi.fn(),
 }));
 
 // The writer queue runs for real; each unit's label is on `openUnits` while
@@ -127,6 +142,8 @@ const mockDuplicateItems = vi.mocked(duplicateVisibleItems);
 const mockMoveItem = vi.mocked(moveItem);
 const mockStats = vi.mocked(loadPlaylistStats);
 const mockTouch = vi.mocked(touchPlaylist);
+const mockCleanMany = vi.mocked(removeUnavailableItemsMany);
+const mockDeleteMany = vi.mocked(deletePlaylistsMany);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 const ALLOWED = ["inst-a"];
@@ -1397,6 +1414,110 @@ describe("Playlist Controller Operations", () => {
 
       expect(body.removableItems).toBe(0);
       expect(mockStats).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("clean or delete several playlists", () => {
+    it("registers both routes before any /:id route", () => {
+      expect(findHandler(playlistRoutes, "post", "/clean")).toBeTypeOf(
+        "function"
+      );
+      expect(findHandler(playlistRoutes, "post", "/delete-many")).toBeTypeOf(
+        "function"
+      );
+      const paths = playlistRoutes.stack.map((l) => l.route?.path);
+      const firstParam = paths.findIndex((p) => p?.startsWith("/:id"));
+      expect(paths.indexOf("/clean")).toBeLessThan(firstParam);
+      expect(paths.indexOf("/delete-many")).toBeLessThan(firstParam);
+    });
+
+    it("clean hands the service the requester and the ids once each, and answers its counts", async () => {
+      mockCleanMany.mockResolvedValue({ removed: 5, playlists: 2 });
+      const req = reqFor(cleanPlaylists, {
+        body: malformed({ playlistIds: [4, 9, 4] }),
+        user: USER,
+      });
+      const res = resFor(cleanPlaylists);
+
+      await cleanPlaylists(req, res);
+
+      expect(mockCleanMany).toHaveBeenCalledExactlyOnceWith(USER.id, [4, 9]);
+      expect(res._getOkBody()).toEqual({ removed: 5, playlists: 2 });
+    });
+
+    it("delete hands the service the requester and the ids once each, and answers its count", async () => {
+      mockDeleteMany.mockResolvedValue(2);
+      const req = reqFor(deletePlaylists, {
+        body: malformed({ playlistIds: [4, 9, 9] }),
+        user: USER,
+      });
+      const res = resFor(deletePlaylists);
+
+      await deletePlaylists(req, res);
+
+      expect(mockDeleteMany).toHaveBeenCalledExactlyOnceWith(USER.id, [4, 9]);
+      expect(res._getOkBody()).toEqual({ deleted: 2 });
+    });
+
+    const TOO_MANY = Array.from(
+      { length: BULK_PLAYLIST_LIMIT + 1 },
+      (_, i) => i + 1
+    );
+    it.each([
+      ["an empty list", { playlistIds: [] }],
+      ["no list", {}],
+      ["a non-array", { playlistIds: "1" }],
+      ["a string id", { playlistIds: ["1"] }],
+      ["a fractional id", { playlistIds: [1.5] }],
+      ["a zero id", { playlistIds: [0] }],
+      ["a negative id", { playlistIds: [-3] }],
+      ["a null id", { playlistIds: [null] }],
+      [`more than ${BULK_PLAYLIST_LIMIT} ids`, { playlistIds: TOO_MANY }],
+    ])("%s answers 400 and changes nothing", async (_name, body) => {
+      const cleanRes = resFor(cleanPlaylists);
+      await cleanPlaylists(
+        reqFor(cleanPlaylists, { body: malformed(body), user: USER }),
+        cleanRes
+      );
+      const deleteRes = resFor(deletePlaylists);
+      await deletePlaylists(
+        reqFor(deletePlaylists, { body: malformed(body), user: USER }),
+        deleteRes
+      );
+      for (const res of [cleanRes, deleteRes]) {
+        expect(res._getStatus()).toBe(400);
+        expect(res._getErrorBody().error).toContain(
+          String(BULK_PLAYLIST_LIMIT)
+        );
+      }
+      expect(mockCleanMany).not.toHaveBeenCalled();
+      expect(mockDeleteMany).not.toHaveBeenCalled();
+    });
+
+    it("exactly BULK_PLAYLIST_LIMIT ids is accepted", async () => {
+      mockDeleteMany.mockResolvedValue(0);
+      const res = resFor(deletePlaylists);
+      await deletePlaylists(
+        reqFor(deletePlaylists, {
+          body: malformed({ playlistIds: TOO_MANY.slice(1) }),
+          user: USER,
+        }),
+        res
+      );
+      expect(res._getOkBody()).toEqual({ deleted: 0 });
+    });
+
+    it("the limit counts the ids sent, duplicates included", async () => {
+      mockDeleteMany.mockResolvedValue(1);
+      const res = resFor(deletePlaylists);
+      await deletePlaylists(
+        reqFor(deletePlaylists, {
+          body: malformed({ playlistIds: [...TOO_MANY.slice(1), 7, 7] }),
+          user: USER,
+        }),
+        res
+      );
+      expect(res._getStatus()).toBe(400);
     });
   });
 

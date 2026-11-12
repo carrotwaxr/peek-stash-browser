@@ -410,6 +410,9 @@ export type {
   SortPlaylistRequest,
   SortPlaylistResponse,
   RemoveUnavailableItemsResponse,
+  BulkPlaylistIdsRequest,
+  CleanPlaylistsResponse,
+  DeletePlaylistsResponse,
 } from "@peek/shared-types/api/playlist.js";
 
 // Carousel endpoint types

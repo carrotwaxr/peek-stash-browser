@@ -400,6 +400,27 @@ export interface RemoveUnavailableItemsResponse {
   removed: number;
 }
 
+/**
+ * POST /api/playlists/clean and POST /api/playlists/delete-many
+ * Several playlists at once, by id (1 to BULK_PLAYLIST_LIMIT). Ids the
+ * requester does not own are left out of the work and the counts.
+ */
+export const BULK_PLAYLIST_LIMIT = 500;
+
+export interface BulkPlaylistIdsRequest {
+  playlistIds: number[];
+}
+
+/** `playlists` counts the playlists that lost at least one item */
+export interface CleanPlaylistsResponse {
+  removed: number;
+  playlists: number;
+}
+
+export interface DeletePlaylistsResponse {
+  deleted: number;
+}
+
 // =============================================================================
 // GET SHARED PLAYLISTS
 // =============================================================================

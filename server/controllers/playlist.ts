@@ -1,4 +1,7 @@
-import { PLAYLIST_REPEAT_MODES } from "@peek/shared-types/api/playlist.js";
+import {
+  BULK_PLAYLIST_LIMIT,
+  PLAYLIST_REPEAT_MODES,
+} from "@peek/shared-types/api/playlist.js";
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import prisma from "../prisma/singleton.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
@@ -9,6 +12,7 @@ import {
 import {
   appendItems,
   countUnavailableItems,
+  deletePlaylistsMany,
   duplicateVisibleItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
@@ -17,6 +21,7 @@ import {
   moveItem,
   playlistsHoldingScene,
   removeUnavailableItems,
+  removeUnavailableItemsMany,
   sortPlaylistItems,
   touchPlaylist,
 } from "../services/PlaylistQueryService.js";
@@ -27,10 +32,13 @@ import type {
   AddScenesToPlaylistRequest,
   AddScenesToPlaylistResponse,
   ApiErrorResponse,
+  BulkPlaylistIdsRequest,
+  CleanPlaylistsResponse,
   CreatePlaylistRequest,
   CreatePlaylistResponse,
   DeletePlaylistParams,
   DeletePlaylistResponse,
+  DeletePlaylistsResponse,
   DuplicatePlaylistResponse,
   GetPlaylistParams,
   GetPlaylistQuery,
@@ -559,6 +567,66 @@ export const deletePlaylist = async (
   );
 
   res.json({ success: true, message: "Playlist deleted" });
+};
+
+/**
+ * The playlist ids of a bulk request: 1 to BULK_PLAYLIST_LIMIT positive
+ * integers, duplicates collapsed, or null when the body is anything else.
+ * The ids are not looked up here: the service acts on the requester's own
+ * playlists among them, so a recipient's or a stranger's id is left out
+ * without an error.
+ */
+function bulkPlaylistIds(
+  body: Partial<BulkPlaylistIdsRequest>
+): number[] | null {
+  const { playlistIds }: { playlistIds?: unknown } = body;
+  if (
+    !Array.isArray(playlistIds) ||
+    playlistIds.length === 0 ||
+    playlistIds.length > BULK_PLAYLIST_LIMIT ||
+    !(playlistIds as unknown[]).every(
+      (id) => typeof id === "number" && Number.isSafeInteger(id) && id > 0
+    )
+  ) {
+    return null;
+  }
+  return [...new Set(playlistIds as number[])];
+}
+
+const BULK_IDS_ERROR = `playlistIds must be an array of 1 to ${BULK_PLAYLIST_LIMIT} playlist ids`;
+
+/**
+ * Clean several playlists at once: remove the items whose scene is deleted
+ * from Stash (as removeUnavailablePlaylistItems) from the requester's own
+ * playlists among the ids. Answers the items removed and the playlists that
+ * lost at least one.
+ */
+export const cleanPlaylists = async (
+  req: TypedAuthRequest<BulkPlaylistIdsRequest>,
+  res: TypedResponse<CleanPlaylistsResponse | ApiErrorResponse>
+) => {
+  const playlistIds = bulkPlaylistIds(req.body);
+  if (playlistIds === null) {
+    res.status(400).json({ error: BULK_IDS_ERROR });
+    return;
+  }
+  res.json(await removeUnavailableItemsMany(req.user.id, playlistIds));
+};
+
+/**
+ * Delete several playlists at once: the requester's own among the ids, with
+ * their items and shares. Answers how many went.
+ */
+export const deletePlaylists = async (
+  req: TypedAuthRequest<BulkPlaylistIdsRequest>,
+  res: TypedResponse<DeletePlaylistsResponse | ApiErrorResponse>
+) => {
+  const playlistIds = bulkPlaylistIds(req.body);
+  if (playlistIds === null) {
+    res.status(400).json({ error: BULK_IDS_ERROR });
+    return;
+  }
+  res.json({ deleted: await deletePlaylistsMany(req.user.id, playlistIds) });
 };
 
 /**

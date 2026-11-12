@@ -785,6 +785,72 @@ export async function removeUnavailableItems(
   });
 }
 
+/** The ids as the JSON array `json_each` reads: one bound parameter, however many */
+const PLAYLIST_IDS_JSON_SQL = "SELECT value FROM json_each(?)";
+
+/**
+ * The same delete for several playlists, limited to the requester's own
+ * (`p.userId = ?`): ids of anyone else's playlists match nothing. Answers
+ * the playlist id of each deleted item (RETURNING takes the bare column: it
+ * does not see the `pi` alias).
+ */
+const REMOVE_UNAVAILABLE_MANY_SQL = `DELETE FROM PlaylistItem AS pi
+WHERE pi.playlistId IN (
+  SELECT p.id FROM json_each(?) j CROSS JOIN Playlist p ON p.id = j.value WHERE p.userId = ?
+) AND ${DELETED_FROM_STASH_ITEM}
+RETURNING playlistId`;
+
+const TOUCH_PLAYLISTS_SQL = `UPDATE Playlist SET updatedAt = ? WHERE id IN (${PLAYLIST_IDS_JSON_SQL})`;
+
+/**
+ * "Clean" for several playlists at once: `removeUnavailableItems` over the
+ * requester's own playlists among `playlistIds` (the rest are left out, with
+ * no error), in one statement in one write unit, then one statement stamping
+ * the playlists that lost items as changed. Answers how many items went and
+ * how many playlists lost at least one.
+ */
+export async function removeUnavailableItemsMany(
+  userId: number,
+  playlistIds: readonly number[]
+): Promise<{ removed: number; playlists: number }> {
+  if (playlistIds.length === 0) return { removed: 0, playlists: 0 };
+  const idsJson = JSON.stringify(playlistIds);
+  return dbWrite("playlist.cleanMany", async () => {
+    const deleted = await prisma.$queryRawUnsafe<{ playlistId: number }[]>(
+      REMOVE_UNAVAILABLE_MANY_SQL,
+      idsJson,
+      userId
+    );
+    const touched = [...new Set(deleted.map((row) => row.playlistId))];
+    if (touched.length > 0) {
+      await prisma.$executeRawUnsafe(
+        TOUCH_PLAYLISTS_SQL,
+        Date.now(),
+        JSON.stringify(touched)
+      );
+    }
+    return { removed: deleted.length, playlists: touched.length };
+  });
+}
+
+/**
+ * Delete several playlists at once: the requester's own among `playlistIds`
+ * go, with their items and shares (cascade); the rest are left out. One
+ * write unit. Answers how many playlists went.
+ */
+export async function deletePlaylistsMany(
+  userId: number,
+  playlistIds: readonly number[]
+): Promise<number> {
+  if (playlistIds.length === 0) return 0;
+  const { count } = await dbWrite("playlist.deleteMany", () =>
+    prisma.playlist.deleteMany({
+      where: { id: { in: [...playlistIds] }, userId },
+    })
+  );
+  return count;
+}
+
 const TOUCH_PLAYLIST_SQL = "UPDATE Playlist SET updatedAt = ? WHERE id = ?";
 
 /**
