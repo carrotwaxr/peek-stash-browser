@@ -1412,6 +1412,47 @@ describe("PlaylistDetail tabs", () => {
     expect(search().has("tab")).toBe(false);
   });
 
+  it("switching to Suggestions and back keeps the Items view: sort, direction and page", async () => {
+    serve({
+      page: (query) =>
+        playlistPage(items, {
+          totalItems: 120,
+          page: Number(query.get("page")),
+          perPage: Number(query.get("per_page")),
+        }),
+      queue: queueOf(items),
+      permissions: {},
+    });
+    renderPage("/playlist/5?sort=title&direction=DESC&page=2");
+    await screen.findByText("Scene 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Suggestions" }));
+    expect(await screen.findByTestId("suggestions-tab")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Items/ }));
+    expect(await screen.findByText("Scene 1")).toBeInTheDocument();
+
+    expect(search().get("sort")).toBe("title");
+    expect(search().get("direction")).toBe("DESC");
+    expect(search().get("page")).toBe("2");
+    expect(search().has("tab")).toBe(false);
+    const last = must(pageRequests().at(-1), "page request");
+    expect(last.get("sort")).toBe("title");
+    expect(last.get("direction")).toBe("DESC");
+    expect(last.get("page")).toBe("2");
+  });
+
+  it("leaving Suggestions drops its page", async () => {
+    serve(server());
+    renderPage("/playlist/5?tab=suggestions&spage=3");
+    await screen.findByTestId("suggestions-tab");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Items/ }));
+
+    expect(await screen.findByText("Scene 1")).toBeInTheDocument();
+    expect(search().has("spage")).toBe(false);
+    expect(search().has("tab")).toBe(false);
+  });
+
   it("a playlist with no items still offers Suggestions, told it is empty", async () => {
     serve({
       page: () => playlistPage([]),

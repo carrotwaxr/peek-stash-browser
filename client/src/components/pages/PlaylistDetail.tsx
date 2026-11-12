@@ -146,6 +146,24 @@ function writeView(params: URLSearchParams, view: PlaylistView) {
   return next;
 }
 
+/**
+ * A tab switch on this page: only `tab` changes, and the Suggestions page
+ * (`spage`) goes. The Items view's own keys (`sort`, `direction`, `page`,
+ * `per_page`) stay, so Items reads as it was left; `switchTabParams` would
+ * drop `sort` and `page` but not `direction`.
+ */
+function switchPlaylistTab(
+  params: URLSearchParams,
+  tabId: string,
+  defaultTab: string
+) {
+  const next = new URLSearchParams(params);
+  next.delete("spage");
+  if (tabId === defaultTab) next.delete("tab");
+  else next.set("tab", tabId);
+  return next;
+}
+
 const asRepeat = (value: string): Repeat =>
   value === "one" || value === "all" ? value : "none";
 
@@ -962,6 +980,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
             },
           ]}
           defaultTab="items"
+          switchParams={switchPlaylistTab}
           showEmpty
         />
 
