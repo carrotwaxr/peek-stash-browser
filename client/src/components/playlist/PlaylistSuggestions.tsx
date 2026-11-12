@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { LucidePlus } from "lucide-react";
@@ -52,6 +52,28 @@ const PlaylistSuggestions = ({ playlistId, playlistEmpty }: Props) => {
     [searchParams, setSearchParams]
   );
 
+  const loading = isPending || isPlaceholderData;
+  const totalCount = data?.count ?? 0;
+  const perPage = data?.perPage ?? 24;
+  const totalPages = Math.ceil(totalCount / perPage);
+  // A page past the end (the last page's scenes were added, or a stale
+  // `spage`) answers no scenes but a count: go to the last page that has any
+  const pastTheEnd =
+    !loading && !isError && totalCount > 0 && page > totalPages;
+
+  useEffect(() => {
+    if (!pastTheEnd) return;
+    setSearchParams(
+      (params) => {
+        const next = new URLSearchParams(params);
+        if (totalPages <= 1) next.delete(PAGE_PARAM);
+        else next.set(PAGE_PARAM, String(totalPages));
+        return next;
+      },
+      { replace: true }
+    );
+  }, [pastTheEnd, totalPages, setSearchParams]);
+
   const handleHideSuccess = (
     hiddenSceneId: string,
     _entityType: string,
@@ -94,13 +116,9 @@ const PlaylistSuggestions = ({ playlistId, playlistEmpty }: Props) => {
     }
   };
 
-  const loading = isPending || isPlaceholderData;
   const scenes = (data?.scenes ?? []).filter(
     (s) => !hiddenIds.has(makeCompositeKey(s.id, s.instanceId))
   );
-  const totalCount = data?.count ?? 0;
-  const perPage = data?.perPage ?? 24;
-  const totalPages = Math.ceil(totalCount / perPage);
 
   if (isError) {
     return (
@@ -112,7 +130,7 @@ const PlaylistSuggestions = ({ playlistId, playlistEmpty }: Props) => {
     );
   }
 
-  if (!loading && scenes.length === 0) {
+  if (!loading && totalCount === 0) {
     return (
       <div className="text-center py-8" style={{ color: "var(--text-muted)" }}>
         {playlistEmpty
@@ -140,7 +158,7 @@ const PlaylistSuggestions = ({ playlistId, playlistEmpty }: Props) => {
 
       <SceneGrid
         scenes={scenes}
-        loading={loading}
+        loading={loading || pastTheEnd}
         error={null}
         currentPage={page}
         totalPages={totalPages}

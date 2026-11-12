@@ -240,4 +240,52 @@ describe("PlaylistSuggestions", () => {
     expect(search.has("spage")).toBe(false);
     expect(search.get("tab")).toBe("suggestions");
   });
+
+  it("a page past the end goes back to the last page that has scenes", async () => {
+    const fetchMock = stubApi({
+      "/playlists/5/suggestions": (url) => {
+        const page = Number(new URL(url, "http://x").searchParams.get("page"));
+        // 30 matches at 24 a page: page 2 is the last
+        return jsonResponse(
+          200,
+          page <= 2
+            ? answer([scene(`p${page}`)], { count: 30, page })
+            : answer([], { count: 30, page })
+        );
+      },
+    });
+    renderTab({}, "/p?spage=7&tab=suggestions");
+
+    expect(await screen.findByText("Scene p2")).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing else matches/)).not.toBeInTheDocument();
+    expect(requestsTo(fetchMock, "/playlists/5/suggestions")).toEqual([
+      "/api/playlists/5/suggestions?page=7",
+      "/api/playlists/5/suggestions?page=2",
+    ]);
+    const search = new URLSearchParams(
+      screen.getByTestId("search").textContent ?? ""
+    );
+    expect(search.get("spage")).toBe("2");
+    expect(search.get("tab")).toBe("suggestions");
+  });
+
+  it("the last page being page 1 takes spage out of the URL", async () => {
+    stubApi({
+      "/playlists/5/suggestions": (url) => {
+        const page = Number(new URL(url, "http://x").searchParams.get("page"));
+        return jsonResponse(
+          200,
+          page === 1
+            ? answer([scene("p1")], { count: 5, page })
+            : answer([], { count: 5, page })
+        );
+      },
+    });
+    renderTab({}, "/p?spage=4");
+
+    expect(await screen.findByText("Scene p1")).toBeInTheDocument();
+    // Page 1 is the default: the key leaves the URL
+    expect(screen.getByTestId("search").textContent).toBe("");
+    expect(screen.queryByText(/Nothing else matches/)).not.toBeInTheDocument();
+  });
 });
