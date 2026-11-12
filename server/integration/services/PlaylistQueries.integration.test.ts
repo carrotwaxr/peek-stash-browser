@@ -51,7 +51,9 @@ import {
   loadPlaylistItems,
   loadPlaylistPreviews,
   loadPlaylistQueue,
+  loadPlaylistStats,
   moveItem,
+  removeUnavailableItems,
 } from "../../services/PlaylistQueryService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
@@ -1025,6 +1027,123 @@ describe("Playlist queries (integration)", () => {
     // PQ holds SAME on B, not on A
     expect(await sharedAs(`${SAME}:${A}`)).toBe(false);
   });
+  describe("last changed and removable items", () => {
+    /** Writes the playlist's updatedAt as Prisma stores it: epoch milliseconds */
+    const setUpdatedAt = (playlistId: number, at: Date) =>
+      prisma.$executeRawUnsafe(
+        "UPDATE Playlist SET updatedAt = ? WHERE id = ?",
+        at.getTime(),
+        playlistId
+      );
+    const updatedAtOf = async (playlistId: number) =>
+      (await prisma.playlist.findUniqueOrThrow({ where: { id: playlistId } }))
+        .updatedAt;
+    const LONG_AGO = new Date(Date.UTC(2020, 0, 1));
+
+    it("loadPlaylistStats counts the items Stash deleted, not the hidden ones, and answers the later of updatedAt and the newest addedAt", async () => {
+      const playlist = await prisma.playlist.create({
+        data: {
+          userId: owner.id,
+          name: "stats",
+          items: {
+            create: [
+              [P1, A], // live
+              [DELETED, A], // soft-deleted
+              [GONE, A], // no row on an enabled, synced instance
+              [X1, A], // hidden by the owner, live
+              [ON_OFF, OFF], // on the disabled instance
+            ].map(([sceneId, instanceId], position) => ({
+              sceneId: must(sceneId),
+              instanceId: must(instanceId),
+              position,
+              addedAt: new Date(Date.UTC(2026, 0, 1 + position)),
+            })),
+          },
+        },
+      });
+      const empty = await prisma.playlist.create({
+        data: { userId: owner.id, name: "stats empty" },
+      });
+
+      // updatedAt older than the newest addedAt: the item wins
+      await setUpdatedAt(playlist.id, LONG_AGO);
+      await setUpdatedAt(empty.id, LONG_AGO);
+      const stats = await loadPlaylistStats([playlist.id, empty.id]);
+      expect(stats.get(playlist.id)).toEqual({
+        lastChangedAt: new Date(Date.UTC(2026, 0, 5)),
+        removableItems: 2,
+      });
+      // No items: updatedAt, and nothing to remove
+      expect(stats.get(empty.id)).toEqual({
+        lastChangedAt: LONG_AGO,
+        removableItems: 0,
+      });
+
+      // updatedAt newer than every addedAt: the playlist wins
+      const later = new Date(Date.UTC(2027, 5, 6, 7, 8, 9));
+      await setUpdatedAt(playlist.id, later);
+      expect(
+        (await loadPlaylistStats([playlist.id])).get(playlist.id)?.lastChangedAt
+      ).toEqual(later);
+
+      expect(await loadPlaylistStats([])).toEqual(new Map());
+    });
+
+    it("an add moves the playlist's updatedAt; one that added nothing does not", async () => {
+      const playlistId = await createPlaylist(owner.id, "touch add", [[P1, A]]);
+      await setUpdatedAt(playlistId, LONG_AGO);
+
+      await appendItems(playlistId, owner.id, [{ id: P1, instanceId: A }]);
+      expect(await updatedAtOf(playlistId)).toEqual(LONG_AGO);
+
+      await appendItems(playlistId, owner.id, [{ id: P2, instanceId: A }]);
+      expect((await updatedAtOf(playlistId)).getTime()).toBeGreaterThan(
+        LONG_AGO.getTime()
+      );
+    });
+
+    it("removing the items Stash deleted moves updatedAt; removing none does not", async () => {
+      const playlistId = await createPlaylist(owner.id, "touch clean", [
+        [P1, A],
+        [DELETED, A],
+      ]);
+      await setUpdatedAt(playlistId, LONG_AGO);
+
+      expect(await removeUnavailableItems(playlistId)).toBe(1);
+      expect((await updatedAtOf(playlistId)).getTime()).toBeGreaterThan(
+        LONG_AGO.getTime()
+      );
+
+      await setUpdatedAt(playlistId, LONG_AGO);
+      expect(await removeUnavailableItems(playlistId)).toBe(0);
+      expect(await updatedAtOf(playlistId)).toEqual(LONG_AGO);
+    });
+
+    it("a move moves updatedAt", async () => {
+      const playlistId = await createPlaylist(owner.id, "touch move", [
+        [P1, A],
+        [P2, A],
+      ]);
+      await setUpdatedAt(playlistId, LONG_AGO);
+      const item = await prisma.playlistItem.findFirstOrThrow({
+        where: { playlistId, sceneId: P1, instanceId: A },
+      });
+
+      expect(
+        await moveItem(
+          playlistId,
+          owner.id,
+          await getUserAllowedInstanceIds(owner.id),
+          item.id,
+          1
+        )
+      ).toBe(true);
+      expect((await updatedAtOf(playlistId)).getTime()).toBeGreaterThan(
+        LONG_AGO.getTime()
+      );
+    });
+  });
+
   describe("view sorts", () => {
     const by = (
       field: PlaylistItemSort,
@@ -1323,7 +1442,11 @@ describe("Playlist queries (integration)", () => {
       } finally {
         recorder.restore();
       }
-      expect(writesOf(recorder)).toHaveLength(1);
+      // The renumbering, then the playlist's own stamp, in the one unit
+      const writes = writesOf(recorder);
+      expect(writes).toHaveLength(2);
+      expect(must(writes[0]).sql).toContain("UPDATE PlaylistItem");
+      expect(must(writes[1]).sql).toContain("UPDATE Playlist SET updatedAt");
       expect(recorder.transactions()).toBe(0);
 
       await prisma.playlist.delete({ where: { id: playlistId } });

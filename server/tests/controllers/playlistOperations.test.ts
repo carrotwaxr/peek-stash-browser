@@ -17,7 +17,9 @@ import {
   createPlaylist,
   deletePlaylist,
   duplicatePlaylist,
+  getPlaylist,
   getPlaylistShares,
+  getUserPlaylists,
   movePlaylistItem,
   removePlaylistItems,
   removeSceneFromPlaylist,
@@ -34,7 +36,9 @@ import {
   appendItems,
   duplicateVisibleItems,
   loadPlaylistPreviews,
+  loadPlaylistStats,
   moveItem,
+  touchPlaylist,
 } from "../../services/PlaylistQueryService.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
 import { authenticated } from "../../utils/routeHelpers.js";
@@ -44,6 +48,7 @@ import {
   userPermissions,
 } from "../helpers/fixtures.js";
 import { objectContaining } from "../helpers/matchers.js";
+import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 type PlaylistWithItemCount = Prisma.PlaylistGetPayload<{
@@ -66,6 +71,9 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
 vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistPreviews: vi.fn(() => Promise.resolve(new Map())),
   loadPlaylistItems: vi.fn(() => Promise.resolve({ items: [], totalItems: 0 })),
+  loadPlaylistStats: vi.fn(() => Promise.resolve(new Map())),
+  countUnavailableItems: vi.fn(() => Promise.resolve(0)),
+  touchPlaylist: vi.fn(),
   duplicateVisibleItems: vi.fn(),
   appendItems: vi.fn(),
   moveItem: vi.fn(),
@@ -117,6 +125,8 @@ const mockAppendItems = vi.mocked(appendItems);
 const mockPreviews = vi.mocked(loadPlaylistPreviews);
 const mockDuplicateItems = vi.mocked(duplicateVisibleItems);
 const mockMoveItem = vi.mocked(moveItem);
+const mockStats = vi.mocked(loadPlaylistStats);
+const mockTouch = vi.mocked(touchPlaylist);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 const ALLOWED = ["inst-a"];
@@ -1250,6 +1260,40 @@ describe("Playlist Controller Operations", () => {
       expect(res._getOkBody()).toEqual({ removed: 2 });
     });
 
+    it("a remove that removed something touches the playlist inside its unit; one that removed nothing does not", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(OWNED);
+      const touched: string[][] = [];
+      mockTouch.mockImplementation(
+        prismaImpl(() => {
+          touched.push([...openUnits]);
+          return 1;
+        })
+      );
+      mockPrisma.playlistItem.deleteMany.mockResolvedValue({ count: 2 });
+
+      await removeReq({ itemIds: [11, 12] }).run();
+      await removeSceneFromPlaylist(
+        reqFor(removeSceneFromPlaylist, {
+          params: { id: "1", sceneId: "42" },
+          query: { instanceId: "inst-b" },
+          user: USER,
+        }),
+        resFor(removeSceneFromPlaylist)
+      );
+
+      expect(mockTouch).toHaveBeenCalledTimes(2);
+      expect(mockTouch).toHaveBeenCalledWith(1);
+      expect(touched).toEqual([
+        ["playlist.removeItems"],
+        ["playlist.removeItem"],
+      ]);
+
+      mockTouch.mockClear();
+      mockPrisma.playlistItem.deleteMany.mockResolvedValue({ count: 0 });
+      await removeReq({ itemIds: [99] }).run();
+      expect(mockTouch).not.toHaveBeenCalled();
+    });
+
     it.each([
       [
         "more than 250 ids",
@@ -1271,6 +1315,88 @@ describe("Playlist Controller Operations", () => {
       );
       expect(mockPrisma.playlist.findFirst).not.toHaveBeenCalled();
       expect(mockPrisma.playlistItem.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("last changed and removable items", () => {
+    const CHANGED = new Date("2026-03-04T05:06:07.000Z");
+
+    it("GET /api/playlists answers each playlist with lastChangedAt as an ISO string and removableItems", async () => {
+      mockPrisma.playlist.findMany.mockResolvedValue([
+        partialRow({
+          id: 1,
+          userId: USER.id,
+          name: "A",
+          updatedAt: new Date("2026-01-01T00:00:00Z"),
+        }),
+        partialRow({
+          id: 2,
+          userId: USER.id,
+          name: "B",
+          updatedAt: new Date("2026-01-02T00:00:00Z"),
+        }),
+      ]);
+      mockPreviews.mockResolvedValue(new Map());
+      mockStats.mockResolvedValue(
+        new Map([[1, { lastChangedAt: CHANGED, removableItems: 3 }]])
+      );
+
+      const req = reqFor(getUserPlaylists, {
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
+      const res = resFor(getUserPlaylists);
+      await getUserPlaylists(req, res);
+
+      expect(mockStats).toHaveBeenCalledExactlyOnceWith([1, 2]);
+      const [first, second] = res._getOkBody().playlists;
+      expect(must(first).lastChangedAt).toBe("2026-03-04T05:06:07.000Z");
+      expect(must(first).removableItems).toBe(3);
+      // A playlist the statement did not answer: its own updatedAt, and
+      // nothing to remove
+      expect(must(second).lastChangedAt).toBe("2026-01-02T00:00:00.000Z");
+      expect(must(second).removableItems).toBe(0);
+    });
+
+    const detailFor = async (level: "owner" | "shared") => {
+      mockGetAccess.mockResolvedValue(
+        level === "owner" ? { level } : { level, groups: ["g"] }
+      );
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow<Prisma.PlaylistGetPayload<{ include: { user: true } }>>({
+          id: 3,
+          userId: 9,
+          name: "Detail",
+          user: partialRow({ id: 9, username: "owner" }),
+        })
+      );
+      mockStats.mockResolvedValue(
+        new Map([[3, { lastChangedAt: CHANGED, removableItems: 4 }]])
+      );
+      const res = resFor(getPlaylist);
+      await getPlaylist(
+        reqFor(getPlaylist, {
+          params: { id: "3" },
+          user: USER,
+          allowedInstanceIds: ALLOWED,
+        }),
+        res
+      );
+      return res._getOkBody();
+    };
+
+    it("GET /api/playlists/:id answers removableItems for the owner", async () => {
+      const body = await detailFor("owner");
+
+      expect(mockStats).toHaveBeenCalledExactlyOnceWith([3]);
+      expect(body.removableItems).toBe(4);
+    });
+
+    it("GET /api/playlists/:id answers 0 for a recipient, and reads nothing", async () => {
+      const body = await detailFor("shared");
+
+      expect(body.removableItems).toBe(0);
+      expect(mockStats).not.toHaveBeenCalled();
     });
   });
 

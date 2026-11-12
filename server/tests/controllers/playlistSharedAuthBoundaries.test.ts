@@ -57,6 +57,7 @@ vi.mock("../../services/PlaylistQueryService.js", () => ({
   sortPlaylistItems: vi.fn(),
   removeUnavailableItems: vi.fn(),
   moveItem: vi.fn(),
+  touchPlaylist: vi.fn(),
 }));
 
 // Mock PermissionService

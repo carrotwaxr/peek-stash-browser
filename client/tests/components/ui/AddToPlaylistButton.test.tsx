@@ -50,6 +50,8 @@ function summary(
     containsScene,
     _count: { items: 4 },
     items: [],
+    lastChangedAt: new Date(0).toISOString(),
+    removableItems: 0,
   };
 }
 

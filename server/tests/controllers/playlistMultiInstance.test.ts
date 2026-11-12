@@ -58,6 +58,7 @@ vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistPreviews: vi.fn(),
   loadPlaylistItems: vi.fn(),
   loadPlaylistQueue: vi.fn(),
+  loadPlaylistStats: vi.fn(() => Promise.resolve(new Map())),
   countUnavailableItems: vi.fn(),
 }));
 
@@ -143,8 +144,18 @@ describe("Playlist reads through PlaylistQueryService", () => {
 
   it("getUserPlaylists passes req.allowedInstanceIds to the builder or service: each playlist's previews and visible count", async () => {
     mockPrisma.playlist.findMany.mockResolvedValueOnce([
-      partialRow({ id: 1, userId: USER.id, name: "Mixed" }),
-      partialRow({ id: 2, userId: USER.id, name: "Nothing visible" }),
+      partialRow({
+        id: 1,
+        userId: USER.id,
+        name: "Mixed",
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+      }),
+      partialRow({
+        id: 2,
+        userId: USER.id,
+        name: "Nothing visible",
+        updatedAt: new Date("2026-01-02T00:00:00Z"),
+      }),
     ]);
     mockPreviews.mockResolvedValueOnce(new Map([[1, MIXED]]));
 

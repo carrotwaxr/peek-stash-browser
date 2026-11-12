@@ -60,6 +60,7 @@ function playlistResponse(page: number): GetPlaylistResponse {
     },
     totalItems: 120,
     unavailableItems: 0,
+    removableItems: 0,
     page,
     perPage: 50,
     sort: "position",

@@ -165,6 +165,7 @@ function playlistPage(
     },
     totalItems: items.length,
     unavailableItems: 0,
+    removableItems: 0,
     page: 1,
     perPage: 50,
     sort: "position",

@@ -566,6 +566,24 @@ export interface PlaylistPreviewQueryRow {
   visibleCount: bigint;
 }
 
+/**
+ * Raw row of the playlist stats (PlaylistQueryService.loadPlaylistStats): a
+ * playlist's own `updatedAt`, its newest item's `addedAt` and how many of its
+ * items Stash deleted
+ */
+export interface PlaylistStatsQueryRow {
+  id: number;
+  updatedAt: Date;
+  /**
+   * MAX over the items, which Prisma reads as the epoch milliseconds the
+   * column holds (a `DATETIME` column alone comes back as a `Date`, an
+   * expression does not); null for a playlist with none
+   */
+  lastAddedAt: bigint | null;
+  /** SUM over the items; null for a playlist with none */
+  removable: bigint | null;
+}
+
 /** Raw row of a page of a playlist's visible items (PlaylistQueryService) */
 export interface PlaylistItemQueryRow {
   id: number;

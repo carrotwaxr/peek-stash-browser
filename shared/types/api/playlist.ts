@@ -82,6 +82,17 @@ export interface PlaylistSummary extends Omit<
   _count: { items: number };
   /** The first four items the viewer can see, in position order */
   items: PlaylistPreviewItem[];
+  /**
+   * When the playlist last changed, as an ISO string: the later of its own
+   * `updatedAt` (rename, description, shuffle, repeat, and every item add,
+   * remove, move and sort) and its newest item's `addedAt`
+   */
+  lastChangedAt: string;
+  /**
+   * Items whose scene was deleted from Stash: what Clean and Remove deleted
+   * remove
+   */
+  removableItems: number;
 }
 
 /**
@@ -135,6 +146,11 @@ export interface GetPlaylistResponse {
    * else, who is told nothing about them
    */
   unavailableItems: number;
+  /**
+   * Items whose scene was deleted from Stash: what Clean and Remove deleted
+   * remove. The owner's count; 0 for anyone else
+   */
+  removableItems: number;
   /** The page read */
   page: number;
   perPage: number;

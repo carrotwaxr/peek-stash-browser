@@ -51,6 +51,8 @@ function summary(id: number, name: string, items: number): PlaylistSummary {
     updatedAt: new Date(0),
     _count: { items },
     items: [],
+    lastChangedAt: new Date(0).toISOString(),
+    removableItems: 0,
   };
 }
 

@@ -13,10 +13,12 @@ import {
   loadPlaylistItems,
   loadPlaylistPreviews,
   loadPlaylistQueue,
+  loadPlaylistStats,
   moveItem,
   playlistsHoldingScene,
   removeUnavailableItems,
   sortPlaylistItems,
+  touchPlaylist,
 } from "../services/PlaylistQueryService.js";
 import type {
   AddSceneToPlaylistParams,
@@ -136,6 +138,7 @@ export const getUserPlaylists = async (
     allowedInstanceIds: req.allowedInstanceIds,
     playlistIds: playlists.map((p) => p.id),
   });
+  const stats = await loadPlaylistStats(playlists.map((p) => p.id));
   const holding = await holdingScene(
     playlists.map((p) => p.id),
     containsScene
@@ -144,11 +147,16 @@ export const getUserPlaylists = async (
   res.json({
     playlists: playlists.map((playlist) => {
       const preview = previews.get(playlist.id);
+      const stat = stats.get(playlist.id);
       return {
         ...playlist,
         ...(holding && { containsScene: holding.has(playlist.id) }),
         _count: { items: preview?.visibleCount ?? 0 },
         items: preview?.items ?? [],
+        lastChangedAt: (
+          stat?.lastChangedAt ?? playlist.updatedAt
+        ).toISOString(),
+        removableItems: stat?.removableItems ?? 0,
       };
     }),
   });
@@ -316,11 +324,17 @@ export const getPlaylist = async (
           playlistId,
         })
       : 0;
+  const removableItems =
+    access.level === "owner"
+      ? ((await loadPlaylistStats([playlistId])).get(playlistId)
+          ?.removableItems ?? 0)
+      : 0;
 
   res.json({
     playlist: { ...playlist, items },
     totalItems,
     unavailableItems,
+    removableItems,
     page: paging.page,
     perPage: paging.perPage,
     // The parser always seeds a random sort
@@ -712,11 +726,13 @@ export const removeSceneFromPlaylist = async (
 
   // Delete the item of that scene on that instance only; the same id on
   // another instance is another item
-  const { count } = await dbWrite("playlist.removeItem", () =>
-    prisma.playlistItem.deleteMany({
+  const { count } = await dbWrite("playlist.removeItem", async () => {
+    const deleted = await prisma.playlistItem.deleteMany({
       where: { playlistId, instanceId, sceneId },
-    })
-  );
+    });
+    if (deleted.count > 0) await touchPlaylist(playlistId);
+    return deleted;
+  });
 
   if (count === 0) {
     res.status(404).json({ error: "Scene not in playlist" });
@@ -835,11 +851,13 @@ export const removePlaylistItems = async (
     return;
   }
 
-  const { count } = await dbWrite("playlist.removeItems", () =>
-    prisma.playlistItem.deleteMany({
+  const { count } = await dbWrite("playlist.removeItems", async () => {
+    const deleted = await prisma.playlistItem.deleteMany({
       where: { playlistId, id: { in: ids } },
-    })
-  );
+    });
+    if (deleted.count > 0) await touchPlaylist(playlistId);
+    return deleted;
+  });
   res.json({ removed: count });
 };
 
