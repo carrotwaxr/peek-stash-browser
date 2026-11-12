@@ -8,9 +8,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { getVisibleEntityKeys } from "../../services/EntityAccessService.js";
 import {
+  BULK_WRITE_CHUNK,
   DELETED_FROM_STASH_ITEM,
   appendItems,
   countUnavailableItems,
+  deletePlaylistsMany,
   duplicateVisibleItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
@@ -19,6 +21,7 @@ import {
   moveItem,
   playlistsHoldingScene,
   removeUnavailableItems,
+  removeUnavailableItemsMany,
   sortPlaylistItems,
   touchPlaylist,
 } from "../../services/PlaylistQueryService.js";
@@ -930,6 +933,82 @@ describe("removeUnavailableItems", () => {
     expect(await removeUnavailableItems(9)).toBe(0);
 
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("bulk writes in chunks", () => {
+  const idsOf = (count: number) =>
+    Array.from({ length: count }, (_, i) => i + 1);
+
+  const deletedIds = (
+    args: Parameters<typeof prisma.playlist.deleteMany>[0]
+  ): number[] => {
+    const id = args?.where?.id;
+    return typeof id === "object" ? (id.in ?? []) : [];
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("writes 50 playlists to a unit", () => {
+    expect(BULK_WRITE_CHUNK).toBe(50);
+  });
+
+  it("removeUnavailableItemsMany deletes one chunk of ids a statement and sums the counts", async () => {
+    // Each playlist loses one item
+    for (const chunk of [idsOf(50), idsOf(50), idsOf(20)]) {
+      mockPrisma.$queryRawUnsafe.mockResolvedValueOnce(
+        chunk.map((playlistId) => ({ playlistId }))
+      );
+    }
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(1);
+
+    const result = await removeUnavailableItemsMany(7, idsOf(120));
+
+    expect(result).toEqual({ removed: 120, playlists: 120 });
+    const deletes = mockPrisma.$queryRawUnsafe.mock.calls.map(
+      ([, idsJson, userId]) => ({
+        count: (JSON.parse(String(idsJson)) as number[]).length,
+        userId: Number(userId),
+      })
+    );
+    expect(deletes).toEqual([
+      { count: 50, userId: 7 },
+      { count: 50, userId: 7 },
+      { count: 20, userId: 7 },
+    ]);
+    // Each chunk stamps its own playlists
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(3);
+  });
+
+  it("removeUnavailableItemsMany makes one unit of a request that fits a chunk", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+    expect(await removeUnavailableItemsMany(7, idsOf(50))).toEqual({
+      removed: 0,
+      playlists: 0,
+    });
+
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletePlaylistsMany deletes one chunk of ids a unit, for the requester only, and sums the counts", async () => {
+    // The requester owns all but one playlist of each chunk
+    for (const owned of [49, 49, 19]) {
+      mockPrisma.playlist.deleteMany.mockResolvedValueOnce({ count: owned });
+    }
+
+    const count = await deletePlaylistsMany(7, idsOf(120));
+
+    expect(count).toBe(117);
+    const calls = mockPrisma.playlist.deleteMany.mock.calls.map(([args]) => ({
+      ids: deletedIds(args),
+      userId: args?.where?.userId,
+    }));
+    expect(calls.map((c) => c.ids.length)).toEqual([50, 50, 20]);
+    expect(calls.flatMap((c) => c.ids)).toEqual(idsOf(120));
+    expect(calls.every((c) => c.userId === 7)).toBe(true);
   });
 });
 

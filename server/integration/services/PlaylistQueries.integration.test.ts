@@ -46,6 +46,7 @@ import {
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
 import {
+  BULK_WRITE_CHUNK,
   appendItems,
   countUnavailableItems,
   deletePlaylistsMany,
@@ -1020,6 +1021,41 @@ describe("Playlist queries (integration)", () => {
       expect(recorder.transactions()).toBe(0);
     });
 
+    it("removeUnavailableItemsMany works through more playlists than a chunk, one delete statement a chunk, and sums the counts", async () => {
+      const count = BULK_WRITE_CHUNK + 1;
+      const ids: number[] = [];
+      for (let n = 0; n < count; n++) {
+        ids.push(
+          await createPlaylist(owner.id, `bulk clean chunk ${n}`, [
+            [P1, A],
+            [DELETED, A],
+          ])
+        );
+      }
+      const other = await createPlaylist(
+        recipient.id,
+        "bulk clean chunk other",
+        [[DELETED, A]]
+      );
+
+      const recorder = recordStatements();
+      let result;
+      try {
+        result = await removeUnavailableItemsMany(owner.id, [...ids, other]);
+      } finally {
+        recorder.restore();
+      }
+
+      expect(result).toEqual({ removed: count, playlists: count });
+      for (const id of ids) expect(await sceneIdsOf(id)).toEqual([P1]);
+      expect(await sceneIdsOf(other)).toEqual([DELETED]);
+      // 52 ids make two chunks of 50 and 2: two delete statements, no transaction
+      expect(
+        recorder.statements.filter((st) => /^\s*DELETE\b/i.test(st.sql))
+      ).toHaveLength(2);
+      expect(recorder.transactions()).toBe(0);
+    });
+
     it("removeUnavailableItemsMany leaves hidden and deselected-instance items, and answers zeros for none", async () => {
       const playlistId = await createPlaylist(owner.id, "bulk clean keep", [
         [P1, A],
@@ -1064,6 +1100,29 @@ describe("Playlist queries (integration)", () => {
       expect(await sceneIdsOf(other)).toEqual([P1]);
       expect(await prisma.playlist.count({ where: { id: kept } })).toBe(1);
       expect(await deletePlaylistsMany(owner.id, [])).toBe(0);
+    });
+
+    it("deletePlaylistsMany works through more playlists than a chunk and counts the requester's across them", async () => {
+      const count = BULK_WRITE_CHUNK + 1;
+      const ids: number[] = [];
+      for (let n = 0; n < count; n++) {
+        ids.push(
+          await createPlaylist(owner.id, `bulk delete chunk ${n}`, [[P1, A]])
+        );
+      }
+      const other = await createPlaylist(
+        recipient.id,
+        "bulk delete chunk other",
+        [[P1, A]]
+      );
+
+      const deleted = await deletePlaylistsMany(owner.id, [...ids, other]);
+
+      expect(deleted).toBe(count);
+      expect(await prisma.playlist.count({ where: { id: { in: ids } } })).toBe(
+        0
+      );
+      expect(await prisma.playlist.count({ where: { id: other } })).toBe(1);
     });
   });
 

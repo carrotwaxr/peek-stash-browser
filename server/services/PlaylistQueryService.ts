@@ -803,52 +803,79 @@ RETURNING playlistId`;
 const TOUCH_PLAYLISTS_SQL = `UPDATE Playlist SET updatedAt = ? WHERE id IN (${PLAYLIST_IDS_JSON_SQL})`;
 
 /**
+ * Playlists a bulk write unit takes: a statement over more rows holds the
+ * write lock longer than the 1 s a unit may (see "Writes" in
+ * `.claude/rules/server-sql.md`), so a request's ids go in chunks of this
+ * size, one unit each, and user writes interleave between them.
+ */
+export const BULK_WRITE_CHUNK = 50;
+
+/** The ids (each once, in order) in groups of `BULK_WRITE_CHUNK` */
+function inChunks(playlistIds: readonly number[]): number[][] {
+  const unique = [...new Set(playlistIds)];
+  const chunks: number[][] = [];
+  for (let from = 0; from < unique.length; from += BULK_WRITE_CHUNK) {
+    chunks.push(unique.slice(from, from + BULK_WRITE_CHUNK));
+  }
+  return chunks;
+}
+
+/**
  * "Clean" for several playlists at once: `removeUnavailableItems` over the
  * requester's own playlists among `playlistIds` (the rest are left out, with
- * no error), in one statement in one write unit, then one statement stamping
- * the playlists that lost items as changed. Answers how many items went and
- * how many playlists lost at least one.
+ * no error). The ids go in chunks of `BULK_WRITE_CHUNK`, each one delete
+ * statement and one statement stamping the playlists that lost items as
+ * changed, in one write unit. Answers how many items went and how many
+ * playlists lost at least one.
  */
 export async function removeUnavailableItemsMany(
   userId: number,
   playlistIds: readonly number[]
 ): Promise<{ removed: number; playlists: number }> {
-  if (playlistIds.length === 0) return { removed: 0, playlists: 0 };
-  const idsJson = JSON.stringify(playlistIds);
-  return dbWrite("playlist.cleanMany", async () => {
-    const deleted = await prisma.$queryRawUnsafe<{ playlistId: number }[]>(
-      REMOVE_UNAVAILABLE_MANY_SQL,
-      idsJson,
-      userId
-    );
-    const touched = [...new Set(deleted.map((row) => row.playlistId))];
-    if (touched.length > 0) {
-      await prisma.$executeRawUnsafe(
-        TOUCH_PLAYLISTS_SQL,
-        Date.now(),
-        JSON.stringify(touched)
+  let removed = 0;
+  let playlists = 0;
+  for (const chunk of inChunks(playlistIds)) {
+    const idsJson = JSON.stringify(chunk);
+    const result = await dbWrite("playlist.cleanMany", async () => {
+      const deleted = await prisma.$queryRawUnsafe<{ playlistId: number }[]>(
+        REMOVE_UNAVAILABLE_MANY_SQL,
+        idsJson,
+        userId
       );
-    }
-    return { removed: deleted.length, playlists: touched.length };
-  });
+      const touched = [...new Set(deleted.map((row) => row.playlistId))];
+      if (touched.length > 0) {
+        await prisma.$executeRawUnsafe(
+          TOUCH_PLAYLISTS_SQL,
+          Date.now(),
+          JSON.stringify(touched)
+        );
+      }
+      return { removed: deleted.length, playlists: touched.length };
+    });
+    removed += result.removed;
+    playlists += result.playlists;
+  }
+  return { removed, playlists };
 }
 
 /**
  * Delete several playlists at once: the requester's own among `playlistIds`
- * go, with their items and shares (cascade); the rest are left out. One
- * write unit. Answers how many playlists went.
+ * go, with their items and shares (cascade); the rest are left out. The ids
+ * go in chunks of `BULK_WRITE_CHUNK`, one write unit each. Answers how many
+ * playlists went.
  */
 export async function deletePlaylistsMany(
   userId: number,
   playlistIds: readonly number[]
 ): Promise<number> {
-  if (playlistIds.length === 0) return 0;
-  const { count } = await dbWrite("playlist.deleteMany", () =>
-    prisma.playlist.deleteMany({
-      where: { id: { in: [...playlistIds] }, userId },
-    })
-  );
-  return count;
+  let deleted = 0;
+  for (const chunk of inChunks(playlistIds)) {
+    const { count } = await dbWrite("playlist.deleteMany", () =>
+      prisma.playlist.deleteMany({ where: { id: { in: chunk }, userId } })
+    );
+    deleted += count;
+  }
+  return deleted;
 }
 
 const TOUCH_PLAYLIST_SQL = "UPDATE Playlist SET updatedAt = ? WHERE id = ?";
