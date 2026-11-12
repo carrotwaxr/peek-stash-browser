@@ -1,7 +1,18 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { PlaylistPreviewItem, PlaylistSummary } from "@peek/shared-types";
-import { ListVideo, type LucideIcon, Share2 } from "lucide-react";
+import type {
+  PlaylistPreviewItem,
+  PlaylistSummary,
+  SharedPlaylistData,
+} from "@peek/shared-types";
+import {
+  ListVideo,
+  LucideArrowDown,
+  LucideArrowUp,
+  type LucideIcon,
+  LucideList,
+  Share2,
+} from "lucide-react";
 import {
   useCreatePlaylist,
   useDeletePlaylist,
@@ -10,7 +21,17 @@ import {
 } from "../../api/hooks";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { makeCompositeKey } from "../../utils/compositeKey";
+import { formatDate } from "../../utils/date";
 import { showError, showSuccess } from "../../utils/toast";
+import {
+  DEFAULT_PLAYLIST_SORT,
+  PLAYLIST_LIST_SORTS,
+  type PlaylistListRow,
+  type PlaylistSortDirection,
+  type PlaylistSortField,
+  filterPlaylists,
+  sortPlaylists,
+} from "../playlists/playlistListSort";
 import {
   Button,
   ConfirmDialog,
@@ -18,9 +39,12 @@ import {
   Modal,
   PageLayout,
   Paper,
+  SearchInput,
+  SortControl,
   StatusMessage,
   TAB_COUNT_LOADING,
   TabNavigation,
+  ViewModeToggle,
 } from "../ui/index";
 
 /** The empty state's icon, drawn like its built-in one (thin, muted, 64 px) */
@@ -33,9 +57,30 @@ const EmptyIcon = ({ icon: Icon }: { icon: LucideIcon }) => (
   />
 );
 
+type PlaylistView = "grid" | "list";
+
+const VIEW_MODES = [
+  { id: "grid", label: "Grid view" },
+  { id: "list", label: "List view", icon: LucideList },
+];
+
+/** A name sorts A to Z first; every other sort starts with the largest */
+const startingDirection = (field: PlaylistSortField): PlaylistSortDirection =>
+  field === "name" ? "ASC" : "DESC";
+
+/** An ISO string for a time the API sent (a JSON string, typed as a Date) */
+const toIso = (value: Date | string): string | null => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
 interface PlaylistThumbnailGridProps {
   items: PlaylistPreviewItem[];
   totalCount: number;
+  /** The box's size classes; 128 px square by default */
+  sizeClass?: string;
+  /** Draw an empty box for a playlist with no preview, to keep rows aligned */
+  placeholder?: boolean;
 }
 
 /**
@@ -44,11 +89,21 @@ interface PlaylistThumbnailGridProps {
 const PlaylistThumbnailGrid = ({
   items,
   totalCount,
+  sizeClass = "w-32 h-32",
+  placeholder = false,
 }: PlaylistThumbnailGridProps) => {
-  if (!items || items.length === 0) return null;
+  if (!items || items.length === 0) {
+    return placeholder ? (
+      <div
+        className={`flex-shrink-0 rounded-lg ${sizeClass}`}
+        style={{ backgroundColor: "var(--bg-tertiary)" }}
+        aria-hidden="true"
+      />
+    ) : null;
+  }
 
   return (
-    <div className="flex-shrink-0 w-32 h-32">
+    <div className={`flex-shrink-0 ${sizeClass}`}>
       <div className="grid grid-cols-2 gap-1 w-full h-full rounded-lg overflow-hidden">
         {items.slice(0, 4).map((item, idx) => (
           <div
@@ -86,9 +141,321 @@ const PlaylistThumbnailGrid = ({
   );
 };
 
+interface PlaylistCardProps {
+  playlist: PlaylistSummary;
+  onDelete: (playlist: PlaylistSummary) => void;
+}
+
+/** One of the user's playlists in the grid */
+const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
+  const count = playlist._count.items;
+  return (
+    <Paper>
+      <Paper.Body>
+        <div className="flex gap-4">
+          <PlaylistThumbnailGrid items={playlist.items} totalCount={count} />
+          <div className="flex-1 min-w-0">
+            <Link to={`/playlist/${playlist.id}`}>
+              <h3
+                className="text-lg font-semibold mb-2 hover:underline"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {playlist.name}
+              </h3>
+            </Link>
+            {playlist.description ? (
+              <p
+                className="text-sm mb-4 line-clamp-2"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {playlist.description}
+              </p>
+            ) : null}
+            <div
+              className="flex items-center justify-between text-sm"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <span>
+                {count} {count === 1 ? "video" : "videos"}
+              </span>
+              <Button
+                onClick={() => onDelete(playlist)}
+                variant="destructive"
+                size="sm"
+                className="px-3 py-1"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Paper.Body>
+    </Paper>
+  );
+};
+
+/** One playlist shared with the user, in the grid */
+const SharedPlaylistCard = ({ playlist }: { playlist: SharedPlaylistData }) => (
+  <Paper>
+    <Paper.Body>
+      <div className="flex gap-4">
+        <PlaylistThumbnailGrid
+          items={playlist.items}
+          totalCount={playlist.sceneCount}
+        />
+        <div className="flex-1 min-w-0">
+          <Link to={`/playlist/${playlist.id}`}>
+            <h3
+              className="text-lg font-semibold mb-1 hover:underline"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {playlist.name}
+            </h3>
+          </Link>
+          <p className="text-sm mb-2" style={{ color: "var(--text-muted)" }}>
+            by {playlist.owner.username}
+          </p>
+          {playlist.description ? (
+            <p
+              className="text-sm mb-4 line-clamp-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {playlist.description}
+            </p>
+          ) : null}
+          <div
+            className="flex items-center justify-between text-sm"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <span>
+              {playlist.sceneCount}{" "}
+              {playlist.sceneCount === 1 ? "video" : "videos"}
+            </span>
+            <span
+              className="text-xs px-2 py-1 rounded"
+              style={{ backgroundColor: "var(--bg-tertiary)" }}
+            >
+              via {playlist.sharedViaGroups.join(", ")}
+            </span>
+          </div>
+        </div>
+      </div>
+    </Paper.Body>
+  </Paper>
+);
+
+/** A playlist as the sort and the list view see it */
+interface PlaylistRow extends PlaylistListRow {
+  thumbnails: PlaylistPreviewItem[];
+  /** Items whose scene was deleted from Stash; shared playlists have none */
+  removable: number;
+  /** Who shared it; absent for the user's own */
+  owner?: string;
+}
+
+const headerClass = "text-left py-3 px-4 font-medium whitespace-nowrap";
+const cellClass = "py-2 px-4 align-middle";
+
+/** The list view: one row for each playlist */
+const PlaylistTable = ({
+  rows,
+  shared,
+}: {
+  rows: PlaylistRow[];
+  shared: boolean;
+}) => (
+  <div
+    className="rounded-lg border overflow-x-auto"
+    style={{
+      backgroundColor: "var(--bg-card)",
+      borderColor: "var(--border-color)",
+    }}
+  >
+    <table className="w-full">
+      <thead>
+        <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+          <th
+            className={headerClass}
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Name
+          </th>
+          {shared && (
+            <th
+              className={headerClass}
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Shared by
+            </th>
+          )}
+          <th
+            className={headerClass}
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Videos
+          </th>
+          {!shared && (
+            <th
+              className={headerClass}
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Deleted from Stash
+            </th>
+          )}
+          {!shared && (
+            <th
+              className={headerClass}
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Created
+            </th>
+          )}
+          <th
+            className={headerClass}
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Last changed
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr
+            key={row.id}
+            style={{ borderBottom: "1px solid var(--border-color)" }}
+          >
+            <td className={cellClass}>
+              <div className="flex items-center gap-3">
+                <PlaylistThumbnailGrid
+                  items={row.thumbnails}
+                  totalCount={row.count}
+                  sizeClass="w-12 h-12"
+                  placeholder
+                />
+                <Link
+                  to={`/playlist/${row.id}`}
+                  className="font-medium hover:underline"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {row.name}
+                </Link>
+              </div>
+            </td>
+            {shared && (
+              <td className={cellClass} style={{ color: "var(--text-muted)" }}>
+                {row.owner}
+              </td>
+            )}
+            <td
+              className={cellClass}
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {row.count}
+            </td>
+            {!shared && (
+              <td
+                className={cellClass}
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {row.removable > 0 ? row.removable : ""}
+              </td>
+            )}
+            {!shared && (
+              <td
+                className={cellClass}
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {formatDate(row.createdAt, { empty: "" })}
+              </td>
+            )}
+            <td
+              className={cellClass}
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {formatDate(row.lastChangedAt, { empty: "" })}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
+interface PlaylistToolbarProps {
+  search: string;
+  onSearch: (query: string) => void;
+  sortOptions: { value: string; label: string }[];
+  sortField: PlaylistSortField;
+  sortDirection: PlaylistSortDirection;
+  onSortField: (field: PlaylistSortField) => void;
+  onToggleDirection: () => void;
+  view: PlaylistView;
+  onView: (view: PlaylistView) => void;
+}
+
+/** Search, sort and view, laid out like the first row of a list's controls */
+const PlaylistToolbar = ({
+  search,
+  onSearch,
+  sortOptions,
+  sortField,
+  sortDirection,
+  onSortField,
+  onToggleDirection,
+  view,
+  onView,
+}: PlaylistToolbarProps) => (
+  <div
+    className="rounded-lg mb-4 p-3"
+    style={{
+      backgroundColor: "var(--bg-card)",
+      border: "1px solid var(--border-color)",
+    }}
+  >
+    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="w-full sm:w-auto sm:flex-1 sm:min-w-[180px] sm:max-w-sm">
+        <SearchInput
+          placeholder="Search playlists..."
+          value={search}
+          onSearch={onSearch}
+        />
+      </div>
+      <div className="flex items-center gap-1">
+        <SortControl
+          options={sortOptions}
+          value={sortField}
+          onChange={(value) => onSortField(value as PlaylistSortField)}
+        />
+        <Button
+          onClick={onToggleDirection}
+          aria-label={`Sort direction: ${sortDirection === "ASC" ? "ascending" : "descending"}`}
+          variant="secondary"
+          size="sm"
+          className="py-1"
+          icon={
+            sortDirection === "ASC" ? (
+              <LucideArrowUp size={22} />
+            ) : (
+              <LucideArrowDown size={22} />
+            )
+          }
+        />
+      </div>
+      <ViewModeToggle
+        modes={VIEW_MODES}
+        value={view}
+        onChange={(mode) => onView(mode === "list" ? "list" : "grid")}
+      />
+    </div>
+  </div>
+);
+
+const GRID_CLASS =
+  "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6";
+
 const Playlists = () => {
   usePageTitle("Playlists");
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const ownQuery = usePlaylists();
   const sharedQuery = useSharedPlaylists();
   const createPlaylistMutation = useCreatePlaylist();
@@ -101,9 +468,15 @@ const Playlists = () => {
   const [playlistToDelete, setPlaylistToDelete] =
     useState<PlaylistSummary | null>(null);
 
-  const playlists = ownQuery.data?.playlists ?? [];
+  const playlists = useMemo(
+    () => ownQuery.data?.playlists ?? [],
+    [ownQuery.data]
+  );
   // Shared playlists are not critical: a failed read shows none
-  const sharedPlaylists = sharedQuery.data?.playlists ?? [];
+  const sharedPlaylists = useMemo(
+    () => sharedQuery.data?.playlists ?? [],
+    [sharedQuery.data]
+  );
   const loading = ownQuery.isPending;
   const loadingShared = sharedQuery.isPending;
   const sharedLoaded = sharedQuery.isSuccess;
@@ -112,6 +485,93 @@ const Playlists = () => {
 
   // Get active tab from URL or default to "mine"
   const activeTab = searchParams.get("tab") || "mine";
+  const isShared = activeTab !== "mine";
+
+  // List state lives in the URL beside `tab`; a default is left out of it
+  const search = searchParams.get("q") ?? "";
+  const view: PlaylistView =
+    searchParams.get("view") === "list" ? "list" : "grid";
+  // A shared playlist has no creation time of its own to sort by
+  const sortOptions = isShared
+    ? PLAYLIST_LIST_SORTS.filter((s) => s.value !== "created")
+    : PLAYLIST_LIST_SORTS;
+  const urlSort = searchParams.get("sort");
+  const sortField =
+    sortOptions.find((s) => s.value === urlSort)?.value ??
+    DEFAULT_PLAYLIST_SORT.field;
+  const sortDirection: PlaylistSortDirection =
+    searchParams.get("dir") === "ASC" ? "ASC" : "DESC";
+
+  const setListParams = (
+    updates: Record<string, string | null>,
+    replace: boolean
+  ) => {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === null) next.delete(key);
+          else next.set(key, value);
+        }
+        return next;
+      },
+      { replace }
+    );
+  };
+
+  const handleSearch = (query: string) =>
+    setListParams({ q: query.trim() ? query : null }, true);
+  const handleView = (mode: PlaylistView) =>
+    setListParams({ view: mode === "grid" ? null : mode }, true);
+  const handleSortField = (field: PlaylistSortField) =>
+    setListParams(
+      {
+        sort: field === DEFAULT_PLAYLIST_SORT.field ? null : field,
+        dir: startingDirection(field) === "DESC" ? null : "ASC",
+      },
+      false
+    );
+  const handleToggleDirection = () =>
+    setListParams({ dir: sortDirection === "ASC" ? null : "ASC" }, false);
+
+  const ownRows = useMemo(() => {
+    const rows = playlists.map((playlist) => ({
+      id: playlist.id,
+      name: playlist.name,
+      description: playlist.description,
+      count: playlist._count.items,
+      createdAt: toIso(playlist.createdAt),
+      lastChangedAt: toIso(playlist.lastChangedAt),
+      thumbnails: playlist.items,
+      removable: playlist.removableItems,
+      playlist,
+    }));
+    return sortPlaylists(
+      filterPlaylists(rows, search),
+      sortField,
+      sortDirection
+    );
+  }, [playlists, search, sortField, sortDirection]);
+
+  const sharedRows = useMemo(() => {
+    const rows = sharedPlaylists.map((playlist) => ({
+      id: playlist.id,
+      name: playlist.name,
+      description: playlist.description,
+      count: playlist.sceneCount,
+      createdAt: null,
+      lastChangedAt: toIso(playlist.sharedAt),
+      thumbnails: playlist.items,
+      removable: 0,
+      owner: playlist.owner.username,
+      playlist,
+    }));
+    return sortPlaylists(
+      filterPlaylists(rows, search),
+      sortField,
+      sortDirection
+    );
+  }, [sharedPlaylists, search, sortField, sortDirection]);
 
   const createPlaylist = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -173,6 +633,29 @@ const Playlists = () => {
     },
   ];
 
+  // The toolbar shows once the tab has playlists to sort and search
+  const toolbar = (
+    <PlaylistToolbar
+      search={search}
+      onSearch={handleSearch}
+      sortOptions={sortOptions}
+      sortField={sortField}
+      sortDirection={sortDirection}
+      onSortField={handleSortField}
+      onToggleDirection={handleToggleDirection}
+      view={view}
+      onView={handleView}
+    />
+  );
+
+  const noMatches = (
+    <EmptyState
+      icon={<EmptyIcon icon={ListVideo} />}
+      title="No playlists match"
+      description="Try a different search"
+    />
+  );
+
   return (
     <PageLayout>
       {/* Header with New Playlist button */}
@@ -208,7 +691,6 @@ const Playlists = () => {
             />
           )}
 
-          {/* My Playlists Grid */}
           {playlists.length === 0 ? (
             <EmptyState
               icon={<EmptyIcon icon={ListVideo} />}
@@ -216,57 +698,24 @@ const Playlists = () => {
               description="Create your first playlist to get started"
             />
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
-              {playlists.map((playlist) => {
-                const count = playlist._count.items;
-                return (
-                  <Paper key={playlist.id}>
-                    <Paper.Body>
-                      <div className="flex gap-4">
-                        <PlaylistThumbnailGrid
-                          items={playlist.items}
-                          totalCount={count}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <Link to={`/playlist/${playlist.id}`}>
-                            <h3
-                              className="text-lg font-semibold mb-2 hover:underline"
-                              style={{ color: "var(--text-primary)" }}
-                            >
-                              {playlist.name}
-                            </h3>
-                          </Link>
-                          {playlist.description ? (
-                            <p
-                              className="text-sm mb-4 line-clamp-2"
-                              style={{ color: "var(--text-secondary)" }}
-                            >
-                              {playlist.description}
-                            </p>
-                          ) : null}
-                          <div
-                            className="flex items-center justify-between text-sm"
-                            style={{ color: "var(--text-muted)" }}
-                          >
-                            <span>
-                              {count} {count === 1 ? "video" : "videos"}
-                            </span>
-                            <Button
-                              onClick={() => handleDeleteClick(playlist)}
-                              variant="destructive"
-                              size="sm"
-                              className="px-3 py-1"
-                            >
-                              Delete
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Paper.Body>
-                  </Paper>
-                );
-              })}
-            </div>
+            <>
+              {toolbar}
+              {ownRows.length === 0 ? (
+                noMatches
+              ) : view === "list" ? (
+                <PlaylistTable rows={ownRows} shared={false} />
+              ) : (
+                <div className={GRID_CLASS}>
+                  {ownRows.map((row) => (
+                    <PlaylistCard
+                      key={row.id}
+                      playlist={row.playlist}
+                      onDelete={handleDeleteClick}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </>
       ) : // Shared playlists view
@@ -281,61 +730,20 @@ const Playlists = () => {
           description="Playlists shared with your groups will appear here"
         />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
-          {sharedPlaylists.map((playlist) => {
-            return (
-              <Paper key={playlist.id}>
-                <Paper.Body>
-                  <div className="flex gap-4">
-                    <PlaylistThumbnailGrid
-                      items={playlist.items}
-                      totalCount={playlist.sceneCount}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <Link to={`/playlist/${playlist.id}`}>
-                        <h3
-                          className="text-lg font-semibold mb-1 hover:underline"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          {playlist.name}
-                        </h3>
-                      </Link>
-                      <p
-                        className="text-sm mb-2"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        by {playlist.owner.username}
-                      </p>
-                      {playlist.description ? (
-                        <p
-                          className="text-sm mb-4 line-clamp-2"
-                          style={{ color: "var(--text-secondary)" }}
-                        >
-                          {playlist.description}
-                        </p>
-                      ) : null}
-                      <div
-                        className="flex items-center justify-between text-sm"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        <span>
-                          {playlist.sceneCount}{" "}
-                          {playlist.sceneCount === 1 ? "video" : "videos"}
-                        </span>
-                        <span
-                          className="text-xs px-2 py-1 rounded"
-                          style={{ backgroundColor: "var(--bg-tertiary)" }}
-                        >
-                          via {playlist.sharedViaGroups.join(", ")}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Paper.Body>
-              </Paper>
-            );
-          })}
-        </div>
+        <>
+          {toolbar}
+          {sharedRows.length === 0 ? (
+            noMatches
+          ) : view === "list" ? (
+            <PlaylistTable rows={sharedRows} shared />
+          ) : (
+            <div className={GRID_CLASS}>
+              {sharedRows.map((row) => (
+                <SharedPlaylistCard key={row.id} playlist={row.playlist} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Create Playlist Modal */}

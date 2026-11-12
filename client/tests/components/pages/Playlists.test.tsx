@@ -1,10 +1,17 @@
+import { useLocation } from "react-router-dom";
 import type {
   AddScenesToPlaylistResponse,
   GetSharedPlaylistsResponse,
   GetUserPlaylistsResponse,
   PlaylistSummary,
 } from "@peek/shared-types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouterWithQuery } from "@tests/helpers/MemoryRouterWithQuery";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -54,6 +61,19 @@ function summary(id: number, name: string, items: number): PlaylistSummary {
     lastChangedAt: new Date(0).toISOString(),
     removableItems: 0,
   };
+}
+
+/** Shows the router's search string, so a test reads the URL */
+function LocationProbe() {
+  return <div data-testid="search">{useLocation().search}</div>;
+}
+
+/** The playlists the page lists, in the order shown (grid titles or list rows) */
+function shownNames(): string[] {
+  return screen
+    .getAllByRole("link")
+    .filter((a) => a.getAttribute("href")?.startsWith("/playlist/"))
+    .map((a) => a.textContent ?? "");
 }
 
 /** The last of several matches: the open menu or dialog renders after the page */
@@ -261,5 +281,221 @@ describe("Playlists page", () => {
     });
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  describe("sorting, searching and views", () => {
+    beforeEach(() => {
+      playlists = [
+        {
+          ...summary(11, "banana", 3),
+          lastChangedAt: "2026-01-01T00:00:00.000Z",
+          createdAt: new Date("2026-03-01T00:00:00.000Z"),
+          description: "a mix tape",
+        },
+        {
+          ...summary(12, "Apple", 9),
+          lastChangedAt: "2026-02-01T12:00:00.000Z",
+          createdAt: new Date("2026-01-01T12:00:00.000Z"),
+          removableItems: 4,
+        },
+        {
+          ...summary(13, "cherry", 1),
+          lastChangedAt: "2026-03-01T00:00:00.000Z",
+          createdAt: new Date("2026-02-01T00:00:00.000Z"),
+        },
+      ];
+    });
+
+    function renderPage(url = "/playlists") {
+      return render(
+        <MemoryRouterWithQuery initialEntries={[url]}>
+          <Playlists />
+          <LocationProbe />
+        </MemoryRouterWithQuery>
+      );
+    }
+
+    it("defaults to Last changed, newest first, with nothing in the URL", async () => {
+      renderPage();
+
+      await screen.findByText("cherry");
+
+      expect(shownNames()).toEqual(["cherry", "Apple", "banana"]);
+      expect(screen.getByLabelText("Sort by")).toHaveValue("last_changed");
+      expect(screen.getByTestId("search").textContent).toBe("");
+    });
+
+    it("choosing Name sorts by name and puts it in the URL", async () => {
+      renderPage();
+      await screen.findByText("cherry");
+
+      fireEvent.change(screen.getByLabelText("Sort by"), {
+        target: { value: "name" },
+      });
+
+      await waitFor(() =>
+        expect(shownNames()).toEqual(["Apple", "banana", "cherry"])
+      );
+      expect(screen.getByTestId("search").textContent).toBe(
+        "?sort=name&dir=ASC"
+      );
+    });
+
+    it("the direction button flips the order", async () => {
+      renderPage();
+      await screen.findByText("cherry");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Sort direction: descending" })
+      );
+
+      await waitFor(() =>
+        expect(shownNames()).toEqual(["banana", "Apple", "cherry"])
+      );
+      expect(screen.getByTestId("search").textContent).toBe("?dir=ASC");
+    });
+
+    it("reads the sort from the URL", async () => {
+      renderPage("/playlists?sort=videos&dir=DESC");
+      await screen.findByText("cherry");
+
+      expect(shownNames()).toEqual(["Apple", "banana", "cherry"]);
+    });
+
+    it("typing in search narrows the cards to the matching playlists", async () => {
+      renderPage();
+      await screen.findByText("cherry");
+
+      fireEvent.change(screen.getByPlaceholderText("Search playlists..."), {
+        target: { value: "MIX tape" },
+      });
+
+      await waitFor(() => expect(shownNames()).toEqual(["banana"]));
+      expect(screen.getByTestId("search").textContent).toBe("?q=MIX+tape");
+    });
+
+    it("a search that matches nothing says so", async () => {
+      renderPage("/playlists?q=zebra");
+
+      expect(await screen.findByText("No playlists match")).toBeTruthy();
+      expect(screen.getByPlaceholderText("Search playlists...")).toBeTruthy();
+    });
+
+    it("?view=list renders a table with the five columns", async () => {
+      renderPage("/playlists?view=list");
+      await screen.findByText("cherry");
+
+      const table = screen.getByRole("table");
+      const headers = within(table)
+        .getAllByRole("columnheader")
+        .map((h) => h.textContent);
+
+      expect(headers).toEqual([
+        "Name",
+        "Videos",
+        "Deleted from Stash",
+        "Created",
+        "Last changed",
+      ]);
+      const rows = within(table).getAllByRole("row").slice(1);
+      expect(rows).toHaveLength(3);
+      // Apple: 9 videos, 4 deleted from Stash; the others show none
+      const apple = within(must(rows[1])).getAllByRole("cell");
+      expect(apple.map((c) => c.textContent)).toEqual([
+        "Apple",
+        "9",
+        "4",
+        "Jan 1, 2026",
+        "Feb 1, 2026",
+      ]);
+      expect(
+        must(within(must(rows[0])).getAllByRole("cell")[2]).textContent
+      ).toBe("");
+    });
+
+    it("the view menu switches to the list and back, and the grid is the default", async () => {
+      renderPage();
+      await screen.findByText("cherry");
+      expect(screen.queryByRole("table")).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: /View mode/ }));
+      fireEvent.click(screen.getByRole("option", { name: "List view" }));
+
+      expect(await screen.findByRole("table")).toBeTruthy();
+      expect(screen.getByTestId("search").textContent).toBe("?view=list");
+
+      fireEvent.click(screen.getByRole("button", { name: /View mode/ }));
+      fireEvent.click(screen.getByRole("option", { name: "Grid view" }));
+
+      await waitFor(() => expect(screen.queryByRole("table")).toBeNull());
+      expect(screen.getByTestId("search").textContent).toBe("");
+    });
+
+    it("keeps the Delete button on each card", async () => {
+      renderPage();
+      await screen.findByText("cherry");
+
+      expect(screen.getAllByText("Delete")).toHaveLength(3);
+    });
+
+    describe("the Shared tab", () => {
+      beforeEach(() => {
+        shared = [
+          {
+            id: 7,
+            name: "Zulu",
+            description: null,
+            sceneCount: 2,
+            owner: { id: 2, username: "bob" },
+            sharedViaGroups: ["crew"],
+            sharedAt: "2026-01-05T00:00:00.000Z",
+            items: [],
+          },
+          {
+            id: 8,
+            name: "Alpha",
+            description: null,
+            sceneCount: 5,
+            owner: { id: 2, username: "bob" },
+            sharedViaGroups: ["crew"],
+            sharedAt: "2026-02-05T00:00:00.000Z",
+            items: [],
+          },
+        ];
+      });
+
+      it("sorts by the same control, Last changed reading sharedAt", async () => {
+        renderPage("/playlists?tab=shared");
+        await screen.findByText("Alpha");
+
+        expect(shownNames()).toEqual(["Alpha", "Zulu"]);
+
+        fireEvent.change(screen.getByLabelText("Sort by"), {
+          target: { value: "name" },
+        });
+        await waitFor(() => expect(shownNames()).toEqual(["Alpha", "Zulu"]));
+
+        fireEvent.click(
+          screen.getByRole("button", { name: "Sort direction: ascending" })
+        );
+        await waitFor(() => expect(shownNames()).toEqual(["Zulu", "Alpha"]));
+      });
+
+      it("lists them as a table with no Deleted from Stash column", async () => {
+        renderPage("/playlists?tab=shared&view=list");
+        await screen.findByText("Alpha");
+
+        const headers = within(screen.getByRole("table"))
+          .getAllByRole("columnheader")
+          .map((h) => h.textContent);
+
+        expect(headers).toEqual([
+          "Name",
+          "Shared by",
+          "Videos",
+          "Last changed",
+        ]);
+      });
+    });
   });
 });
