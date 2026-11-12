@@ -25,6 +25,7 @@ import {
   sortPlaylistItems,
   touchPlaylist,
 } from "../services/PlaylistQueryService.js";
+import { getPlaylistSuggestions as loadPlaylistSuggestions } from "../services/PlaylistSuggestionService.js";
 import type {
   AddSceneToPlaylistParams,
   AddSceneToPlaylistRequest,
@@ -46,6 +47,8 @@ import type {
   GetPlaylistQueueResponse,
   GetPlaylistResponse,
   GetPlaylistSharesResponse,
+  GetPlaylistSuggestionsQuery,
+  GetPlaylistSuggestionsResponse,
   GetSharedPlaylistsResponse,
   GetUserPlaylistsQuery,
   GetUserPlaylistsResponse,
@@ -388,6 +391,49 @@ export const getPlaylistQueue = async (
     sort,
   });
   res.json({ entries });
+};
+
+/**
+ * Scenes like the ones the playlist holds (PlaylistSuggestionService), a
+ * page of 24, for anyone who can open it: the owner or a recipient, each
+ * under their own exclusions. `page` is a positive integer, 1 when absent.
+ */
+export const getPlaylistSuggestions = async (
+  req: TypedLibraryRequest<
+    unknown,
+    GetPlaylistParams,
+    GetPlaylistSuggestionsQuery
+  >,
+  res: TypedResponse<GetPlaylistSuggestionsResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const playlistId = parseInt(req.params.id);
+  if (isNaN(playlistId)) {
+    res.status(400).json({ error: "Invalid playlist ID" });
+    return;
+  }
+
+  const rawPage = req.query.page ?? "1";
+  const page = /^\d+$/.test(rawPage) ? Number(rawPage) : NaN;
+  if (!Number.isSafeInteger(page) || page < 1) {
+    res.status(400).json({ error: "page must be a positive integer" });
+    return;
+  }
+
+  const access = await getPlaylistAccess(playlistId, userId);
+  if (access.level === "none") {
+    res.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+
+  res.json(
+    await loadPlaylistSuggestions({
+      userId,
+      playlistId,
+      allowedInstanceIds: req.allowedInstanceIds,
+      page,
+    })
+  );
 };
 
 const NAME_REQUIRED = "Playlist name is required";

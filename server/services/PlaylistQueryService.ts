@@ -138,7 +138,7 @@ const POSITION_ASC: ParsedPlaylistItemSort = {
  * `LEFT JOIN` keeps every item, and then `s.id IS NOT NULL` belongs with
  * `where`.
  */
-function visibleItem(
+export function visibleItem(
   userId: number,
   allowedInstanceIds: readonly string[],
   sceneJoin: "CROSS JOIN" | "LEFT JOIN" = "CROSS JOIN"

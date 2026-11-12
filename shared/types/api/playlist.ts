@@ -204,6 +204,28 @@ export interface GetPlaylistQueueResponse {
   entries: PlaylistQueueEntry[];
 }
 
+/**
+ * GET /api/playlists/:id/suggestions
+ * Scenes like the ones the playlist holds, for anyone who can open it (the
+ * owner or a recipient), under the viewer's own exclusions: a page of 24 of
+ * at most 500, none already in the playlist
+ */
+export interface GetPlaylistSuggestionsQuery extends Record<
+  string,
+  string | undefined
+> {
+  /** From 1 (the default); anything but a positive integer answers 400 */
+  page?: string;
+}
+
+export interface GetPlaylistSuggestionsResponse {
+  scenes: NormalizedScene[];
+  /** How many suggestions there are in all */
+  count: number;
+  page: number;
+  perPage: number;
+}
+
 // =============================================================================
 // CREATE PLAYLIST
 // =============================================================================

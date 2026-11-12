@@ -170,14 +170,8 @@ class StashEntityService {
    * the seed, live, and not excluded for the user, sorted by total weight,
    * then date, then id. A shared performer or tag counts its entry in
    * `weights` (a tag or performer not in the list counts nothing), the
-   * studio `weights.studio`; the weights add up.
-   *
-   * Every branch joins within the seed's instance, so the candidates are
-   * all on it and the seed's own access check covers the allowed
-   * instances. The weighted lists drive their branch (`json_each` as the
-   * outer loop, CROSS JOIN, then the junction's tag or performer index).
-   * The exclusions are an anti-join on UserExcludedEntity, never a bound
-   * list: a user with 100k excluded scenes costs nothing extra.
+   * studio `weights.studio`; the weights add up. The seed itself is never a
+   * candidate.
    */
   async getSimilarSceneCandidates(
     seed: EntityRef,
@@ -189,11 +183,69 @@ class StashEntityService {
     },
     maxCandidates: number = 500
   ): Promise<SimilarSceneCandidate[]> {
+    const { id, instanceId } = seed;
+    const scene = await prisma.stashScene.findUnique({
+      where: { id_stashInstanceId: { id, stashInstanceId: instanceId } },
+      select: { studioId: true },
+    });
+    const studioId = scene?.studioId ?? null;
+    return this.getWeightedSceneCandidates({
+      instanceId,
+      userId,
+      performers: weights.performers,
+      studios: studioId === null ? [] : [[studioId, weights.studio]],
+      tags: weights.tags,
+      exclude: { scene: id },
+      maxCandidates,
+    });
+  }
+
+  /**
+   * Up to `maxCandidates` scenes on one instance that share a weighted
+   * performer, studio or tag, live and not excluded for the user, sorted by
+   * total weight (each shared entry's weight, added up), then date desc,
+   * then id. `exclude` leaves out one scene (a seed) or every item of a
+   * playlist on this instance, whether the user sees it or not.
+   *
+   * Every branch joins within the instance, so the candidates are all on
+   * it, and the caller's access to the instance covers the allowed
+   * instances. Each weighted list drives its branch (`json_each` as the
+   * outer loop, CROSS JOIN, then the junction's performer or tag index, or
+   * `StashScene`'s studio index). The exclusions are an anti-join on
+   * UserExcludedEntity, never a bound list: a user with 100k excluded
+   * scenes costs nothing extra; a playlist's items are a NOT EXISTS on its
+   * `(playlistId, instanceId, sceneId)` unique index.
+   */
+  async getWeightedSceneCandidates(options: {
+    instanceId: string;
+    userId: number;
+    performers: ReadonlyArray<readonly [string, number]>;
+    studios: ReadonlyArray<readonly [string, number]>;
+    tags: ReadonlyArray<readonly [string, number]>;
+    exclude: { scene: string } | { playlistId: number };
+    maxCandidates: number;
+  }): Promise<SimilarSceneCandidate[]> {
     const startTime = Date.now();
+    const { instanceId, userId, exclude, maxCandidates } = options;
+
+    const excluded =
+      "scene" in exclude
+        ? {
+            sql: "NOT (c.sceneId = ? AND c.inst = ?)",
+            params: [exclude.scene, instanceId],
+          }
+        : {
+            sql: `NOT EXISTS (SELECT 1 FROM PlaylistItem pi
+          WHERE pi.playlistId = ? AND pi.instanceId = c.inst AND pi.sceneId = c.sceneId)`,
+            params: [exclude.playlistId],
+          };
 
     const sql = `
       WITH pw AS (
         SELECT json_extract(value, '$[0]') AS performerId, CAST(json_extract(value, '$[1]') AS REAL) AS weight
+        FROM json_each(?)
+      ), sw AS (
+        SELECT json_extract(value, '$[0]') AS studioId, CAST(json_extract(value, '$[1]') AS REAL) AS weight
         FROM json_each(?)
       ), tw AS (
         SELECT json_extract(value, '$[0]') AS tagId, CAST(json_extract(value, '$[1]') AS REAL) AS weight
@@ -204,19 +256,18 @@ class StashEntityService {
         CROSS JOIN ScenePerformer sp ON sp.performerId = pw.performerId
           AND sp.performerInstanceId = ? AND sp.sceneInstanceId = ?
         UNION ALL
-        SELECT s2.id, s2.stashInstanceId, CAST(? AS REAL)
-        FROM StashScene s1
-        JOIN StashScene s2 ON s2.studioId = s1.studioId AND s2.stashInstanceId = s1.stashInstanceId
-        WHERE s1.id = ? AND s1.stashInstanceId = ? AND s1.studioId IS NOT NULL
+        SELECT s2.id, s2.stashInstanceId, sw.weight
+        FROM sw
+        CROSS JOIN StashScene s2 ON s2.studioId = sw.studioId AND s2.stashInstanceId = ?
         UNION ALL
         SELECT st.sceneId, st.sceneInstanceId, tw.weight
         FROM tw
         CROSS JOIN SceneTag st ON st.tagId = tw.tagId
           AND st.tagInstanceId = ? AND st.sceneInstanceId = ?
       ), scored AS (
-        SELECT sceneId, inst, CAST(SUM(weight) AS REAL) AS totalWeight FROM candidates
-        WHERE NOT (sceneId = ? AND inst = ?)
-        GROUP BY sceneId, inst
+        SELECT c.sceneId, c.inst, CAST(SUM(c.weight) AS REAL) AS totalWeight FROM candidates c
+        WHERE ${excluded.sql}
+        GROUP BY c.sceneId, c.inst
       )
       SELECT c.sceneId, c.inst AS instanceId, c.totalWeight, s.date
       FROM scored c
@@ -228,7 +279,6 @@ class StashEntityService {
       LIMIT ?
     `;
 
-    const { id, instanceId } = seed;
     const rows = await prisma.$queryRawUnsafe<
       Array<{
         sceneId: string;
@@ -238,17 +288,15 @@ class StashEntityService {
       }>
     >(
       sql,
-      JSON.stringify(weights.performers),
-      JSON.stringify(weights.tags),
+      JSON.stringify(options.performers),
+      JSON.stringify(options.studios),
+      JSON.stringify(options.tags),
       instanceId,
       instanceId, // performers
-      weights.studio,
-      id,
-      instanceId, // studio
+      instanceId, // studios
       instanceId,
       instanceId, // tags
-      id,
-      instanceId, // never the seed itself
+      ...excluded.params,
       userId,
       maxCandidates
     );
@@ -261,7 +309,7 @@ class StashEntityService {
     }));
 
     logger.debug(
-      `getSimilarSceneCandidates: ${Date.now() - startTime}ms, candidates=${result.length}`
+      `getWeightedSceneCandidates: ${Date.now() - startTime}ms, candidates=${result.length}`
     );
 
     return result;

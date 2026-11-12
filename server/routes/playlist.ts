@@ -10,6 +10,7 @@ import {
   getPlaylist,
   getPlaylistQueue,
   getPlaylistShares,
+  getPlaylistSuggestions,
   getSharedPlaylists,
   getUserPlaylists,
   movePlaylistItem,
@@ -47,6 +48,13 @@ router.get(
   "/:id/queue",
   withAllowedInstances,
   libraryHandler(getPlaylistQueue)
+);
+
+// Scenes like the ones the playlist holds, for the owner or a recipient
+router.get(
+  "/:id/suggestions",
+  withAllowedInstances,
+  libraryHandler(getPlaylistSuggestions)
 );
 
 // Create new playlist
