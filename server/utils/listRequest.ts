@@ -1690,6 +1690,22 @@ export function parseRecommendedListRequest(
   });
 }
 
+/**
+ * A playlist's Suggestions list request: Recommended's sorts (`recommended`
+ * reads the suggestion rank), within the playlist's suggestions
+ */
+export function parsePlaylistSuggestionsRequest(
+  body: unknown,
+  options: Pick<ParseOptions, "userId">
+): ParsedListRequest<"scene"> {
+  return parseListRequest("scene", body, {
+    ...options,
+    sorts: RECOMMENDED_SORTS,
+    defaultSort: DEFAULT_RECOMMENDED_SORT,
+    refuseIds: "Suggestions list their own scenes",
+  });
+}
+
 // =============================================================================
 // PLAYLIST ITEMS
 // =============================================================================

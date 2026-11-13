@@ -19,7 +19,8 @@
  *
  * The instances' lists merge in the candidate query's order, the viewer's
  * watch state reorders them (`applyWatchFactor`), and the best 500 are the
- * suggestions. The viewer is whoever asks: a recipient of a shared playlist
+ * suggestions (`getSuggestionRefs`). The Suggestions tab lists the scene
+ * list's request within them, as Recommended does within its ranking. The viewer is whoever asks: a recipient of a shared playlist
  * gets suggestions under their own exclusions and preferences.
  */
 import type { RecommendationPreferences } from "@peek/shared-types/recommendationPreferences.js";
@@ -336,41 +337,30 @@ async function readSupport(
   );
 }
 
-export interface PlaylistSuggestionsOptions {
+export interface SuggestionRefsOptions {
   /** The viewer: the owner or a recipient */
   userId: number;
   playlistId: number;
   /** `req.allowedInstanceIds`: none means nothing is visible */
   allowedInstanceIds: readonly string[];
-  /** From 1 */
-  page: number;
-  perPage?: number;
   /** TAG_ROW_BUDGET unless a test sets another */
   tagRowBudget?: number;
 }
 
-export interface PlaylistSuggestions {
-  scenes: NormalizedScene[];
-  /** Every suggestion, at most SIMILAR_LIST_LIMIT */
-  count: number;
-  page: number;
-  perPage: number;
-}
-
 /**
- * A page of the playlist's suggestions for the viewer. The caller has
- * checked the viewer may open the playlist.
+ * The playlist's suggestions for the viewer as (id, instance) refs, best
+ * first, at most SIMILAR_LIST_LIMIT. The caller has checked the viewer may
+ * open the playlist. The list runs the scene list within them
+ * (`ListQueryOptions.ranked`), whose `recommended` sort is this order.
  */
-export async function getPlaylistSuggestions(
-  options: PlaylistSuggestionsOptions
-): Promise<PlaylistSuggestions> {
+export async function getSuggestionRefs(
+  options: SuggestionRefsOptions
+): Promise<EntityRef[]> {
   const startTime = Date.now();
   const {
     userId,
     playlistId,
     allowedInstanceIds,
-    page,
-    perPage = SUGGESTIONS_PER_PAGE,
     tagRowBudget = TAG_ROW_BUDGET,
   } = options;
 
@@ -379,7 +369,7 @@ export async function getPlaylistSuggestions(
     readSupport(userId, allowedInstanceIds, playlistId),
     readUserRecommendationPreferences(userId),
   ]);
-  if (instances.length === 0) return { scenes: [], count: 0, page, perPage };
+  if (instances.length === 0) return [];
 
   const liveCounts = await liveSceneCounts(
     instances.map((i) => i.support.instanceId)
@@ -426,17 +416,53 @@ export async function getPlaylistSuggestions(
   ranked.sort(compareCandidates);
 
   // What the viewer already kept sinks, before the list is cut
-  const candidates = (await applyWatchFactor(userId, ranked)).slice(
-    0,
-    SIMILAR_LIST_LIMIT
-  );
+  const refs = (await applyWatchFactor(userId, ranked))
+    .slice(0, SIMILAR_LIST_LIMIT)
+    .map((c) => ({ id: c.sceneId, instanceId: c.instanceId }));
+
+  logger.debug("getSuggestionRefs completed", {
+    totalTime: `${Date.now() - startTime}ms`,
+    playlistId,
+    instances: instances.length,
+    candidateCount: refs.length,
+  });
+  return refs;
+}
+
+export interface PlaylistSuggestionsOptions extends SuggestionRefsOptions {
+  /** From 1 */
+  page: number;
+  perPage?: number;
+}
+
+export interface PlaylistSuggestions {
+  scenes: NormalizedScene[];
+  /** Every suggestion, at most SIMILAR_LIST_LIMIT */
+  count: number;
+  page: number;
+  perPage: number;
+}
+
+/**
+ * A page of the playlist's suggestions in their own order, for
+ * `GET /api/playlists/:id/suggestions` (a tab still on the 3.5.0-beta.3
+ * bundle). The caller has checked the viewer may open the playlist.
+ */
+export async function getPlaylistSuggestions(
+  options: PlaylistSuggestionsOptions
+): Promise<PlaylistSuggestions> {
+  const {
+    userId,
+    allowedInstanceIds,
+    page,
+    perPage = SUGGESTIONS_PER_PAGE,
+  } = options;
+  const refs = await getSuggestionRefs(options);
 
   const startIndex = (page - 1) * perPage;
-  const pageRefs: EntityRef[] = candidates
-    .slice(startIndex, startIndex + perPage)
-    .map((c) => ({ id: c.sceneId, instanceId: c.instanceId }));
+  const pageRefs = refs.slice(startIndex, startIndex + perPage);
   if (pageRefs.length === 0) {
-    return { scenes: [], count: candidates.length, page, perPage };
+    return { scenes: [], count: refs.length, page, perPage };
   }
 
   const scenes = await sceneQueryBuilder.getByRefs({
@@ -444,7 +470,7 @@ export async function getPlaylistSuggestions(
     refs: pageRefs,
     allowedInstanceIds: [...allowedInstanceIds],
   });
-  // Back into candidate order, each scene by its (id, instance)
+  // Back into suggestion order, each scene by its (id, instance)
   const sceneByKey = new Map(
     scenes.map((s) => [entityKey(s.id, s.instanceId), s])
   );
@@ -452,14 +478,5 @@ export async function getPlaylistSuggestions(
     .map((ref) => sceneByKey.get(entityKey(ref.id, ref.instanceId)))
     .filter((s): s is NormalizedScene => s !== undefined);
 
-  logger.debug("getPlaylistSuggestions completed", {
-    totalTime: `${Date.now() - startTime}ms`,
-    playlistId,
-    instances: instances.length,
-    candidateCount: candidates.length,
-    resultCount: orderedScenes.length,
-    page,
-  });
-
-  return { scenes: orderedScenes, count: candidates.length, page, perPage };
+  return { scenes: orderedScenes, count: refs.length, page, perPage };
 }

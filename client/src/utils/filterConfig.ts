@@ -96,6 +96,13 @@ export const RECOMMENDED_SORT_OPTIONS = [
   ...SCENE_SORT_OPTIONS,
 ];
 
+// A playlist's Suggestions tab: Recommended's sorts, its rank (the
+// suggestion order) first as "Best match"
+export const PLAYLIST_SUGGESTION_SORT_OPTIONS = [
+  { value: "recommended", label: "Best match" },
+  ...SCENE_SORT_OPTIONS,
+];
+
 // Performer sorting options (alphabetically organized by label)
 export const PERFORMER_SORT_OPTIONS = [
   { value: "birthdate", label: "Birthdate" },

@@ -68,6 +68,7 @@ import {
   showSuccess,
   showWarning,
 } from "../../utils/toast";
+import { switchTabParams } from "../../utils/urlParams";
 import { ThemedIcon } from "../icons/index";
 import PlaylistSuggestions from "../playlist/PlaylistSuggestions";
 import PlaylistSortControl from "../playlists/PlaylistSortControl";
@@ -147,22 +148,22 @@ function writeView(params: URLSearchParams, view: PlaylistView) {
 }
 
 /**
- * A tab switch on this page: only `tab` changes, and the Suggestions page
- * (`spage`) goes. The Items view's own keys (`sort`, `direction`, `page`,
- * `per_page`) stay, so Items reads as it was left; `switchTabParams` would
- * drop `sort` and `page` but not `direction`.
+ * A tab switch on this page: each tab is its own list, as on every detail
+ * page, so the list keys go (`switchTabParams`), and with them the Items
+ * view's own `direction`, which no list owns
  */
 function switchPlaylistTab(
   params: URLSearchParams,
   tabId: string,
   defaultTab: string
 ) {
-  const next = new URLSearchParams(params);
-  next.delete("spage");
-  if (tabId === defaultTab) next.delete("tab");
-  else next.set("tab", tabId);
+  const next = switchTabParams(params, tabId, defaultTab);
+  next.delete("direction");
   return next;
 }
+
+/** The Items view's defaults: what it reads while Suggestions is open */
+const NO_VIEW_PARAMS = new URLSearchParams();
 
 const asRepeat = (value: string): Repeat =>
   value === "one" || value === "all" ? value : "none";
@@ -184,7 +185,11 @@ const plural = (count: number, one: string, many: string) =>
 const PlaylistDetail = () => {
   const { playlistId } = useParams<{ playlistId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const view = readView(searchParams);
+  // The Suggestions list owns `sort`, `page` and `per_page` while it is
+  // open: the Items view (its page, and the order Play and the queue read)
+  // is the playlist's own order then
+  const suggestionsTab = searchParams.get("tab") === "suggestions";
+  const view = readView(suggestionsTab ? NO_VIEW_PARAMS : searchParams);
   const needsSeed = view.field === "random" && view.seed === null;
 
   useEffect(() => {
@@ -412,6 +417,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
   // any page, but only in the playlist's own order
   const canReorder =
     isOwner &&
+    !suggestionsTab &&
     view.field === "position" &&
     view.direction === "ASC" &&
     totalItems > 1;
@@ -942,7 +948,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
                     </>
                   )}
                 </div>
-                {totalItems > 0 && !reorderMode && (
+                {totalItems > 0 && !reorderMode && !suggestionsTab && (
                   <PlaylistSortControl
                     field={view.field}
                     direction={view.direction}

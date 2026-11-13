@@ -77,6 +77,14 @@ If you own the playlist, a sort other than **Playlist order** also offers **Save
 
 If some of your playlist's scenes can't be played here, the owner sees **N unavailable** next to the video count, and a **Remove unavailable** button. It removes only the scenes that were deleted from Stash. Scenes that are hidden, restricted, or on a server you don't use stay in the playlist, since they may come back. People the playlist is shared with see only the scenes they can play, and nothing about the others.
 
+### Suggestions
+
+A playlist's **Suggestions** tab lists up to 500 scenes that share its performers, tags and studios, best match first, leaving out the scenes already in it. Its owner and the people it is shared with each see their own suggestions, under their own hidden items and restrictions.
+
+The tab works like a scene list: Grid, Wall or Table view, a page size, a sort menu (**Best match** first, then every scene sort), search, filters and saved Views. A search or a filter narrows the 500 suggestions only, never the whole library. To add suggestions to the playlist, select them in Grid view and click **Add N to this playlist**; they leave the list once added.
+
+Each tab has its own sort and page: switching tabs opens the other one at its defaults. Play on the Suggestions tab plays the playlist in its own order.
+
 ### Reordering Scenes
 
 To change the playlist's own order:

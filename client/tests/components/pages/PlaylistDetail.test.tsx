@@ -1412,7 +1412,7 @@ describe("PlaylistDetail tabs", () => {
     expect(search().has("tab")).toBe(false);
   });
 
-  it("switching to Suggestions and back keeps the Items view: sort, direction and page", async () => {
+  it("switching tabs drops the other tab's sort, direction and page, as each tab is its own list", async () => {
     serve({
       page: (query) =>
         playlistPage(items, {
@@ -1423,34 +1423,46 @@ describe("PlaylistDetail tabs", () => {
       queue: queueOf(items),
       permissions: {},
     });
-    renderPage("/playlist/5?sort=title&direction=DESC&page=2");
+    renderPage("/playlist/5?sort=title&direction=DESC&page=2&per_page=100");
     await screen.findByText("Scene 1");
 
     fireEvent.click(screen.getByRole("button", { name: "Suggestions" }));
     expect(await screen.findByTestId("suggestions-tab")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^Items/ }));
-    expect(await screen.findByText("Scene 1")).toBeInTheDocument();
-
-    expect(search().get("sort")).toBe("title");
-    expect(search().get("direction")).toBe("DESC");
-    expect(search().get("page")).toBe("2");
-    expect(search().has("tab")).toBe(false);
-    const last = must(pageRequests().at(-1), "page request");
-    expect(last.get("sort")).toBe("title");
-    expect(last.get("direction")).toBe("DESC");
-    expect(last.get("page")).toBe("2");
+    for (const key of ["sort", "direction", "page", "per_page"]) {
+      expect(search().has(key)).toBe(false);
+    }
+    expect(search().get("tab")).toBe("suggestions");
   });
 
-  it("leaving Suggestions drops its page", async () => {
+  it("leaving Suggestions drops its list's keys and opens Items in the playlist's order", async () => {
     serve(server());
-    renderPage("/playlist/5?tab=suggestions&spage=3");
+    renderPage("/playlist/5?tab=suggestions&sort=title&dir=ASC&page=3&q=beach");
     await screen.findByTestId("suggestions-tab");
 
     fireEvent.click(screen.getByRole("button", { name: /^Items/ }));
 
     expect(await screen.findByText("Scene 1")).toBeInTheDocument();
-    expect(search().has("spage")).toBe(false);
-    expect(search().has("tab")).toBe(false);
+    for (const key of ["tab", "sort", "dir", "page", "q"]) {
+      expect(search().has(key)).toBe(false);
+    }
+    const last = must(pageRequests().at(-1), "page request");
+    expect(last.has("sort")).toBe(false);
+    expect(last.get("page")).toBe("1");
+  });
+
+  it("on Suggestions, the list's sort and page are not the Items view: Play reads the playlist's order", async () => {
+    serve(server());
+    renderPage("/playlist/5?tab=suggestions&sort=title&dir=ASC&page=3");
+    await screen.findByTestId("suggestions-tab");
+
+    // The Items sort control and Reorder act on the items: not shown here
+    expect(screen.queryByLabelText("Sort playlist by")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Reorder Scenes")).not.toBeInTheDocument();
+    await waitFor(() => expect(queueRequests().length).toBeGreaterThan(0));
+    for (const query of [...pageRequests(), ...queueRequests()]) {
+      expect(query.has("sort")).toBe(false);
+    }
+    expect(must(pageRequests().at(-1), "page request").get("page")).toBe("1");
   });
 
   it("a playlist with no items still offers Suggestions, told it is empty", async () => {

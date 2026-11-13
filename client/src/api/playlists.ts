@@ -14,10 +14,11 @@ import type {
   DeletePlaylistResponse,
   DeletePlaylistsResponse,
   DuplicatePlaylistResponse,
+  FindPlaylistSuggestionsRequest,
+  FindPlaylistSuggestionsResponse,
   GetPlaylistQueueResponse,
   GetPlaylistResponse,
   GetPlaylistSharesResponse,
-  GetPlaylistSuggestionsResponse,
   GetSharedPlaylistsResponse,
   GetUserPlaylistsQuery,
   GetUserPlaylistsResponse,
@@ -98,14 +99,23 @@ export const getPlaylistQueue = (
     signal
   );
 
-/** One page of the scenes a playlist suggests, best first */
-export const getPlaylistSuggestions = (
+/** Where a playlist's Suggestions list asks, and counts */
+export const playlistSuggestionsPath = (playlistId: number) =>
+  `/playlists/${playlistId}/suggestions`;
+
+/**
+ * One page of the scene list's request within the scenes a playlist
+ * suggests: its filters, search, sort (`recommended`, best first, unless
+ * named) and paging
+ */
+export const findPlaylistSuggestions = (
   playlistId: number,
-  page: number,
+  request: FindPlaylistSuggestionsRequest,
   signal?: AbortSignal
 ) =>
-  apiGet<GetPlaylistSuggestionsResponse>(
-    `/playlists/${playlistId}/suggestions${queryString({ page })}`,
+  apiPost<FindPlaylistSuggestionsResponse>(
+    playlistSuggestionsPath(playlistId),
+    request,
     signal
   );
 

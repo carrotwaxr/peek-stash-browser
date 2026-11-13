@@ -1,6 +1,6 @@
 /**
- * A playlist's suggestions (GET /api/playlists/:id/suggestions) against the
- * replay fixture.
+ * A playlist's suggestions (POST /api/playlists/:id/suggestions, its count,
+ * and the GET a 3.5.0-beta.3 tab still asks) against the replay fixture.
  *
  * The owner's playlist holds five scenes of the fixture's performer with
  * the most scenes, on the test instance; the performer's other scenes are
@@ -17,9 +17,15 @@ import {
   getPlaylistSuggestions,
 } from "../../services/PlaylistSuggestionService.js";
 import { must } from "../../tests/helpers/must.js";
-import type { GetPlaylistSuggestionsResponse } from "../../types/api/index.js";
+import type {
+  FindPlaylistSuggestionsRequest,
+  FindPlaylistSuggestionsResponse,
+  GetPlaylistSuggestionsResponse,
+  ListCountResponse,
+} from "../../types/api/index.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { createApiUser, hideFor } from "../helpers/accessFixture.js";
+import { expectRefused } from "../helpers/refused.js";
 import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
 
 const PREFIX = "plsugg_it_";
@@ -48,7 +54,8 @@ async function removeRows(): Promise<void> {
   });
 }
 
-async function suggestionsFor(
+/** The beta.3 bundle's GET: a page of 24 in the suggestions' order */
+async function legacySuggestionsFor(
   user: ApiUser,
   id: number,
   query = ""
@@ -58,7 +65,30 @@ async function suggestionsFor(
   );
 }
 
-const sceneIds = (data: GetPlaylistSuggestionsResponse) =>
+/** The list's request; a page of 24 unless the body names its paging */
+async function suggestionsFor(
+  user: ApiUser,
+  id: number,
+  body: FindPlaylistSuggestionsRequest = {}
+): Promise<{ status: number; data: FindPlaylistSuggestionsResponse }> {
+  return user.client.post<FindPlaylistSuggestionsResponse>(
+    `/api/playlists/${id}/suggestions`,
+    { ...body, filter: { per_page: 24, ...body.filter } }
+  );
+}
+
+async function countFor(
+  user: ApiUser,
+  id: number,
+  body: FindPlaylistSuggestionsRequest = {}
+): Promise<{ status: number; data: ListCountResponse }> {
+  return user.client.post<ListCountResponse>(
+    `/api/playlists/${id}/suggestions/count`,
+    body
+  );
+}
+
+const sceneIds = (data: { scenes: Array<{ id: string }> }) =>
   data.scenes.map((s) => s.id);
 
 describe("Playlist suggestions (integration)", () => {
@@ -180,9 +210,117 @@ describe("Playlist suggestions (integration)", () => {
     expect(status).toBe(404);
   });
 
-  it("answers 400 to a page that is not a positive integer", async () => {
+  it("answers 404 to the count for a user the playlist is not shared with", async () => {
+    const { status } = await countFor(stranger, playlistId);
+    expect(status).toBe(404);
+  });
+
+  it("answers 400 to a request naming its own scene ids", async () => {
+    const ref = `${must(items[0])}:${instanceId}`;
+    expectRefused(
+      await owner.client.post(`/api/playlists/${playlistId}/suggestions`, {
+        ids: [ref],
+      }),
+      ["ids"]
+    );
+    expectRefused(
+      await owner.client.post(
+        `/api/playlists/${playlistId}/suggestions/count`,
+        { scene_filter: { ids: { value: [ref] } } }
+      ),
+      ["scene_filter.ids"]
+    );
+  });
+
+  it("pages by the request's page size, and counts every suggestion", async () => {
+    const all = await suggestionsFor(owner, playlistId, {
+      filter: { per_page: 100 },
+    });
+    const total = must(all.data.count);
+    expect(total).toBeGreaterThan(5);
+    const first = await suggestionsFor(owner, playlistId, {
+      filter: { per_page: 5 },
+    });
+    const second = await suggestionsFor(owner, playlistId, {
+      filter: { per_page: 5, page: 2 },
+    });
+    expect(first.data.perPage).toBe(5);
+    expect(first.data.count).toBe(total);
+    expect(sceneIds(first.data)).toEqual(sceneIds(all.data).slice(0, 5));
+    expect(sceneIds(second.data)).toEqual(sceneIds(all.data).slice(5, 10));
+    expect((await countFor(owner, playlistId)).data.count).toBe(total);
+  });
+
+  it("lists in the suggestions' own order by default, the GET's order", async () => {
+    const list = await suggestionsFor(owner, playlistId);
+    const legacy = await legacySuggestionsFor(owner, playlistId);
+    expect(legacy.status).toBe(200);
+    expect(sceneIds(list.data)).toEqual(sceneIds(legacy.data));
+    expect(list.data.count).toBe(legacy.data.count);
+  });
+
+  it("sorts the same suggestions by another scene sort", async () => {
+    const byRank = await suggestionsFor(owner, playlistId, {
+      filter: { per_page: 100 },
+    });
+    const byTitle = await suggestionsFor(owner, playlistId, {
+      filter: { per_page: 100, sort: "title", direction: "ASC" },
+    });
+    expect(byTitle.status).toBe(200);
+    expect([...sceneIds(byTitle.data)].sort()).toEqual(
+      [...sceneIds(byRank.data)].sort()
+    );
+    // In the order of the stored sort key the scene list's title sort reads
+    const keys = await prisma.stashScene.findMany({
+      where: {
+        stashInstanceId: instanceId,
+        id: { in: sceneIds(byTitle.data) },
+      },
+      select: { id: true, titleSort: true },
+    });
+    const keyOf = new Map(keys.map((k) => [k.id, k.titleSort ?? ""]));
+    const titles = sceneIds(byTitle.data).map((id) => keyOf.get(id) ?? "");
+    for (let i = 1; i < titles.length; i++) {
+      expect(must(titles[i - 1]) <= must(titles[i])).toBe(true);
+    }
+  });
+
+  it("filters and counts within the suggestions only", async () => {
+    const all = await suggestionsFor(owner, playlistId, {
+      filter: { per_page: 100 },
+    });
+    const studios = await prisma.stashScene.findMany({
+      where: { stashInstanceId: instanceId, id: { in: sceneIds(all.data) } },
+      select: { id: true, studioId: true },
+    });
+    const studioId = must(studios.find((x) => x.studioId !== null)?.studioId);
+    const expected = studios
+      .filter((x) => x.studioId === studioId)
+      .map((x) => x.id)
+      .sort();
+    const body: FindPlaylistSuggestionsRequest = {
+      scene_filter: {
+        studios: { value: [`${studioId}:${instanceId}`], modifier: "INCLUDES" },
+      },
+    };
+    const filtered = await suggestionsFor(owner, playlistId, {
+      ...body,
+      filter: { per_page: 100 },
+    });
+    expect([...sceneIds(filtered.data)].sort()).toEqual(expected);
+    expect(filtered.data.count).toBe(expected.length);
+    expect((await countFor(owner, playlistId, body)).data.count).toBe(
+      expected.length
+    );
+    // The studio's scenes outside the suggestions stay out (the items)
+    for (const id of items) {
+      expect(sceneIds(filtered.data)).not.toContain(id);
+    }
+  });
+
+  it("answers 400 to a legacy page that is not a positive integer", async () => {
     for (const page of ["0", "-1", "abc", "1.5"]) {
-      const { status } = await suggestionsFor(
+      const { status } = await legacySuggestionsFor(
         owner,
         playlistId,
         `?page=${page}`
@@ -288,5 +426,10 @@ describe("Playlist suggestions (integration)", () => {
     const { status, data } = await suggestionsFor(owner, emptyPlaylistId);
     expect(status).toBe(200);
     expect(data).toEqual({ scenes: [], count: 0, page: 1, perPage: 24 });
+    expect((await countFor(owner, emptyPlaylistId)).data).toEqual({
+      count: 0,
+    });
+    const legacy = await legacySuggestionsFor(owner, emptyPlaylistId);
+    expect(legacy.data).toEqual({ scenes: [], count: 0, page: 1, perPage: 24 });
   });
 });

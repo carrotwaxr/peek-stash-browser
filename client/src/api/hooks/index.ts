@@ -55,6 +55,7 @@ export {
   useSharedPlaylists,
   usePlaylist,
   usePlaylistQueue,
+  usePlaylistSuggestionList,
   useCreatePlaylist,
   useDeletePlaylist,
   useDeletePlaylists,

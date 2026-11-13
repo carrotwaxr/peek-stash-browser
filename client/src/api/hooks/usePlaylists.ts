@@ -2,15 +2,18 @@ import type {
   AddScenesToPlaylistRequest,
   BulkPlaylistIdsRequest,
   CreatePlaylistRequest,
+  FindPlaylistSuggestionsRequest,
   SortPlaylistRequest,
   UpdatePlaylistRequest,
 } from "@peek/shared-types";
 import {
   keepPreviousData,
+  skipToken,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { fetchListPage, recommendedListTotal } from "../../utils/listQuery";
 import {
   type PlaylistPageParams,
   type PlaylistQueueParams,
@@ -20,9 +23,9 @@ import {
   deletePlaylist,
   deletePlaylists,
   duplicatePlaylist,
+  findPlaylistSuggestions,
   getPlaylist,
   getPlaylistQueue,
-  getPlaylistSuggestions,
   getPlaylists,
   getSharedPlaylists,
   movePlaylistItem,
@@ -144,15 +147,29 @@ export function useCleanPlaylists() {
 }
 
 /**
- * One page of the scenes a playlist suggests. The page on screen stays while
- * the next one loads, for the same playlist only (key: ["playlists",
- * "suggestions", playlistId, page]). Any playlist write invalidates it, so
- * a scene just added leaves the list.
+ * One page of a playlist's Suggestions list: the scene list's request
+ * within the scenes the playlist suggests, its total in a top-level `count`
+ * (`recommendedListTotal`, so a page change reuses it). The page on screen
+ * stays while the next loads, for the same playlist only. Any playlist write
+ * invalidates it, so a scene just added leaves the list. A null request
+ * sends nothing.
  */
-export function usePlaylistSuggestions(playlistId: number, page: number) {
+export function usePlaylistSuggestionList(
+  playlistId: number,
+  params: FindPlaylistSuggestionsRequest | null
+) {
   return useQuery({
-    queryKey: queryKeys.playlists.suggestions(playlistId, page),
-    queryFn: ({ signal }) => getPlaylistSuggestions(playlistId, page, signal),
+    queryKey: queryKeys.playlists.suggestions(
+      playlistId,
+      (params ?? {}) as Record<string, unknown>
+    ),
+    queryFn:
+      params === null
+        ? skipToken
+        : (context) =>
+            fetchListPage(context, params, recommendedListTotal, (request) =>
+              findPlaylistSuggestions(playlistId, request, context.signal)
+            ),
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey[2] === playlistId ? previous : undefined,
   });

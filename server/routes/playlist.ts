@@ -3,10 +3,12 @@ import {
   addSceneToPlaylist,
   addScenesToPlaylist,
   cleanPlaylists,
+  countPlaylistSuggestions,
   createPlaylist,
   deletePlaylist,
   deletePlaylists,
   duplicatePlaylist,
+  findPlaylistSuggestions,
   getPlaylist,
   getPlaylistQueue,
   getPlaylistShares,
@@ -50,7 +52,19 @@ router.get(
   libraryHandler(getPlaylistQueue)
 );
 
-// Scenes like the ones the playlist holds, for the owner or a recipient
+// Scenes like the ones the playlist holds, for the owner or a recipient:
+// the scene list's request within them, and its count
+router.post(
+  "/:id/suggestions",
+  withAllowedInstances,
+  libraryHandler(findPlaylistSuggestions)
+);
+router.post(
+  "/:id/suggestions/count",
+  withAllowedInstances,
+  libraryHandler(countPlaylistSuggestions)
+);
+// A tab on the 3.5.0-beta.3 bundle; remove in the release after 3.5.0-beta.4
 router.get(
   "/:id/suggestions",
   withAllowedInstances,
