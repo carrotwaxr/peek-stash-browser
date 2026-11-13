@@ -27,6 +27,7 @@ import {
   IMAGE_SORT_OPTIONS,
   PERFORMER_FILTER_OPTIONS,
   PERFORMER_SORT_OPTIONS,
+  PLAYLIST_SUGGESTION_SORT_OPTIONS,
   RECOMMENDED_SORT_OPTIONS,
   SCENE_FILTER_OPTIONS,
   SCENE_SORT_OPTIONS,
@@ -155,5 +156,15 @@ describe("client filter options and the shared contract", () => {
       SCENE_SORT_OPTIONS.map((option) => option.value)
     );
     expect(new Set(values).size).toBe(values.length);
+  });
+
+  it("the Suggestions tab offers Recommended's sorts in its order, the rank as `Best match`", () => {
+    expect(PLAYLIST_SUGGESTION_SORT_OPTIONS[0]).toEqual({
+      value: "recommended",
+      label: "Best match",
+    });
+    expect(PLAYLIST_SUGGESTION_SORT_OPTIONS.map((o) => o.value)).toEqual(
+      RECOMMENDED_SORT_OPTIONS.map((o) => o.value)
+    );
   });
 });

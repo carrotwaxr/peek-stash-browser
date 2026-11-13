@@ -215,9 +215,12 @@ export const queryKeys = {
     /** One page of one playlist's items in one order */
     detail: (playlistId: number, params: object = {}) =>
       ["playlists", "detail", playlistId, params] as const,
-    /** One page of the scenes one playlist suggests */
-    suggestions: (playlistId: number, page: number) =>
-      ["playlists", "suggestions", playlistId, page] as const,
+    /**
+     * One page of one playlist's Suggestions list; its total sits beside it
+     * (`listCountKey`), so a playlist write or an exclusion change marks both
+     */
+    suggestions: (playlistId: number, params: Record<string, unknown>) =>
+      ["playlists", "suggestions", playlistId, "list", params] as const,
     /** One playlist's play queue in one order */
     queue: (playlistId: number, sort?: string, direction?: string) =>
       ["playlists", "queue", playlistId, sort, direction] as const,

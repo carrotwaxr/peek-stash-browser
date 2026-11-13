@@ -7,6 +7,7 @@
 import { useCallback } from "react";
 import type {
   FindClipsRequest,
+  FindPlaylistSuggestionsRequest,
   FindRecommendedScenesRequest,
   ListPageInput,
 } from "@peek/shared-types";
@@ -18,11 +19,13 @@ import {
   useGroupList,
   useImageList,
   usePerformerList,
+  usePlaylistSuggestionList,
   useRecommendedList,
   useSceneList,
   useStudioList,
   useTagList,
 } from "../../api/hooks";
+import { playlistSuggestionsPath } from "../../api/playlists";
 import { queryKeys } from "../../api/queryKeys";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import type { ListQuery } from "../../utils/listQuery";
@@ -171,6 +174,27 @@ export const RECOMMENDED_SOURCE: ListSource = {
   count: "count",
   countPath: "/library/scenes/recommended/count",
 };
+
+/**
+ * A playlist's Suggestions tab: the scene list's request within the scenes
+ * the playlist suggests (at most RECOMMENDED_LIMIT), its rows and total at
+ * the top level, cached under the playlist's root (a playlist write marks
+ * it) and counted within the suggestions
+ */
+export function playlistSuggestionsSource(playlistId: number): ListSource {
+  return {
+    useList: (request) =>
+      usePlaylistSuggestionList(
+        playlistId,
+        request as FindPlaylistSuggestionsRequest | null
+      ),
+    listKey: (params) => queryKeys.playlists.suggestions(playlistId, params),
+    result: null,
+    items: "scenes",
+    count: "count",
+    countPath: `${playlistSuggestionsPath(playlistId)}/count`,
+  };
+}
 
 type ListResult = Record<string, unknown>;
 type ListResponse = Record<string, unknown>;
