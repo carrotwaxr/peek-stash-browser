@@ -5,6 +5,7 @@
  * Request and response types for /api/playlists/* endpoints.
  */
 import type { NormalizedScene } from "../entities.js";
+import type { FindRecommendedScenesRequest, WithStashUrl } from "./library.js";
 
 // =============================================================================
 // COMMON TYPES
@@ -205,10 +206,20 @@ export interface GetPlaylistQueueResponse {
 }
 
 /**
- * GET /api/playlists/:id/suggestions
- * Scenes like the ones the playlist holds, for anyone who can open it (the
- * owner or a recipient), under the viewer's own exclusions: a page of 24 of
- * at most 500, none already in the playlist
+ * POST /api/playlists/:id/suggestions: the scene list's request within the
+ * scenes like the ones the playlist holds (at most RECOMMENDED_LIMIT, none
+ * already in the playlist), for anyone who can open it (the owner or a
+ * recipient), under the viewer's own exclusions. As Recommended's request:
+ * its sorts add `recommended`, the suggestion rank and the default (DESC is
+ * best first); no top-level `ids` and no `scene_filter.ids`.
+ * POST /api/playlists/:id/suggestions/count takes the same body.
+ */
+export type FindPlaylistSuggestionsRequest = FindRecommendedScenesRequest;
+
+/**
+ * GET /api/playlists/:id/suggestions: a page of 24 in the suggestions' own
+ * order. Kept for a tab still on the 3.5.0-beta.3 bundle; remove it in the
+ * release after 3.5.0-beta.4.
  */
 export interface GetPlaylistSuggestionsQuery extends Record<
   string,
@@ -218,9 +229,18 @@ export interface GetPlaylistSuggestionsQuery extends Record<
   page?: string;
 }
 
+/** The POST's answer: one page and the total */
+export interface FindPlaylistSuggestionsResponse {
+  scenes: WithStashUrl<NormalizedScene>[];
+  /** The suggestions the request matches; null when it asked for none (`filter.count: false`) */
+  count: number | null;
+  page: number;
+  perPage: number;
+}
+
+/** The GET's answer: one page and how many suggestions there are */
 export interface GetPlaylistSuggestionsResponse {
   scenes: NormalizedScene[];
-  /** How many suggestions there are in all */
   count: number;
   page: number;
   perPage: number;

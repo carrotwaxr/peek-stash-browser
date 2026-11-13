@@ -25,7 +25,11 @@ import {
   sortPlaylistItems,
   touchPlaylist,
 } from "../services/PlaylistQueryService.js";
-import { getPlaylistSuggestions as loadPlaylistSuggestions } from "../services/PlaylistSuggestionService.js";
+import {
+  getSuggestionRefs,
+  getPlaylistSuggestions as loadPlaylistSuggestions,
+} from "../services/PlaylistSuggestionService.js";
+import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
 import type {
   AddSceneToPlaylistParams,
   AddSceneToPlaylistRequest,
@@ -41,6 +45,8 @@ import type {
   DeletePlaylistResponse,
   DeletePlaylistsResponse,
   DuplicatePlaylistResponse,
+  FindPlaylistSuggestionsRequest,
+  FindPlaylistSuggestionsResponse,
   GetPlaylistParams,
   GetPlaylistQuery,
   GetPlaylistQueueQuery,
@@ -52,6 +58,7 @@ import type {
   GetSharedPlaylistsResponse,
   GetUserPlaylistsQuery,
   GetUserPlaylistsResponse,
+  ListCountResponse,
   MovePlaylistItemParams,
   MovePlaylistItemRequest,
   MovePlaylistItemResponse,
@@ -77,11 +84,13 @@ import type { EntityRef } from "../utils/entityRef.js";
 import {
   parsePlaylistItemsRequest,
   parsePlaylistQueueRequest,
+  parsePlaylistSuggestionsRequest,
   parsePlaylistsQuery,
   parseSortPlaylistRequest,
 } from "../utils/listRequest.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
+import { addStashUrl } from "./library/scenes.js";
 
 /**
  * A scene reference from a request: a playlist item names its scene and the
@@ -394,9 +403,102 @@ export const getPlaylistQueue = async (
 };
 
 /**
- * Scenes like the ones the playlist holds (PlaylistSuggestionService), a
- * page of 24, for anyone who can open it: the owner or a recipient, each
- * under their own exclusions. `page` is a positive integer, 1 when absent.
+ * The suggestions a viewer who can open the playlist (the owner or a
+ * recipient, each under their own exclusions) gets, best first; null (and
+ * a 404 sent) when the id is not a playlist they can open
+ */
+async function suggestionRefsFor(
+  req: TypedLibraryRequest<unknown, GetPlaylistParams>,
+  res: TypedResponse<ApiErrorResponse>
+): Promise<EntityRef[] | null> {
+  const playlistId = parseInt(req.params.id);
+  if (isNaN(playlistId)) {
+    res.status(400).json({ error: "Invalid playlist ID" });
+    return null;
+  }
+  const access = await getPlaylistAccess(playlistId, req.user.id);
+  if (access.level === "none") {
+    res.status(404).json({ error: "Playlist not found" });
+    return null;
+  }
+  return getSuggestionRefs({
+    userId: req.user.id,
+    playlistId,
+    allowedInstanceIds: req.allowedInstanceIds,
+  });
+}
+
+/**
+ * `POST /api/playlists/:id/suggestions`: the scene list request within the
+ * playlist's suggestions (PlaylistSuggestionService), its filter, `where`,
+ * search, sort and paging run in SQL by the scene builder, as Recommended
+ * runs within its ranking. A ValidationError (400) reaches the central
+ * error handler; the body is parsed before the playlist is looked up.
+ */
+export const findPlaylistSuggestions = async (
+  req: TypedLibraryRequest<FindPlaylistSuggestionsRequest, GetPlaylistParams>,
+  res: TypedResponse<FindPlaylistSuggestionsResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const request = parsePlaylistSuggestionsRequest(req.body, { userId });
+  const { page, perPage } = request;
+  const refs = await suggestionRefsFor(req, res);
+  if (refs === null) return;
+  if (refs.length === 0) {
+    res.json({ scenes: [], count: 0, page, perPage });
+    return;
+  }
+
+  const { allowedInstanceIds, timeZone } = req;
+  const result = await sceneQueryBuilder.execute({
+    userId,
+    allowedInstanceIds,
+    timeZone,
+    request,
+    ranked: refs,
+  });
+  res.json({
+    scenes: addStashUrl(result.items, req.user),
+    count: result.total,
+    page,
+    perPage,
+  });
+};
+
+/**
+ * `POST /api/playlists/:id/suggestions/count`: how many suggestions the
+ * request matches, the number `findPlaylistSuggestions` answers as `count`
+ */
+export const countPlaylistSuggestions = async (
+  req: TypedLibraryRequest<FindPlaylistSuggestionsRequest, GetPlaylistParams>,
+  res: TypedResponse<ListCountResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const request = parsePlaylistSuggestionsRequest(req.body, { userId });
+  const refs = await suggestionRefsFor(req, res);
+  if (refs === null) return;
+  if (refs.length === 0) {
+    res.json({ count: 0 });
+    return;
+  }
+
+  const { allowedInstanceIds, timeZone } = req;
+  res.json({
+    count: await sceneQueryBuilder.count({
+      userId,
+      allowedInstanceIds,
+      timeZone,
+      request,
+      ranked: refs,
+    }),
+  });
+};
+
+/**
+ * `GET /api/playlists/:id/suggestions`: a page of 24 in the suggestions'
+ * own order, kept for a tab still on the 3.5.0-beta.3 bundle; remove it in
+ * the release after 3.5.0-beta.4. `page` is a positive integer, 1 when
+ * absent.
  */
 export const getPlaylistSuggestions = async (
   req: TypedLibraryRequest<

@@ -400,6 +400,8 @@ export type {
   PlaylistQueueEntry,
   GetPlaylistQueueQuery,
   GetPlaylistQueueResponse,
+  FindPlaylistSuggestionsRequest,
+  FindPlaylistSuggestionsResponse,
   GetPlaylistSuggestionsQuery,
   GetPlaylistSuggestionsResponse,
   AddScenesToPlaylistRequest,

@@ -30,6 +30,7 @@ import {
   parseMinimalRequest,
   parsePlaylistItemsRequest,
   parsePlaylistQueueRequest,
+  parsePlaylistSuggestionsRequest,
   parseRecommendedListRequest,
   parseRecommendedRequest,
   parseSceneClipsRequest,
@@ -2586,6 +2587,37 @@ describe("parseRecommendedListRequest", () => {
       refs: [{ id: "12", instanceId: "B" }],
     });
     expect(JSON.stringify(parsed.where)).toContain('"instanceId":"A"');
+  });
+});
+
+describe("parsePlaylistSuggestionsRequest", () => {
+  const suggestions = (body: Record<string, unknown>) =>
+    parsePlaylistSuggestionsRequest(body, opts());
+
+  it("sorts by the suggestion rank, best first, when none is named", () => {
+    expect(suggestions({}).sort).toMatchObject({
+      field: "recommended",
+      direction: "DESC",
+    });
+  });
+
+  it("takes any scene sort and the page size", () => {
+    const parsed = suggestions({
+      filter: { sort: "title", direction: "ASC", per_page: 60, page: 2 },
+    });
+    expect(parsed.sort).toMatchObject({ field: "title", direction: "ASC" });
+    expect(parsed).toMatchObject({ page: 2, perPage: 60 });
+  });
+
+  it("refuses top-level `ids` and `scene_filter.ids`", () => {
+    for (const [path, body] of [
+      ["ids", { ids: ["1:A"] }],
+      ["scene_filter.ids", { scene_filter: { ids: { value: ["1:A"] } } }],
+    ] as const) {
+      expect(issuesOf(() => suggestions(body))).toEqual([
+        { path, message: "Suggestions list their own scenes" },
+      ]);
+    }
   });
 });
 
