@@ -90,7 +90,7 @@ export const PeekLogo = ({
 
   return (
     <a
-      href="/"
+      href={withBase("/")}
       onClick={handleClick}
       className={`flex items-center ${config.container} hover:opacity-80 transition-opacity duration-200 cursor-pointer`}
     >
