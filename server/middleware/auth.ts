@@ -7,6 +7,7 @@ import {
   getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
 } from "../services/UserInstanceService.js";
+import { getBasePath } from "../utils/basePath.js";
 import { compositeKey } from "../utils/entityRef.js";
 import { getJwtSecret } from "../utils/jwtSecret.js";
 import { shouldLogOnce } from "../utils/logThrottle.js";
@@ -64,13 +65,22 @@ export const generateToken = (
   );
 
 /**
+ * Options shared by setting and clearing the token cookie. A cookie clears
+ * only with the path it was set under, and under BASE_PATH that is the prefix.
+ */
+export const tokenCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.SECURE_COOKIES === "true",
+  sameSite: "strict" as const,
+  path: getBasePath() || "/",
+});
+
+/**
  * Set the auth token cookie on a response
  */
 export const setTokenCookie = (res: Response, token: string) => {
   res.cookie("token", token, {
-    httpOnly: true,
-    secure: process.env.SECURE_COOKIES === "true",
-    sameSite: "strict",
+    ...tokenCookieOptions(),
     maxAge: TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
   });
 };

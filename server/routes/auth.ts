@@ -19,6 +19,7 @@ import {
   authenticate,
   generateToken,
   setTokenCookie,
+  tokenCookieOptions,
 } from "../middleware/auth.js";
 import { authRateLimiter } from "../middleware/rateLimiter.js";
 import prisma from "../prisma/singleton.js";
@@ -133,7 +134,7 @@ router.post("/login", authRateLimiter, async (req, res) => {
 
 // Logout endpoint
 router.post("/logout", (req, res) => {
-  res.clearCookie("token");
+  res.clearCookie("token", tokenCookieOptions());
   res.json({ success: true, message: "Logged out successfully" });
 });
 
