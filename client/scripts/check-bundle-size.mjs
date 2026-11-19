@@ -35,11 +35,13 @@ function measure(file) {
 const html = fs.readFileSync(path.join(dist, "index.html"), "utf8");
 const firstLoadFiles = [
   ...html.matchAll(
-    /<script[^>]*\ssrc="\/assets\/([^"]+\.js)"|<link[^>]*rel="modulepreload"[^>]*href="\/assets\/([^"]+\.js)"/g
+    /<script[^>]*\ssrc="\.?\/assets\/([^"]+\.js)"|<link[^>]*rel="modulepreload"[^>]*href="\.?\/assets\/([^"]+\.js)"/g
   ),
 ].map((match) => match[1] ?? match[2]);
 
-const entryFile = html.match(/<script[^>]*\ssrc="\/assets\/([^"]+\.js)"/)?.[1];
+const entryFile = html.match(
+  /<script[^>]*\ssrc="\.?\/assets\/([^"]+\.js)"/
+)?.[1];
 if (!entryFile) throw new Error("dist/index.html loads no entry script");
 
 const files = fs.readdirSync(assets).filter((file) => file.endsWith(".js"));
