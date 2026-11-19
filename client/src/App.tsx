@@ -15,6 +15,7 @@ import { ShortcutScopeProvider } from "./contexts/ShortcutScopeContext";
 import { TVModeProvider } from "./contexts/TVModeProvider";
 import { UnitPreferenceProvider } from "./contexts/UnitPreferenceProvider";
 import { ThemeProvider } from "./themes/ThemeProvider";
+import { BASE_PATH, withBase } from "./utils/basePath";
 import "./themes/base.css";
 
 // Main app component with authentication and routing
@@ -28,13 +29,13 @@ const AppContent = () => {
       queryKeys.setup.status(),
       (status) => status && { ...status, setupComplete: true }
     );
-    window.location.href = "/";
+    window.location.href = withBase("/");
   };
 
   return (
     <SetupStatusGate>
       {(setupStatus) => (
-        <Router>
+        <Router basename={BASE_PATH || undefined}>
           <Suspense fallback={<PageLoader />}>
             <AppRoutes
               setupStatus={setupStatus}

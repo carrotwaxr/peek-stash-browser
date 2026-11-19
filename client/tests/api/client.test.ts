@@ -106,6 +106,25 @@ describe("api client login redirect", () => {
     expect(LOGIN_MESSAGE_STORAGE_KEY).toBe("peek_login_message");
   });
 
+  it("under a base path, redirectToLogin stores the router path and navigates to the prefixed login", async () => {
+    vi.doMock("@/utils/basePath", () => ({
+      BASE_PATH: "/peek",
+      API_PATH: "/peek/api",
+      withBase: (path: string) => `/peek${path}`,
+      stripBase: (pathname: string) =>
+        pathname === "/peek" ? "/" : pathname.replace(/^\/peek(?=\/)/, ""),
+    }));
+    location = stubLocation("/peek/scenes", "?x=1");
+    const { redirectToLogin, REDIRECT_STORAGE_KEY } =
+      await import("@/api/client");
+
+    redirectToLogin();
+
+    expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBe("/scenes?x=1");
+    expect(location.href).toBe("/peek/login");
+    vi.doUnmock("@/utils/basePath");
+  });
+
   it("apiFetch 401 still redirects without a message", async () => {
     stubFetch(401, { error: "Access denied. No token provided." });
     const { apiFetch, LOGIN_MESSAGE_STORAGE_KEY, REDIRECT_STORAGE_KEY } =

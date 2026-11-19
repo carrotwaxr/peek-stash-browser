@@ -7,6 +7,7 @@ import {
   resetLibraryStamp,
 } from "../api/client";
 import { queryClient } from "../api/queryClient";
+import { API_PATH, withBase } from "../utils/basePath";
 import { AuthContext } from "./AuthContextProvider";
 import type { AuthUser } from "./AuthContextProvider";
 
@@ -22,7 +23,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch("/api/auth/check", {
+      const response = await fetch(`${API_PATH}/auth/check`, {
         credentials: "include",
       });
 
@@ -43,7 +44,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const login = async (credentials: { username: string; password: string }) => {
-    const response = await fetch("/api/auth/login", {
+    const response = await fetch(`${API_PATH}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -74,7 +75,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
-      await fetch("/api/auth/logout", {
+      await fetch(`${API_PATH}/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
@@ -91,7 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       sessionStorage.clear();
       queryClient.clear();
       resetLibraryStamp();
-      window.location.assign("/login");
+      window.location.assign(withBase("/login"));
     }
   };
 

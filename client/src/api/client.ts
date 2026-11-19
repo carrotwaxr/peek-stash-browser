@@ -4,8 +4,9 @@
  * Replaces the base fetch helpers from services/api.js with typed wrappers.
  */
 import { PUBLIC_ROUTES, isPublicRoute } from "../constants/navigation";
+import { API_PATH, stripBase, withBase } from "../utils/basePath";
 
-const API_BASE_URL = "/api";
+const API_BASE_URL = API_PATH;
 const REDIRECT_STORAGE_KEY = "peek_auth_redirect";
 /** A one-time notice the login page shows (set by redirectToLogin). */
 export const LOGIN_MESSAGE_STORAGE_KEY = "peek_login_message";
@@ -23,10 +24,10 @@ export function redirectToLogin(message?: string): void {
   isRedirectingToLogin = true;
   sessionStorage.setItem(
     REDIRECT_STORAGE_KEY,
-    window.location.pathname + window.location.search
+    stripBase(window.location.pathname) + window.location.search
   );
   if (message) sessionStorage.setItem(LOGIN_MESSAGE_STORAGE_KEY, message);
-  window.location.href = PUBLIC_ROUTES.login;
+  window.location.href = withBase(PUBLIC_ROUTES.login);
 }
 
 // Background/fire-and-forget endpoints where a 401 should NOT trigger redirect.
@@ -257,7 +258,7 @@ export async function apiFetch<T = unknown>(
     response.status === 401 &&
     !endpoint.startsWith("/auth/") &&
     !AUTH_SILENT_ENDPOINTS.has(endpoint) &&
-    !isPublicRoute(window.location.pathname);
+    !isPublicRoute(stripBase(window.location.pathname));
 
   if (sessionLost && !isRedirectingToLogin) {
     redirectToLogin();
