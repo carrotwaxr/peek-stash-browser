@@ -17,6 +17,7 @@
  * encoding is unambiguous.
  */
 import { createHmac, hkdfSync, timingSafeEqual } from "crypto";
+import { publicPath } from "./basePath.js";
 import { getJwtSecret } from "./jwtSecret.js";
 
 export const STREAM_LINK_TTL_SECONDS = 12 * 60 * 60;
@@ -142,7 +143,9 @@ export function applySignedQuery(
 
 export function buildStreamLinkPath(c: StreamLinkClaims, sig: string): string {
   const q = signedQuery(c, sig);
-  return `/api/scene/${c.sceneId}/proxy-stream/stream?${q.toString()}`;
+  return publicPath(
+    `/api/scene/${c.sceneId}/proxy-stream/stream?${q.toString()}`
+  );
 }
 
 let cachedSecret: string | null = null;

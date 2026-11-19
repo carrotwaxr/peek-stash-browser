@@ -5,7 +5,7 @@
  * [label, MIME type, path file, resolution query]. Their URLs carried the
  * Stash API key, so only these four fields are kept.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type CastFile,
   type StashStreamOptions,
@@ -513,5 +513,24 @@ describe("streamOptionsOf", () => {
         fileHeight: 404,
       })
     ).toEqual({ direct: true, mkv: false, resolutions: ["ORIGINAL", "LOW"] });
+  });
+});
+
+describe("under BASE_PATH", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("buildSceneStreams URLs start with the prefix", () => {
+    vi.stubEnv("BASE_PATH", "/peek");
+    const streams = buildSceneStreams("123", "inst-a", {
+      direct: true,
+      mkv: false,
+      resolutions: ["ORIGINAL", "LOW"],
+    });
+    expect(streams.length).toBeGreaterThan(0);
+    for (const s of streams) {
+      expect(s.url).toMatch(/^\/peek\/api\/scene\/123\/proxy-stream\//);
+    }
   });
 });

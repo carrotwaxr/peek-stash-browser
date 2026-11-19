@@ -20,6 +20,7 @@ import {
   signedQuery,
   signedQueryOf,
 } from "../../utils/streamLink.js";
+import { must } from "../helpers/must.js";
 
 vi.mock("../../utils/jwtSecret.js", () => ({
   getJwtSecret: vi.fn().mockReturnValue("test-secret"),
@@ -117,6 +118,32 @@ describe("streamLink", () => {
     expect(buildStreamLinkPath(claims, "SIG")).toBe(
       "/api/scene/123/proxy-stream/stream?instanceId=inst-a&uid=7&exp=1790208000&sig=SIG"
     );
+  });
+
+  describe("under BASE_PATH", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("buildStreamLinkPath prefixes the path and leaves the query alone", () => {
+      vi.stubEnv("BASE_PATH", "/peek");
+      expect(buildStreamLinkPath(claims, "SIG")).toBe(
+        "/peek/api/scene/123/proxy-stream/stream?instanceId=inst-a&uid=7&exp=1790208000&sig=SIG"
+      );
+    });
+
+    it("the signature covers the claims, not the path", () => {
+      const without = signStreamLink(claims, key);
+      vi.stubEnv("BASE_PATH", "/peek");
+      const withPrefix = signStreamLink(claims, key);
+      expect(withPrefix).toBe(without);
+      const sig = new URL(
+        buildStreamLinkPath(claims, withPrefix),
+        "http://peek.test"
+      ).searchParams.get("sig");
+      expect(sig).toBe(without);
+      expect(isStreamLinkSignatureValid(claims, must(sig), key)).toBe(true);
+    });
   });
 
   it("a media-scope signature differs from a v1 signature over the same claims", () => {

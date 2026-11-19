@@ -15,6 +15,7 @@ import {
 } from "../services/StashInstanceManager.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import { publicPath } from "../utils/basePath.js";
 import { privateCacheControl } from "../utils/cacheControl.js";
 import { redactUrl } from "../utils/logRedaction.js";
 import { logger } from "../utils/logger.js";
@@ -222,7 +223,9 @@ function rewriteStashUri(
     const cleanQuery = queryParams.toString();
     const queryString = cleanQuery ? `?${cleanQuery}` : "";
 
-    return `/api/scene/${sceneId}/proxy-stream/${streamPath}${queryString}`;
+    return publicPath(
+      `/api/scene/${sceneId}/proxy-stream/${streamPath}${queryString}`
+    );
   } catch {
     return null;
   }
@@ -877,7 +880,10 @@ export const createSceneMediaLink = async (
     const query = new URLSearchParams({ lang, type });
     return [
       {
-        url: sign(`/api/scene/${sceneId}/caption`, query.toString()),
+        url: sign(
+          publicPath(`/api/scene/${sceneId}/caption`),
+          query.toString()
+        ),
         lang,
         type,
       },
@@ -885,7 +891,7 @@ export const createSceneMediaLink = async (
   });
 
   const poster = scene.pathScreenshot
-    ? sign(`/api/scene/${sceneId}/poster`)
+    ? sign(publicPath(`/api/scene/${sceneId}/poster`))
     : null;
 
   res.setHeader("Cache-Control", "no-store");
