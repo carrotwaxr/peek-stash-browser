@@ -57,10 +57,13 @@ sed -e "s|=\"\./|=\"$BASE_PATH/|g" \
     -e "s|name=\"peek-base-path\" content=\"\"|name=\"peek-base-path\" content=\"$BASE_PATH\"|" \
     /app/frontend/index.html > "$NGINX_RUNTIME/html/index.html"
 if [ -n "$BASE_PATH" ]; then
-  # nginx strips the prefix; the unprefixed paths keep working
+  # nginx strips the prefix; the unprefixed paths keep working. The rewrite is
+  # a regex, so the prefix's dots are escaped (the other allowed characters
+  # are literal there)
+  BASE_PATH_RE="${BASE_PATH//./\\.}"
   cat > "$NGINX_RUNTIME/conf.d/base-path.conf" <<CONF
 location = $BASE_PATH { return 301 $BASE_PATH/; }
-rewrite ^$BASE_PATH/(.*)\$ /\$1 break;
+rewrite ^$BASE_PATH_RE/(.*)\$ /\$1 break;
 CONF
 fi
 chown -R "$APP_USER:$APP_USER" "$NGINX_RUNTIME"
