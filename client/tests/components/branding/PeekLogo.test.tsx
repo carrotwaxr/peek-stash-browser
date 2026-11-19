@@ -92,4 +92,34 @@ describe("PeekLogo", () => {
 
     expect(screen.getByTestId("location")).toHaveTextContent("/performers");
   });
+
+  it("under a base path the logo image is the prefixed asset", async () => {
+    vi.resetModules();
+    vi.doMock("@/utils/basePath", () => ({
+      BASE_PATH: "/peek",
+      API_PATH: "/peek/api",
+      withBase: (path: string) => `/peek${path}`,
+      stripBase: (pathname: string) => pathname,
+    }));
+    const { PeekLogo: PrefixedLogo } =
+      await import("@/components/branding/PeekLogo");
+    // The reset gave the auth context a new identity: its provider is new too
+    const { SignedInWithQuery: PrefixedSignedIn } =
+      await import("@tests/helpers/SignedInWithQuery");
+
+    render(
+      <MemoryRouter>
+        <PrefixedSignedIn>
+          <PrefixedLogo />
+        </PrefixedSignedIn>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("img", { name: "Peek" })).toHaveAttribute(
+      "src",
+      "/peek/branding/logos/peek-logo.svg"
+    );
+    vi.doUnmock("@/utils/basePath");
+    vi.resetModules();
+  });
 });

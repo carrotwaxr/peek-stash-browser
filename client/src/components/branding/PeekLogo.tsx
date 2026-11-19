@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { getLandingPage } from "../../constants/navigation";
+import { withBase } from "../../utils/basePath";
 
 interface PeekLogoProps {
   size?: "small" | "default" | "large";
@@ -50,7 +51,7 @@ export const PeekLogo = ({
 
   // Get logo image paths
   const getLogoPath = () => {
-    const basePath = "/branding/logos";
+    const basePath = withBase("/branding/logos");
 
     return `${basePath}/peek-logo.svg`;
   };

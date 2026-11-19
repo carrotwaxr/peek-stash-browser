@@ -7,6 +7,7 @@ import type {
   GetClipsForSceneResponse,
   ListCount,
 } from "@peek/shared-types";
+import { API_PATH } from "../utils/basePath";
 import { apiGet, apiPost } from "./client";
 
 /**
@@ -39,5 +40,5 @@ export async function getClipsForScene(
  * a media request only from the instance it names.
  */
 export function getClipPreviewUrl(clipId: string, instanceId: string): string {
-  return `/api/proxy/clip/${clipId}/preview?instanceId=${encodeURIComponent(instanceId)}`;
+  return `${API_PATH}/proxy/clip/${clipId}/preview?instanceId=${encodeURIComponent(instanceId)}`;
 }

@@ -4,6 +4,7 @@ import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { useInView } from "../../hooks/useInView";
 import { usePreviewVideoRef } from "../../hooks/usePreviewVideoRef";
+import { API_PATH } from "../../utils/basePath";
 import {
   getPreviewProbe,
   setPreviewProbe,
@@ -154,8 +155,8 @@ const SceneCardPreview = ({
         // Handle high quality preferences (webp/mp4) with 404 fallback to sprite
         const previewUrl = withInstance(
           preferredPreviewType === "mp4"
-            ? `/api/proxy/scene/${scene.id}/preview`
-            : `/api/proxy/scene/${scene.id}/webp`,
+            ? `${API_PATH}/proxy/scene/${scene.id}/preview`
+            : `${API_PATH}/proxy/scene/${scene.id}/webp`,
           scene.instanceId
         );
 
@@ -289,13 +290,13 @@ const SceneCardPreview = ({
   const getPreviewUrl = () => {
     if (activePreviewType === "mp4" && scene?.id) {
       return withInstance(
-        `/api/proxy/scene/${scene.id}/preview`,
+        `${API_PATH}/proxy/scene/${scene.id}/preview`,
         scene.instanceId
       );
     }
     if (activePreviewType === "webp" && scene?.id) {
       return withInstance(
-        `/api/proxy/scene/${scene.id}/webp`,
+        `${API_PATH}/proxy/scene/${scene.id}/webp`,
         scene.instanceId
       );
     }

@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { apiPost } from "../api";
 import { useInvalidateDownloads } from "../api/hooks/useDownloads";
 import { useMyPermissions } from "../api/hooks/useMyPermissions";
+import { API_PATH } from "../utils/basePath";
 import { showError, showSuccess } from "../utils/toast";
 
 interface DownloadableImage {
@@ -40,7 +41,7 @@ export function useImageDownload(enabled: boolean) {
           { instanceId: image.instanceId }
         );
         void invalidateDownloads();
-        window.location.href = `/api/downloads/${response.download.id}/file`;
+        window.location.href = `${API_PATH}/downloads/${response.download.id}/file`;
         showSuccess("Download started");
       } catch (error) {
         const err = error as { data?: { error?: string }; message?: string };

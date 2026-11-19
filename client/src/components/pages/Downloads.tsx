@@ -7,6 +7,7 @@ import {
   useRetryDownload,
 } from "../../api/hooks/useDownloads";
 import { usePageTitle } from "../../hooks/usePageTitle";
+import { API_PATH } from "../../utils/basePath";
 import { formatDateTime } from "../../utils/date";
 import { formatFileSize } from "../../utils/format";
 import { showError, showSuccess } from "../../utils/toast";
@@ -105,7 +106,7 @@ const getDownloadThumbnail = (download: SerializedDownload) => {
     return (
       <div className="flex-shrink-0 w-16 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/stash?path=${encodeURIComponent(`/scene/${entityId}/screenshot`)}&${instanceParam}`}
+          src={`${API_PATH}/proxy/stash?path=${encodeURIComponent(`/scene/${entityId}/screenshot`)}&${instanceParam}`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -128,7 +129,7 @@ const getDownloadThumbnail = (download: SerializedDownload) => {
     return (
       <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/image/${entityId}/thumbnail?${instanceParam}`}
+          src={`${API_PATH}/proxy/image/${entityId}/thumbnail?${instanceParam}`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -398,7 +399,7 @@ const Downloads = () => {
                     {/* Download button for completed */}
                     {download.status === "COMPLETED" && (
                       <a
-                        href={`/api/downloads/${download.id}/file`}
+                        href={`${API_PATH}/downloads/${download.id}/file`}
                         download={download.fileName}
                         className="inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-lg font-medium transition-all"
                         style={{
