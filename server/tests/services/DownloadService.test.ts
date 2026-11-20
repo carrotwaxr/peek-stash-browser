@@ -6,7 +6,9 @@ import prisma from "../../prisma/singleton.js";
 import { DownloadService } from "../../services/DownloadService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userDownloadsDir, zipPath } from "../../utils/downloadPaths.js";
+import { logger } from "../../utils/logger.js";
 import { type PlaylistWithItems, downloadRow } from "../helpers/fixtures.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -716,6 +718,51 @@ describe("DownloadService", () => {
       });
       expect(fs.existsSync(first)).toBe(false);
       expect(fs.existsSync(second)).toBe(false);
+    });
+
+    it("keeps going when one delete fails, and logs a warning naming the download", async () => {
+      const first = writeZip(1, 21);
+      const second = writeZip(1, 22);
+      const rows = [
+        downloadRow({
+          id: 21,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: first,
+        }),
+        downloadRow({
+          id: 22,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: second,
+        }),
+      ];
+      vi.mocked(prisma.download.findMany).mockResolvedValue(rows);
+      vi.mocked(prisma.download.findUnique).mockImplementation(((args: {
+        where: { id: number };
+      }) =>
+        Promise.resolve(
+          rows.find((r) => r.id === args.where.id) ?? null
+        )) as never);
+      vi.mocked(prisma.download.delete).mockImplementation(((args: {
+        where: { id: number };
+      }) =>
+        args.where.id === 21
+          ? Promise.reject(new Error("db busy"))
+          : Promise.resolve(must(rows[1]))) as never);
+      const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      await expect(service.expireUserPlaylistZips(1)).resolves.toBeUndefined();
+
+      expect(prisma.download.delete).toHaveBeenCalledTimes(2);
+      expect(fs.existsSync(second)).toBe(false);
+      expect(warn).toHaveBeenCalledWith(
+        anyOf(String),
+        objectContaining({ downloadId: 21, error: "db busy" })
+      );
+      warn.mockRestore();
     });
 
     it("does nothing when the user has no finished zip", async () => {

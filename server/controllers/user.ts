@@ -993,6 +993,11 @@ export const updateUserRole = async (
     return;
   }
 
+  const previous = await prisma.user.findUnique({
+    where: { id: userIdInt },
+    select: { role: true },
+  });
+
   // Update user role
   const updatedUser = await prisma.user.update({
     where: { id: userIdInt },
@@ -1010,6 +1015,12 @@ export const updateUserRole = async (
   await exclusionComputationService.recomputeForUser(userIdInt);
   // Their open tabs refetch what the new role lets them see
   bumpUser(userIdInt);
+
+  // A demotion applies the user's limits again: a playlist zip built while
+  // they were an admin may hold what they may no longer see
+  if (previous?.role === "ADMIN" && role === "USER") {
+    await expireBuiltZips(userIdInt);
+  }
 
   res.json({
     success: true,
@@ -2741,14 +2752,6 @@ export const adminRegenerateRecoveryKey = async (
 // =============================================================================
 
 /**
- * Get user's selected Stash instances
- * GET /api/user/stash-instances
- *
- * Returns:
- * - selectedInstanceIds: IDs the user has selected (empty = all enabled)
- * - availableInstances: All enabled instances for selection UI
- */
-/**
  * The enabled instances a user may pick from: all of them, or those on the
  * admin's allow-list for a limited user (`access`, from getUserInstanceAccess).
  */
@@ -2760,6 +2763,14 @@ function pickableInstancesWhere(
     : { enabled: true, id: { in: access } };
 }
 
+/**
+ * Get user's selected Stash instances
+ * GET /api/user/stash-instances
+ *
+ * Returns:
+ * - selectedInstanceIds: IDs the user has selected (empty = all enabled)
+ * - availableInstances: All enabled instances for selection UI
+ */
 export const getUserStashInstances = async (
   req: TypedAuthRequest,
   res: TypedResponse<

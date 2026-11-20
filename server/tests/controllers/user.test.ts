@@ -1772,6 +1772,70 @@ describe("User Controller", () => {
       expect(res._getOkBody().success).toBe(true);
     });
 
+    it("expires the user's built playlist zips when an admin becomes a user, after the recompute and the bump", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ role: "ADMIN" })
+      );
+      mockPrisma.user.update.mockResolvedValue(
+        partialRow({
+          id: 3,
+          username: "user3",
+          role: "USER",
+          updatedAt: new Date(),
+        })
+      );
+      const before = libraryStampFor(3);
+      let stampAtExpire: string | undefined;
+      mockDownloads.expireUserPlaylistZips.mockImplementation(() => {
+        stampAtExpire = libraryStampFor(3);
+        return Promise.resolve();
+      });
+
+      await updateUserRole(
+        reqFor(updateUserRole, {
+          body: { role: "USER" },
+          params: { userId: "3" },
+          user: ADMIN,
+        }),
+        resFor(updateUserRole)
+      );
+
+      expect(
+        mockDownloads.expireUserPlaylistZips
+      ).toHaveBeenCalledExactlyOnceWith(3);
+      const [recomputed] =
+        mockExclusions.recomputeForUser.mock.invocationCallOrder;
+      const [expired] =
+        mockDownloads.expireUserPlaylistZips.mock.invocationCallOrder;
+      expect(must(recomputed)).toBeLessThan(must(expired));
+      expect(stampAtExpire).not.toBe(before);
+    });
+
+    it("expires nothing when a user becomes an admin", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ role: "USER" })
+      );
+      mockPrisma.user.update.mockResolvedValue(
+        partialRow({
+          id: 3,
+          username: "user3",
+          role: "ADMIN",
+          updatedAt: new Date(),
+        })
+      );
+
+      await updateUserRole(
+        reqFor(updateUserRole, {
+          body: { role: "ADMIN" },
+          params: { userId: "3" },
+          user: ADMIN,
+        }),
+        resFor(updateUserRole)
+      );
+
+      expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+    });
+
     it("a role change moves that user's stamp, after the recompute", async () => {
       mockPrisma.user.update.mockResolvedValue(
         partialRow({

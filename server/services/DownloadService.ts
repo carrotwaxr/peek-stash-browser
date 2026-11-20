@@ -2,12 +2,12 @@ import type { Download, DownloadStatus, DownloadType } from "@prisma/client";
 import * as fs from "fs";
 import { ForbiddenError, NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
-import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import { fileExtension, safeFileName } from "../utils/contentDisposition.js";
 import { zipPath } from "../utils/downloadPaths.js";
 import { logger } from "../utils/logger.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
+import { getUserAllowedInstanceIds } from "./UserInstanceService.js";
 
 /** 24 hours in milliseconds for download expiry */
 const DOWNLOAD_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -338,7 +338,15 @@ export class DownloadService {
       select: { id: true },
     });
     for (const { id } of zips) {
-      await this.deleteDownload(id, userId);
+      try {
+        await this.deleteDownload(id, userId);
+      } catch (error) {
+        // One zip that will not go must not keep the others
+        logger.warn("Could not expire a user's playlist zip", {
+          downloadId: id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 }
