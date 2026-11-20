@@ -11,7 +11,7 @@ Peek calls a server an instance in some places, and the Settings page calls the 
 Tick the servers whose content you want in your library. Each change saves as you click, and every page then lists content from the ticked servers only: scenes, performers, tags, search results, carousels, playlists and the timeline.
 
 - At least one server stays ticked. Peek ignores a click that would untick the last one.
-- This is a preference, not access control. It only narrows what you see, and you can change it at any time. Your content restrictions and hidden items apply to every server, whatever you tick.
+- This is a preference. It only narrows what you see, and you can change it at any time. An admin can also limit your account to some servers (see [Limit which Stash servers a user sees](user-management.md#limit-which-stash-servers-a-user-sees)); you then choose only among those, and never see the others. Your content restrictions and hidden items apply to every server, whatever you tick.
 - Only servers an admin has enabled are listed. A disabled server never shows, even if you had ticked it.
 - If you have never made a choice, or an admin disables every server you ticked, you see all the enabled servers until you choose again.
 - The **Content Sources** section appears only when two or more servers are enabled. With one, there is nothing to choose.
@@ -38,4 +38,6 @@ Filter lists (performers, tags, studios and the like) show a name once per item.
 
 **Content I expect is missing.** Check Content Sources: the server may be unticked. Also check [Hidden Items](hidden-items.md), and ask an admin whether the server is enabled and has finished its first sync.
 
-**There is no Content Sources section.** Only one server is enabled, so there is nothing to choose.
+**There is no Content Sources section.** Only one server is enabled, or an admin limited your account to one, so there is nothing to choose.
+
+**The library says no Stash servers are available to my account.** An admin limited your account and has not ticked any server for you. Ask an admin for access; the page loads by itself once they grant one.

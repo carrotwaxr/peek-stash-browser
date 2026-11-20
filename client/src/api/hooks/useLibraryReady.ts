@@ -6,7 +6,9 @@
  * not retried: the query client's cache marks the library not ready
  * (`markLibraryNotReady`), every page shows `LibraryInitializingBanner`, and
  * this hook asks `GET /library/ready` every 5 seconds. Once it answers true,
- * the library's lists and carousels load again.
+ * the library's lists and carousels load again. The answer's `reason` tells
+ * a first sync ("initializing") from a user no Stash server is open to
+ * ("noAccess"); the banner words each.
  */
 import type { LibraryReadyResponse } from "@peek/shared-types";
 import {
@@ -53,16 +55,36 @@ function isLibraryQuery(queryKey: QueryKey): boolean {
   );
 }
 
+/** The `reason` a 503 or ready answer carries, if it is one the client knows. */
+export function libraryNotReadyReason(
+  data: Record<string, unknown>
+): LibraryReadyResponse["reason"] {
+  const { reason } = data;
+  return reason === "initializing" || reason === "noAccess"
+    ? reason
+    : undefined;
+}
+
 /**
- * Marks the library as initializing, which starts the re-check. Called by
- * the query cache for a query answered 503 `ready: false`; a second call
- * while it is already marked changes nothing, so it does not push the next
- * check back.
+ * Marks the library as not ready, which starts the re-check. Called by the
+ * query cache for a query answered 503 `ready: false`, with the body's
+ * `reason`. A second call that adds nothing (no reason, or the stored one)
+ * changes nothing, so it does not push the next check back and a bare call
+ * never overwrites a stored reason.
  */
-export function markLibraryNotReady(client: QueryClient): void {
+export function markLibraryNotReady(
+  client: QueryClient,
+  reason?: LibraryReadyResponse["reason"]
+): void {
   const key = queryKeys.library.ready();
-  if (client.getQueryData<LibraryReadyResponse>(key)?.ready === false) return;
-  client.setQueryData<LibraryReadyResponse>(key, { ready: false });
+  const current = client.getQueryData<LibraryReadyResponse>(key);
+  if (current?.ready === false && (!reason || reason === current.reason)) {
+    return;
+  }
+  client.setQueryData<LibraryReadyResponse>(
+    key,
+    reason ? { ready: false, reason } : { ready: false }
+  );
 }
 
 /**
@@ -129,10 +151,14 @@ async function checkLibraryReady(
 
 /**
  * `ready` is false only while the server has said the library is
- * initializing; until then nothing is asked. Queries that should wait for
- * the library take `enabled: ready`.
+ * initializing or the user has no Stash server; until then nothing is
+ * asked. Queries that should wait for the library take `enabled: ready`.
+ * `reason` is the server's, when it gave one.
  */
-export function useLibraryReady(): { ready: boolean } {
+export function useLibraryReady(): {
+  ready: boolean;
+  reason: LibraryReadyResponse["reason"];
+} {
   const client = useQueryClient();
   const { data } = useQuery({
     queryKey: queryKeys.library.ready(),
@@ -141,5 +167,5 @@ export function useLibraryReady(): { ready: boolean } {
     refetchInterval: (query) =>
       query.state.data?.ready === false ? LIBRARY_READY_POLL_MS : false,
   });
-  return { ready: data?.ready !== false };
+  return { ready: data?.ready !== false, reason: data?.reason };
 }

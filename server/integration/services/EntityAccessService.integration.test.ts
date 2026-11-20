@@ -44,11 +44,30 @@ const SEVEN_TYPES = [
   "image",
 ] as const satisfies readonly AccessEntityType[];
 
-async function createUser(username: string): Promise<number> {
+async function createUser(
+  username: string,
+  role: "USER" | "ADMIN" = "USER"
+): Promise<number> {
   const user = await prisma.user.create({
-    data: { username, password: "not-a-real-hash", role: "USER" },
+    data: { username, password: "not-a-real-hash", role },
   });
   return user.id;
+}
+
+/** Sets the allow-list flag and the allowed instances (replacing any). */
+async function setAccess(
+  userId: number,
+  limited: boolean,
+  allowed: string[]
+): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { instanceAccessLimited: limited },
+  });
+  await prisma.userInstanceAccess.deleteMany({ where: { userId } });
+  for (const instanceId of allowed) {
+    await prisma.userInstanceAccess.create({ data: { userId, instanceId } });
+  }
 }
 
 describeWithDb("EntityAccessService (integration)", () => {
@@ -177,6 +196,74 @@ describeWithDb("EntityAccessService (integration)", () => {
     }
   });
 
+  it("applies an admin's instance allow-list (#439)", async () => {
+    const limited = await createUser("access-it-limited");
+    const admin = await createUser("access-it-limited-admin", "ADMIN");
+    const unlimited = await createUser("access-it-unlimited");
+    const refs = [
+      { id: FX_ID.SAME, instanceId: FX.A },
+      { id: FX_ID.SAME, instanceId: FX.B },
+    ];
+    try {
+      // Limited to A: A yes, B no, by id and in batch
+      await setAccess(limited, true, [FX.A]);
+      expect(
+        await canUserAccessEntity(limited, "scene", FX_ID.SAME, FX.A)
+      ).toBe(true);
+      expect(
+        await canUserAccessEntity(limited, "scene", FX_ID.B_ONLY, FX.B)
+      ).toBe(false);
+      expect(await getVisibleEntityKeys(limited, "scene", refs)).toEqual(
+        new Set([entityKey(FX_ID.SAME, FX.A)])
+      );
+      expect(
+        await resolveAccessibleInstanceId(limited, "scene", FX_ID.B_ONLY, FX.B)
+      ).toBeNull();
+
+      // A selection of B cannot widen it: the fallback stays inside A
+      await prisma.userStashInstance.create({
+        data: { userId: limited, instanceId: FX.B },
+      });
+      expect(
+        await canUserAccessEntity(limited, "scene", FX_ID.SAME, FX.A)
+      ).toBe(true);
+      expect(
+        await canUserAccessEntity(limited, "scene", FX_ID.B_ONLY, FX.B)
+      ).toBe(false);
+      await prisma.userStashInstance.deleteMany({
+        where: { userId: limited },
+      });
+
+      // An admin with the flag and rows for A only sees both
+      await setAccess(admin, true, [FX.A]);
+      expect(await canUserAccessEntity(admin, "scene", FX_ID.SAME, FX.A)).toBe(
+        true
+      );
+      expect(
+        await canUserAccessEntity(admin, "scene", FX_ID.B_ONLY, FX.B)
+      ).toBe(true);
+
+      // Limited with no rows sees nothing
+      await setAccess(limited, true, []);
+      for (const ref of refs) {
+        expect(
+          await canUserAccessEntity(limited, "scene", ref.id, ref.instanceId)
+        ).toBe(false);
+      }
+      expect((await getVisibleEntityKeys(limited, "scene", refs)).size).toBe(0);
+
+      // The flag off: rows are kept but ignored
+      await setAccess(unlimited, false, [FX.A]);
+      expect(
+        await canUserAccessEntity(unlimited, "scene", FX_ID.B_ONLY, FX.B)
+      ).toBe(true);
+    } finally {
+      await prisma.userStashInstance.deleteMany({
+        where: { userId: limited },
+      });
+    }
+  });
+
   it("agrees with getUserAllowedInstanceIds", async () => {
     const probes: [string, string][] = [
       [FX_ID.SAME, FX.A],
@@ -192,6 +279,19 @@ describeWithDb("EntityAccessService (integration)", () => {
       [FX.OFF, FX.B],
     ];
 
+    // [limited, allowed]: unlimited, then every allow-list shape
+    const accesses: [boolean, string[]][] = [
+      [false, []],
+      [false, [FX.A]],
+      [true, []],
+      [true, [FX.A]],
+      [true, [FX.B]],
+      [true, [FX.OFF]],
+      [true, [FX.A, FX.B]],
+      [true, [FX.OFF, FX.B]],
+    ];
+    const asAdmin = await createUser("access-it-parity-admin", "ADMIN");
+
     try {
       // B synced, then B on its first sync
       for (const bFirstSyncedAt of [new Date(), null]) {
@@ -199,25 +299,36 @@ describeWithDb("EntityAccessService (integration)", () => {
           where: { id: FX.B },
           data: { firstSyncedAt: bFirstSyncedAt },
         });
-        for (const selection of selections) {
-          await prisma.userStashInstance.deleteMany({ where: { userId: w } });
-          for (const instanceId of selection) {
-            await prisma.userStashInstance.create({
-              data: { userId: w, instanceId },
-            });
-          }
-          const allowed = await getUserAllowedInstanceIds(w);
+        for (const [limited, allowedRows] of accesses) {
+          await setAccess(w, limited, allowedRows);
+          await setAccess(asAdmin, limited, allowedRows);
+          for (const selection of selections) {
+            for (const user of [w, asAdmin]) {
+              await prisma.userStashInstance.deleteMany({
+                where: { userId: user },
+              });
+              for (const instanceId of selection) {
+                await prisma.userStashInstance.create({
+                  data: { userId: user, instanceId },
+                });
+              }
+              const allowed = await getUserAllowedInstanceIds(user);
 
-          for (const [id, inst] of probes) {
-            expect(
-              await canUserAccessEntity(w, "scene", id, inst),
-              `B synced ${String(bFirstSyncedAt !== null)}, selection [${selection.join(",")}], ${id}@${inst}`
-            ).toBe(allowed.includes(inst));
+              for (const [id, inst] of probes) {
+                expect(
+                  await canUserAccessEntity(user, "scene", id, inst),
+                  `${user === w ? "user" : "admin"}, limited ${String(limited)} [${allowedRows.join(",")}], B synced ${String(bFirstSyncedAt !== null)}, selection [${selection.join(",")}], ${id}@${inst}`
+                ).toBe(allowed.includes(inst));
+              }
+            }
           }
         }
       }
     } finally {
-      await prisma.userStashInstance.deleteMany({ where: { userId: w } });
+      await prisma.userStashInstance.deleteMany({
+        where: { userId: { in: [w, asAdmin] } },
+      });
+      await setAccess(w, false, []);
       await prisma.stashInstance.update({
         where: { id: FX.B },
         data: { firstSyncedAt: new Date() },
@@ -250,7 +361,21 @@ describeWithDb("EntityAccessService (integration)", () => {
           `selection [${selection.join(",")}]`
         ).toBe(affected);
       }
+
+      // A limited user allowed only A whose selection names another enabled
+      // instance (B) falls back to A, so a change to A affects them
+      await setAccess(w, true, [FX.A]);
+      await prisma.userStashInstance.deleteMany({ where: { userId: w } });
+      await prisma.userStashInstance.create({
+        data: { userId: w, instanceId: FX.B },
+      });
+      expect(await getUserAllowedInstanceIds(w)).toEqual([FX.A]);
+      expect((await getUsersSelecting(FX.A)).includes(w)).toBe(true);
+      // ... and one not allowed A never sees it, whatever they select
+      await setAccess(w, true, [FX.B]);
+      expect((await getUsersSelecting(FX.A)).includes(w)).toBe(false);
     } finally {
+      await setAccess(w, false, []);
       await prisma.userStashInstance.deleteMany({ where: { userId: w } });
     }
   });

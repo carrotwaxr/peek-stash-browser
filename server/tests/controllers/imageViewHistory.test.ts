@@ -751,6 +751,34 @@ describe("Image View History Controller", () => {
       expect(mockPrisma.imageViewHistory.findUnique).not.toHaveBeenCalled();
     });
 
+    it("answers as for an image with no history when the instance is outside the user's access (#439)", async () => {
+      mockResolve.mockResolvedValue(null);
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(
+        partialRow({ id: 1, viewCount: 4 })
+      );
+
+      const req = reqFor(getImageViewHistory, {
+        params: { imageId: "img-1" },
+        query: { instanceId: "instance-b" },
+        user: USER,
+      });
+      const res = resFor(getImageViewHistory);
+      await getImageViewHistory(req, res);
+
+      expect(mockResolve).toHaveBeenCalledWith(
+        USER.id,
+        "image",
+        "img-1",
+        "instance-b"
+      );
+      expect(mockPrisma.imageViewHistory.findUnique).not.toHaveBeenCalled();
+      expect(res._getBody()).toEqual({
+        exists: false,
+        viewCount: 0,
+        oCount: 0,
+      });
+    });
+
     it("returns exists:false when no history found", async () => {
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
 

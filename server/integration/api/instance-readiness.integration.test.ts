@@ -55,9 +55,9 @@ interface Observation {
   restrictedScenes: string[];
   adminScenes: string[];
   /** POST /api/library/scenes for the user whose only instance is NEW */
-  onlyNew: { status: number; ready: unknown };
+  onlyNew: { status: number; ready: unknown; reason: unknown };
   /** GET /api/library/ready for the same user: the client's re-check */
-  onlyNewReadyCheck: { status: number; ready: unknown };
+  onlyNewReadyCheck: { status: number; ready: unknown; reason: unknown };
   /** The admin's GET of a NEW scene's screenshot */
   screenshot: number;
   /** firstSyncedAt of NEW and of the primary instance in the sync status */
@@ -172,13 +172,14 @@ describeReplay("an instance on its first sync", () => {
   let syncStartedAt: number;
 
   async function observe(): Promise<Observation> {
-    const scenes = await onlyNew.client.post<{ ready?: unknown }>(
-      "/api/library/scenes",
-      { filter: { per_page: 1 } }
-    );
-    const readyCheck = await onlyNew.client.get<{ ready?: unknown }>(
-      "/api/library/ready"
-    );
+    const scenes = await onlyNew.client.post<{
+      ready?: unknown;
+      reason?: unknown;
+    }>("/api/library/scenes", { filter: { per_page: 1 } });
+    const readyCheck = await onlyNew.client.get<{
+      ready?: unknown;
+      reason?: unknown;
+    }>("/api/library/ready");
     const screenshot = await fetch(
       `${TEST_CONFIG.baseUrl}/api/proxy/stash?path=${encodeURIComponent(`/scene/${sceneId}/screenshot`)}&instanceId=${NEW}`,
       { headers: { Cookie: adminCookie } }
@@ -195,10 +196,15 @@ describeReplay("an instance on its first sync", () => {
     return {
       restrictedScenes: await newScenesListedTo(restricted.client),
       adminScenes: await newScenesListedTo(adminClient),
-      onlyNew: { status: scenes.status, ready: scenes.data.ready },
+      onlyNew: {
+        status: scenes.status,
+        ready: scenes.data.ready,
+        reason: scenes.data.reason,
+      },
       onlyNewReadyCheck: {
         status: readyCheck.status,
         ready: readyCheck.data.ready,
+        reason: readyCheck.data.reason,
       },
       screenshot: screenshot.status,
       firstSyncedAt: {
@@ -352,15 +358,18 @@ describeReplay("an instance on its first sync", () => {
   });
 
   it("requireCacheReady answers 503 ready:false for a user whose every selected instance is still on its first sync", () => {
-    expect(before.onlyNew).toEqual({ status: 503, ready: false });
-    expect(during.onlyNew).toEqual({ status: 503, ready: false });
+    const initializing = { status: 503, ready: false, reason: "initializing" };
+    expect(before.onlyNew).toEqual(initializing);
+    expect(during.onlyNew).toEqual(initializing);
     expect(after.onlyNew.status).toBe(200);
   });
 
   it("GET /library/ready answers ready false while the user's only instance is on its first sync, then true", () => {
-    expect(before.onlyNewReadyCheck).toEqual({ status: 200, ready: false });
-    expect(during.onlyNewReadyCheck).toEqual({ status: 200, ready: false });
-    expect(after.onlyNewReadyCheck).toEqual({ status: 200, ready: true });
+    const initializing = { status: 200, ready: false, reason: "initializing" };
+    expect(before.onlyNewReadyCheck).toEqual(initializing);
+    expect(during.onlyNewReadyCheck).toEqual(initializing);
+    expect(after.onlyNewReadyCheck).toMatchObject({ status: 200, ready: true });
+    expect(after.onlyNewReadyCheck.reason).toBeUndefined();
   });
 
   it("GET /api/sync/status reports firstSyncedAt per instance", () => {

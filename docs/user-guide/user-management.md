@@ -46,6 +46,7 @@ Click on any user row in the User Management table to open the **User Edit Modal
 | **Groups** | Manage group memberships for permission inheritance |
 | **Permissions** | View and override individual permissions |
 | **Content Restrictions** | Set what content the user can see |
+| **Stash Servers** | Limit which Stash servers the user sees (user accounts only, and only when Peek has two or more servers) |
 | **Account Actions** | Reset the password, regenerate the recovery key, or delete the user |
 
 Each change saves as you make it, and **Saved** appears beside the control (or the error, with the control back at its stored value). Changing the role asks you to confirm first. There is no Save button: **Close** closes the editor, and the user list updates.
@@ -205,6 +206,28 @@ The **Also hide items with no ...** box hides content with no item of that type.
 - Scene counts exclude restricted content
 
 Promoting a user to admin stops their restrictions applying; demoting an admin applies any saved restrictions again. See [Content Restrictions](content-restrictions.md) for the full guide.
+
+---
+
+## Limit which Stash servers a user sees
+
+**Requirements:** Admin role, and two or more Stash servers
+
+By default a user sees every enabled Stash server. You can limit a user to the servers you choose. This is access control: the user cannot pick a server outside the limit, and their library, search, playlists, history and downloads leave out everything from the others.
+
+1. Click **Edit** on a user in the User Management table (a user account; admins are never limited).
+2. In the **Stash Servers** section, tick **Limit to selected servers**. Every server starts ticked, so the user loses nothing until you untick one.
+3. Tick the servers the user may see. Each change saves as you click.
+
+Things to know:
+
+- A server you add later stays hidden from a limited user until you tick it.
+- Inside the limit, the user still chooses which of their servers to see under **Content Sources** (see [Using Several Stash Servers](multiple-stash-servers.md)). Their choice only narrows what they see.
+- If you tick no server, the user sees nothing. Their library shows a notice to ask an admin for access, and the notice goes away by itself once you grant a server.
+- A server that is switched off never shows, even when ticked.
+- Unticking the limit lifts it and keeps the ticked list, so ticking it again brings the same servers back. The same holds across a promotion to admin: an admin is never limited, and a demoted admin is limited again as before.
+- Narrowing a user's servers (or their content restrictions) deletes the playlist zips already built for them, so they cannot download what they may no longer see. They can build the zip again.
+- **Sync from Stash** for a limited user imports only from the servers they may see.
 
 ---
 

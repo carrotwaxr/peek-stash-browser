@@ -4,12 +4,13 @@ import {
   PASSWORD_RULES_TEXT,
   validatePassword,
 } from "@peek/shared-types/password.js";
-import { Key, Lock, Shield, Trash2, User, Users } from "lucide-react";
+import { Key, Lock, Server, Shield, Trash2, User, Users } from "lucide-react";
 import {
   addGroupMember,
   adminRegenerateRecoveryKey,
   adminResetPassword,
   apiDelete,
+  apiGet,
   apiPut,
   getUserGroupMemberships,
   getUserPermissions,
@@ -44,6 +45,19 @@ interface UserPermissions {
   canDownloadFiles: boolean;
   canDownloadPlaylists: boolean;
   sources: PermissionSources;
+}
+
+/** A Stash server as the admin's instance list gives it */
+interface ServerOption {
+  id: string;
+  name: string;
+  enabled: boolean;
+}
+
+/** Which Stash servers the user is limited to (`GET/PUT /user/:id/instance-access`) */
+interface InstanceAccess {
+  limited: boolean;
+  instanceIds: string[];
 }
 
 interface UserEditModalContentProps {
@@ -135,6 +149,10 @@ const UserEditModalContent = ({
   const [showContentRestrictionsModal, setShowContentRestrictionsModal] =
     useState(false);
 
+  // Stash server access: the servers to choose from and the user's limit
+  const [servers, setServers] = useState<ServerOption[]>([]);
+  const [access, setAccess] = useState<InstanceAccess | null>(null);
+
   // Every control saves when changed (no Save button). `wroteRef` remembers
   // that something was saved, so closing tells the list to reload.
   const wroteRef = useRef(false);
@@ -202,6 +220,50 @@ const UserEditModalContent = ({
       void loadPermissions();
     }
   }, [user?.id, userGroups]); // Re-fetch when groups change
+
+  // Load the Stash servers and the user's limit (administrators have none)
+  useEffect(() => {
+    if (role === "ADMIN") return;
+    let cancelled = false;
+    const loadAccess = async () => {
+      try {
+        const [list, stored] = await Promise.all([
+          apiGet<{ instances?: ServerOption[] }>("/setup/stash-instances"),
+          apiGet<InstanceAccess>(`/user/${user.id}/instance-access`),
+        ]);
+        if (cancelled) return;
+        setServers(list.instances ?? []);
+        setAccess({
+          limited: stored.limited,
+          instanceIds: stored.instanceIds,
+        });
+      } catch (err) {
+        console.error("Failed to load Stash server access:", err);
+      }
+    };
+    void loadAccess();
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id, role]);
+
+  // Saves the limit; the checkboxes show the stored one until the write succeeds
+  const handleAccessChange = (next: InstanceAccess) =>
+    saveControl(
+      "servers",
+      async () => {
+        const saved = await apiPut<InstanceAccess>(
+          `/user/${user.id}/instance-access`,
+          next
+        );
+        setAccess({
+          limited: saved.limited,
+          instanceIds: saved.instanceIds,
+        });
+        onMessage?.(`Stash server access updated for ${user.username}`);
+      },
+      "Failed to update Stash server access"
+    );
 
   const handleGroupToggle = (groupId: number, isCurrentlyMember: boolean) =>
     saveControl(
@@ -758,7 +820,116 @@ const UserEditModalContent = ({
             </div>
           </section>
 
-          {/* Section 5: Account Actions */}
+          {/* Section 5: Stash Servers (only when there is a choice to make) */}
+          {role !== "ADMIN" &&
+            access &&
+            (servers.length > 1 || access.limited) && (
+              <section>
+                <h3
+                  className="text-sm font-medium mb-3 flex items-center gap-2"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <Server size={16} />
+                  Stash Servers
+                </h3>
+                <div
+                  className="p-4 rounded-lg space-y-3"
+                  style={{
+                    backgroundColor: "var(--bg-secondary)",
+                    border: "1px solid var(--border-color)",
+                  }}
+                >
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    By default a user sees every Stash server. Limit them to the
+                    servers ticked below; servers you add later stay hidden from
+                    them until you tick them.
+                  </p>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={access.limited}
+                      aria-describedby={noteId("servers")}
+                      disabled={isSaving("servers")}
+                      onChange={(e) =>
+                        void handleAccessChange({
+                          limited: e.target.checked,
+                          // Switching on starts from every server (disabled
+                          // ones too), so the user loses nothing until the
+                          // admin unticks one; ids kept from an earlier limit
+                          // come back as they were
+                          instanceIds:
+                            e.target.checked && access.instanceIds.length === 0
+                              ? servers.map((server) => server.id)
+                              : access.instanceIds,
+                        })
+                      }
+                      className="w-4 h-4 rounded cursor-pointer"
+                      style={{ accentColor: "var(--primary-color)" }}
+                    />
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      Limit to selected servers
+                    </span>
+                    <ControlNote
+                      id={noteId("servers")}
+                      state={controls.servers}
+                    />
+                  </label>
+                  {access.limited && (
+                    <div className="space-y-2 pl-7">
+                      {servers.map((server) => (
+                        <label
+                          key={server.id}
+                          className="flex items-center gap-3 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={access.instanceIds.includes(server.id)}
+                            disabled={isSaving("servers")}
+                            onChange={(e) =>
+                              void handleAccessChange({
+                                limited: true,
+                                instanceIds: e.target.checked
+                                  ? [...access.instanceIds, server.id]
+                                  : access.instanceIds.filter(
+                                      (id) => id !== server.id
+                                    ),
+                              })
+                            }
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span
+                            className="text-sm"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {server.name}
+                            {!server.enabled && (
+                              <span style={{ color: "var(--text-muted)" }}>
+                                {" "}
+                                (disabled)
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      ))}
+                      {access.instanceIds.length === 0 && (
+                        <StatusMessage
+                          variant="warning"
+                          title={null}
+                          className="text-sm"
+                          message="This user will see nothing until you tick a server."
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+          {/* Section 6: Account Actions */}
           <section>
             <h3
               className="text-sm font-medium mb-3 flex items-center gap-2"

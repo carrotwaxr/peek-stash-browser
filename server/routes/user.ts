@@ -17,6 +17,7 @@ import {
   getRecoveryKey,
   getSetupStatus,
   getUserGroupMemberships,
+  getUserInstanceAccess,
   getUserPermissions,
   getUserRestrictions,
   getUserSettings,
@@ -34,6 +35,7 @@ import {
   unhideAllEntities,
   unhideEntity,
   updateHideConfirmation,
+  updateUserInstanceAccess,
   updateUserPermissionOverrides,
   updateUserRestrictions,
   updateUserRole,
@@ -115,6 +117,18 @@ router.put(
   "/:userId/permissions",
   requireAdmin,
   authenticated(updateUserPermissionOverrides)
+);
+
+// Admin: get/set the Stash servers a user is limited to
+router.get(
+  "/:userId/instance-access",
+  requireAdmin,
+  authenticated(getUserInstanceAccess)
+);
+router.put(
+  "/:userId/instance-access",
+  requireAdmin,
+  authenticated(updateUserInstanceAccess)
 );
 
 // Admin: get user's group memberships

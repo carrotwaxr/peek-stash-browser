@@ -1335,6 +1335,32 @@ describe("Watch History Controller", () => {
       });
     });
 
+    it("answers as for a scene with no history when the instance is outside the user's access (#439)", async () => {
+      mockResolve.mockResolvedValue(null);
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(
+        partialRow({ id: 1, resumeTime: 120, playCount: 5 })
+      );
+
+      const res = resFor(getWatchHistory);
+      await getWatchHistory(
+        reqFor(getWatchHistory, {
+          params: { sceneId: "123" },
+          query: { instanceId: "inst-b" },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(mockResolve).toHaveBeenCalledWith(1, "scene", "123", "inst-b");
+      expect(mockPrisma.watchHistory.findUnique).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        exists: false,
+        resumeTime: null,
+        playCount: 0,
+        oCount: 0,
+      });
+    });
+
     it("should return exists:false when no watch history found", async () => {
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
 

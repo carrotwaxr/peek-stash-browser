@@ -7,6 +7,7 @@ import { zipPath } from "../utils/downloadPaths.js";
 import { logger } from "../utils/logger.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
+import { getUserAllowedInstanceIds } from "./UserInstanceService.js";
 
 /** 24 hours in milliseconds for download expiry */
 const DOWNLOAD_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -205,14 +206,21 @@ export class DownloadService {
   }
 
   /**
-   * Get all downloads for a user, sorted by creation date descending.
+   * Get all downloads for a user, sorted by creation date descending. A scene
+   * or image row of an instance the user may no longer use (an admin limited
+   * their servers, or they narrowed their selection) is left out; playlist
+   * rows carry no instance (`""`) and stay.
    */
   async getUserDownloads(
     userId: number,
     limit: number = 20
   ): Promise<Download[]> {
+    const allowed = await getUserAllowedInstanceIds(userId);
     return prisma.download.findMany({
-      where: { userId },
+      where: {
+        userId,
+        OR: [{ instanceId: "" }, { instanceId: { in: allowed } }],
+      },
       orderBy: { createdAt: "desc" },
       take: limit,
     });
@@ -315,6 +323,31 @@ export class DownloadService {
         error: error instanceof Error ? error.message : String(error),
       });
     });
+  }
+
+  /**
+   * Delete a user's finished playlist zips, rows and files. A zip is served
+   * from disk without re-checking its contents, so one built before an admin
+   * narrowed the user's access or restrictions still holds what they may no
+   * longer see. A pending or running build re-scopes at build time and is
+   * left alone.
+   */
+  async expireUserPlaylistZips(userId: number): Promise<void> {
+    const zips = await prisma.download.findMany({
+      where: { userId, type: "PLAYLIST", status: "COMPLETED" },
+      select: { id: true },
+    });
+    for (const { id } of zips) {
+      try {
+        await this.deleteDownload(id, userId);
+      } catch (error) {
+        // One zip that will not go must not keep the others
+        logger.warn("Could not expire a user's playlist zip", {
+          downloadId: id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 }
 

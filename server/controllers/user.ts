@@ -40,6 +40,7 @@ import {
 } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { downloadJobQueue } from "../services/DownloadJobQueue.js";
+import { downloadService } from "../services/DownloadService.js";
 import { getVisibleEntityKeys } from "../services/EntityAccessService.js";
 import {
   type RestrictionRowInput,
@@ -61,6 +62,7 @@ import {
   isHideableEntityType,
   userHiddenEntityService,
 } from "../services/UserHiddenEntityService.js";
+import { getUserInstanceAccess as readInstanceAccess } from "../services/UserInstanceService.js";
 import {
   RESTRICTABLE_ENTITY_TYPES,
   RESTRICTION_MODES,
@@ -105,6 +107,7 @@ import type {
   GetMyPermissionsResponse,
   GetRecoveryKeyResponse,
   GetUserGroupMembershipsParams,
+  GetUserInstanceAccessResponse,
   GetUserPermissionsParams,
   GetUserRestrictionsParams,
   GetUserSettingsResponse,
@@ -136,6 +139,8 @@ import type {
   UpdateHideConfirmationBody,
   UpdateHideConfirmationResponse,
   UpdatePermissionOverridesBody,
+  UpdateUserInstanceAccessBody,
+  UpdateUserInstanceAccessResponse,
   UpdateUserRestrictionsBody,
   UpdateUserRestrictionsResponse,
   UpdateUserRoleBody,
@@ -145,6 +150,7 @@ import type {
   UpdateUserSettingsParams,
   UpdateUserSettingsResponse,
   UpdateUserStashInstancesBody,
+  UserInstanceAccessParams,
 } from "../types/api/user.js";
 import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { userDownloadsDir } from "../utils/downloadPaths.js";
@@ -987,6 +993,11 @@ export const updateUserRole = async (
     return;
   }
 
+  const previous = await prisma.user.findUnique({
+    where: { id: userIdInt },
+    select: { role: true },
+  });
+
   // Update user role
   const updatedUser = await prisma.user.update({
     where: { id: userIdInt },
@@ -1004,6 +1015,12 @@ export const updateUserRole = async (
   await exclusionComputationService.recomputeForUser(userIdInt);
   // Their open tabs refetch what the new role lets them see
   bumpUser(userIdInt);
+
+  // A demotion applies the user's limits again: a playlist zip built while
+  // they were an admin may hold what they may no longer see
+  if (previous?.role === "ADMIN" && role === "USER") {
+    await expireBuiltZips(userIdInt);
+  }
 
   res.json({
     success: true,
@@ -1631,9 +1648,21 @@ export const syncFromStash = async (
   if (!target) throw new NotFoundError("User not found");
 
   const options = importOptionsFrom(req.body.options);
-  const instances = stashInstanceManager.getAll();
-  if (instances.length === 0) {
+  const configured = stashInstanceManager.getAll();
+  if (configured.length === 0) {
     res.status(400).json({ error: "No Stash instances configured" });
+    return;
+  }
+  // A user an admin limited to some servers gets imports from those only
+  const access = await readInstanceAccess(targetUserId);
+  const instances =
+    access === null
+      ? configured
+      : configured.filter(([instanceId]) => access.includes(instanceId));
+  if (instances.length === 0) {
+    res.status(400).json({
+      error: "This user has access to no Stash instance",
+    });
     return;
   }
 
@@ -1728,6 +1757,79 @@ export const getUserRestrictions = async (
     }),
   });
 };
+
+/**
+ * Recompute a user's exclusions after a save that may widen what they see.
+ * The save is already committed: when the recompute throws, the user would see
+ * the newly reachable servers without their exclusion rows, so `restore` puts
+ * the previous state back (fail closed) and the original error is rethrown. A
+ * failure of the restore itself is logged with both errors.
+ */
+async function recomputeOrRestore(
+  userId: number,
+  restore: () => Promise<unknown>
+): Promise<void> {
+  try {
+    await exclusionComputationService.recomputeForUser(userId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      await restore();
+      logger.error(
+        "Recompute failed after a save; the previous state was restored",
+        {
+          userId,
+          error: message,
+        }
+      );
+    } catch (restoreError) {
+      logger.error("Recompute failed after a save and the restore failed too", {
+        userId,
+        error: message,
+        restoreError:
+          restoreError instanceof Error
+            ? restoreError.message
+            : String(restoreError),
+      });
+    }
+    throw error;
+  }
+}
+
+/** Sets a user's access flag and replaces their allow-list rows in one unit */
+function replaceInstanceAccess(
+  userId: number,
+  limited: boolean,
+  instanceIds: string[]
+) {
+  return dbWriteTransaction("user.instanceAccess", async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { instanceAccessLimited: limited },
+    });
+    await tx.userInstanceAccess.deleteMany({ where: { userId } });
+    if (instanceIds.length > 0) {
+      await tx.userInstanceAccess.createMany({
+        data: instanceIds.map((instanceId) => ({ userId, instanceId })),
+      });
+    }
+  });
+}
+
+/**
+ * Expire a user's built playlist zips after an admin narrowed what they may
+ * see. The change is already saved, so a failure here is logged, not raised.
+ */
+async function expireBuiltZips(userId: number): Promise<void> {
+  try {
+    await downloadService.expireUserPlaylistZips(userId);
+  } catch (error) {
+    logger.warn("Could not expire a user's built playlist zips", {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 /**
  * Update content restrictions for a user (Admin only)
@@ -1883,6 +1985,7 @@ export const updateUserRestrictions = async (
   // recompute runs on these rows and its swap stores both, so a failure
   // leaves the user's old restrictions and old exclusions in place
   await exclusionComputationService.saveRestrictions(targetUserId, rows);
+  await expireBuiltZips(targetUserId);
 
   const saved = await prisma.userContentRestriction.findMany({
     where: { userId: targetUserId },
@@ -1924,6 +2027,141 @@ export const deleteUserRestrictions = async (
     success: true,
     message: "All content restrictions removed successfully",
   });
+};
+
+/**
+ * Get the Stash servers a user is limited to (Admin only)
+ * GET /api/user/:userId/instance-access
+ *
+ * `limited` is the stored flag and the ids are the stored rows, whatever the
+ * user's role (a limit kept across a promotion applies again on demotion).
+ */
+export const getUserInstanceAccess = async (
+  req: TypedAuthRequest<never, UserInstanceAccessParams>,
+  res: TypedResponse<GetUserInstanceAccessResponse | ApiErrorResponse>
+) => {
+  const targetUserId = parseInt(req.params.userId);
+  if (isNaN(targetUserId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: {
+      instanceAccessLimited: true,
+      instanceAccess: { select: { instanceId: true } },
+    },
+  });
+  if (!target) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  res.json({
+    limited: target.instanceAccessLimited,
+    instanceIds: target.instanceAccess.map((a) => a.instanceId),
+  });
+};
+
+/**
+ * Limit a user to chosen Stash servers, or lift the limit (Admin only)
+ * PUT /api/user/:userId/instance-access
+ *
+ * Body: { limited: boolean; instanceIds: string[] }
+ * - `limited: true` with an empty list leaves the user nothing to see
+ * - The ids may name any StashInstance, enabled or not
+ * - The flag and the rows are replaced in one unit; the user's exclusions
+ *   are then recomputed over their new scope and their library stamp moves
+ */
+export const updateUserInstanceAccess = async (
+  req: TypedAuthRequest<UpdateUserInstanceAccessBody, UserInstanceAccessParams>,
+  res: TypedResponse<UpdateUserInstanceAccessResponse | ApiErrorResponse>
+) => {
+  const targetUserId = parseInt(req.params.userId);
+  if (isNaN(targetUserId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: {
+      role: true,
+      instanceAccessLimited: true,
+      instanceAccess: { select: { instanceId: true } },
+    },
+  });
+  if (!target) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (!restrictionsApplyTo(target.role)) {
+    res
+      .status(400)
+      .json({ error: "Server access limits do not apply to administrators" });
+    return;
+  }
+
+  const { limited } = req.body;
+  if (typeof limited !== "boolean") {
+    throw new ValidationError("Invalid request", {
+      issues: [{ path: "limited", message: "Expected a boolean" }],
+    });
+  }
+  const instanceIds = parseInstanceSelection(
+    req.body.instanceIds,
+    "instanceIds"
+  );
+
+  // Any instance counts, enabled or not: an admin may grant a server that is
+  // switched off for now
+  if (instanceIds.length > 0) {
+    const known = await prisma.stashInstance.findMany({
+      where: { id: { in: instanceIds } },
+      select: { id: true },
+    });
+    const knownIds = new Set(known.map((i) => i.id));
+    const invalidIds = instanceIds.filter((id) => !knownIds.has(id));
+    if (invalidIds.length > 0) {
+      res.status(400).json({
+        error: "Invalid instance IDs",
+        details: invalidIds.join(", "),
+      });
+      return;
+    }
+  }
+
+  await replaceInstanceAccess(targetUserId, limited, instanceIds);
+
+  // The user's scope changed: their exclusion rows must cover it before
+  // anything on a newly granted server is listed to them, and their cached
+  // library views are stale. A save that widens the scope is put back when
+  // the recompute fails; a narrowing one stays (the SQL scope already
+  // narrows).
+  const oldIds = target.instanceAccess.map((a) => a.instanceId);
+  const oldKnown = new Set(oldIds);
+  const widened =
+    target.instanceAccessLimited &&
+    (!limited || instanceIds.some((id) => !oldKnown.has(id)));
+  if (widened) {
+    await recomputeOrRestore(targetUserId, () =>
+      replaceInstanceAccess(targetUserId, true, oldIds)
+    );
+  } else {
+    await exclusionComputationService.recomputeForUser(targetUserId);
+  }
+  bumpUser(targetUserId);
+
+  // A built playlist zip holds scenes of the servers the user could use
+  // then: when the save takes one away, the zip goes too. Lifting a limit or
+  // adding a server removes nothing.
+  const kept = new Set(instanceIds);
+  const narrowed =
+    limited &&
+    (!target.instanceAccessLimited ||
+      target.instanceAccess.some((a) => !kept.has(a.instanceId)));
+  if (narrowed) await expireBuiltZips(targetUserId);
+
+  res.json({ limited, instanceIds });
 };
 
 /**
@@ -2514,6 +2752,18 @@ export const adminRegenerateRecoveryKey = async (
 // =============================================================================
 
 /**
+ * The enabled instances a user may pick from: all of them, or those on the
+ * admin's allow-list for a limited user (`access`, from getUserInstanceAccess).
+ */
+function pickableInstancesWhere(
+  access: string[] | null
+): Prisma.StashInstanceWhereInput {
+  return access === null
+    ? { enabled: true }
+    : { enabled: true, id: { in: access } };
+}
+
+/**
  * Get user's selected Stash instances
  * GET /api/user/stash-instances
  *
@@ -2529,16 +2779,20 @@ export const getUserStashInstances = async (
   >
 ) => {
   const userId = req.user.id;
-  // Get user's selected instances
+  const access = await readInstanceAccess(userId);
+  // Get user's selected instances; a limited user's selection that names a
+  // server outside their access (saved before the limit) is not reported
   const userSelections = await prisma.userStashInstance.findMany({
     where: { userId },
     select: { instanceId: true },
   });
-  const selectedInstanceIds = userSelections.map((s) => s.instanceId);
+  const selectedInstanceIds = userSelections
+    .map((s) => s.instanceId)
+    .filter((id) => access === null || access.includes(id));
 
-  // Get all enabled instances for the selection UI
+  // Get the enabled instances the user may use, for the selection UI
   const availableInstances = await prisma.stashInstance.findMany({
-    where: { enabled: true },
+    where: pickableInstancesWhere(access),
     select: {
       id: true,
       name: true,
@@ -2569,6 +2823,15 @@ function parseInstanceSelection(value: unknown, field: string): string[] {
     });
   }
   return [...new Set(parsed.data)];
+}
+
+/** The instance ids the user's selection holds now, as stored */
+async function readStoredSelection(userId: number): Promise<string[]> {
+  const rows = await prisma.userStashInstance.findMany({
+    where: { userId },
+    select: { instanceId: true },
+  });
+  return rows.map((r) => r.instanceId);
 }
 
 /** Replaces the user's selection in one unit: no reader sees the deleted rows without the created ones */
@@ -2603,8 +2866,10 @@ export const updateUserStashInstances = async (
     "instanceIds"
   );
 
-  // Validate that all instance IDs exist and are enabled
+  // Validate that all instance IDs exist, are enabled and, for a user an
+  // admin limited, are among the servers they may use
   if (instanceIds.length > 0) {
+    const access = await readInstanceAccess(userId);
     const validInstances = await prisma.stashInstance.findMany({
       where: {
         id: { in: instanceIds },
@@ -2614,7 +2879,9 @@ export const updateUserStashInstances = async (
     });
 
     const validIds = new Set(validInstances.map((i) => i.id));
-    const invalidIds = instanceIds.filter((id) => !validIds.has(id));
+    const invalidIds = instanceIds.filter(
+      (id) => !validIds.has(id) || (access !== null && !access.includes(id))
+    );
 
     if (invalidIds.length > 0) {
       res.status(400).json({
@@ -2625,11 +2892,15 @@ export const updateUserStashInstances = async (
     }
   }
 
+  const previous = await readStoredSelection(userId);
   await replaceInstanceSelection(userId, instanceIds);
 
   // The user's scope changed: their exclusion rows must cover it before
-  // anything on the added instances is listed to them
-  await exclusionComputationService.recomputeForUser(userId);
+  // anything on the added instances is listed to them. If the recompute
+  // fails the old selection comes back.
+  await recomputeOrRestore(userId, () =>
+    replaceInstanceSelection(userId, previous)
+  );
 
   res.json({
     success: true,
@@ -2665,9 +2936,10 @@ export const getSetupStatus = async (
     return;
   }
 
-  // Get enabled instances for selection
+  // Get the enabled instances the user may use, for selection
+  const access = await readInstanceAccess(userId);
   const instances = await prisma.stashInstance.findMany({
-    where: { enabled: true },
+    where: pickableInstancesWhere(access),
     select: {
       id: true,
       name: true,
@@ -2696,9 +2968,11 @@ export const completeSetup = async (
   const userId = req.user.id;
   const { selectedInstanceIds: requestedIds } = req.body;
 
-  // Check if multi-instance - require at least one selection
+  // Check if multi-instance - require at least one selection. A limited
+  // user chooses among the servers they may use only
+  const access = await readInstanceAccess(userId);
   const instanceCount = await prisma.stashInstance.count({
-    where: { enabled: true },
+    where: pickableInstancesWhere(access),
   });
 
   if (instanceCount >= 2) {
@@ -2723,7 +2997,9 @@ export const completeSetup = async (
     });
 
     const validIds = new Set(validInstances.map((i) => i.id));
-    const invalidIds = selectedInstanceIds.filter((id) => !validIds.has(id));
+    const invalidIds = selectedInstanceIds.filter(
+      (id) => !validIds.has(id) || (access !== null && !access.includes(id))
+    );
 
     if (invalidIds.length > 0) {
       res.status(400).json({
@@ -2733,11 +3009,14 @@ export const completeSetup = async (
       return;
     }
 
+    const previous = await readStoredSelection(userId);
     await replaceInstanceSelection(userId, selectedInstanceIds);
 
     // The user's scope changed with the selection (see
     // updateUserStashInstances)
-    await exclusionComputationService.recomputeForUser(userId);
+    await recomputeOrRestore(userId, () =>
+      replaceInstanceSelection(userId, previous)
+    );
   }
 
   // Mark setup as complete and issue the first recovery key. The

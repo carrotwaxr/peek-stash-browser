@@ -704,6 +704,34 @@ export interface AdminRegenerateRecoveryKeyResponse {
 }
 
 // =============================================================================
+// USER STASH SERVER ACCESS (admin)
+// =============================================================================
+
+/** GET and PUT /api/user/:userId/instance-access */
+export interface UserInstanceAccessParams extends Record<string, string> {
+  userId: string;
+}
+
+/**
+ * The Stash servers an admin lets a USER see. `limited` false means every
+ * server; true means only `instanceIds` (an empty list: none). The ids are
+ * kept while `limited` is false, so turning the limit back on restores them.
+ */
+export interface UserInstanceAccess {
+  limited: boolean;
+  instanceIds: string[];
+}
+
+/** GET /api/user/:userId/instance-access */
+export type GetUserInstanceAccessResponse = UserInstanceAccess;
+
+/** PUT /api/user/:userId/instance-access */
+export type UpdateUserInstanceAccessBody = UserInstanceAccess;
+
+/** PUT /api/user/:userId/instance-access: the saved state */
+export type UpdateUserInstanceAccessResponse = UserInstanceAccess;
+
+// =============================================================================
 // USER STASH INSTANCE SELECTION
 // =============================================================================
 

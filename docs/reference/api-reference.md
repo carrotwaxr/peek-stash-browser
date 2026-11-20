@@ -1,7 +1,7 @@
 # API Reference
 
 > Generated from the server's source by `cd server && npm run generate-api-docs`; do not edit it by hand.
-> Last updated: 2026-10-03
+> Last updated: 2026-11-20
 
 **Authentication** names who may call a route: **None** (anyone), **Session** (a signed-in Peek user), **Admin** (a signed-in admin), **Session or signed link** (a session, or the personal link the external player gets), or **None until setup starts, then Admin** (open to the setup wizard while Peek has no user and no Stash server).
 
@@ -514,6 +514,7 @@ interface GetUserSettingsResponse {
     cardDisplaySettings: CardDisplaySettings;
     landingPagePreference: LandingPagePreference;
     lightboxDoubleTapAction: string;
+    recommendationPreferences: RecommendationPreferences;
   };
 }
 ```
@@ -543,6 +544,7 @@ interface UpdateUserSettingsBody {
   cardDisplaySettings?: CardDisplaySettings;
   landingPagePreference?: LandingPagePreference | null;
   lightboxDoubleTapAction?: string;
+  recommendationPreferences?: RecommendationPreferences;
 }
 ```
 
@@ -570,6 +572,7 @@ interface UpdateUserSettingsResponse {
     cardDisplaySettings: CardDisplaySettings;
     landingPagePreference: LandingPagePreference;
     lightboxDoubleTapAction: string;
+    recommendationPreferences: RecommendationPreferences;
   };
 }
 ```
@@ -1116,6 +1119,7 @@ interface UpdateUserSettingsBody {
   cardDisplaySettings?: CardDisplaySettings;
   landingPagePreference?: LandingPagePreference | null;
   lightboxDoubleTapAction?: string;
+  recommendationPreferences?: RecommendationPreferences;
 }
 ```
 
@@ -1143,6 +1147,7 @@ interface UpdateUserSettingsResponse {
     cardDisplaySettings: CardDisplaySettings;
     landingPagePreference: LandingPagePreference;
     lightboxDoubleTapAction: string;
+    recommendationPreferences: RecommendationPreferences;
   };
 }
 ```
@@ -1256,6 +1261,58 @@ interface GetUserPermissionsParams extends Record<string, string> {
 ```
 
 **Handler:** `updateUserPermissionOverrides` in `server/controllers/user.ts`
+
+---
+
+### GET /api/user/:userId/instance-access
+
+**Authentication:** Admin
+
+**Request Body:** `never`
+
+**URL Parameters:**
+
+```typescript
+interface UserInstanceAccessParams extends Record<string, string> {
+  userId: string;
+}
+```
+
+**Response:**
+
+```typescript
+type GetUserInstanceAccessResponse = UserInstanceAccess;
+```
+
+**Handler:** `getUserInstanceAccess` in `server/controllers/user.ts`
+
+---
+
+### PUT /api/user/:userId/instance-access
+
+**Authentication:** Admin
+
+**Request Body:**
+
+```typescript
+type UpdateUserInstanceAccessBody = UserInstanceAccess;
+```
+
+**URL Parameters:**
+
+```typescript
+interface UserInstanceAccessParams extends Record<string, string> {
+  userId: string;
+}
+```
+
+**Response:**
+
+```typescript
+type UpdateUserInstanceAccessResponse = UserInstanceAccess;
+```
+
+**Handler:** `updateUserInstanceAccess` in `server/controllers/user.ts`
 
 ---
 
@@ -1945,6 +2002,8 @@ Browsing scenes, performers, studios, tags, collections, galleries and images, w
 ```typescript
 interface LibraryReadyResponse {
   ready: boolean;
+  /** Why it is not ready: a first sync running, or no Stash server open to the user */
+  reason?: "initializing" | "noAccess";
 }
 ```
 
@@ -3096,6 +3155,55 @@ interface GetUserPlaylistsResponse {
 
 ---
 
+### POST /api/playlists/clean
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+interface BulkPlaylistIdsRequest {
+  playlistIds: number[];
+}
+```
+
+**Response:**
+
+```typescript
+interface CleanPlaylistsResponse {
+  removed: number;
+  playlists: number;
+}
+```
+
+**Handler:** `cleanPlaylists` in `server/controllers/playlist.ts`
+
+---
+
+### POST /api/playlists/delete-many
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+interface BulkPlaylistIdsRequest {
+  playlistIds: number[];
+}
+```
+
+**Response:**
+
+```typescript
+interface DeletePlaylistsResponse {
+  deleted: number;
+}
+```
+
+**Handler:** `deletePlaylists` in `server/controllers/playlist.ts`
+
+---
+
 ### GET /api/playlists/:id
 
 Get single playlist with a page of its items
@@ -3134,6 +3242,11 @@ interface GetPlaylistResponse {
    * else, who is told nothing about them
    */
   unavailableItems: number;
+  /**
+   * Items whose scene was deleted from Stash: what Clean and Remove deleted
+   * remove. The owner's count; 0 for anyone else
+   */
+  removableItems: number;
   /** The page read */
   page: number;
   perPage: number;
@@ -3190,6 +3303,111 @@ interface GetPlaylistQueueResponse {
 ```
 
 **Handler:** `getPlaylistQueue` in `server/controllers/playlist.ts`
+
+---
+
+### POST /api/playlists/:id/suggestions
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+type FindPlaylistSuggestionsRequest = FindRecommendedScenesRequest;
+```
+
+**URL Parameters:**
+
+```typescript
+interface GetPlaylistParams extends Record<string, string> {
+  id: string;
+}
+```
+
+**Response:**
+
+```typescript
+interface FindPlaylistSuggestionsResponse {
+  scenes: WithStashUrl<NormalizedScene>[];
+  /** The suggestions the request matches; null when it asked for none (`filter.count: false`) */
+  count: number | null;
+  page: number;
+  perPage: number;
+}
+```
+
+**Handler:** `findPlaylistSuggestions` in `server/controllers/playlist.ts`
+
+---
+
+### POST /api/playlists/:id/suggestions/count
+
+**Authentication:** Session
+
+**Request Body:**
+
+```typescript
+type FindPlaylistSuggestionsRequest = FindRecommendedScenesRequest;
+```
+
+**URL Parameters:**
+
+```typescript
+interface GetPlaylistParams extends Record<string, string> {
+  id: string;
+}
+```
+
+**Response:**
+
+```typescript
+interface ListCountResponse {
+  count: number;
+}
+```
+
+**Handler:** `countPlaylistSuggestions` in `server/controllers/playlist.ts`
+
+---
+
+### GET /api/playlists/:id/suggestions
+
+A tab on the 3.5.0-beta.3 bundle; remove in the release after 3.5.0-beta.4
+
+**Authentication:** Session
+
+**URL Parameters:**
+
+```typescript
+interface GetPlaylistParams extends Record<string, string> {
+  id: string;
+}
+```
+
+**Query Parameters:**
+
+```typescript
+interface GetPlaylistSuggestionsQuery extends Record<
+  string,
+  string | undefined
+> {
+  /** From 1 (the default); anything but a positive integer answers 400 */
+  page?: string;
+}
+```
+
+**Response:**
+
+```typescript
+interface GetPlaylistSuggestionsResponse {
+  scenes: NormalizedScene[];
+  count: number;
+  page: number;
+  perPage: number;
+}
+```
+
+**Handler:** `getPlaylistSuggestions` in `server/controllers/playlist.ts`
 
 ---
 
@@ -4255,6 +4473,8 @@ interface UserStatsResponse {
   engagement: EngagementStats;
   topScenes: TopScene[];
   topPerformers: TopPerformer[];
+  /** Performers of the viewer's partner genders; [] unless they set some */
+  topPartners: TopPerformer[];
   topStudios: TopStudio[];
   topTags: TopTag[];
   mostWatchedScene: HighlightScene | null;
@@ -4715,6 +4935,21 @@ Re-probe clips that were synced before previews were generated (admin only)
 Body: { instanceId?: string } Without an instanceId every enabled instance is re-probed, one after another, and the results are summed; a named instance must be loaded (404). The answer breaks the clips that still have no preview down by cause (`misses`) and carries the first fetch error's text (`firstError`, prefixed with its instance's name when several instances were re-probed).
 
 **Authentication:** Admin
+
+**Request Body:**
+
+```typescript
+{ instanceId?: string } | undefined
+```
+
+**Response:**
+
+```typescript
+interface ReprobeClipsResponse extends ReprobeClipsResult {
+  ok: true;
+  message: string;
+}
+```
 
 **Handler:** inline in `server/routes/sync.ts`
 

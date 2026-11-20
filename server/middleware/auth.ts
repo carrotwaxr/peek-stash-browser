@@ -6,7 +6,10 @@ import { libraryStampFor } from "../services/LibraryStamp.js";
 import {
   getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
+  getUserInstanceAccess,
+  getUserInstanceScope,
 } from "../services/UserInstanceService.js";
+import type { LibraryReadyResponse } from "../types/api/index.js";
 import { getBasePath } from "../utils/basePath.js";
 import { compositeKey } from "../utils/entityRef.js";
 import { getJwtSecret } from "../utils/jwtSecret.js";
@@ -301,21 +304,60 @@ export const requireAdmin = (
 };
 
 /**
- * Whether the user has an instance to show: false on a fresh install before
- * its first sync, or while every instance the user sees is still on its
- * first sync (an instance shows once that sync's exclusions are computed).
- * `GET /api/library/ready` answers from it; `requireCacheReady` applies the
- * same rule to the list it puts on the request.
+ * Why a user with no instance to show has none: `noAccess` when the user is
+ * limited to servers and none of them is enabled (waiting will not help
+ * until an admin grants one), `initializing` otherwise (a fresh install, or
+ * every instance the user sees is still on its first sync).
  */
-export const isLibraryReady = async (userId: number): Promise<boolean> =>
-  (await getUserAllowedInstanceIds(userId)).length > 0;
+async function notReadyReason(
+  userId: number
+): Promise<NonNullable<LibraryReadyResponse["reason"]>> {
+  const scope = await getUserInstanceScope(userId);
+  if (scope.length === 0 && (await getUserInstanceAccess(userId)) !== null) {
+    return "noAccess";
+  }
+  return "initializing";
+}
 
-/** The 503 a list route answers while the viewer has no instance to show */
-function answerInitializing(res: Response): void {
+/**
+ * Whether the user has an instance to show: not ready on a fresh install
+ * before its first sync, while every instance the user sees is still on its
+ * first sync (an instance shows once that sync's exclusions are computed),
+ * or when a limited user has no enabled instance they may see (`reason`
+ * tells which). `GET /api/library/ready` answers from it;
+ * `requireCacheReady` applies the same rule to the list it puts on the
+ * request.
+ */
+export const libraryReadiness = async (
+  userId: number
+): Promise<LibraryReadyResponse> =>
+  (await getUserAllowedInstanceIds(userId)).length > 0
+    ? { ready: true }
+    : { ready: false, reason: await notReadyReason(userId) };
+
+/**
+ * The 503 a list route answers while the viewer has no instance to show:
+ * the first-sync notice, or `noAccess` for a limited user with no server.
+ * `ready: false` either way, so the client does not retry and its 5 s
+ * re-check picks up a grant.
+ */
+async function answerNotReady(res: Response, userId: number): Promise<void> {
+  const reason = await notReadyReason(userId);
+  if (reason === "noAccess") {
+    res.status(503).json({
+      error: "No Stash servers available",
+      message:
+        "No Stash server is open to this account. Ask an admin for access.",
+      ready: false,
+      reason,
+    });
+    return;
+  }
   res.status(503).json({
     error: "Server is initializing",
     message: "Cache is still loading. Please wait a moment and try again.",
     ready: false,
+    reason,
   });
 }
 
@@ -363,7 +405,7 @@ export const requireCacheReady = async (
   if (!user) return;
   const allowedInstanceIds = await getUserAllowedInstanceIds(user.id);
   if (allowedInstanceIds.length === 0) {
-    answerInitializing(res);
+    await answerNotReady(res, user.id);
     return;
   }
   attachAllowedInstances(req, allowedInstanceIds);
@@ -417,7 +459,7 @@ export const requirePickerReady = async (
     ? await getEnabledSyncedInstanceIds()
     : await getUserAllowedInstanceIds(user.id);
   if (allowedInstanceIds.length === 0) {
-    answerInitializing(res);
+    await answerNotReady(res, user.id);
     return;
   }
   attachAllowedInstances(req, allowedInstanceIds);

@@ -52,7 +52,10 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import type * as userHiddenEntityModule from "../../services/UserHiddenEntityService.js";
+import { getUserInstanceAccess } from "../../services/UserInstanceService.js";
+import type * as userInstanceServiceModule from "../../services/UserInstanceService.js";
 import { entityKey } from "../../utils/entityRef.js";
+import { logger } from "../../utils/logger.js";
 import {
   formatRecoveryKey,
   generateRecoveryKey,
@@ -165,7 +168,15 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
+// The admin's per-user server allow-list (#439): null (unlimited) unless a
+// test limits the user; the rest of the module stays real
+vi.mock("../../services/UserInstanceService.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof userInstanceServiceModule>()),
+  getUserInstanceAccess: vi.fn(),
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
+const mockInstanceAccess = vi.mocked(getUserInstanceAccess);
 const mockUpdateUserJson = vi.mocked(updateUserJson);
 const mockVisibleKeys = vi.mocked(getVisibleEntityKeys);
 const mockAlreadyHidden = vi.mocked(userHiddenEntityService.findAlreadyHidden);
@@ -219,6 +230,10 @@ function viewsStored(stored: {
 describe("User Controller — Features", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // No user is limited to a set of servers unless a test says so
+    mockInstanceAccess.mockResolvedValue(null);
+    // The user's stored selection, read before a save replaces it
+    mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
     // Every entity is visible and not yet hidden unless a test says otherwise
     mockAlreadyHidden.mockImplementation((_userId, targets) =>
       Promise.resolve(targets.map(() => false))
@@ -2001,6 +2016,43 @@ describe("User Controller — Features", () => {
       expect(body.selectedInstanceIds).toEqual(["inst-1"]);
       expect(body.availableInstances).toHaveLength(2);
     });
+
+    it("lists only the enabled instances a limited user may use (#439)", async () => {
+      mockInstanceAccess.mockResolvedValue(["inst-1"]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "inst-1" }),
+        partialRow({ instanceId: "inst-2" }),
+      ]);
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "inst-1", name: "Stash 1", description: null }),
+      ]);
+      const res = resFor(getUserStashInstances);
+      await getUserStashInstances(
+        reqFor(getUserStashInstances, { user: USER }),
+        res
+      );
+      expect(mockInstanceAccess).toHaveBeenCalledWith(USER.id);
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith(
+        objectContaining({ where: { enabled: true, id: { in: ["inst-1"] } } })
+      );
+      // A selection left over from a revoked server is not reported
+      expect(res._getOkBody().selectedInstanceIds).toEqual(["inst-1"]);
+    });
+
+    it("lists nothing for a limited user with no server (#439)", async () => {
+      mockInstanceAccess.mockResolvedValue([]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
+      mockPrisma.stashInstance.findMany.mockResolvedValue([]);
+      const res = resFor(getUserStashInstances);
+      await getUserStashInstances(
+        reqFor(getUserStashInstances, { user: USER }),
+        res
+      );
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith(
+        objectContaining({ where: { enabled: true, id: { in: [] } } })
+      );
+      expect(res._getOkBody().availableInstances).toEqual([]);
+    });
   });
 
   describe("updateUserStashInstances", () => {
@@ -2028,6 +2080,104 @@ describe("User Controller — Features", () => {
       expect(res._getStatus()).toBe(400);
       expect(res._getErrorBody().error).toBe("Invalid instance IDs");
       expect(res._getErrorBody().details).toBe("inst-99");
+    });
+
+    it("returns 400 for a server outside a limited user's access (#439)", async () => {
+      mockInstanceAccess.mockResolvedValue(["inst-1"]);
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "inst-1" }),
+        partialRow({ id: "inst-2" }),
+      ]);
+      const res = resFor(updateUserStashInstances);
+      await updateUserStashInstances(
+        reqFor(updateUserStashInstances, {
+          body: { instanceIds: ["inst-1", "inst-2"] },
+          user: USER,
+        }),
+        res
+      );
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toBe("Invalid instance IDs");
+      expect(res._getErrorBody().details).toBe("inst-2");
+      expect(mockPrisma.userStashInstance.createMany).not.toHaveBeenCalled();
+    });
+
+    it("saves a server inside a limited user's access (#439)", async () => {
+      mockInstanceAccess.mockResolvedValue(["inst-1"]);
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "inst-1" }),
+      ]);
+      const res = resFor(updateUserStashInstances);
+      await updateUserStashInstances(
+        reqFor(updateUserStashInstances, {
+          body: { instanceIds: ["inst-1"] },
+          user: USER,
+        }),
+        res
+      );
+      expect(res._getOkBody().selectedInstanceIds).toEqual(["inst-1"]);
+    });
+
+    describe("a recompute that fails after the save (#439)", () => {
+      beforeEach(() => {
+        mockPrisma.userStashInstance.findMany.mockResolvedValue([
+          partialRow({ instanceId: "inst-1" }),
+        ]);
+        mockPrisma.stashInstance.findMany.mockResolvedValue([
+          partialRow({ id: "inst-2" }),
+        ]);
+        mockExclusionService.recomputeForUser.mockRejectedValueOnce(
+          new Error("compute failed")
+        );
+      });
+
+      it("restores the old selection in one transaction and rethrows", async () => {
+        await expect(
+          updateUserStashInstances(
+            reqFor(updateUserStashInstances, {
+              body: { instanceIds: ["inst-2"] },
+              user: USER,
+            }),
+            resFor(updateUserStashInstances)
+          )
+        ).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+        expect(mockPrisma.userStashInstance.createMany).toHaveBeenNthCalledWith(
+          1,
+          { data: [{ userId: USER.id, instanceId: "inst-2" }] }
+        );
+        expect(mockPrisma.userStashInstance.createMany).toHaveBeenNthCalledWith(
+          2,
+          { data: [{ userId: USER.id, instanceId: "inst-1" }] }
+        );
+        expect(logger.error).toHaveBeenCalled();
+      });
+
+      it("logs both errors and rethrows the original when the restore fails too", async () => {
+        mockPrisma.userStashInstance.createMany
+          .mockResolvedValueOnce({ count: 1 })
+          .mockRejectedValueOnce(new Error("restore failed"));
+
+        await expect(
+          updateUserStashInstances(
+            reqFor(updateUserStashInstances, {
+              body: { instanceIds: ["inst-2"] },
+              user: USER,
+            }),
+            resFor(updateUserStashInstances)
+          )
+        ).rejects.toThrow("compute failed");
+
+        expect(logger.error).toHaveBeenCalledWith(
+          anyOf(String),
+          objectContaining({
+            userId: USER.id,
+            error: "compute failed",
+            restoreError: "restore failed",
+          })
+        );
+      });
     });
 
     it("clears selections when empty array", async () => {
@@ -2104,6 +2254,23 @@ describe("User Controller — Features", () => {
       expect(body.instances).toHaveLength(1);
       expect(body.instanceCount).toBe(1);
     });
+
+    it("lists only the enabled instances a limited user may use (#439)", async () => {
+      mockInstanceAccess.mockResolvedValue(["inst-1"]);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ setupCompleted: false })
+      );
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "inst-1", name: "Stash 1", description: null }),
+      ]);
+      const res = resFor(getSetupStatus);
+      await getSetupStatus(reqFor(getSetupStatus, { user: USER }), res);
+      expect(mockInstanceAccess).toHaveBeenCalledWith(USER.id);
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith(
+        objectContaining({ where: { enabled: true, id: { in: ["inst-1"] } } })
+      );
+      expect(res._getOkBody().instanceCount).toBe(1);
+    });
   });
 
   describe("completeSetup", () => {
@@ -2172,6 +2339,74 @@ describe("User Controller — Features", () => {
       const res = resFor(completeSetup);
       await completeSetup(req, res);
       expect(res._getOkBody().success).toBe(true);
+    });
+  });
+
+  describe("completeSetup access (#439)", () => {
+    it("counts only a limited user's accessible instances and refuses one outside them", async () => {
+      mockInstanceAccess.mockResolvedValue(["inst-1", "inst-2"]);
+      mockPrisma.stashInstance.count.mockResolvedValue(2);
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "inst-1" }),
+        partialRow({ id: "inst-3" }),
+      ]);
+      const res = resFor(completeSetup);
+      await completeSetup(
+        reqFor(completeSetup, {
+          body: { selectedInstanceIds: ["inst-1", "inst-3"] },
+          user: USER,
+        }),
+        res
+      );
+      expect(mockPrisma.stashInstance.count).toHaveBeenCalledWith({
+        where: { enabled: true, id: { in: ["inst-1", "inst-2"] } },
+      });
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toBe("Invalid instance IDs");
+      expect(res._getErrorBody().details).toBe("inst-3");
+      expect(mockPrisma.userStashInstance.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("asks no selection of a limited user with one accessible instance", async () => {
+      mockInstanceAccess.mockResolvedValue(["inst-1"]);
+      mockPrisma.stashInstance.count.mockResolvedValue(1);
+      mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
+      vi.mocked(formatRecoveryKey).mockReturnValue("RAWK-EY");
+      const res = resFor(completeSetup);
+      await completeSetup(reqFor(completeSetup, { user: USER }), res);
+      expect(res._getOkBody().success).toBe(true);
+    });
+  });
+
+  describe("completeSetup with a failing recompute (#439)", () => {
+    it("restores the old selection, does not complete setup, and rethrows", async () => {
+      mockPrisma.stashInstance.count.mockResolvedValue(3);
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "inst-2" }),
+      ]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "inst-1" }),
+      ]);
+      mockExclusionService.recomputeForUser.mockRejectedValueOnce(
+        new Error("compute failed")
+      );
+
+      await expect(
+        completeSetup(
+          reqFor(completeSetup, {
+            body: { selectedInstanceIds: ["inst-2"] },
+            user: USER,
+          }),
+          resFor(completeSetup)
+        )
+      ).rejects.toThrow("compute failed");
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.userStashInstance.createMany).toHaveBeenLastCalledWith({
+        data: [{ userId: USER.id, instanceId: "inst-1" }],
+      });
+      expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
     });
   });
 

@@ -269,4 +269,46 @@ describe("useLibraryReady", () => {
 
     expect(requestsTo(fetchMock, "/library/ready")).toHaveLength(1);
   });
+
+  it("exposes the reason the poll answers with, and a grant makes it ready", async () => {
+    const answers = [{ ready: false, reason: "noAccess" }, { ready: true }];
+    stubApi({
+      "/library/ready": () =>
+        jsonResponse(200, must(answers.shift(), "a ready answer")),
+    });
+    markLibraryNotReady(client);
+    const { result } = renderHook(() => useLibraryReady(), {
+      wrapper: wrapperFor(client),
+    });
+    expect(result.current.reason).toBeUndefined();
+
+    await advance(LIBRARY_READY_POLL_MS + 100);
+    expect(result.current).toEqual({ ready: false, reason: "noAccess" });
+
+    await advance(LIBRARY_READY_POLL_MS);
+    expect(result.current.ready).toBe(true);
+    expect(result.current.reason).toBeUndefined();
+  });
+
+  it("a bare mark keeps a stored reason; a 503's reason is stored", () => {
+    const key = queryKeys.library.ready();
+
+    markLibraryNotReady(client, "noAccess");
+    expect(client.getQueryData(key)).toEqual({
+      ready: false,
+      reason: "noAccess",
+    });
+
+    markLibraryNotReady(client);
+    expect(client.getQueryData(key)).toEqual({
+      ready: false,
+      reason: "noAccess",
+    });
+
+    markLibraryNotReady(client, "initializing");
+    expect(client.getQueryData(key)).toEqual({
+      ready: false,
+      reason: "initializing",
+    });
+  });
 });

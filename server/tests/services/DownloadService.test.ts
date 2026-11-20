@@ -4,8 +4,11 @@ import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { DownloadService } from "../../services/DownloadService.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userDownloadsDir, zipPath } from "../../utils/downloadPaths.js";
+import { logger } from "../../utils/logger.js";
 import { type PlaylistWithItems, downloadRow } from "../helpers/fixtures.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -15,12 +18,18 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
+// The instances the user may use (selection, access list, first sync)
+vi.mock("../../services/UserInstanceService.js", () => ({
+  getUserAllowedInstanceIds: vi.fn(),
+}));
+
 describe("DownloadService", () => {
   let service: DownloadService;
 
   beforeEach(() => {
     service = new DownloadService();
     vi.clearAllMocks();
+    vi.mocked(getUserAllowedInstanceIds).mockResolvedValue(["inst-1"]);
   });
 
   describe("createSceneDownload", () => {
@@ -373,11 +382,48 @@ describe("DownloadService", () => {
       const result = await service.getUserDownloads(1);
 
       expect(prisma.download.findMany).toHaveBeenCalledWith({
-        where: { userId: 1 },
+        where: {
+          userId: 1,
+          OR: [{ instanceId: "" }, { instanceId: { in: ["inst-1"] } }],
+        },
         orderBy: { createdAt: "desc" },
         take: 20,
       });
       expect(result).toHaveLength(2);
+    });
+
+    it("leaves out scene and image rows of an instance the user may not use, keeping playlist rows (#439)", async () => {
+      vi.mocked(getUserAllowedInstanceIds).mockResolvedValue(["inst-a"]);
+      vi.mocked(prisma.download.findMany).mockResolvedValue([]);
+
+      await service.getUserDownloads(7);
+
+      expect(getUserAllowedInstanceIds).toHaveBeenCalledWith(7);
+      expect(prisma.download.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: 7,
+          // Playlist rows carry no instance; the rest must be an allowed one
+          OR: [{ instanceId: "" }, { instanceId: { in: ["inst-a"] } }],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      });
+    });
+
+    it("keeps only playlist rows for a user with no allowed instance (#439)", async () => {
+      vi.mocked(getUserAllowedInstanceIds).mockResolvedValue([]);
+      vi.mocked(prisma.download.findMany).mockResolvedValue([]);
+
+      await service.getUserDownloads(7);
+
+      expect(prisma.download.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId: 7,
+            OR: [{ instanceId: "" }, { instanceId: { in: [] } }],
+          },
+        })
+      );
     });
 
     it("should respect limit parameter", async () => {
@@ -386,7 +432,10 @@ describe("DownloadService", () => {
       await service.getUserDownloads(1, 50);
 
       expect(prisma.download.findMany).toHaveBeenCalledWith({
-        where: { userId: 1 },
+        where: {
+          userId: 1,
+          OR: [{ instanceId: "" }, { instanceId: { in: ["inst-1"] } }],
+        },
         orderBy: { createdAt: "desc" },
         take: 50,
       });
@@ -599,6 +648,129 @@ describe("DownloadService", () => {
         statusCode: 403,
         message: "Access denied",
       });
+    });
+  });
+
+  describe("expireUserPlaylistZips", () => {
+    const previousConfigDir = process.env.CONFIG_DIR;
+    let configDir: string;
+
+    beforeEach(() => {
+      configDir = fs.mkdtempSync(path.join(os.tmpdir(), "peek-dl-expire-"));
+      process.env.CONFIG_DIR = configDir;
+    });
+
+    afterEach(() => {
+      if (previousConfigDir === undefined) delete process.env.CONFIG_DIR;
+      else process.env.CONFIG_DIR = previousConfigDir;
+      fs.rmSync(configDir, { recursive: true, force: true });
+    });
+
+    function writeZip(userId: number, downloadId: number): string {
+      const file = zipPath(userId, downloadId);
+      fs.mkdirSync(userDownloadsDir(userId), { recursive: true });
+      fs.writeFileSync(file, "zip bytes");
+      return file;
+    }
+
+    it("deletes the user's completed playlist downloads, rows and files, and nothing else", async () => {
+      const first = writeZip(1, 21);
+      const second = writeZip(1, 22);
+      const rows = [
+        downloadRow({
+          id: 21,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: first,
+        }),
+        downloadRow({
+          id: 22,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: second,
+        }),
+      ];
+      vi.mocked(prisma.download.findMany).mockResolvedValue(rows);
+      vi.mocked(prisma.download.findUnique).mockImplementation(((args: {
+        where: { id: number };
+      }) =>
+        Promise.resolve(
+          rows.find((r) => r.id === args.where.id) ?? null
+        )) as never);
+      vi.mocked(prisma.download.delete).mockResolvedValue(must(rows[0]));
+
+      await service.expireUserPlaylistZips(1);
+
+      // Only the user's finished playlist zips are looked up: a pending or
+      // processing build re-scopes at build time, a scene has no zip
+      expect(prisma.download.findMany).toHaveBeenCalledExactlyOnceWith({
+        where: { userId: 1, type: "PLAYLIST", status: "COMPLETED" },
+        select: { id: true },
+      });
+      expect(prisma.download.delete).toHaveBeenCalledTimes(2);
+      expect(prisma.download.delete).toHaveBeenCalledWith({
+        where: { id: 21 },
+      });
+      expect(prisma.download.delete).toHaveBeenCalledWith({
+        where: { id: 22 },
+      });
+      expect(fs.existsSync(first)).toBe(false);
+      expect(fs.existsSync(second)).toBe(false);
+    });
+
+    it("keeps going when one delete fails, and logs a warning naming the download", async () => {
+      const first = writeZip(1, 21);
+      const second = writeZip(1, 22);
+      const rows = [
+        downloadRow({
+          id: 21,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: first,
+        }),
+        downloadRow({
+          id: 22,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: second,
+        }),
+      ];
+      vi.mocked(prisma.download.findMany).mockResolvedValue(rows);
+      vi.mocked(prisma.download.findUnique).mockImplementation(((args: {
+        where: { id: number };
+      }) =>
+        Promise.resolve(
+          rows.find((r) => r.id === args.where.id) ?? null
+        )) as never);
+      vi.mocked(prisma.download.delete).mockImplementation(((args: {
+        where: { id: number };
+      }) =>
+        args.where.id === 21
+          ? Promise.reject(new Error("db busy"))
+          : Promise.resolve(must(rows[1]))) as never);
+      const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      await expect(service.expireUserPlaylistZips(1)).resolves.toBeUndefined();
+
+      expect(prisma.download.delete).toHaveBeenCalledTimes(2);
+      expect(fs.existsSync(second)).toBe(false);
+      expect(warn).toHaveBeenCalledWith(
+        anyOf(String),
+        objectContaining({ downloadId: 21, error: "db busy" })
+      );
+      warn.mockRestore();
+    });
+
+    it("does nothing when the user has no finished zip", async () => {
+      vi.mocked(prisma.download.findMany).mockResolvedValue([]);
+
+      await service.expireUserPlaylistZips(1);
+
+      expect(prisma.download.delete).not.toHaveBeenCalled();
     });
   });
 

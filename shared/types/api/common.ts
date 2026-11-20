@@ -88,4 +88,6 @@ export interface CacheNotReadyResponse {
  */
 export interface LibraryReadyResponse {
   ready: boolean;
+  /** Why it is not ready: a first sync running, or no Stash server open to the user */
+  reason?: "initializing" | "noAccess";
 }

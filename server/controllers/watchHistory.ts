@@ -281,9 +281,22 @@ export async function getWatchHistory(
     return;
   }
 
-  const watchHistory = await prisma.watchHistory.findUnique({
-    where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
-  });
+  // A scene the user cannot reach (its instance is outside their access, or
+  // it is hidden from them) answers as one with no history
+  const accessible = await resolveAccessibleInstanceId(
+    userId,
+    "scene",
+    sceneId,
+    instanceId
+  );
+  const watchHistory =
+    accessible === null
+      ? null
+      : await prisma.watchHistory.findUnique({
+          where: {
+            userId_instanceId_sceneId: { userId, instanceId, sceneId },
+          },
+        });
 
   if (!watchHistory) {
     res.json({

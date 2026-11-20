@@ -10,6 +10,11 @@
  * - A selection only narrows (invariant 11): when none of its instances is
  *   enabled (the admin disabled them), the user sees every enabled instance,
  *   as with no selection, rather than nothing
+ * - An admin can limit a USER to an allow-list (User.instanceAccessLimited
+ *   plus UserInstanceAccess rows): a limited non-admin's scope is the enabled
+ *   instances they are allowed, narrowed by their selection. A selection
+ *   naming no allowed instance means all allowed, and an empty allow-list
+ *   means nothing, never everything. Admins are never limited
  * - Disabled instances are never shown regardless of user selection
  * - An instance on its first sync (no firstSyncedAt) is shown to nobody,
  *   admins included, until that sync's exclusion recompute has run; the
@@ -24,19 +29,52 @@ interface ScopedInstance {
 }
 
 /**
- * The enabled instances, narrowed to the user's selection when it names an
- * enabled one (an empty selection, or one whose instances are all disabled,
- * means all enabled), each with whether its first sync has finished
- * (`firstSyncedAt`). Throws on a database error.
+ * The instance allow-list an admin set for a user (#439): the allowed
+ * instance ids, enabled or not, for a limited non-admin user; `null` for an
+ * unlimited user, an admin (never limited, whatever the flag) or a missing
+ * user. An empty array is a limited user with no server: they see nothing.
+ * Throws on a database error.
+ */
+export async function getUserInstanceAccess(
+  userId: number
+): Promise<string[] | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      role: true,
+      instanceAccessLimited: true,
+      instanceAccess: { select: { instanceId: true } },
+    },
+  });
+  if (!user || user.role === "ADMIN" || !user.instanceAccessLimited) {
+    return null;
+  }
+  return user.instanceAccess.map((a) => a.instanceId);
+}
+
+/**
+ * The enabled instances, narrowed to the user's allow-list when an admin
+ * limited them, then to the user's selection when it names an accessible
+ * one (an empty selection, or one whose instances are all disabled or not
+ * allowed, means all accessible), each with whether its first sync has
+ * finished (`firstSyncedAt`). Throws on a database error.
  */
 async function readScope(userId: number): Promise<ScopedInstance[]> {
-  // Get all enabled instances
-  const enabledInstances = await prisma.stashInstance.findMany({
-    where: { enabled: true },
-    select: { id: true, firstSyncedAt: true },
-  });
+  // Get all enabled instances, and the user's allow-list if they are limited
+  const [enabledInstances, access] = await Promise.all([
+    prisma.stashInstance.findMany({
+      where: { enabled: true },
+      select: { id: true, firstSyncedAt: true },
+    }),
+    getUserInstanceAccess(userId),
+  ]);
+  // Only the allowed instances count as enabled for a limited user, so the
+  // selection filter and its fallback both see just those
+  const allowed = access === null ? null : new Set(access);
   const enabled = new Map(
-    enabledInstances.map((i) => [i.id, i.firstSyncedAt !== null])
+    enabledInstances
+      .filter((i) => allowed === null || allowed.has(i.id))
+      .map((i) => [i.id, i.firstSyncedAt !== null])
   );
 
   // Get user's instance selections
@@ -45,8 +83,9 @@ async function readScope(userId: number): Promise<ScopedInstance[]> {
     select: { instanceId: true },
   });
 
-  // The selection narrowed to the enabled instances; when that leaves none
-  // (no selection, or every selected instance disabled), every enabled one
+  // The selection narrowed to the accessible instances; when that leaves none
+  // (no selection, or every selected instance disabled or not allowed), every
+  // accessible one
   const selected = userSelections
     .map((s) => s.instanceId)
     .filter((id) => enabled.has(id));
@@ -55,10 +94,11 @@ async function readScope(userId: number): Promise<ScopedInstance[]> {
 }
 
 /**
- * A user's instance scope: the enabled instances, narrowed to the user's
- * selection when it names an enabled one (an empty selection, or one whose
- * instances are all disabled, means all enabled), whether or not their
- * first sync has finished. The exclusion compute runs
+ * A user's instance scope: the enabled instances (for a limited user, the
+ * allowed ones, see getUserInstanceAccess), narrowed to the user's
+ * selection when it names an accessible one (an empty selection, or one
+ * whose instances are all disabled or not allowed, means all accessible),
+ * whether or not their first sync has finished. The exclusion compute runs
  * over it, so an instance's exclusion rows exist before it shows, and a
  * sync recomputes the users whose scope holds a changed instance. Throws on
  * a database error.
@@ -74,7 +114,10 @@ export async function getUserInstanceScope(userId: number): Promise<string[]> {
  * The users whose scope includes `instanceId` in either of its enabled
  * states: those whose selection names it, and those whose selection names
  * no other enabled instance (no selection at all, or only disabled ones),
- * who see every enabled instance. These are the users a change to the
+ * who see every enabled instance, and a limited USER allowed the instance
+ * (a selection of servers they are not allowed falls back to the allowed
+ * ones; a superset costs one extra recompute); a limited USER without access
+ * to the instance is left out of all of them. These are the users a change to the
  * instance's enabled state, or its deletion, affects; read them before a
  * deletion removes the selection rows.
  *
@@ -84,11 +127,31 @@ export async function getUserInstanceScope(userId: number): Promise<string[]> {
 export async function getUsersSelecting(instanceId: string): Promise<number[]> {
   const users = await prisma.user.findMany({
     where: {
-      OR: [
-        { stashInstances: { some: { instanceId } } },
+      AND: [
         {
-          stashInstances: {
-            none: { instance: { enabled: true, id: { not: instanceId } } },
+          OR: [
+            { stashInstances: { some: { instanceId } } },
+            {
+              stashInstances: {
+                none: { instance: { enabled: true, id: { not: instanceId } } },
+              },
+            },
+            // A limited USER's selection that names no allowed instance falls
+            // back to every allowed one, this one included, whatever the
+            // selection names
+            {
+              role: "USER",
+              instanceAccessLimited: true,
+              instanceAccess: { some: { instanceId } },
+            },
+          ],
+        },
+        // A limited USER without access to the instance never sees it
+        {
+          NOT: {
+            role: "USER",
+            instanceAccessLimited: true,
+            instanceAccess: { none: { instanceId } },
           },
         },
       ],

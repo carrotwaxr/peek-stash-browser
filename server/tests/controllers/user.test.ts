@@ -11,7 +11,12 @@ import {
   DEFAULT_RECOMMENDATION_PREFERENCES,
   type RecommendationPreferences,
 } from "@peek/shared-types/recommendationPreferences.js";
-import type { CustomTheme, User, UserContentRestriction } from "@prisma/client";
+import type {
+  CustomTheme,
+  Prisma,
+  User,
+  UserContentRestriction,
+} from "@prisma/client";
 import bcrypt from "bcryptjs";
 import * as fs from "fs";
 import jwt from "jsonwebtoken";
@@ -34,6 +39,7 @@ import {
   deleteUserRestrictions,
   getAllUsers,
   getRecoveryKey,
+  getUserInstanceAccess,
   getUserRestrictions,
   getUserSettings,
   overwriteFilterPreset,
@@ -41,6 +47,7 @@ import {
   renameFilterPreset,
   saveFilterPreset,
   setDefaultFilterPreset,
+  updateUserInstanceAccess,
   updateUserRestrictions,
   updateUserRole,
   updateUserSettings,
@@ -49,6 +56,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import userRoutes from "../../routes/user.js";
 import { downloadJobQueue } from "../../services/DownloadJobQueue.js";
+import { downloadService } from "../../services/DownloadService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { bumpUser, libraryStampFor } from "../../services/LibraryStamp.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
@@ -72,6 +80,7 @@ import { type UserWithGroups, userRow } from "../helpers/fixtures.js";
 import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 // Mock prisma
 vi.mock(
@@ -136,7 +145,13 @@ vi.mock("../../services/DownloadJobQueue.js", () => ({
   downloadJobQueue: { cancelUser: vi.fn() },
 }));
 
+// The built playlist zips an admin's narrowing expires
+vi.mock("../../services/DownloadService.js", () => ({
+  downloadService: { expireUserPlaylistZips: vi.fn() },
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
+const mockDownloads = vi.mocked(downloadService, true);
 const mockDownloadQueue = vi.mocked(downloadJobQueue, true);
 const mockExclusions = vi.mocked(exclusionComputationService);
 const mockRankings = vi.mocked(rankingComputeService, true);
@@ -1757,6 +1772,70 @@ describe("User Controller", () => {
       expect(res._getOkBody().success).toBe(true);
     });
 
+    it("expires the user's built playlist zips when an admin becomes a user, after the recompute and the bump", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ role: "ADMIN" })
+      );
+      mockPrisma.user.update.mockResolvedValue(
+        partialRow({
+          id: 3,
+          username: "user3",
+          role: "USER",
+          updatedAt: new Date(),
+        })
+      );
+      const before = libraryStampFor(3);
+      let stampAtExpire: string | undefined;
+      mockDownloads.expireUserPlaylistZips.mockImplementation(() => {
+        stampAtExpire = libraryStampFor(3);
+        return Promise.resolve();
+      });
+
+      await updateUserRole(
+        reqFor(updateUserRole, {
+          body: { role: "USER" },
+          params: { userId: "3" },
+          user: ADMIN,
+        }),
+        resFor(updateUserRole)
+      );
+
+      expect(
+        mockDownloads.expireUserPlaylistZips
+      ).toHaveBeenCalledExactlyOnceWith(3);
+      const [recomputed] =
+        mockExclusions.recomputeForUser.mock.invocationCallOrder;
+      const [expired] =
+        mockDownloads.expireUserPlaylistZips.mock.invocationCallOrder;
+      expect(must(recomputed)).toBeLessThan(must(expired));
+      expect(stampAtExpire).not.toBe(before);
+    });
+
+    it("expires nothing when a user becomes an admin", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ role: "USER" })
+      );
+      mockPrisma.user.update.mockResolvedValue(
+        partialRow({
+          id: 3,
+          username: "user3",
+          role: "ADMIN",
+          updatedAt: new Date(),
+        })
+      );
+
+      await updateUserRole(
+        reqFor(updateUserRole, {
+          body: { role: "ADMIN" },
+          params: { userId: "3" },
+          user: ADMIN,
+        }),
+        resFor(updateUserRole)
+      );
+
+      expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+    });
+
     it("a role change moves that user's stamp, after the recompute", async () => {
       mockPrisma.user.update.mockResolvedValue(
         partialRow({
@@ -1787,6 +1866,457 @@ describe("User Controller", () => {
     });
   });
 
+  // ─── instance access (#439) ───
+
+  describe("getUserInstanceAccess", () => {
+    it("answers the stored flag and the stored rows", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        // The handler's `select` shape, which the mock's full-row type cannot hold
+        untrusted(
+          partialRow<
+            Prisma.UserGetPayload<{
+              select: {
+                instanceAccessLimited: true;
+                instanceAccess: { select: { instanceId: true } };
+              };
+            }>
+          >({
+            instanceAccessLimited: true,
+            instanceAccess: [{ instanceId: "A" }, { instanceId: "B" }],
+          })
+        )
+      );
+      const req = reqFor(getUserInstanceAccess, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(getUserInstanceAccess);
+      await getUserInstanceAccess(req, res);
+
+      expect(res._getOkBody()).toEqual({
+        limited: true,
+        instanceIds: ["A", "B"],
+      });
+    });
+
+    it("answers 404 for an unknown user", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      const req = reqFor(getUserInstanceAccess, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(getUserInstanceAccess);
+      await getUserInstanceAccess(req, res);
+
+      expect(res._getStatus()).toBe(404);
+      expect(res._getErrorBody().error).toBe("User not found");
+    });
+  });
+
+  describe("updateUserInstanceAccess", () => {
+    // The target as stored before the save: the old limit and allow-list
+    const storedAccess = (limited: boolean, ids: string[]) =>
+      partialRow<
+        User & Prisma.UserGetPayload<{ select: { instanceAccess: true } }>
+      >({
+        role: "USER",
+        instanceAccessLimited: limited,
+        instanceAccess: ids.map((instanceId) => partialRow({ instanceId })),
+      });
+
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockResolvedValue(storedAccess(false, []));
+      mockDownloads.expireUserPlaylistZips.mockResolvedValue(undefined);
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "A" }),
+        partialRow({ id: "B" }),
+      ]);
+      mockPrisma.user.update.mockResolvedValue(partialRow({}));
+      mockPrisma.userInstanceAccess.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userInstanceAccess.createMany.mockResolvedValue({ count: 2 });
+      mockExclusions.recomputeForUser.mockResolvedValue(undefined);
+    });
+
+    it("answers 404 for an unknown user and writes nothing", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      const req = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: ["A"] },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(req, res);
+
+      expect(res._getStatus()).toBe(404);
+      expect(res._getErrorBody().error).toBe("User not found");
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 for an administrator and writes nothing", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ role: "ADMIN" })
+      );
+      const req = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: ["A"] },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toBe(
+        "Server access limits do not apply to administrators"
+      );
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockExclusions.recomputeForUser).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 naming the ids that are no StashInstance, enabled or not, and writes nothing", async () => {
+      const req = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: ["A", "gone", "also-gone"] },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({
+        error: "Invalid instance IDs",
+        details: "gone, also-gone",
+      });
+      // Any instance is valid: the lookup does not ask for enabled ones
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["A", "gone", "also-gone"] } },
+        select: { id: true },
+      });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("throws a ValidationError for a limited that is no boolean and ids that are no list", async () => {
+      const bad = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: malformed({ limited: "yes", instanceIds: [] }),
+        user: ADMIN,
+      });
+      await expect(
+        updateUserInstanceAccess(bad, resFor(updateUserInstanceAccess))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [objectContaining({ path: "limited" })],
+      });
+
+      const notList = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: malformed({ limited: true, instanceIds: "A" }),
+        user: ADMIN,
+      });
+      await expect(
+        updateUserInstanceAccess(notList, resFor(updateUserInstanceAccess))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [objectContaining({ path: "instanceIds" })],
+      });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("sets the flag and replaces the rows in one dbWriteTransaction, then recomputes and bumps the user", async () => {
+      const before = libraryStampFor(3);
+      const other = libraryStampFor(4);
+      let stampAtRecompute: string | undefined;
+      mockExclusions.recomputeForUser.mockImplementation(() => {
+        stampAtRecompute = libraryStampFor(3);
+        return Promise.resolve();
+      });
+      const req = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: ["A", "B", "A"] },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(req, res);
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.update).toHaveBeenCalledExactlyOnceWith({
+        where: { id: 3 },
+        data: { instanceAccessLimited: true },
+      });
+      expect(
+        mockPrisma.userInstanceAccess.deleteMany
+      ).toHaveBeenCalledExactlyOnceWith({ where: { userId: 3 } });
+      expect(
+        mockPrisma.userInstanceAccess.createMany
+      ).toHaveBeenCalledExactlyOnceWith({
+        data: [
+          { userId: 3, instanceId: "A" },
+          { userId: 3, instanceId: "B" },
+        ],
+      });
+      const [transaction] = mockPrisma.$transaction.mock.invocationCallOrder;
+      const [deleted] =
+        mockPrisma.userInstanceAccess.deleteMany.mock.invocationCallOrder;
+      const [created] =
+        mockPrisma.userInstanceAccess.createMany.mock.invocationCallOrder;
+      const [recomputed] =
+        mockExclusions.recomputeForUser.mock.invocationCallOrder;
+      expect(must(transaction)).toBeLessThan(must(deleted));
+      expect(must(deleted)).toBeLessThan(must(created));
+      expect(must(created)).toBeLessThan(must(recomputed));
+
+      expect(mockExclusions.recomputeForUser).toHaveBeenCalledExactlyOnceWith(
+        3
+      );
+      // The stamp moves after the recompute, for this user only
+      expect(stampAtRecompute).toBe(before);
+      expect(libraryStampFor(3)).not.toBe(before);
+      expect(libraryStampFor(4)).toBe(other);
+      expect(res._getOkBody()).toEqual({
+        limited: true,
+        instanceIds: ["A", "B"],
+      });
+    });
+
+    it("limited with an empty list is stored (the user sees nothing); lifting the limit keeps the given ids", async () => {
+      const empty = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: [] },
+        user: ADMIN,
+      });
+      const emptyRes = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(empty, emptyRes);
+      expect(mockPrisma.user.update).toHaveBeenLastCalledWith({
+        where: { id: 3 },
+        data: { instanceAccessLimited: true },
+      });
+      expect(mockPrisma.userInstanceAccess.createMany).not.toHaveBeenCalled();
+      expect(emptyRes._getOkBody()).toEqual({ limited: true, instanceIds: [] });
+
+      const lifted = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: false, instanceIds: ["B"] },
+        user: ADMIN,
+      });
+      const liftedRes = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(lifted, liftedRes);
+      expect(mockPrisma.user.update).toHaveBeenLastCalledWith({
+        where: { id: 3 },
+        data: { instanceAccessLimited: false },
+      });
+      expect(mockPrisma.userInstanceAccess.createMany).toHaveBeenCalledWith({
+        data: [{ userId: 3, instanceId: "B" }],
+      });
+      expect(liftedRes._getOkBody()).toEqual({
+        limited: false,
+        instanceIds: ["B"],
+      });
+    });
+
+    describe("a recompute that fails after the save (#439)", () => {
+      const save = (limited: boolean, instanceIds: string[]) =>
+        updateUserInstanceAccess(
+          reqFor(updateUserInstanceAccess, {
+            params: { userId: "3" },
+            body: { limited, instanceIds },
+            user: ADMIN,
+          }),
+          resFor(updateUserInstanceAccess)
+        );
+
+      /** The last flag and rows the save or its restore wrote */
+      const lastWritten = () => ({
+        flag: mockPrisma.user.update.mock.lastCall,
+        rows: mockPrisma.userInstanceAccess.createMany.mock.lastCall,
+      });
+
+      beforeEach(() => {
+        mockExclusions.recomputeForUser.mockRejectedValue(
+          new Error("compute failed")
+        );
+      });
+
+      it("restores the old limit and rows in one transaction when the save lifts the limit, and rethrows", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+        const before = libraryStampFor(3);
+
+        await expect(save(false, [])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+        expect(lastWritten().flag).toEqual([
+          { where: { id: 3 }, data: { instanceAccessLimited: true } },
+        ]);
+        expect(lastWritten().rows).toEqual([
+          {
+            data: [
+              { userId: 3, instanceId: "A" },
+              { userId: 3, instanceId: "B" },
+            ],
+          },
+        ]);
+        expect(logger.error).toHaveBeenCalled();
+        expect(libraryStampFor(3)).toBe(before);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+
+      it("restores when the save adds a server to a limited user", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, ["A"]));
+
+        await expect(save(true, ["A", "B"])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+        expect(lastWritten().flag).toEqual([
+          { where: { id: 3 }, data: { instanceAccessLimited: true } },
+        ]);
+        expect(lastWritten().rows).toEqual([
+          { data: [{ userId: 3, instanceId: "A" }] },
+        ]);
+      });
+
+      it("restores an old limit with no rows without creating any", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, []));
+
+        await expect(save(true, ["A"])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+        expect(mockPrisma.userInstanceAccess.createMany).toHaveBeenCalledTimes(
+          1
+        );
+        expect(mockPrisma.userInstanceAccess.deleteMany).toHaveBeenCalledTimes(
+          2
+        );
+      });
+
+      it("does not restore a narrowing save: it turns the limit on", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(false, []));
+
+        await expect(save(true, ["A"])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not restore a narrowing save: it removes a server", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+
+        await expect(save(true, ["A"])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      });
+
+      it("logs both errors and rethrows the original when the restore fails too", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, ["A"]));
+        mockPrisma.user.update
+          .mockResolvedValueOnce(partialRow({}))
+          .mockRejectedValueOnce(new Error("restore failed"));
+
+        await expect(save(false, [])).rejects.toThrow("compute failed");
+
+        expect(logger.error).toHaveBeenCalledWith(
+          anyOf(String),
+          objectContaining({
+            userId: 3,
+            error: "compute failed",
+            restoreError: "restore failed",
+          })
+        );
+      });
+    });
+
+    describe("expiring the user's built playlist zips", () => {
+      const save = async (limited: boolean, instanceIds: string[]) => {
+        const req = reqFor(updateUserInstanceAccess, {
+          params: { userId: "3" },
+          body: { limited, instanceIds },
+          user: ADMIN,
+        });
+        const res = resFor(updateUserInstanceAccess);
+        await updateUserInstanceAccess(req, res);
+        return res;
+      };
+
+      it("expires them when an unlimited user becomes limited, after the recompute and the stamp bump", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(false, []));
+        const before = libraryStampFor(3);
+        let stampAtExpire: string | undefined;
+        mockDownloads.expireUserPlaylistZips.mockImplementation(() => {
+          stampAtExpire = libraryStampFor(3);
+          return Promise.resolve();
+        });
+
+        await save(true, ["A"]);
+
+        expect(
+          mockDownloads.expireUserPlaylistZips
+        ).toHaveBeenCalledExactlyOnceWith(3);
+        const [recomputed] =
+          mockExclusions.recomputeForUser.mock.invocationCallOrder;
+        const [expired] =
+          mockDownloads.expireUserPlaylistZips.mock.invocationCallOrder;
+        expect(must(recomputed)).toBeLessThan(must(expired));
+        expect(stampAtExpire).not.toBe(before);
+      });
+
+      it("expires them when a limited user loses a server", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+        await save(true, ["A"]);
+        expect(
+          mockDownloads.expireUserPlaylistZips
+        ).toHaveBeenCalledExactlyOnceWith(3);
+      });
+
+      it("expires them when a limited user is left no server", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, ["A"]));
+        await save(true, []);
+        expect(mockDownloads.expireUserPlaylistZips).toHaveBeenCalledTimes(1);
+      });
+
+      it("expires nothing when a server is added", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, ["A"]));
+        await save(true, ["A", "B"]);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+
+      it("expires nothing when the list is unchanged", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+        await save(true, ["B", "A"]);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+
+      it("expires nothing when the limit is lifted", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+        await save(false, ["A"]);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+
+      it("still answers the saved state when the expiry fails, and logs a warning", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(false, []));
+        mockDownloads.expireUserPlaylistZips.mockRejectedValue(
+          new Error("disk full")
+        );
+
+        const res = await save(true, ["A"]);
+
+        expect(res._getOkBody()).toEqual({ limited: true, instanceIds: ["A"] });
+        expect(logger.warn).toHaveBeenCalled();
+      });
+
+      it("expires nothing when the request is refused", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(null);
+        await save(true, ["A"]);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   // ─── updateUserRestrictions ───
 
   describe("updateUserStashInstances", () => {
@@ -1797,7 +2327,33 @@ describe("User Controller", () => {
       ]);
       mockPrisma.userStashInstance.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.userStashInstance.createMany.mockResolvedValue({ count: 2 });
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
       mockExclusions.recomputeForUser.mockResolvedValue(undefined);
+    });
+
+    it("restores the old selection in one transaction when the recompute fails, and rethrows (#439)", async () => {
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "B" }),
+      ]);
+      mockExclusions.recomputeForUser.mockRejectedValue(
+        new Error("compute failed")
+      );
+
+      await expect(
+        updateUserStashInstances(
+          reqFor(updateUserStashInstances, {
+            user: USER,
+            body: { instanceIds: ["A"] },
+          }),
+          resFor(updateUserStashInstances)
+        )
+      ).rejects.toThrow("compute failed");
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.userStashInstance.createMany).toHaveBeenLastCalledWith({
+        data: [{ userId: USER.id, instanceId: "B" }],
+      });
+      expect(logger.error).toHaveBeenCalled();
     });
 
     it("recomputes the user's exclusions in the same request, after the selection is stored", async () => {
@@ -1914,6 +2470,7 @@ describe("User Controller", () => {
       ]);
       mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
       mockExclusions.saveRestrictions.mockResolvedValue(undefined);
+      mockDownloads.expireUserPlaylistZips.mockResolvedValue(undefined);
     });
 
     it("returns 403 when non-admin", async () => {
@@ -2165,6 +2722,53 @@ describe("User Controller", () => {
       expect(must(savedAt)).toBeLessThan(must(readAt));
       expect(res._getOkBody().success).toBe(true);
       expect(res._getOkBody().restrictions).toEqual(saved);
+    });
+
+    it("expires the user's built playlist zips after every successful save, and still answers when that fails", async () => {
+      const req = reqFor(updateUserRestrictions, {
+        body: { restrictions: [tagRule("EXCLUDE")] },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      await updateUserRestrictions(req, resFor(updateUserRestrictions));
+
+      expect(
+        mockDownloads.expireUserPlaylistZips
+      ).toHaveBeenCalledExactlyOnceWith(3);
+      const [savedAt] =
+        mockExclusions.saveRestrictions.mock.invocationCallOrder;
+      const [expiredAt] =
+        mockDownloads.expireUserPlaylistZips.mock.invocationCallOrder;
+      expect(must(savedAt)).toBeLessThan(must(expiredAt));
+
+      mockDownloads.expireUserPlaylistZips.mockRejectedValue(
+        new Error("disk full")
+      );
+      const failing = resFor(updateUserRestrictions);
+      await updateUserRestrictions(req, failing);
+      expect(failing._getStatus()).toBe(200);
+      expect(logger.warn).toHaveBeenCalled();
+    });
+
+    it("expires nothing when the save is refused or fails", async () => {
+      mockExclusions.saveRestrictions.mockRejectedValue(new Error("boom"));
+      const req = reqFor(updateUserRestrictions, {
+        body: { restrictions: [tagRule("EXCLUDE")] },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      await expect(
+        updateUserRestrictions(req, resFor(updateUserRestrictions))
+      ).rejects.toThrow("boom");
+
+      const bad = reqFor(updateUserRestrictions, {
+        body: { restrictions: [tagRule("INCLUDE", [])] },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      await updateUserRestrictions(bad, resFor(updateUserRestrictions));
+
+      expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
     });
 
     it("a failed save throws (500) and reads nothing back", async () => {

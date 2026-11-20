@@ -83,15 +83,36 @@ const ENTITY_SOURCES: Record<AccessEntityType, EntitySource> = {
 };
 
 /**
- * Rules 1, 2 and 3 for the row aliased `x`. Binds userId, userId. The
- * queries' own JOIN on StashInstance checks rule 2's enabled part too; the
- * probe here keeps every query that uses the clause on both parts. Rule 3's
- * first probe does not depend on `x`, so SQLite runs it once per statement.
+ * Rules 1, 2 and 3 for the row aliased `x`. Binds userId six times: 3a's two
+ * probes, then 3b's selection probe with its two allow-list probes, then 3b's
+ * per-row probe. The queries' own JOIN on StashInstance checks rule 2's
+ * enabled part too; the probe here keeps every query that uses the clause on
+ * both parts.
+ *
+ * Rule 3 is two parts. 3a is the admin's allow-list: a non-admin with
+ * `instanceAccessLimited` sees only instances with a UserInstanceAccess row.
+ * 3b is the user's own selection, whose fallback ("a selection naming no
+ * enabled instance means all enabled") counts only accessible instances, so
+ * a limited user whose selection names nothing they may use sees everything
+ * they may use and no more. Both mirror `readScope` in UserInstanceService;
+ * the integration test "agrees with getUserAllowedInstanceIds" pins them.
+ * The probes that depend only on the user (`lu`, `lu2`, the selection
+ * probe) do not depend on `x`, so SQLite runs them once per statement; the
+ * ones that do depend on `x` hit UserInstanceAccess's and UserStashInstance's
+ * (userId, instanceId) primary keys.
  */
 const LIVE_AND_ALLOWED_WHERE = `x.deletedAt IS NULL
   AND EXISTS (SELECT 1 FROM StashInstance ri WHERE ri.id = x.stashInstanceId AND ri.enabled = 1 AND ri.firstSyncedAt IS NOT NULL)
-  AND (NOT EXISTS (SELECT 1 FROM UserStashInstance usi JOIN StashInstance si ON si.id = usi.instanceId AND si.enabled = 1 WHERE usi.userId = ?)
-       OR EXISTS (SELECT 1 FROM UserStashInstance usi WHERE usi.userId = ? AND usi.instanceId = x.stashInstanceId))`;
+  AND (NOT EXISTS (SELECT 1 FROM User lu WHERE lu.id = ? AND lu.role <> 'ADMIN' AND lu.instanceAccessLimited = 1)
+       OR EXISTS (SELECT 1 FROM UserInstanceAccess ua WHERE ua.userId = ? AND ua.instanceId = x.stashInstanceId))
+  AND (NOT EXISTS (SELECT 1 FROM UserStashInstance usi JOIN StashInstance si ON si.id = usi.instanceId AND si.enabled = 1
+                    WHERE usi.userId = ?
+                      AND (NOT EXISTS (SELECT 1 FROM User lu2 WHERE lu2.id = ? AND lu2.role <> 'ADMIN' AND lu2.instanceAccessLimited = 1)
+                           OR EXISTS (SELECT 1 FROM UserInstanceAccess ua2 WHERE ua2.userId = ? AND ua2.instanceId = usi.instanceId)))
+       OR EXISTS (SELECT 1 FROM UserStashInstance usi2 WHERE usi2.userId = ? AND usi2.instanceId = x.stashInstanceId))`;
+
+/** How many times LIVE_AND_ALLOWED_WHERE binds the user id. */
+const LIVE_AND_ALLOWED_USER_BINDS = 6;
 
 /**
  * Rule 4's probe for the row aliased `x`. Binds userId, entityType. Any
@@ -104,8 +125,9 @@ const EXCLUSION_PROBE = `SELECT 1 FROM UserExcludedEntity e
 
 /**
  * Rules 1 to 4 for the row aliased `x`, shared by every query here so the
- * single and batch checks can't drift. Binds userId, userId, userId,
- * entityType. Each probe hits an index: StashInstance's primary key,
+ * single and batch checks can't drift. Binds userId (six times, see
+ * LIVE_AND_ALLOWED_WHERE), userId, entityType. Each probe hits an index:
+ * StashInstance's and User's primary keys, UserInstanceAccess and
  * UserStashInstance (userId, instanceId) and UserExcludedEntity (userId,
  * entityType, entityId, instanceId).
  */
@@ -147,7 +169,11 @@ function accessParams(
   userId: number,
   entityType: AccessEntityType
 ): unknown[] {
-  const params: unknown[] = [userId, userId, userId, entityType];
+  const params: unknown[] = [
+    ...Array<number>(LIVE_AND_ALLOWED_USER_BINDS).fill(userId),
+    userId,
+    entityType,
+  ];
   if (source.extraUserParam) params.push(userId);
   return params;
 }
