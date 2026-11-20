@@ -87,6 +87,7 @@
     "deepmerge-ts": "^8.0.2",
     "archiver-utils": {
       "lodash": "^4.18.1"
-    }
+    },
+    "effect": "^3.22.1"
   }
 }
