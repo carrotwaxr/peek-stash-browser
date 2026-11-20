@@ -38,7 +38,9 @@ export const validateStartup = () => {
     LOG_LEVEL: emptyToNull(process.env.LOG_LEVEL) ?? "INFO",
     PROXY_AUTH_HEADER: emptyToNull(proxyAuthHeader) ?? "NOT SET",
     PROXY_AUTH_TRUSTED_IPS: emptyToNull(proxyAuthTrustedIps) ?? "NOT SET",
-    BASE_PATH: getBasePath() || "NOT SET",
+    // The value as given when invalid: the throw below names it too
+    BASE_PATH:
+      getBasePath() || (emptyToNull(process.env.BASE_PATH) ?? "NOT SET"),
   });
 
   // A malformed prefix would scope cookies and links wrongly: refuse to start

@@ -53,6 +53,13 @@ describe("validateStartup", () => {
     );
   });
 
+  it("logs an invalid BASE_PATH as given, not as NOT SET", () => {
+    process.env.BASE_PATH = "//evil.com";
+
+    expect(() => validateStartup()).toThrow("BASE_PATH must be a path");
+    expect(allLogged()).toContain('"BASE_PATH":"//evil.com"');
+  });
+
   it("logs a valid BASE_PATH normalised, and NOT SET without one", () => {
     process.env.BASE_PATH = "/peek/";
     validateStartup();
