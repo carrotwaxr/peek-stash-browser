@@ -138,20 +138,23 @@ describe("auth cookie path", () => {
     expect(cookieOptions()).toMatchObject({ path: "/" });
   });
 
-  it.each([
-    ["/peek", "Path=/peek"],
-    [undefined, "Path=/"],
-  ])(
-    "logout clears the cookie with the same path (BASE_PATH=%s)",
-    async (bp, expected) => {
-      if (bp === undefined) delete process.env.BASE_PATH;
-      else process.env.BASE_PATH = bp;
+  const logoutClears = async (bp: string | undefined) => {
+    if (bp === undefined) delete process.env.BASE_PATH;
+    else process.env.BASE_PATH = bp;
 
-      const res = await fetch(`${baseUrl}/api/auth/logout`, { method: "POST" });
-      const setCookie = res.headers.get("set-cookie") ?? "";
+    const res = await fetch(`${baseUrl}/api/auth/logout`, { method: "POST" });
+    return res.headers
+      .getSetCookie()
+      .filter((cookie) => cookie.startsWith("token=;"))
+      .map((cookie) => /Path=([^;]*)/.exec(cookie)?.[1]);
+  };
 
-      expect(setCookie).toContain("token=;");
-      expect(setCookie).toContain(`${expected};`);
-    }
-  );
+  it("logout under BASE_PATH clears the cookie on the prefix and on the root", async () => {
+    // A cookie set before BASE_PATH was enabled sits on Path=/
+    expect(await logoutClears("/peek")).toEqual(["/peek", "/"]);
+  });
+
+  it("logout without BASE_PATH clears the cookie once, on the root", async () => {
+    expect(await logoutClears(undefined)).toEqual(["/"]);
+  });
 });

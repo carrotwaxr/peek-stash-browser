@@ -25,6 +25,7 @@ import { authRateLimiter } from "../middleware/rateLimiter.js";
 import prisma from "../prisma/singleton.js";
 import { setUserPassword } from "../services/PasswordService.js";
 import rankingComputeService from "../services/RankingComputeService.js";
+import { getBasePath } from "../utils/basePath.js";
 import { validatePassword } from "../utils/passwordValidation.js";
 import { recoveryKeyMatches } from "../utils/recoveryKey.js";
 import { authenticated } from "../utils/routeHelpers.js";
@@ -135,6 +136,11 @@ router.post("/login", authRateLimiter, async (req, res) => {
 // Logout endpoint
 router.post("/logout", (req, res) => {
   res.clearCookie("token", tokenCookieOptions());
+  if (getBasePath()) {
+    // A cookie set before BASE_PATH was enabled sits on Path=/ and is still
+    // sent to the prefix on the same host
+    res.clearCookie("token", { ...tokenCookieOptions(), path: "/" });
+  }
   res.json({ success: true, message: "Logged out successfully" });
 });
 
