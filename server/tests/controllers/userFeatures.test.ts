@@ -55,6 +55,7 @@ import type * as userHiddenEntityModule from "../../services/UserHiddenEntitySer
 import { getUserInstanceAccess } from "../../services/UserInstanceService.js";
 import type * as userInstanceServiceModule from "../../services/UserInstanceService.js";
 import { entityKey } from "../../utils/entityRef.js";
+import { logger } from "../../utils/logger.js";
 import {
   formatRecoveryKey,
   generateRecoveryKey,
@@ -231,6 +232,8 @@ describe("User Controller — Features", () => {
     vi.clearAllMocks();
     // No user is limited to a set of servers unless a test says so
     mockInstanceAccess.mockResolvedValue(null);
+    // The user's stored selection, read before a save replaces it
+    mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
     // Every entity is visible and not yet hidden unless a test says otherwise
     mockAlreadyHidden.mockImplementation((_userId, targets) =>
       Promise.resolve(targets.map(() => false))
@@ -2115,6 +2118,68 @@ describe("User Controller — Features", () => {
       expect(res._getOkBody().selectedInstanceIds).toEqual(["inst-1"]);
     });
 
+    describe("a recompute that fails after the save (#439)", () => {
+      beforeEach(() => {
+        mockPrisma.userStashInstance.findMany.mockResolvedValue([
+          partialRow({ instanceId: "inst-1" }),
+        ]);
+        mockPrisma.stashInstance.findMany.mockResolvedValue([
+          partialRow({ id: "inst-2" }),
+        ]);
+        mockExclusionService.recomputeForUser.mockRejectedValueOnce(
+          new Error("compute failed")
+        );
+      });
+
+      it("restores the old selection in one transaction and rethrows", async () => {
+        await expect(
+          updateUserStashInstances(
+            reqFor(updateUserStashInstances, {
+              body: { instanceIds: ["inst-2"] },
+              user: USER,
+            }),
+            resFor(updateUserStashInstances)
+          )
+        ).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+        expect(mockPrisma.userStashInstance.createMany).toHaveBeenNthCalledWith(
+          1,
+          { data: [{ userId: USER.id, instanceId: "inst-2" }] }
+        );
+        expect(mockPrisma.userStashInstance.createMany).toHaveBeenNthCalledWith(
+          2,
+          { data: [{ userId: USER.id, instanceId: "inst-1" }] }
+        );
+        expect(logger.error).toHaveBeenCalled();
+      });
+
+      it("logs both errors and rethrows the original when the restore fails too", async () => {
+        mockPrisma.userStashInstance.createMany
+          .mockResolvedValueOnce({ count: 1 })
+          .mockRejectedValueOnce(new Error("restore failed"));
+
+        await expect(
+          updateUserStashInstances(
+            reqFor(updateUserStashInstances, {
+              body: { instanceIds: ["inst-2"] },
+              user: USER,
+            }),
+            resFor(updateUserStashInstances)
+          )
+        ).rejects.toThrow("compute failed");
+
+        expect(logger.error).toHaveBeenCalledWith(
+          anyOf(String),
+          objectContaining({
+            userId: USER.id,
+            error: "compute failed",
+            restoreError: "restore failed",
+          })
+        );
+      });
+    });
+
     it("clears selections when empty array", async () => {
       mockPrisma.userStashInstance.deleteMany.mockResolvedValue({
         count: 1,
@@ -2311,6 +2376,37 @@ describe("User Controller — Features", () => {
       const res = resFor(completeSetup);
       await completeSetup(reqFor(completeSetup, { user: USER }), res);
       expect(res._getOkBody().success).toBe(true);
+    });
+  });
+
+  describe("completeSetup with a failing recompute (#439)", () => {
+    it("restores the old selection, does not complete setup, and rethrows", async () => {
+      mockPrisma.stashInstance.count.mockResolvedValue(3);
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "inst-2" }),
+      ]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "inst-1" }),
+      ]);
+      mockExclusionService.recomputeForUser.mockRejectedValueOnce(
+        new Error("compute failed")
+      );
+
+      await expect(
+        completeSetup(
+          reqFor(completeSetup, {
+            body: { selectedInstanceIds: ["inst-2"] },
+            user: USER,
+          }),
+          resFor(completeSetup)
+        )
+      ).rejects.toThrow("compute failed");
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.userStashInstance.createMany).toHaveBeenLastCalledWith({
+        data: [{ userId: USER.id, instanceId: "inst-1" }],
+      });
+      expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
     });
   });
 

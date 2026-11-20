@@ -1748,6 +1748,64 @@ export const getUserRestrictions = async (
 };
 
 /**
+ * Recompute a user's exclusions after a save that may widen what they see.
+ * The save is already committed: when the recompute throws, the user would see
+ * the newly reachable servers without their exclusion rows, so `restore` puts
+ * the previous state back (fail closed) and the original error is rethrown. A
+ * failure of the restore itself is logged with both errors.
+ */
+async function recomputeOrRestore(
+  userId: number,
+  restore: () => Promise<unknown>
+): Promise<void> {
+  try {
+    await exclusionComputationService.recomputeForUser(userId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      await restore();
+      logger.error(
+        "Recompute failed after a save; the previous state was restored",
+        {
+          userId,
+          error: message,
+        }
+      );
+    } catch (restoreError) {
+      logger.error("Recompute failed after a save and the restore failed too", {
+        userId,
+        error: message,
+        restoreError:
+          restoreError instanceof Error
+            ? restoreError.message
+            : String(restoreError),
+      });
+    }
+    throw error;
+  }
+}
+
+/** Sets a user's access flag and replaces their allow-list rows in one unit */
+function replaceInstanceAccess(
+  userId: number,
+  limited: boolean,
+  instanceIds: string[]
+) {
+  return dbWriteTransaction("user.instanceAccess", async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { instanceAccessLimited: limited },
+    });
+    await tx.userInstanceAccess.deleteMany({ where: { userId } });
+    if (instanceIds.length > 0) {
+      await tx.userInstanceAccess.createMany({
+        data: instanceIds.map((instanceId) => ({ userId, instanceId })),
+      });
+    }
+  });
+}
+
+/**
  * Expire a user's built playlist zips after an admin narrowed what they may
  * see. The change is already saved, so a failure here is logged, not raised.
  */
@@ -2061,28 +2119,25 @@ export const updateUserInstanceAccess = async (
     }
   }
 
-  await dbWriteTransaction("user.instanceAccess", async (tx) => {
-    await tx.user.update({
-      where: { id: targetUserId },
-      data: { instanceAccessLimited: limited },
-    });
-    await tx.userInstanceAccess.deleteMany({
-      where: { userId: targetUserId },
-    });
-    if (instanceIds.length > 0) {
-      await tx.userInstanceAccess.createMany({
-        data: instanceIds.map((instanceId) => ({
-          userId: targetUserId,
-          instanceId,
-        })),
-      });
-    }
-  });
+  await replaceInstanceAccess(targetUserId, limited, instanceIds);
 
   // The user's scope changed: their exclusion rows must cover it before
   // anything on a newly granted server is listed to them, and their cached
-  // library views are stale
-  await exclusionComputationService.recomputeForUser(targetUserId);
+  // library views are stale. A save that widens the scope is put back when
+  // the recompute fails; a narrowing one stays (the SQL scope already
+  // narrows).
+  const oldIds = target.instanceAccess.map((a) => a.instanceId);
+  const oldKnown = new Set(oldIds);
+  const widened =
+    target.instanceAccessLimited &&
+    (!limited || instanceIds.some((id) => !oldKnown.has(id)));
+  if (widened) {
+    await recomputeOrRestore(targetUserId, () =>
+      replaceInstanceAccess(targetUserId, true, oldIds)
+    );
+  } else {
+    await exclusionComputationService.recomputeForUser(targetUserId);
+  }
   bumpUser(targetUserId);
 
   // A built playlist zip holds scenes of the servers the user could use
@@ -2759,6 +2814,15 @@ function parseInstanceSelection(value: unknown, field: string): string[] {
   return [...new Set(parsed.data)];
 }
 
+/** The instance ids the user's selection holds now, as stored */
+async function readStoredSelection(userId: number): Promise<string[]> {
+  const rows = await prisma.userStashInstance.findMany({
+    where: { userId },
+    select: { instanceId: true },
+  });
+  return rows.map((r) => r.instanceId);
+}
+
 /** Replaces the user's selection in one unit: no reader sees the deleted rows without the created ones */
 function replaceInstanceSelection(userId: number, instanceIds: string[]) {
   return dbWriteTransaction("user.instances", async (tx) => {
@@ -2817,11 +2881,15 @@ export const updateUserStashInstances = async (
     }
   }
 
+  const previous = await readStoredSelection(userId);
   await replaceInstanceSelection(userId, instanceIds);
 
   // The user's scope changed: their exclusion rows must cover it before
-  // anything on the added instances is listed to them
-  await exclusionComputationService.recomputeForUser(userId);
+  // anything on the added instances is listed to them. If the recompute
+  // fails the old selection comes back.
+  await recomputeOrRestore(userId, () =>
+    replaceInstanceSelection(userId, previous)
+  );
 
   res.json({
     success: true,
@@ -2930,11 +2998,14 @@ export const completeSetup = async (
       return;
     }
 
+    const previous = await readStoredSelection(userId);
     await replaceInstanceSelection(userId, selectedInstanceIds);
 
     // The user's scope changed with the selection (see
     // updateUserStashInstances)
-    await exclusionComputationService.recomputeForUser(userId);
+    await recomputeOrRestore(userId, () =>
+      replaceInstanceSelection(userId, previous)
+    );
   }
 
   // Mark setup as complete and issue the first recovery key. The

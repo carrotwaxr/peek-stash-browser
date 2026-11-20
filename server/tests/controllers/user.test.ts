@@ -2048,6 +2048,119 @@ describe("User Controller", () => {
       });
     });
 
+    describe("a recompute that fails after the save (#439)", () => {
+      const save = (limited: boolean, instanceIds: string[]) =>
+        updateUserInstanceAccess(
+          reqFor(updateUserInstanceAccess, {
+            params: { userId: "3" },
+            body: { limited, instanceIds },
+            user: ADMIN,
+          }),
+          resFor(updateUserInstanceAccess)
+        );
+
+      /** The last flag and rows the save or its restore wrote */
+      const lastWritten = () => ({
+        flag: mockPrisma.user.update.mock.lastCall,
+        rows: mockPrisma.userInstanceAccess.createMany.mock.lastCall,
+      });
+
+      beforeEach(() => {
+        mockExclusions.recomputeForUser.mockRejectedValue(
+          new Error("compute failed")
+        );
+      });
+
+      it("restores the old limit and rows in one transaction when the save lifts the limit, and rethrows", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+        const before = libraryStampFor(3);
+
+        await expect(save(false, [])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+        expect(lastWritten().flag).toEqual([
+          { where: { id: 3 }, data: { instanceAccessLimited: true } },
+        ]);
+        expect(lastWritten().rows).toEqual([
+          {
+            data: [
+              { userId: 3, instanceId: "A" },
+              { userId: 3, instanceId: "B" },
+            ],
+          },
+        ]);
+        expect(logger.error).toHaveBeenCalled();
+        expect(libraryStampFor(3)).toBe(before);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+
+      it("restores when the save adds a server to a limited user", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, ["A"]));
+
+        await expect(save(true, ["A", "B"])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+        expect(lastWritten().flag).toEqual([
+          { where: { id: 3 }, data: { instanceAccessLimited: true } },
+        ]);
+        expect(lastWritten().rows).toEqual([
+          { data: [{ userId: 3, instanceId: "A" }] },
+        ]);
+      });
+
+      it("restores an old limit with no rows without creating any", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, []));
+
+        await expect(save(true, ["A"])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+        expect(mockPrisma.userInstanceAccess.createMany).toHaveBeenCalledTimes(
+          1
+        );
+        expect(mockPrisma.userInstanceAccess.deleteMany).toHaveBeenCalledTimes(
+          2
+        );
+      });
+
+      it("does not restore a narrowing save: it turns the limit on", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(false, []));
+
+        await expect(save(true, ["A"])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not restore a narrowing save: it removes a server", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+
+        await expect(save(true, ["A"])).rejects.toThrow("compute failed");
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      });
+
+      it("logs both errors and rethrows the original when the restore fails too", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, ["A"]));
+        mockPrisma.user.update
+          .mockResolvedValueOnce(partialRow({}))
+          .mockRejectedValueOnce(new Error("restore failed"));
+
+        await expect(save(false, [])).rejects.toThrow("compute failed");
+
+        expect(logger.error).toHaveBeenCalledWith(
+          anyOf(String),
+          objectContaining({
+            userId: 3,
+            error: "compute failed",
+            restoreError: "restore failed",
+          })
+        );
+      });
+    });
+
     describe("expiring the user's built playlist zips", () => {
       const save = async (limited: boolean, instanceIds: string[]) => {
         const req = reqFor(updateUserInstanceAccess, {
@@ -2150,7 +2263,33 @@ describe("User Controller", () => {
       ]);
       mockPrisma.userStashInstance.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.userStashInstance.createMany.mockResolvedValue({ count: 2 });
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
       mockExclusions.recomputeForUser.mockResolvedValue(undefined);
+    });
+
+    it("restores the old selection in one transaction when the recompute fails, and rethrows (#439)", async () => {
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "B" }),
+      ]);
+      mockExclusions.recomputeForUser.mockRejectedValue(
+        new Error("compute failed")
+      );
+
+      await expect(
+        updateUserStashInstances(
+          reqFor(updateUserStashInstances, {
+            user: USER,
+            body: { instanceIds: ["A"] },
+          }),
+          resFor(updateUserStashInstances)
+        )
+      ).rejects.toThrow("compute failed");
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.userStashInstance.createMany).toHaveBeenLastCalledWith({
+        data: [{ userId: USER.id, instanceId: "B" }],
+      });
+      expect(logger.error).toHaveBeenCalled();
     });
 
     it("recomputes the user's exclusions in the same request, after the selection is stored", async () => {
