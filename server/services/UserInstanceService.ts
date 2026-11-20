@@ -114,8 +114,10 @@ export async function getUserInstanceScope(userId: number): Promise<string[]> {
  * The users whose scope includes `instanceId` in either of its enabled
  * states: those whose selection names it, and those whose selection names
  * no other enabled instance (no selection at all, or only disabled ones),
- * who see every enabled instance; a limited USER without access to the
- * instance is left out of both. These are the users a change to the
+ * who see every enabled instance, and a limited USER allowed the instance
+ * (a selection of servers they are not allowed falls back to the allowed
+ * ones; a superset costs one extra recompute); a limited USER without access
+ * to the instance is left out of all of them. These are the users a change to the
  * instance's enabled state, or its deletion, affects; read them before a
  * deletion removes the selection rows.
  *
@@ -133,6 +135,14 @@ export async function getUsersSelecting(instanceId: string): Promise<number[]> {
               stashInstances: {
                 none: { instance: { enabled: true, id: { not: instanceId } } },
               },
+            },
+            // A limited USER's selection that names no allowed instance falls
+            // back to every allowed one, this one included, whatever the
+            // selection names
+            {
+              role: "USER",
+              instanceAccessLimited: true,
+              instanceAccess: { some: { instanceId } },
             },
           ],
         },

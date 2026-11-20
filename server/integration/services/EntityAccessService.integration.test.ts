@@ -361,7 +361,21 @@ describeWithDb("EntityAccessService (integration)", () => {
           `selection [${selection.join(",")}]`
         ).toBe(affected);
       }
+
+      // A limited user allowed only A whose selection names another enabled
+      // instance (B) falls back to A, so a change to A affects them
+      await setAccess(w, true, [FX.A]);
+      await prisma.userStashInstance.deleteMany({ where: { userId: w } });
+      await prisma.userStashInstance.create({
+        data: { userId: w, instanceId: FX.B },
+      });
+      expect(await getUserAllowedInstanceIds(w)).toEqual([FX.A]);
+      expect((await getUsersSelecting(FX.A)).includes(w)).toBe(true);
+      // ... and one not allowed A never sees it, whatever they select
+      await setAccess(w, true, [FX.B]);
+      expect((await getUsersSelecting(FX.A)).includes(w)).toBe(false);
     } finally {
+      await setAccess(w, false, []);
       await prisma.userStashInstance.deleteMany({ where: { userId: w } });
     }
   });

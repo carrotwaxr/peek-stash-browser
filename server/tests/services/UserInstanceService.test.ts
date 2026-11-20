@@ -266,6 +266,12 @@ describe("UserInstanceService", () => {
                     },
                   },
                 },
+                // A limited USER allowed it falls back to it whatever they select
+                {
+                  role: "USER",
+                  instanceAccessLimited: true,
+                  instanceAccess: { some: { instanceId: "instance-a" } },
+                },
               ],
             },
             // A limited USER without access to the instance never selects it
