@@ -2,7 +2,7 @@
  * Unit Tests for Auth Middleware Functions
  *
  * Tests authenticate, authenticateToken, requireAdmin, requireCacheReady and
- * isLibraryReady with mocked Prisma and UserInstanceService.
+ * libraryReadiness with mocked Prisma and UserInstanceService.
  * Covers proxy auth flow, JWT token validation, token refresh, role checks,
  * and cache readiness.
  */
@@ -24,7 +24,7 @@ import {
   authenticate,
   authenticateToken,
   generateToken,
-  isLibraryReady,
+  libraryReadiness,
   requireAdmin,
   requireCacheReady,
   requirePickerReady,
@@ -36,6 +36,8 @@ import { libraryStampFor } from "../../services/LibraryStamp.js";
 import {
   getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
+  getUserInstanceAccess,
+  getUserInstanceScope,
 } from "../../services/UserInstanceService.js";
 import type { TypedLibraryRequest } from "../../types/api/express.js";
 import {
@@ -62,6 +64,8 @@ vi.mock(
 vi.mock("../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn(),
   getEnabledSyncedInstanceIds: vi.fn(),
+  getUserInstanceScope: vi.fn(),
+  getUserInstanceAccess: vi.fn(),
 }));
 
 // Mock logger
@@ -78,6 +82,8 @@ vi.mock("../../utils/logger.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 const mockEnabledSynced = vi.mocked(getEnabledSyncedInstanceIds);
+const mockScope = vi.mocked(getUserInstanceScope);
+const mockAccess = vi.mocked(getUserInstanceAccess);
 
 /** The list a readiness middleware put on the request, if any */
 function allowedOn(req: object): readonly string[] | undefined {
@@ -116,6 +122,9 @@ describe("Auth Middleware", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // An unlimited user whose instances are still on their first sync
+    mockScope.mockResolvedValue(["inst-a"]);
+    mockAccess.mockResolvedValue(null);
     nextFn = vi.fn<() => void>();
     // Reset env
     delete process.env.PROXY_AUTH_HEADER;
@@ -830,16 +839,54 @@ describe("Auth Middleware", () => {
     });
   });
 
-  describe("isLibraryReady", () => {
-    it("is false while the user has no instance past its first sync, and true once one is", async () => {
-      mockAllowedInstances.mockResolvedValue([]);
-      await expect(isLibraryReady(MOCK_USER.id)).resolves.toBe(false);
-
+  describe("libraryReadiness", () => {
+    it("is ready once the user has an instance past its first sync", async () => {
       mockAllowedInstances.mockResolvedValue(["inst-a"]);
-      await expect(isLibraryReady(MOCK_USER.id)).resolves.toBe(true);
+      await expect(libraryReadiness(MOCK_USER.id)).resolves.toEqual({
+        ready: true,
+      });
+      expect(mockAllowedInstances).toHaveBeenCalledExactlyOnceWith(
+        MOCK_USER.id
+      );
+    });
 
-      expect(mockAllowedInstances).toHaveBeenCalledTimes(2);
-      expect(mockAllowedInstances).toHaveBeenLastCalledWith(MOCK_USER.id);
+    it("says initializing while the user's instances are on their first sync", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      await expect(libraryReadiness(MOCK_USER.id)).resolves.toEqual({
+        ready: false,
+        reason: "initializing",
+      });
+    });
+
+    it("says initializing for a limited user whose allowed instance is on its first sync", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      mockScope.mockResolvedValue(["inst-a"]);
+      mockAccess.mockResolvedValue(["inst-a"]);
+      await expect(libraryReadiness(MOCK_USER.id)).resolves.toEqual({
+        ready: false,
+        reason: "initializing",
+      });
+    });
+
+    it("says noAccess for a limited user with no accessible enabled instance", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      mockScope.mockResolvedValue([]);
+      mockAccess.mockResolvedValue([]);
+      await expect(libraryReadiness(MOCK_USER.id)).resolves.toEqual({
+        ready: false,
+        reason: "noAccess",
+      });
+      expect(mockScope).toHaveBeenCalledExactlyOnceWith(MOCK_USER.id);
+    });
+
+    it("says initializing, not noAccess, for an unlimited user with an empty scope (no instance at all)", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      mockScope.mockResolvedValue([]);
+      mockAccess.mockResolvedValue(null);
+      await expect(libraryReadiness(MOCK_USER.id)).resolves.toEqual({
+        ready: false,
+        reason: "initializing",
+      });
     });
   });
 
@@ -874,8 +921,44 @@ describe("Auth Middleware", () => {
         error: "Server is initializing",
         message: "Cache is still loading. Please wait a moment and try again.",
         ready: false,
+        reason: "initializing",
       });
       expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("answers 503 noAccess for a limited user with no accessible enabled instance", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      mockScope.mockResolvedValue([]);
+      mockAccess.mockResolvedValue([]);
+      const req = createMockReq({ user: MOCK_USER });
+      const { res, statusFn, jsonFn } = createMockRes();
+
+      await requireCacheReady(req, res, nextFn);
+
+      expect(statusFn).toHaveBeenCalledWith(503);
+      expect(jsonFn).toHaveBeenCalledWith({
+        error: "No Stash servers available",
+        message:
+          "No Stash server is open to this account. Ask an admin for access.",
+        ready: false,
+        reason: "noAccess",
+      });
+      expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("requirePickerReady answers 503 noAccess for a limited user with no accessible instance", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      mockScope.mockResolvedValue([]);
+      mockAccess.mockResolvedValue([]);
+      const req = createMockReq({ user: MOCK_USER, body: {} });
+      const { res, statusFn, jsonFn } = createMockRes();
+
+      await requirePickerReady(req, res, nextFn);
+
+      expect(statusFn).toHaveBeenCalledWith(503);
+      expect(jsonFn).toHaveBeenCalledWith(
+        expect.objectContaining({ ready: false, reason: "noAccess" })
+      );
     });
 
     it("requireCacheReady passes a failed instance lookup on (next(error) or a rejection), never the 503 initializing answer", async () => {

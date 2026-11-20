@@ -247,8 +247,21 @@ describe("Per-user Stash server access (integration)", () => {
     });
     expect(put.status).toBe(200);
 
-    const listed = await scenesListedTo(other.client);
-    expect(listed.scenes).toEqual([]);
-    expect(listed.count).toBe(0);
+    const res = await other.client.post<{
+      error?: string;
+      ready?: unknown;
+      reason?: unknown;
+    }>("/api/library/scenes", { filter: { page: 1, per_page: PAGE } });
+    expect(res.status).toBe(503);
+    expect(res.data).toMatchObject({
+      error: "No Stash servers available",
+      ready: false,
+      reason: "noAccess",
+    });
+
+    // The client's re-check says the same, so its poll picks up a grant
+    const ready = await other.client.get("/api/library/ready");
+    expect(ready.status).toBe(200);
+    expect(ready.data).toEqual({ ready: false, reason: "noAccess" });
   });
 });

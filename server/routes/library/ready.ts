@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate, isLibraryReady } from "../../middleware/auth.js";
+import { authenticate, libraryReadiness } from "../../middleware/auth.js";
 import type {
   LibraryReadyResponse,
   TypedAuthRequest,
@@ -11,14 +11,15 @@ const router = express.Router();
 
 /**
  * Whether the user's library can be shown yet: the test `requireCacheReady`
- * answers 503 `ready: false` on. The client re-checks it every 5 seconds
- * while the library is initializing, and loads the library once it is true.
+ * answers 503 `ready: false` on, with `reason` when it is not ready. The
+ * client re-checks it every 5 seconds while the library is not ready, and
+ * loads the library once it is true.
  */
 export const getLibraryReady = async (
   req: TypedAuthRequest,
   res: TypedResponse<LibraryReadyResponse>
 ) => {
-  res.json({ ready: await isLibraryReady(req.user.id) });
+  res.json(await libraryReadiness(req.user.id));
 };
 
 router.get("/ready", authenticate, authenticated(getLibraryReady));
