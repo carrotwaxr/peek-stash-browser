@@ -2,6 +2,9 @@
 export type {
   ApplyDeletionsRequest,
   ApplyDeletionsResponse,
+  ReprobeClipsResponse,
+  ReprobeClipsResult,
+  ReprobeMisses,
   SyncJob,
   SyncEntityState,
   SyncEntityType,

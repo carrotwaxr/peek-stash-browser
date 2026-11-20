@@ -20,7 +20,10 @@ import {
 } from "../../graphql/StashClient.js";
 import { CriterionModifier } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
-import { clipPreviewProber } from "../../services/ClipPreviewProber.js";
+import {
+  type ProbeOutcome,
+  clipPreviewProber,
+} from "../../services/ClipPreviewProber.js";
 import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
 import {
   UnknownInstanceError,
@@ -272,6 +275,7 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
 vi.mock("../../services/ClipPreviewProber.js", () => ({
   clipPreviewProber: {
     probeBatch: vi.fn().mockResolvedValue(new Map()),
+    probeBatchDetailed: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -1653,6 +1657,13 @@ describe("StashSyncService deleteInstance guard", () => {
 
 describe("StashSyncService reProbeUngeneratedClips", () => {
   const PREVIEW = "http://stash-b:9999/scene/1/scene_marker/7/stream";
+  const NO_MISSES = {
+    placeholder: 0,
+    notFound: 0,
+    tooSmall: 0,
+    fetchError: 0,
+    noPreviewPath: 0,
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1668,18 +1679,118 @@ describe("StashSyncService reProbeUngeneratedClips", () => {
     mockPrisma.stashClip.findMany.mockResolvedValue([
       partialRow({ id: "7", previewPath: PREVIEW }),
     ]);
-    vi.mocked(clipPreviewProber.probeBatch).mockResolvedValueOnce(
-      new Map([[`${PREVIEW}?apikey=key-b`, true]])
+    vi.mocked(clipPreviewProber.probeBatchDetailed).mockResolvedValueOnce(
+      new Map([[`${PREVIEW}?apikey=key-b`, { generated: true }]])
     );
 
     expect(await stashSyncService.reProbeUngeneratedClips("inst-b")).toEqual({
       checked: 1,
       updated: 1,
+      misses: NO_MISSES,
     });
     expect(stashInstanceManager.getCredentials).toHaveBeenCalledWith("inst-b");
-    expect(clipPreviewProber.probeBatch).toHaveBeenCalledWith([
+    expect(clipPreviewProber.probeBatchDetailed).toHaveBeenCalledWith([
       `${PREVIEW}?apikey=key-b`,
     ]);
+  });
+
+  it("counts each miss by reason, and clips with no preview path", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    vi.mocked(stashInstanceManager.getCredentials).mockReturnValueOnce({
+      baseUrl: "http://stash-b:9999",
+      apiKey: "key-b",
+    });
+    const url = (id: string) => `${PREVIEW}/${id}?apikey=key-b`;
+    mockPrisma.stashClip.findMany.mockResolvedValue(
+      Array.from({ length: 10 }, (_, i) =>
+        partialRow({
+          id: String(i + 1),
+          // Clip 9 has no path; clip 10 has a fragment, which cannot be built
+          // into a URL
+          previewPath:
+            i === 8
+              ? null
+              : i === 9
+                ? "http://old-host:9999/x#frag"
+                : `${PREVIEW}/${i + 1}`,
+        })
+      )
+    );
+    mockPrisma.stashClip.update.mockResolvedValue(partialRow({}));
+    vi.mocked(clipPreviewProber.probeBatchDetailed).mockResolvedValueOnce(
+      new Map<string, ProbeOutcome>([
+        [url("1"), { generated: true }],
+        [url("2"), { generated: false, reason: "placeholder" }],
+        [url("3"), { generated: false, reason: "placeholder" }],
+        [url("4"), { generated: false, reason: "not_found", status: 404 }],
+        [url("5"), { generated: false, reason: "too_small" }],
+        [
+          url("6"),
+          {
+            generated: false,
+            reason: "fetch_error",
+            status: 401,
+            error: "Stash answered HTTP 401",
+          },
+        ],
+        [
+          url("7"),
+          { generated: false, reason: "fetch_error", error: "Timed out" },
+        ],
+        [url("8"), { generated: false, reason: "not_found", status: 404 }],
+      ])
+    );
+    const info = vi.spyOn(logger, "info");
+
+    try {
+      expect(await stashSyncService.reProbeUngeneratedClips("inst-b")).toEqual({
+        checked: 10,
+        updated: 1,
+        misses: {
+          placeholder: 2,
+          notFound: 2,
+          tooSmall: 1,
+          fetchError: 2,
+          noPreviewPath: 2,
+        },
+        firstError: "Stash answered HTTP 401",
+      });
+
+      // One summary line per instance, with the breakdown and no secrets
+      const summaries = info.mock.calls.filter(([message]) =>
+        message.startsWith("Re-probe complete")
+      );
+      expect(summaries).toHaveLength(1);
+      const text = JSON.stringify(info.mock.calls);
+      expect(text).toContain("Stash answered HTTP 401");
+      expect(text).not.toContain("key-b");
+    } finally {
+      info.mockRestore();
+    }
+  });
+
+  it("a clip whose URL is shared by another still counts once each", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    vi.mocked(stashInstanceManager.getCredentials).mockReturnValueOnce({
+      baseUrl: "http://stash-b:9999",
+      apiKey: "key-b",
+    });
+    mockPrisma.stashClip.findMany.mockResolvedValue([
+      partialRow({ id: "1", previewPath: PREVIEW }),
+      partialRow({ id: "2", previewPath: PREVIEW }),
+    ]);
+    mockPrisma.stashClip.update.mockResolvedValue(partialRow({}));
+    vi.mocked(clipPreviewProber.probeBatchDetailed).mockResolvedValueOnce(
+      new Map([[`${PREVIEW}?apikey=key-b`, { generated: true }]])
+    );
+
+    expect(await stashSyncService.reProbeUngeneratedClips("inst-b")).toEqual({
+      checked: 2,
+      updated: 2,
+      misses: NO_MISSES,
+    });
   });
 
   it("re-probe URLs use the instance's base URL", async () => {
@@ -1696,13 +1807,15 @@ describe("StashSyncService reProbeUngeneratedClips", () => {
       }),
       partialRow({ id: "8", previewPath: "http://old-host:9999/x#frag" }),
     ]);
-    vi.mocked(clipPreviewProber.probeBatch).mockResolvedValueOnce(new Map());
+    vi.mocked(clipPreviewProber.probeBatchDetailed).mockResolvedValueOnce(
+      new Map()
+    );
 
     await stashSyncService.reProbeUngeneratedClips("inst-b");
 
     // The key goes to the address the instance has now, never the stored
     // host; a path holding # is not probed
-    expect(clipPreviewProber.probeBatch).toHaveBeenCalledWith([
+    expect(clipPreviewProber.probeBatchDetailed).toHaveBeenCalledWith([
       "http://stash-b:9999/scene/1/scene_marker/7/stream?t=1&apikey=key-b",
     ]);
   });
@@ -1718,14 +1831,20 @@ describe("StashSyncService reProbeUngeneratedClips", () => {
     mockPrisma.stashClip.findMany.mockResolvedValue(
       ids.map((id) => partialRow({ id, previewPath: `${PREVIEW}/${id}` }))
     );
-    vi.mocked(clipPreviewProber.probeBatch).mockResolvedValueOnce(
-      new Map(ids.map((id) => [`${PREVIEW}/${id}?apikey=key-b`, true]))
+    vi.mocked(clipPreviewProber.probeBatchDetailed).mockResolvedValueOnce(
+      new Map(
+        ids.map((id) => [
+          `${PREVIEW}/${id}?apikey=key-b`,
+          { generated: true } as const,
+        ])
+      )
     );
     mockPrisma.stashClip.update.mockResolvedValue(partialRow({}));
 
     expect(await stashSyncService.reProbeUngeneratedClips("inst-b")).toEqual({
       checked: 450,
       updated: 450,
+      misses: NO_MISSES,
     });
 
     // 200 + 200 + 50: no unit holds the write lock for the whole library
@@ -1750,9 +1869,9 @@ describe("StashSyncService reProbeUngeneratedClips", () => {
     try {
       expect(
         await stashSyncService.reProbeUngeneratedClips("inst-gone")
-      ).toEqual({ checked: 0, updated: 0 });
+      ).toEqual({ checked: 0, updated: 0, misses: NO_MISSES });
       expect(mockPrisma.stashClip.findMany).not.toHaveBeenCalled();
-      expect(clipPreviewProber.probeBatch).not.toHaveBeenCalled();
+      expect(clipPreviewProber.probeBatchDetailed).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledWith(
         "Re-probe skipped: the Stash instance is not loaded",
         { stashInstanceId: "inst-gone" }

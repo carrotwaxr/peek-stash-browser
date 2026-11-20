@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import type { ReprobeClipsResponse, ReprobeMisses } from "@peek/shared-types";
 import { Clock, Cpu, Database, Film, HardDrive, RefreshCw } from "lucide-react";
 import { apiGet, apiPost } from "../../api";
 import { ApiError } from "../../api/client";
@@ -43,8 +44,51 @@ interface ServerStats {
 }
 
 type ReprobeResult =
-  | { success: true; checked: number; updated: number }
+  | { success: true; data: ReprobeClipsResponse }
   | { success: false; message: string };
+
+const countOf = (n: number, one: string, many: string) =>
+  `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+/** The next step for the admin, from the biggest cause of the misses */
+function reprobeHint(data: ReprobeClipsResponse): string | null {
+  const { placeholder, notFound, tooSmall, fetchError } = data.misses;
+  const pending = placeholder + tooSmall;
+  const biggest = Math.max(fetchError, pending, notFound);
+  if (biggest === 0) return null;
+  if (fetchError === biggest) {
+    const first = data.firstError ? ` (first error: ${data.firstError})` : "";
+    return `Peek couldn't reach ${countOf(fetchError, "preview", "previews")} on Stash${first}. Check the Stash URL and API key under Settings > Server Configuration > Stash Instances.`;
+  }
+  if (pending === biggest) {
+    return `Stash hasn't generated ${countOf(pending, "marker preview", "marker previews")} yet. Run Generate > Marker Previews in Stash (Settings > Tasks), then re-probe.`;
+  }
+  return `Stash has no preview file for ${countOf(notFound, "clip", "clips")}. Run Generate > Marker Previews in Stash, then re-probe.`;
+}
+
+/** The clips still without a preview, by cause, as one sentence; null when none */
+function reprobeBreakdown(misses: ReprobeMisses): string | null {
+  const causes: Array<[number, string]> = [
+    [misses.placeholder, "waiting on Stash to generate"],
+    [misses.tooSmall, "too small"],
+    [misses.notFound, "not found"],
+    [misses.fetchError, "unreachable"],
+    [misses.noPreviewPath, "with no preview address"],
+  ];
+  const parts = causes
+    .filter(([n]) => n > 0)
+    .map(([n, label]) => `${n.toLocaleString()} ${label}`);
+  return parts.length > 0
+    ? `Still without a preview: ${parts.join(", ")}.`
+    : null;
+}
+
+const missCount = (misses: ReprobeMisses) =>
+  misses.placeholder +
+  misses.notFound +
+  misses.tooSmall +
+  misses.fetchError +
+  misses.noPreviewPath;
 
 interface Props {
   /**
@@ -115,15 +159,12 @@ const ServerStatsSection = ({ onSyncStarted }: Props) => {
     try {
       setReprobingClips(true);
       setReprobeResult(null);
-      const data = await apiPost<{ checked: number; updated: number }>(
+      // No instance named: the server re-probes every enabled one
+      const data = await apiPost<ReprobeClipsResponse>(
         "/sync/reprobe-clips",
         {}
       );
-      setReprobeResult({
-        success: true,
-        checked: data.checked,
-        updated: data.updated,
-      });
+      setReprobeResult({ success: true, data });
       // Reload stats to reflect updated counts
       void loadStats();
     } catch (err) {
@@ -346,17 +387,42 @@ const ServerStatsSection = ({ onSyncStarted }: Props) => {
                 Stash. Click &quot;Re-probe Clips&quot; to check if previews are
                 now available.
               </StatusMessage>
-              {reprobeResult && (
+              {reprobeResult && !reprobeResult.success && (
                 <StatusMessage
-                  variant={reprobeResult.success ? "success" : "error"}
+                  variant="error"
                   title={null}
                   className="mt-3 text-sm"
-                  message={
-                    reprobeResult.success
-                      ? `Checked ${reprobeResult.checked.toLocaleString()} clips, ${reprobeResult.updated.toLocaleString()} now have previews`
-                      : reprobeResult.message
-                  }
+                  message={reprobeResult.message}
                 />
+              )}
+              {reprobeResult?.success && (
+                <StatusMessage
+                  variant={
+                    missCount(reprobeResult.data.misses) > 0 &&
+                    reprobeResult.data.updated === 0
+                      ? "warning"
+                      : "success"
+                  }
+                  title={null}
+                  className="mt-3 text-sm"
+                >
+                  <p>
+                    {`Checked ${reprobeResult.data.checked.toLocaleString()} clips, ${reprobeResult.data.updated.toLocaleString()} now have previews.`}
+                  </p>
+                  {reprobeBreakdown(reprobeResult.data.misses) && (
+                    <p className="mt-1">
+                      {reprobeBreakdown(reprobeResult.data.misses)}
+                    </p>
+                  )}
+                  {reprobeHint(reprobeResult.data) && (
+                    <p
+                      className="mt-1"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {reprobeHint(reprobeResult.data)}
+                    </p>
+                  )}
+                </StatusMessage>
               )}
             </div>
           </>

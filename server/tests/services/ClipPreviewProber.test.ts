@@ -1,8 +1,10 @@
+import crypto from "crypto";
 import { EventEmitter } from "events";
 import http from "http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClipPreviewProber } from "../../services/ClipPreviewProber.js";
 import { logger } from "../../utils/logger.js";
+import { stringContaining } from "../helpers/matchers.js";
 
 describe("ClipPreviewProber", () => {
   describe("probePreviewUrl", () => {
@@ -38,6 +40,61 @@ describe("ClipPreviewProber", () => {
         "http://httpbin.org/delay/10"
       );
       expect(result).toBe(false);
+    });
+  });
+
+  describe("probePreviewOutcome", () => {
+    it("reports a network failure as fetch_error without the URL or key", async () => {
+      const prober = new ClipPreviewProber({ timeoutMs: 1000 });
+      // Port 1: connection refused
+      const outcome = await prober.probePreviewOutcome(
+        "http://127.0.0.1:1/scene/1/preview?apikey=SECRETKEY"
+      );
+
+      expect(outcome).toMatchObject({
+        generated: false,
+        reason: "fetch_error",
+      });
+      const text = JSON.stringify(outcome);
+      expect(text).toContain("ECONNREFUSED");
+      expect(text).not.toContain("SECRETKEY");
+      expect(text).not.toContain("127.0.0.1:1/scene");
+    });
+
+    it("reports an unparsable URL as fetch_error without the URL", async () => {
+      const prober = new ClipPreviewProber({ timeoutMs: 1000 });
+      const outcome = await prober.probePreviewOutcome(
+        "not a url?apikey=SECRETKEY"
+      );
+
+      expect(outcome).toMatchObject({
+        generated: false,
+        reason: "fetch_error",
+      });
+      expect(JSON.stringify(outcome)).not.toContain("SECRETKEY");
+    });
+  });
+
+  describe("probeBatchDetailed", () => {
+    it("returns an outcome per URL", async () => {
+      const prober = new ClipPreviewProber({
+        maxConcurrent: 2,
+        timeoutMs: 1000,
+      });
+      const urls = ["http://127.0.0.1:1/a", "http://127.0.0.1:1/b"];
+      const results = await prober.probeBatchDetailed(urls);
+      expect(results.size).toBe(2);
+      for (const url of urls) {
+        expect(results.get(url)).toMatchObject({
+          generated: false,
+          reason: "fetch_error",
+        });
+      }
+    });
+
+    it("handles an empty URL list", async () => {
+      const prober = new ClipPreviewProber();
+      expect((await prober.probeBatchDetailed([])).size).toBe(0);
     });
   });
 
@@ -199,6 +256,144 @@ describe("ClipPreviewProber", () => {
         `http://localhost:${port}/404`
       );
       expect(result).toBe(false);
+    });
+  });
+
+  describe("outcome reasons", () => {
+    let server: http.Server;
+    let port: number;
+    const placeholderBody = Buffer.alloc(1199, 0);
+
+    beforeEach(() => {
+      return new Promise<void>((resolve) => {
+        server = http.createServer((req, res) => {
+          const url = req.url ?? "";
+          const send = (body: Buffer) => {
+            if (req.headers.range) {
+              res.writeHead(206, {
+                "Content-Range": `bytes 0-0/${body.length}`,
+                "Content-Length": "1",
+              });
+              res.end(body.subarray(0, 1));
+            } else {
+              res.writeHead(200, { "Content-Length": String(body.length) });
+              res.end(body);
+            }
+          };
+          if (url.startsWith("/big")) send(Buffer.alloc(10000, "x"));
+          else if (url.startsWith("/tiny")) send(Buffer.alloc(100, "y"));
+          else if (url.startsWith("/placeholder")) send(placeholderBody);
+          else if (url.startsWith("/denied")) {
+            res.writeHead(401);
+            res.end();
+          } else if (url.startsWith("/boom")) {
+            res.writeHead(500);
+            res.end();
+          } else {
+            res.writeHead(404);
+            res.end();
+          }
+        });
+        server.listen(0, () => {
+          const address = server.address();
+          if (address && typeof address !== "string") port = address.port;
+          resolve();
+        });
+      });
+    });
+
+    afterEach(() => {
+      return new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
+    });
+
+    const outcome = (path: string) =>
+      new ClipPreviewProber({ timeoutMs: 5000 }).probePreviewOutcome(
+        `http://localhost:${port}${path}?apikey=SECRETKEY`
+      );
+
+    it("a real preview is generated", async () => {
+      expect(await outcome("/big")).toEqual({ generated: true });
+    });
+
+    it("a 404 is not_found", async () => {
+      expect(await outcome("/missing")).toEqual({
+        generated: false,
+        reason: "not_found",
+        status: 404,
+      });
+    });
+
+    it("another status is a fetch_error carrying it", async () => {
+      expect(await outcome("/denied")).toEqual({
+        generated: false,
+        reason: "fetch_error",
+        status: 401,
+        error: "Stash answered HTTP 401",
+      });
+      expect(await outcome("/boom")).toEqual({
+        generated: false,
+        reason: "fetch_error",
+        status: 500,
+        error: "Stash answered HTTP 500",
+      });
+    });
+
+    it("a small file that is not the placeholder is too_small", async () => {
+      expect(await outcome("/tiny")).toEqual({
+        generated: false,
+        reason: "too_small",
+      });
+    });
+
+    it("the 1199-byte placeholder is a placeholder", async () => {
+      // The prober compares the body's MD5 to Stash's placeholder hash
+      const md5 = vi.spyOn(crypto, "createHash").mockReturnValue({
+        update: () => ({
+          digest: () => "c4a2e6b6547057dd0ef0c7d7e3c420d4",
+        }),
+      } as unknown as ReturnType<typeof crypto.createHash>);
+      try {
+        expect(await outcome("/placeholder")).toEqual({
+          generated: false,
+          reason: "placeholder",
+        });
+      } finally {
+        md5.mockRestore();
+      }
+    });
+
+    it("a timeout is a fetch_error", async () => {
+      const slow = http.createServer(() => {
+        // never answers
+      });
+      await new Promise<void>((r) => slow.listen(0, r));
+      const slowPort = (slow.address() as { port: number }).port;
+      try {
+        const result = await new ClipPreviewProber({
+          timeoutMs: 50,
+        }).probePreviewOutcome(`http://localhost:${slowPort}/x?apikey=K`);
+        expect(result).toMatchObject({
+          generated: false,
+          reason: "fetch_error",
+          error: stringContaining("Timed out"),
+        });
+      } finally {
+        slow.closeAllConnections();
+        await new Promise<void>((r) => slow.close(() => r()));
+      }
+    });
+
+    it("probeBatch and probePreviewUrl still answer with booleans", async () => {
+      const prober = new ClipPreviewProber({ timeoutMs: 5000 });
+      const big = `http://localhost:${port}/big`;
+      const gone = `http://localhost:${port}/gone`;
+      expect(await prober.probePreviewUrl(big)).toBe(true);
+      expect(await prober.probePreviewUrl(gone)).toBe(false);
+      const batch = await prober.probeBatch([big, gone]);
+      expect(batch.get(big)).toBe(true);
+      expect(batch.get(gone)).toBe(false);
     });
   });
 

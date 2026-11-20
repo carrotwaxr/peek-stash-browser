@@ -4712,7 +4712,7 @@ interface ApplyDeletionsResponse {
 
 Re-probe clips that were synced before previews were generated (admin only)
 
-Body: { instanceId?: string } If instanceId is not provided, uses the first enabled instance
+Body: { instanceId?: string } Without an instanceId every enabled instance is re-probed, one after another, and the results are summed; a named instance must be loaded (404). The answer breaks the clips that still have no preview down by cause (`misses`) and carries the first fetch error's text (`firstError`, prefixed with its instance's name when several instances were re-probed).
 
 **Authentication:** Admin
 

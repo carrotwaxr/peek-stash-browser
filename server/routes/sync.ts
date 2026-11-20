@@ -27,6 +27,9 @@ import type { TypedRequest, TypedResponse } from "../types/api/express.js";
 import type {
   ApplyDeletionsRequest,
   ApplyDeletionsResponse,
+  ReprobeClipsResponse,
+  ReprobeClipsResult,
+  ReprobeMisses,
   SyncStatusResponse,
 } from "../types/api/sync.js";
 import { authenticated } from "../utils/routeHelpers.js";
@@ -197,58 +200,82 @@ router.post(
  * Re-probe clips that were synced before previews were generated (admin only)
  *
  * Body: { instanceId?: string }
- * If instanceId is not provided, uses the first enabled instance
+ * Without an instanceId every enabled instance is re-probed, one after
+ * another, and the results are summed; a named instance must be loaded (404).
+ * The answer breaks the clips that still have no preview down by cause
+ * (`misses`) and carries the first fetch error's text (`firstError`, prefixed
+ * with its instance's name when several instances were re-probed).
  */
 router.post(
   "/reprobe-clips",
   requireAdmin,
-  authenticated(async (req, res) => {
-    if (stashSyncService.isSyncing()) {
-      res.status(409).json({
-        error: "Sync in progress",
-        message: "Cannot re-probe clips while a sync is running",
+  authenticated(
+    async (
+      req: TypedRequest<{ instanceId?: string } | undefined>,
+      res: TypedResponse<ReprobeClipsResponse | ApiErrorResponse>
+    ) => {
+      if (stashSyncService.isSyncing()) {
+        res.status(409).json({
+          error: "Sync in progress",
+          message: "Cannot re-probe clips while a sync is running",
+        });
+        return;
+      }
+
+      const { instanceId } = req.body ?? {};
+
+      // A named instance must be one that is loaded (404 otherwise)
+      if (instanceId && !stashInstanceManager.get(instanceId)) {
+        throw new UnknownInstanceError(instanceId);
+      }
+
+      const targets = instanceId
+        ? [{ id: instanceId, name: instanceId }]
+        : stashInstanceManager.getAllEnabled();
+      if (targets.length === 0) {
+        res.status(400).json({
+          error: "No Stash instances",
+          message: "No enabled Stash instances found",
+        });
+        return;
+      }
+
+      const total: ReprobeClipsResult = {
+        checked: 0,
+        updated: 0,
+        misses: {
+          placeholder: 0,
+          notFound: 0,
+          tooSmall: 0,
+          fetchError: 0,
+          noPreviewPath: 0,
+        },
+      };
+      for (const target of targets) {
+        const result = await stashSyncService.reProbeUngeneratedClips(
+          target.id
+        );
+        total.checked += result.checked;
+        total.updated += result.updated;
+        for (const cause of Object.keys(total.misses) as Array<
+          keyof ReprobeMisses
+        >) {
+          total.misses[cause] += result.misses[cause];
+        }
+        if (result.firstError !== undefined && total.firstError === undefined) {
+          total.firstError = instanceId
+            ? result.firstError
+            : `${target.name}: ${result.firstError}`;
+        }
+      }
+
+      res.json({
+        ok: true,
+        ...total,
+        message: `Re-probed ${total.checked} clips, ${total.updated} now have previews`,
       });
-      return;
     }
-
-    const { instanceId } = (req.body ?? {}) as { instanceId?: string };
-
-    // A named instance must be one that is loaded (404 otherwise)
-    if (instanceId && !stashInstanceManager.get(instanceId)) {
-      throw new UnknownInstanceError(instanceId);
-    }
-
-    // If no instance specified, get the first enabled instance
-    let targetInstanceId: string | undefined = instanceId;
-    if (!targetInstanceId) {
-      const enabledInstances = stashInstanceManager.getAllEnabled();
-      if (enabledInstances.length === 0) {
-        res.status(400).json({
-          error: "No Stash instances",
-          message: "No enabled Stash instances found",
-        });
-        return;
-      }
-      const firstInstance = enabledInstances[0];
-      if (!firstInstance) {
-        res.status(400).json({
-          error: "No Stash instances",
-          message: "No enabled Stash instances found",
-        });
-        return;
-      }
-      targetInstanceId = firstInstance.id;
-    }
-
-    const result =
-      await stashSyncService.reProbeUngeneratedClips(targetInstanceId);
-
-    res.json({
-      ok: true,
-      ...result,
-      message: `Re-probed ${result.checked} clips, ${result.updated} now have previews`,
-    });
-  })
+  )
 );
 
 /**
