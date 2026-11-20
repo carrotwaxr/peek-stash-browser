@@ -2,6 +2,7 @@ import type { Download, DownloadStatus, DownloadType } from "@prisma/client";
 import * as fs from "fs";
 import { ForbiddenError, NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
+import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import { fileExtension, safeFileName } from "../utils/contentDisposition.js";
 import { zipPath } from "../utils/downloadPaths.js";
 import { logger } from "../utils/logger.js";
@@ -205,14 +206,21 @@ export class DownloadService {
   }
 
   /**
-   * Get all downloads for a user, sorted by creation date descending.
+   * Get all downloads for a user, sorted by creation date descending. A scene
+   * or image row of an instance the user may no longer use (an admin limited
+   * their servers, or they narrowed their selection) is left out; playlist
+   * rows carry no instance (`""`) and stay.
    */
   async getUserDownloads(
     userId: number,
     limit: number = 20
   ): Promise<Download[]> {
+    const allowed = await getUserAllowedInstanceIds(userId);
     return prisma.download.findMany({
-      where: { userId },
+      where: {
+        userId,
+        OR: [{ instanceId: "" }, { instanceId: { in: allowed } }],
+      },
       orderBy: { createdAt: "desc" },
       take: limit,
     });

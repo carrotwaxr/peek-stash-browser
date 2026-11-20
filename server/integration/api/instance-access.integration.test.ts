@@ -9,6 +9,7 @@
  * The admin's own selection is never touched; the users are this file's own.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
 import type {
   GetUserInstanceAccessResponse,
@@ -192,14 +193,36 @@ describe("Per-user Stash server access (integration)", () => {
     expect(limited.count).toBe(limited.scenes.length);
 
     // The user's own selection cannot reach past the limit: naming only the
-    // second server falls back to the allowed one
-    await user.client.put("/api/user/stash-instances", {
-      instanceIds: [secondInstanceId],
+    // second server is refused
+    const refused = await user.client.put<{ error?: string }>(
+      "/api/user/stash-instances",
+      { instanceIds: [secondInstanceId] }
+    );
+    expect(refused.status).toBe(400);
+    expect(refused.data.error).toBe("Invalid instance IDs");
+
+    // A selection saved before the limit (seeded directly: the endpoint no
+    // longer takes it) falls back to the allowed server, never past it
+    await prisma.userStashInstance.create({
+      data: { userId: user.id, instanceId: secondInstanceId },
     });
-    const selected = await scenesListedTo(user.client);
-    expect(selected.status).toBe(200);
-    expect(instancesOf(selected.scenes)).toEqual([testInstanceId]);
-    await user.client.put("/api/user/stash-instances", { instanceIds: [] });
+    try {
+      const selected = await scenesListedTo(user.client);
+      expect(selected.status).toBe(200);
+      expect(instancesOf(selected.scenes)).toEqual([testInstanceId]);
+      // The user's own list of servers shows only the allowed one, and no
+      // stale selection
+      const own = await user.client.get<{
+        selectedInstanceIds: string[];
+        availableInstances: Array<{ id: string }>;
+      }>("/api/user/stash-instances");
+      expect(own.data.availableInstances.map((i) => i.id)).toEqual([
+        testInstanceId,
+      ]);
+      expect(own.data.selectedInstanceIds).toEqual([]);
+    } finally {
+      await prisma.userStashInstance.deleteMany({ where: { userId: user.id } });
+    }
 
     // The limit lifted: every server again; the kept ids stay for a re-grant
     const lifted = await adminClient.put<UpdateUserInstanceAccessResponse>(

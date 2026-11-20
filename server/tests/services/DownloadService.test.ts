@@ -4,6 +4,7 @@ import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { DownloadService } from "../../services/DownloadService.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userDownloadsDir, zipPath } from "../../utils/downloadPaths.js";
 import { type PlaylistWithItems, downloadRow } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
@@ -15,12 +16,18 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
+// The instances the user may use (selection, access list, first sync)
+vi.mock("../../services/UserInstanceService.js", () => ({
+  getUserAllowedInstanceIds: vi.fn(),
+}));
+
 describe("DownloadService", () => {
   let service: DownloadService;
 
   beforeEach(() => {
     service = new DownloadService();
     vi.clearAllMocks();
+    vi.mocked(getUserAllowedInstanceIds).mockResolvedValue(["inst-1"]);
   });
 
   describe("createSceneDownload", () => {
@@ -373,11 +380,48 @@ describe("DownloadService", () => {
       const result = await service.getUserDownloads(1);
 
       expect(prisma.download.findMany).toHaveBeenCalledWith({
-        where: { userId: 1 },
+        where: {
+          userId: 1,
+          OR: [{ instanceId: "" }, { instanceId: { in: ["inst-1"] } }],
+        },
         orderBy: { createdAt: "desc" },
         take: 20,
       });
       expect(result).toHaveLength(2);
+    });
+
+    it("leaves out scene and image rows of an instance the user may not use, keeping playlist rows (#439)", async () => {
+      vi.mocked(getUserAllowedInstanceIds).mockResolvedValue(["inst-a"]);
+      vi.mocked(prisma.download.findMany).mockResolvedValue([]);
+
+      await service.getUserDownloads(7);
+
+      expect(getUserAllowedInstanceIds).toHaveBeenCalledWith(7);
+      expect(prisma.download.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: 7,
+          // Playlist rows carry no instance; the rest must be an allowed one
+          OR: [{ instanceId: "" }, { instanceId: { in: ["inst-a"] } }],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      });
+    });
+
+    it("keeps only playlist rows for a user with no allowed instance (#439)", async () => {
+      vi.mocked(getUserAllowedInstanceIds).mockResolvedValue([]);
+      vi.mocked(prisma.download.findMany).mockResolvedValue([]);
+
+      await service.getUserDownloads(7);
+
+      expect(prisma.download.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId: 7,
+            OR: [{ instanceId: "" }, { instanceId: { in: [] } }],
+          },
+        })
+      );
     });
 
     it("should respect limit parameter", async () => {
@@ -386,7 +430,10 @@ describe("DownloadService", () => {
       await service.getUserDownloads(1, 50);
 
       expect(prisma.download.findMany).toHaveBeenCalledWith({
-        where: { userId: 1 },
+        where: {
+          userId: 1,
+          OR: [{ instanceId: "" }, { instanceId: { in: ["inst-1"] } }],
+        },
         orderBy: { createdAt: "desc" },
         take: 50,
       });

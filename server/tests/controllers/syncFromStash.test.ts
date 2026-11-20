@@ -8,7 +8,7 @@
  * upserts go in one writer-queue unit. The scene history cases pin the merge
  * of Stash's O and play dates with Peek's.
  */
-import type { User, WatchHistory } from "@prisma/client";
+import type { Prisma, User, WatchHistory } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { syncFromStash } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
@@ -112,6 +112,16 @@ const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockStats = vi.mocked(userStatsService, true);
 const mockRankings = vi.mocked(rankingComputeService, true);
 const mockRecommendations = vi.mocked(recommendationService, true);
+
+/** The target as the access check reads it: flag and allowed servers */
+type LimitedUser = Prisma.UserGetPayload<{
+  select: {
+    role: true;
+    instanceAccessLimited: true;
+    instanceAccess: { select: { instanceId: true } };
+  };
+}> &
+  User;
 
 const ADMIN = { id: 1, username: "admin", role: "ADMIN" };
 const USER = { id: 2, username: "testuser", role: "USER" };
@@ -523,6 +533,44 @@ describe("syncFromStash", () => {
       });
       expect(mockStashClient.findScenes).not.toHaveBeenCalled();
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("imports only the instances a limited target may use (#439)", async () => {
+      const second = stashStub();
+      mockInstanceManager.getAll.mockReturnValue([
+        [INSTANCE, partialRow(mockStashClient)],
+        ["instance-2", partialRow(second)],
+      ]);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow<LimitedUser>({
+          id: TARGET_USER_ID,
+          role: "USER",
+          instanceAccessLimited: true,
+          instanceAccess: [{ instanceId: "instance-2" }],
+        })
+      );
+      const res = await run(DEFAULT_OPTIONS);
+
+      expect(res._getOkBody().success).toBe(true);
+      // Only the allowed instance's client is asked
+      expect(second.findPerformers).toHaveBeenCalled();
+      expect(mockStashClient.findPerformers).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 for a limited target with no server, reading no Stash (#439)", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow<LimitedUser>({
+          id: TARGET_USER_ID,
+          role: "USER",
+          instanceAccessLimited: true,
+          instanceAccess: [],
+        })
+      );
+      const res = await run(DEFAULT_OPTIONS);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toMatch(/no Stash instance/i);
+      expect(mockStashClient.findScenes).not.toHaveBeenCalled();
     });
 
     it("returns 400 when no Stash instances configured", async () => {

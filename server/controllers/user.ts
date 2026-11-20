@@ -61,6 +61,7 @@ import {
   isHideableEntityType,
   userHiddenEntityService,
 } from "../services/UserHiddenEntityService.js";
+import { getUserInstanceAccess as readInstanceAccess } from "../services/UserInstanceService.js";
 import {
   RESTRICTABLE_ENTITY_TYPES,
   RESTRICTION_MODES,
@@ -1635,9 +1636,21 @@ export const syncFromStash = async (
   if (!target) throw new NotFoundError("User not found");
 
   const options = importOptionsFrom(req.body.options);
-  const instances = stashInstanceManager.getAll();
-  if (instances.length === 0) {
+  const configured = stashInstanceManager.getAll();
+  if (configured.length === 0) {
     res.status(400).json({ error: "No Stash instances configured" });
+    return;
+  }
+  // A user an admin limited to some servers gets imports from those only
+  const access = await readInstanceAccess(targetUserId);
+  const instances =
+    access === null
+      ? configured
+      : configured.filter(([instanceId]) => access.includes(instanceId));
+  if (instances.length === 0) {
+    res.status(400).json({
+      error: "This user has access to no Stash instance",
+    });
     return;
   }
 
@@ -2649,6 +2662,18 @@ export const adminRegenerateRecoveryKey = async (
  * - selectedInstanceIds: IDs the user has selected (empty = all enabled)
  * - availableInstances: All enabled instances for selection UI
  */
+/**
+ * The enabled instances a user may pick from: all of them, or those on the
+ * admin's allow-list for a limited user (`access`, from getUserInstanceAccess).
+ */
+function pickableInstancesWhere(
+  access: string[] | null
+): Prisma.StashInstanceWhereInput {
+  return access === null
+    ? { enabled: true }
+    : { enabled: true, id: { in: access } };
+}
+
 export const getUserStashInstances = async (
   req: TypedAuthRequest,
   res: TypedResponse<
@@ -2657,16 +2682,20 @@ export const getUserStashInstances = async (
   >
 ) => {
   const userId = req.user.id;
-  // Get user's selected instances
+  const access = await readInstanceAccess(userId);
+  // Get user's selected instances; a limited user's selection that names a
+  // server outside their access (saved before the limit) is not reported
   const userSelections = await prisma.userStashInstance.findMany({
     where: { userId },
     select: { instanceId: true },
   });
-  const selectedInstanceIds = userSelections.map((s) => s.instanceId);
+  const selectedInstanceIds = userSelections
+    .map((s) => s.instanceId)
+    .filter((id) => access === null || access.includes(id));
 
-  // Get all enabled instances for the selection UI
+  // Get the enabled instances the user may use, for the selection UI
   const availableInstances = await prisma.stashInstance.findMany({
-    where: { enabled: true },
+    where: pickableInstancesWhere(access),
     select: {
       id: true,
       name: true,
@@ -2731,8 +2760,10 @@ export const updateUserStashInstances = async (
     "instanceIds"
   );
 
-  // Validate that all instance IDs exist and are enabled
+  // Validate that all instance IDs exist, are enabled and, for a user an
+  // admin limited, are among the servers they may use
   if (instanceIds.length > 0) {
+    const access = await readInstanceAccess(userId);
     const validInstances = await prisma.stashInstance.findMany({
       where: {
         id: { in: instanceIds },
@@ -2742,7 +2773,9 @@ export const updateUserStashInstances = async (
     });
 
     const validIds = new Set(validInstances.map((i) => i.id));
-    const invalidIds = instanceIds.filter((id) => !validIds.has(id));
+    const invalidIds = instanceIds.filter(
+      (id) => !validIds.has(id) || (access !== null && !access.includes(id))
+    );
 
     if (invalidIds.length > 0) {
       res.status(400).json({
@@ -2793,9 +2826,10 @@ export const getSetupStatus = async (
     return;
   }
 
-  // Get enabled instances for selection
+  // Get the enabled instances the user may use, for selection
+  const access = await readInstanceAccess(userId);
   const instances = await prisma.stashInstance.findMany({
-    where: { enabled: true },
+    where: pickableInstancesWhere(access),
     select: {
       id: true,
       name: true,
@@ -2824,9 +2858,11 @@ export const completeSetup = async (
   const userId = req.user.id;
   const { selectedInstanceIds: requestedIds } = req.body;
 
-  // Check if multi-instance - require at least one selection
+  // Check if multi-instance - require at least one selection. A limited
+  // user chooses among the servers they may use only
+  const access = await readInstanceAccess(userId);
   const instanceCount = await prisma.stashInstance.count({
-    where: { enabled: true },
+    where: pickableInstancesWhere(access),
   });
 
   if (instanceCount >= 2) {
@@ -2851,7 +2887,9 @@ export const completeSetup = async (
     });
 
     const validIds = new Set(validInstances.map((i) => i.id));
-    const invalidIds = selectedInstanceIds.filter((id) => !validIds.has(id));
+    const invalidIds = selectedInstanceIds.filter(
+      (id) => !validIds.has(id) || (access !== null && !access.includes(id))
+    );
 
     if (invalidIds.length > 0) {
       res.status(400).json({

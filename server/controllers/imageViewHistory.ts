@@ -306,9 +306,22 @@ export async function getImageViewHistory(
   }
   const instanceId = requestInstanceId;
 
-  const viewHistory = await prisma.imageViewHistory.findUnique({
-    where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
-  });
+  // An image the user cannot reach (its instance is outside their access, or
+  // it is hidden from them) answers as one with no history
+  const accessible = await resolveAccessibleInstanceId(
+    userId,
+    "image",
+    imageId,
+    instanceId
+  );
+  const viewHistory =
+    accessible === null
+      ? null
+      : await prisma.imageViewHistory.findUnique({
+          where: {
+            userId_instanceId_imageId: { userId, instanceId, imageId },
+          },
+        });
 
   if (!viewHistory) {
     res.json({
