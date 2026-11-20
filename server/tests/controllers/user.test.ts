@@ -56,6 +56,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import userRoutes from "../../routes/user.js";
 import { downloadJobQueue } from "../../services/DownloadJobQueue.js";
+import { downloadService } from "../../services/DownloadService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { bumpUser, libraryStampFor } from "../../services/LibraryStamp.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
@@ -144,7 +145,13 @@ vi.mock("../../services/DownloadJobQueue.js", () => ({
   downloadJobQueue: { cancelUser: vi.fn() },
 }));
 
+// The built playlist zips an admin's narrowing expires
+vi.mock("../../services/DownloadService.js", () => ({
+  downloadService: { expireUserPlaylistZips: vi.fn() },
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
+const mockDownloads = vi.mocked(downloadService, true);
 const mockDownloadQueue = vi.mocked(downloadJobQueue, true);
 const mockExclusions = vi.mocked(exclusionComputationService);
 const mockRankings = vi.mocked(rankingComputeService, true);
@@ -1843,10 +1850,19 @@ describe("User Controller", () => {
   });
 
   describe("updateUserInstanceAccess", () => {
+    // The target as stored before the save: the old limit and allow-list
+    const storedAccess = (limited: boolean, ids: string[]) =>
+      partialRow<
+        User & Prisma.UserGetPayload<{ select: { instanceAccess: true } }>
+      >({
+        role: "USER",
+        instanceAccessLimited: limited,
+        instanceAccess: ids.map((instanceId) => partialRow({ instanceId })),
+      });
+
     beforeEach(() => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({ role: "USER" })
-      );
+      mockPrisma.user.findUnique.mockResolvedValue(storedAccess(false, []));
+      mockDownloads.expireUserPlaylistZips.mockResolvedValue(undefined);
       mockPrisma.stashInstance.findMany.mockResolvedValue([
         partialRow({ id: "A" }),
         partialRow({ id: "B" }),
@@ -2031,6 +2047,97 @@ describe("User Controller", () => {
         instanceIds: ["B"],
       });
     });
+
+    describe("expiring the user's built playlist zips", () => {
+      const save = async (limited: boolean, instanceIds: string[]) => {
+        const req = reqFor(updateUserInstanceAccess, {
+          params: { userId: "3" },
+          body: { limited, instanceIds },
+          user: ADMIN,
+        });
+        const res = resFor(updateUserInstanceAccess);
+        await updateUserInstanceAccess(req, res);
+        return res;
+      };
+
+      it("expires them when an unlimited user becomes limited, after the recompute and the stamp bump", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(false, []));
+        const before = libraryStampFor(3);
+        let stampAtExpire: string | undefined;
+        mockDownloads.expireUserPlaylistZips.mockImplementation(() => {
+          stampAtExpire = libraryStampFor(3);
+          return Promise.resolve();
+        });
+
+        await save(true, ["A"]);
+
+        expect(
+          mockDownloads.expireUserPlaylistZips
+        ).toHaveBeenCalledExactlyOnceWith(3);
+        const [recomputed] =
+          mockExclusions.recomputeForUser.mock.invocationCallOrder;
+        const [expired] =
+          mockDownloads.expireUserPlaylistZips.mock.invocationCallOrder;
+        expect(must(recomputed)).toBeLessThan(must(expired));
+        expect(stampAtExpire).not.toBe(before);
+      });
+
+      it("expires them when a limited user loses a server", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+        await save(true, ["A"]);
+        expect(
+          mockDownloads.expireUserPlaylistZips
+        ).toHaveBeenCalledExactlyOnceWith(3);
+      });
+
+      it("expires them when a limited user is left no server", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, ["A"]));
+        await save(true, []);
+        expect(mockDownloads.expireUserPlaylistZips).toHaveBeenCalledTimes(1);
+      });
+
+      it("expires nothing when a server is added", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(true, ["A"]));
+        await save(true, ["A", "B"]);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+
+      it("expires nothing when the list is unchanged", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+        await save(true, ["B", "A"]);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+
+      it("expires nothing when the limit is lifted", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          storedAccess(true, ["A", "B"])
+        );
+        await save(false, ["A"]);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+
+      it("still answers the saved state when the expiry fails, and logs a warning", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(storedAccess(false, []));
+        mockDownloads.expireUserPlaylistZips.mockRejectedValue(
+          new Error("disk full")
+        );
+
+        const res = await save(true, ["A"]);
+
+        expect(res._getOkBody()).toEqual({ limited: true, instanceIds: ["A"] });
+        expect(logger.warn).toHaveBeenCalled();
+      });
+
+      it("expires nothing when the request is refused", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(null);
+        await save(true, ["A"]);
+        expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
+      });
+    });
   });
 
   // ─── updateUserRestrictions ───
@@ -2160,6 +2267,7 @@ describe("User Controller", () => {
       ]);
       mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
       mockExclusions.saveRestrictions.mockResolvedValue(undefined);
+      mockDownloads.expireUserPlaylistZips.mockResolvedValue(undefined);
     });
 
     it("returns 403 when non-admin", async () => {
@@ -2411,6 +2519,53 @@ describe("User Controller", () => {
       expect(must(savedAt)).toBeLessThan(must(readAt));
       expect(res._getOkBody().success).toBe(true);
       expect(res._getOkBody().restrictions).toEqual(saved);
+    });
+
+    it("expires the user's built playlist zips after every successful save, and still answers when that fails", async () => {
+      const req = reqFor(updateUserRestrictions, {
+        body: { restrictions: [tagRule("EXCLUDE")] },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      await updateUserRestrictions(req, resFor(updateUserRestrictions));
+
+      expect(
+        mockDownloads.expireUserPlaylistZips
+      ).toHaveBeenCalledExactlyOnceWith(3);
+      const [savedAt] =
+        mockExclusions.saveRestrictions.mock.invocationCallOrder;
+      const [expiredAt] =
+        mockDownloads.expireUserPlaylistZips.mock.invocationCallOrder;
+      expect(must(savedAt)).toBeLessThan(must(expiredAt));
+
+      mockDownloads.expireUserPlaylistZips.mockRejectedValue(
+        new Error("disk full")
+      );
+      const failing = resFor(updateUserRestrictions);
+      await updateUserRestrictions(req, failing);
+      expect(failing._getStatus()).toBe(200);
+      expect(logger.warn).toHaveBeenCalled();
+    });
+
+    it("expires nothing when the save is refused or fails", async () => {
+      mockExclusions.saveRestrictions.mockRejectedValue(new Error("boom"));
+      const req = reqFor(updateUserRestrictions, {
+        body: { restrictions: [tagRule("EXCLUDE")] },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      await expect(
+        updateUserRestrictions(req, resFor(updateUserRestrictions))
+      ).rejects.toThrow("boom");
+
+      const bad = reqFor(updateUserRestrictions, {
+        body: { restrictions: [tagRule("INCLUDE", [])] },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      await updateUserRestrictions(bad, resFor(updateUserRestrictions));
+
+      expect(mockDownloads.expireUserPlaylistZips).not.toHaveBeenCalled();
     });
 
     it("a failed save throws (500) and reads nothing back", async () => {

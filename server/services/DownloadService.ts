@@ -324,6 +324,23 @@ export class DownloadService {
       });
     });
   }
+
+  /**
+   * Delete a user's finished playlist zips, rows and files. A zip is served
+   * from disk without re-checking its contents, so one built before an admin
+   * narrowed the user's access or restrictions still holds what they may no
+   * longer see. A pending or running build re-scopes at build time and is
+   * left alone.
+   */
+  async expireUserPlaylistZips(userId: number): Promise<void> {
+    const zips = await prisma.download.findMany({
+      where: { userId, type: "PLAYLIST", status: "COMPLETED" },
+      select: { id: true },
+    });
+    for (const { id } of zips) {
+      await this.deleteDownload(id, userId);
+    }
+  }
 }
 
 export const downloadService = new DownloadService();

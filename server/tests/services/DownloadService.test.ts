@@ -649,6 +649,84 @@ describe("DownloadService", () => {
     });
   });
 
+  describe("expireUserPlaylistZips", () => {
+    const previousConfigDir = process.env.CONFIG_DIR;
+    let configDir: string;
+
+    beforeEach(() => {
+      configDir = fs.mkdtempSync(path.join(os.tmpdir(), "peek-dl-expire-"));
+      process.env.CONFIG_DIR = configDir;
+    });
+
+    afterEach(() => {
+      if (previousConfigDir === undefined) delete process.env.CONFIG_DIR;
+      else process.env.CONFIG_DIR = previousConfigDir;
+      fs.rmSync(configDir, { recursive: true, force: true });
+    });
+
+    function writeZip(userId: number, downloadId: number): string {
+      const file = zipPath(userId, downloadId);
+      fs.mkdirSync(userDownloadsDir(userId), { recursive: true });
+      fs.writeFileSync(file, "zip bytes");
+      return file;
+    }
+
+    it("deletes the user's completed playlist downloads, rows and files, and nothing else", async () => {
+      const first = writeZip(1, 21);
+      const second = writeZip(1, 22);
+      const rows = [
+        downloadRow({
+          id: 21,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: first,
+        }),
+        downloadRow({
+          id: 22,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: second,
+        }),
+      ];
+      vi.mocked(prisma.download.findMany).mockResolvedValue(rows);
+      vi.mocked(prisma.download.findUnique).mockImplementation(((args: {
+        where: { id: number };
+      }) =>
+        Promise.resolve(
+          rows.find((r) => r.id === args.where.id) ?? null
+        )) as never);
+      vi.mocked(prisma.download.delete).mockResolvedValue(must(rows[0]));
+
+      await service.expireUserPlaylistZips(1);
+
+      // Only the user's finished playlist zips are looked up: a pending or
+      // processing build re-scopes at build time, a scene has no zip
+      expect(prisma.download.findMany).toHaveBeenCalledExactlyOnceWith({
+        where: { userId: 1, type: "PLAYLIST", status: "COMPLETED" },
+        select: { id: true },
+      });
+      expect(prisma.download.delete).toHaveBeenCalledTimes(2);
+      expect(prisma.download.delete).toHaveBeenCalledWith({
+        where: { id: 21 },
+      });
+      expect(prisma.download.delete).toHaveBeenCalledWith({
+        where: { id: 22 },
+      });
+      expect(fs.existsSync(first)).toBe(false);
+      expect(fs.existsSync(second)).toBe(false);
+    });
+
+    it("does nothing when the user has no finished zip", async () => {
+      vi.mocked(prisma.download.findMany).mockResolvedValue([]);
+
+      await service.expireUserPlaylistZips(1);
+
+      expect(prisma.download.delete).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getOwnedDownload", () => {
     it("returns the row of its owner", async () => {
       const row = downloadRow({ id: 1, userId: 1 });

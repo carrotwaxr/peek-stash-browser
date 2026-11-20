@@ -40,6 +40,7 @@ import {
 } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { downloadJobQueue } from "../services/DownloadJobQueue.js";
+import { downloadService } from "../services/DownloadService.js";
 import { getVisibleEntityKeys } from "../services/EntityAccessService.js";
 import {
   type RestrictionRowInput,
@@ -1747,6 +1748,21 @@ export const getUserRestrictions = async (
 };
 
 /**
+ * Expire a user's built playlist zips after an admin narrowed what they may
+ * see. The change is already saved, so a failure here is logged, not raised.
+ */
+async function expireBuiltZips(userId: number): Promise<void> {
+  try {
+    await downloadService.expireUserPlaylistZips(userId);
+  } catch (error) {
+    logger.warn("Could not expire a user's built playlist zips", {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
  * Update content restrictions for a user (Admin only)
  * Replaces all existing restrictions with new ones
  */
@@ -1900,6 +1916,7 @@ export const updateUserRestrictions = async (
   // recompute runs on these rows and its swap stores both, so a failure
   // leaves the user's old restrictions and old exclusions in place
   await exclusionComputationService.saveRestrictions(targetUserId, rows);
+  await expireBuiltZips(targetUserId);
 
   const saved = await prisma.userContentRestriction.findMany({
     where: { userId: targetUserId },
@@ -1998,7 +2015,11 @@ export const updateUserInstanceAccess = async (
 
   const target = await prisma.user.findUnique({
     where: { id: targetUserId },
-    select: { role: true },
+    select: {
+      role: true,
+      instanceAccessLimited: true,
+      instanceAccess: { select: { instanceId: true } },
+    },
   });
   if (!target) {
     res.status(404).json({ error: "User not found" });
@@ -2063,6 +2084,16 @@ export const updateUserInstanceAccess = async (
   // library views are stale
   await exclusionComputationService.recomputeForUser(targetUserId);
   bumpUser(targetUserId);
+
+  // A built playlist zip holds scenes of the servers the user could use
+  // then: when the save takes one away, the zip goes too. Lifting a limit or
+  // adding a server removes nothing.
+  const kept = new Set(instanceIds);
+  const narrowed =
+    limited &&
+    (!target.instanceAccessLimited ||
+      target.instanceAccess.some((a) => !kept.has(a.instanceId)));
+  if (narrowed) await expireBuiltZips(targetUserId);
 
   res.json({ limited, instanceIds });
 };
