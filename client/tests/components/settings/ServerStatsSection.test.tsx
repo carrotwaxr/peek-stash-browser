@@ -184,3 +184,157 @@ describe("ServerStatsSection", () => {
     expect(await screen.findByText("Syncing...")).toBeInTheDocument();
   });
 });
+
+describe("ServerStatsSection Re-probe Clips", () => {
+  const NO_MISSES = {
+    placeholder: 0,
+    notFound: 0,
+    tooSmall: 0,
+    fetchError: 0,
+    noPreviewPath: 0,
+  };
+
+  /** What the server answers a re-probe with, from the fields a test sets */
+  function reprobeAnswer(answer: {
+    checked: number;
+    updated: number;
+    misses?: Partial<typeof NO_MISSES>;
+    firstError?: string;
+  }) {
+    return {
+      ok: true,
+      message: "Re-probed",
+      ...answer,
+      misses: { ...NO_MISSES, ...answer.misses },
+    };
+  }
+
+  /** GET /stats with 1,682 clips pending previews */
+  function statsWithPendingClips(count: number) {
+    const base = stats();
+    return {
+      ...base,
+      cache: {
+        ...base.cache,
+        counts: { ...base.cache.counts, ungeneratedClips: count },
+      },
+    };
+  }
+
+  /** Clicks Re-probe Clips with the server answering `answer`; returns the result banner */
+  async function reprobe(answer: ReturnType<typeof reprobeAnswer>) {
+    mockApiGet.mockResolvedValue(statsWithPendingClips(1682));
+    mockApiPost.mockResolvedValue(answer);
+    render(<ServerStatsSection />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Re-probe Clips" })
+    );
+    const summary = await screen.findByText(/^Checked /);
+    const banner = summary.closest("[role]");
+    if (!banner) throw new Error("the result banner is missing");
+    return banner;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuth).mockReturnValue(
+      createAuthValue({
+        isAuthenticated: true,
+        user: { id: 1, username: "admin", role: "ADMIN", setupCompleted: true },
+      })
+    );
+  });
+
+  it("asks the server to re-probe every instance, naming none", async () => {
+    await reprobe(reprobeAnswer({ checked: 3, updated: 3 }));
+
+    expect(mockApiPost).toHaveBeenCalledWith("/sync/reprobe-clips", {});
+  });
+
+  it("success with no misses shows the count and no hint", async () => {
+    const banner = await reprobe(
+      reprobeAnswer({ checked: 1682, updated: 1682 })
+    );
+
+    expect(banner).toHaveTextContent(
+      "Checked 1,682 clips, 1,682 now have previews."
+    );
+    expect(banner).not.toHaveTextContent("Still without a preview");
+    expect(banner.getAttribute("style")).toContain("--status-success");
+  });
+
+  it("some updated and some missed stays a success, with the breakdown", async () => {
+    const banner = await reprobe(
+      reprobeAnswer({
+        checked: 1682,
+        updated: 100,
+        misses: { placeholder: 1500, notFound: 80, noPreviewPath: 2 },
+      })
+    );
+
+    expect(banner.getAttribute("style")).toContain("--status-success");
+    expect(banner).toHaveTextContent(
+      "Still without a preview: 1,500 waiting on Stash to generate, 80 not found, 2 with no preview address."
+    );
+  });
+
+  it("mostly fetch errors: reach hint with the first error, as a warning", async () => {
+    const banner = await reprobe(
+      reprobeAnswer({
+        checked: 1682,
+        updated: 0,
+        misses: { fetchError: 1600, notFound: 82 },
+        firstError: "Home: Stash answered HTTP 401",
+      })
+    );
+
+    expect(banner.getAttribute("style")).toContain("--status-warning");
+    expect(banner).toHaveTextContent(
+      "Peek couldn't reach 1,600 previews on Stash (first error: Home: Stash answered HTTP 401). Check the Stash URL and API key under Settings > Server Configuration > Stash Instances."
+    );
+  });
+
+  it("mostly placeholders and small files: generate marker previews hint", async () => {
+    const banner = await reprobe(
+      reprobeAnswer({
+        checked: 1682,
+        updated: 0,
+        // 600 + 700 together outweigh the 300 unreachable
+        misses: { placeholder: 600, tooSmall: 700, fetchError: 300 },
+      })
+    );
+
+    expect(banner).toHaveTextContent(
+      "Stash hasn't generated 1,300 marker previews yet. Run Generate > Marker Previews in Stash (Settings > Tasks), then re-probe."
+    );
+    expect(banner).not.toHaveTextContent("Peek couldn't reach");
+  });
+
+  it("mostly 404s: no preview file hint", async () => {
+    const banner = await reprobe(
+      reprobeAnswer({
+        checked: 1682,
+        updated: 0,
+        misses: { notFound: 1682 },
+      })
+    );
+
+    expect(banner).toHaveTextContent(
+      "Stash has no preview file for 1,682 clips. Run Generate > Marker Previews in Stash, then re-probe."
+    );
+  });
+
+  it("a failed request shows the error", async () => {
+    mockApiGet.mockResolvedValue(statsWithPendingClips(5));
+    mockApiPost.mockRejectedValue(new Error("Cannot re-probe clips"));
+    render(<ServerStatsSection />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Re-probe Clips" })
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Cannot re-probe clips"
+    );
+  });
+});
