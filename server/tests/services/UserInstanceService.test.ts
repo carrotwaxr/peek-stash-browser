@@ -10,6 +10,7 @@ import prisma from "../../prisma/singleton.js";
 import {
   getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
+  getUserInstanceAccess,
   getUserInstanceScope,
   getUsersSelecting,
 } from "../../services/UserInstanceService.js";
@@ -254,19 +255,159 @@ describe("UserInstanceService", () => {
       // so enabling or disabling instance-a changes what they see too
       expect(mockPrisma.user.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [
-            { stashInstances: { some: { instanceId: "instance-a" } } },
+          AND: [
             {
-              stashInstances: {
-                none: {
-                  instance: { enabled: true, id: { not: "instance-a" } },
+              OR: [
+                { stashInstances: { some: { instanceId: "instance-a" } } },
+                {
+                  stashInstances: {
+                    none: {
+                      instance: { enabled: true, id: { not: "instance-a" } },
+                    },
+                  },
                 },
+              ],
+            },
+            // A limited USER without access to the instance never selects it
+            {
+              NOT: {
+                role: "USER",
+                instanceAccessLimited: true,
+                instanceAccess: { none: { instanceId: "instance-a" } },
               },
             },
           ],
         },
         select: { id: true },
         orderBy: { id: "asc" },
+      });
+    });
+  });
+
+  describe("instance access (#439)", () => {
+    const bothEnabled = () =>
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "A", firstSyncedAt: new Date() }),
+        partialRow({ id: "B", firstSyncedAt: new Date() }),
+      ]);
+    const userRow = (
+      role: "USER" | "ADMIN",
+      limited: boolean,
+      access: string[]
+    ) =>
+      mockPrisma.user.findUnique.mockResolvedValue(
+        // The select's shape (role, flag, allow-list), not a whole User row
+        {
+          role,
+          instanceAccessLimited: limited,
+          instanceAccess: access.map((instanceId) => ({ instanceId })),
+        } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>
+      );
+
+    it("a limited user with access to A only, no selection, sees [A]", async () => {
+      bothEnabled();
+      userRow("USER", true, ["A"]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
+
+      expect(await getUserAllowedInstanceIds(1)).toEqual(["A"]);
+      expect(await getUserInstanceScope(1)).toEqual(["A"]);
+    });
+
+    it("a selection of B (not allowed) falls back inside the allow-list: [A]", async () => {
+      bothEnabled();
+      userRow("USER", true, ["A"]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "B" }),
+      ]);
+
+      expect(await getUserAllowedInstanceIds(1)).toEqual(["A"]);
+      expect(await getUserInstanceScope(1)).toEqual(["A"]);
+    });
+
+    it("a selection inside the allow-list narrows it", async () => {
+      bothEnabled();
+      userRow("USER", true, ["A", "B"]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "B" }),
+      ]);
+
+      expect(await getUserAllowedInstanceIds(1)).toEqual(["B"]);
+    });
+
+    it("a limited user with no access rows sees nothing, never everything", async () => {
+      bothEnabled();
+      userRow("USER", true, []);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
+
+      expect(await getUserAllowedInstanceIds(1)).toEqual([]);
+      expect(await getUserInstanceScope(1)).toEqual([]);
+    });
+
+    it("an admin with instanceAccessLimited and rows for A only still sees [A, B]", async () => {
+      bothEnabled();
+      userRow("ADMIN", true, ["A"]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
+
+      expect(await getUserAllowedInstanceIds(1)).toEqual(["A", "B"]);
+      expect(await getUserInstanceScope(1)).toEqual(["A", "B"]);
+    });
+
+    it("an allowed instance that is disabled leaves nothing", async () => {
+      // only B is enabled; the user is allowed A only
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "B", firstSyncedAt: new Date() }),
+      ]);
+      userRow("USER", true, ["A"]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
+
+      expect(await getUserAllowedInstanceIds(1)).toEqual([]);
+      expect(await getUserInstanceScope(1)).toEqual([]);
+    });
+
+    it("the first-sync rule still applies on top of the allow-list", async () => {
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "A", firstSyncedAt: null }),
+        partialRow({ id: "B", firstSyncedAt: new Date() }),
+      ]);
+      userRow("USER", true, ["A", "B"]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
+
+      expect(await getUserInstanceScope(1)).toEqual(["A", "B"]);
+      expect(await getUserAllowedInstanceIds(1)).toEqual(["B"]);
+    });
+
+    describe("getUserInstanceAccess", () => {
+      it("is null for an unlimited user", async () => {
+        userRow("USER", false, ["A"]);
+        expect(await getUserInstanceAccess(1)).toBeNull();
+      });
+
+      it("is null for an admin, limited flag or not", async () => {
+        userRow("ADMIN", true, ["A"]);
+        expect(await getUserInstanceAccess(1)).toBeNull();
+      });
+
+      it("is null for a missing user", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(null);
+        expect(await getUserInstanceAccess(1)).toBeNull();
+      });
+
+      it("is the allowed ids, enabled or not, for a limited user", async () => {
+        userRow("USER", true, ["A", "disabled-z"]);
+        expect(await getUserInstanceAccess(7)).toEqual(["A", "disabled-z"]);
+        expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+          where: { id: 7 },
+          select: {
+            role: true,
+            instanceAccessLimited: true,
+            instanceAccess: { select: { instanceId: true } },
+          },
+        });
+      });
+
+      it("throws on a database error", async () => {
+        mockPrisma.user.findUnique.mockRejectedValue(new Error("SQLITE_BUSY"));
+        await expect(getUserInstanceAccess(1)).rejects.toThrow("SQLITE_BUSY");
       });
     });
   });

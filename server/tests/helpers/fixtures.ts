@@ -74,6 +74,7 @@ export function userRow(overrides: Partial<User> = {}): User {
     canDownloadPlaylistsOverride: null,
     recoveryKeyHash: null,
     passwordChangedAt: null,
+    instanceAccessLimited: false,
     ...overrides,
   };
 }

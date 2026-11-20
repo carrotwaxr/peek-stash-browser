@@ -94,6 +94,10 @@ model User {
 
   // Stash instance selection (which instances user sees content from)
   stashInstances UserStashInstance[]
+
+  // Admin-only: limit this USER to the instances in UserInstanceAccess; ignored for admins
+  instanceAccessLimited Boolean              @default(false)
+  instanceAccess        UserInstanceAccess[]
 }
 
 model UserGroup {
@@ -639,6 +643,7 @@ model StashInstance {
 
   // Relations
   userSelections UserStashInstance[]
+  userAccess     UserInstanceAccess[]
 }
 
 // Tracks which Stash instances each user wants to see content from
@@ -654,6 +659,20 @@ model UserStashInstance {
 
   @@unique([userId, instanceId])
   @@index([userId])
+  @@index([instanceId])
+}
+
+// Admin-granted allow-list: a User with instanceAccessLimited sees only the
+// instances listed here (a non-admin; admins are never limited)
+model UserInstanceAccess {
+  userId     Int
+  instanceId String
+  createdAt  DateTime @default(now())
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instance StashInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, instanceId])
   @@index([instanceId])
 }
 
