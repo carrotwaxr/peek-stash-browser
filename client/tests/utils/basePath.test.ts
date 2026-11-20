@@ -59,4 +59,29 @@ describe("basePath", () => {
     expect(withBase("/api/x")).toBe("/api/x");
     expect(stripBase("/scenes")).toBe("/scenes");
   });
+
+  describe("prefixedLocation", () => {
+    it("sends an unprefixed URL into the prefix, keeping query and hash", async () => {
+      const { prefixedLocation } = await load("/peek");
+
+      expect(prefixedLocation("/scenes", "?x=1", "#h")).toBe(
+        "/peek/scenes?x=1#h"
+      );
+      expect(prefixedLocation("/", "", "")).toBe("/peek/");
+      expect(prefixedLocation("/peekaboo", "", "")).toBe("/peek/peekaboo");
+    });
+
+    it("returns null for a URL already under the prefix", async () => {
+      const { prefixedLocation } = await load("/peek");
+
+      expect(prefixedLocation("/peek/scenes", "?x=1", "")).toBeNull();
+      expect(prefixedLocation("/peek", "", "")).toBeNull();
+    });
+
+    it("returns null without a prefix", async () => {
+      const { prefixedLocation } = await load(null);
+
+      expect(prefixedLocation("/scenes", "", "")).toBeNull();
+    });
+  });
 });

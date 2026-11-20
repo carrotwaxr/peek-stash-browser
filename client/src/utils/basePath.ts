@@ -44,3 +44,20 @@ export function stripBase(pathname: string): string {
   }
   return pathname;
 }
+
+/**
+ * Where to send a page opened outside the prefix (nginx serves the shell for
+ * "/scenes" too, but the router only renders under its basename), or null when
+ * the URL is fine as it is.
+ */
+export function prefixedLocation(
+  pathname: string,
+  search: string,
+  hash: string
+): string | null {
+  if (!BASE_PATH) return null;
+  if (pathname === BASE_PATH || pathname.startsWith(BASE_PATH + "/")) {
+    return null;
+  }
+  return withBase(pathname) + search + hash;
+}
