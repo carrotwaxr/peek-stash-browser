@@ -6,10 +6,10 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 
 What Peek adds to Stash, and the invariants every change keeps. `.claude/rules/` has the detail per area.
 
-- Users and access: ADMIN and USER accounts; groups grant Can Share, Download Files and Download Playlists (denied by default; a per-user override beats groups); recovery keys; trusted-header SSO; login rate limit and lockout; a setup wizard.
+- Users and access: ADMIN and USER accounts; groups grant Can Share, Download Files and Download Playlists (denied by default; a per-user override beats groups); an admin can limit a user to chosen Stash servers; recovery keys; trusted-header SSO; login rate limit and lockout; a setup wizard.
 - Per-user data, keyed by user and instance: ratings and favorites on all 7 entity types, watch history and resume points, O counts, image views, stats, hidden items, presets, carousels, themes and other preferences. Rating, favorite, O-count and play fields in responses are the requesting user's, not Stash's.
 - Content restrictions: an admin gives a user Show-only and Always-hide lists of collections, tags, studios and galleries (tags and studios include their descendants; Always-hide wins), cascading to the entities they cover; precomputed into `UserExcludedEntity`.
-- Multi-instance: one Peek in front of several Stash servers. Each user picks which enabled instances to see, as a preference, not access control.
+- Multi-instance: one Peek in front of several Stash servers. An admin can limit a user to chosen servers (access control); within that, each user picks which instances to see, as a preference.
 - Media: streams, captions and images go through Peek; the external player and cast devices get a personal signed link (12 h). Named playlists shareable with groups, TV mode, timeline and folder views, recommendations and similar scenes from the user's own data.
 - Downloads: scene files and playlist zips with NFO, permission-gated and queued.
 - Operations: a synced SQL cache of each library, merge reconciliation, per-user Sync to Stash and Sync from Stash, database backups.
@@ -26,7 +26,7 @@ Invariants:
 8. Peek never edits Stash metadata. It writes to Stash only through Sync to Stash, which only an admin can switch on for a user.
 9. Sharing and downloading are denied by default and enforced on the server.
 10. Sharing never widens access: a recipient sees only what their own exclusions allow.
-11. Instance selection only narrows what a user sees: disabled instances never show, and an empty selection means all enabled instances.
+11. Instance scope: an admin may limit a USER to chosen enabled instances (an allow-list; servers added later stay hidden from them, admins are never limited); within that, the user's own selection only narrows, and an empty selection means every instance they may see. Disabled instances never show.
 
 ## Commands
 
