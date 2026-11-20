@@ -7,6 +7,7 @@
  * GetSceneStreamPaths in Stash's internal/manager/scene.go.
  */
 import type { SceneStream } from "../types/index.js";
+import { publicPath } from "./basePath.js";
 
 export const STREAM_RESOLUTIONS = [
   "ORIGINAL",
@@ -150,7 +151,9 @@ export function buildSceneStreams(
   instanceId: string,
   options: StashStreamOptions
 ): SceneStream[] {
-  const base = `/api/scene/${encodeURIComponent(sceneId)}/proxy-stream`;
+  const base = publicPath(
+    `/api/scene/${encodeURIComponent(sceneId)}/proxy-stream`
+  );
   const stream = (
     file: string,
     mime: string,

@@ -1,4 +1,5 @@
 import { useAuth } from "../../hooks/useAuth";
+import { withBase } from "../../utils/basePath";
 
 interface Props {
   stashUrl: string;
@@ -42,7 +43,7 @@ export default function ViewInStashButton({
       aria-label="View in Stash"
     >
       <img
-        src="/assets/stash-logo.svg"
+        src={withBase("/assets/stash-logo.svg")}
         alt="Stash"
         width={size}
         height={size}

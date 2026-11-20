@@ -4,7 +4,7 @@
  * serves it. The cases from the old copies (UserStatsAggregationService's
  * exported transformUrl, ClipService's private one) live here now.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { toProxyUrl } from "../../utils/proxyUrl.js";
 import { untrusted } from "../helpers/untrusted.js";
 
@@ -154,5 +154,32 @@ describe("toProxyUrl", () => {
       expect(out, input).toMatch(/^\/api\/proxy\/stash\?path=/);
       expect(out, input).not.toMatch(/stash:9999|SECRET|apikey/i);
     }
+  });
+});
+
+describe("under BASE_PATH", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("prefixes a built proxy path", () => {
+    vi.stubEnv("BASE_PATH", "/peek");
+    expect(toProxyUrl("/scene/1/screenshot?x=1", "inst-a")).toBe(
+      `/peek${proxied("/scene/1/screenshot?x=1")}`
+    );
+  });
+
+  it("adds the prefix once to an unprefixed proxy path", () => {
+    vi.stubEnv("BASE_PATH", "/peek");
+    expect(toProxyUrl("/api/proxy/stash?path=x", "inst-a")).toBe(
+      "/peek/api/proxy/stash?path=x"
+    );
+  });
+
+  it("returns an already prefixed proxy path unchanged", () => {
+    vi.stubEnv("BASE_PATH", "/peek");
+    expect(toProxyUrl("/peek/api/proxy/stash?path=x", "inst-a")).toBe(
+      "/peek/api/proxy/stash?path=x"
+    );
   });
 });

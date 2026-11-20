@@ -155,6 +155,25 @@ export default defineConfig([
   // VrControls.ts) are the small `vr-ui` chunk, which useVrMode reaches by
   // import() on VR scenes only. A static import anywhere else pulls a chunk
   // into that file's own (the Scene page). Type imports are free.
+  // Peek can be served under a path prefix (BASE_PATH): a root "/api/" string
+  // in the source would reach the wrong server. (esquery ends a regex at the
+  // first slash, so each is written \x2f.)
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...[
+          "Literal[value=/^\\x2fapi\\x2f/]",
+          "TemplateElement[value.raw=/^\\x2fapi\\x2f/]",
+        ].map((selector) => ({
+          selector,
+          message:
+            "Build API URLs from API_PATH (utils/basePath.ts) so they work under BASE_PATH",
+        })),
+      ],
+    },
+  },
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: [VR_PLUGIN, VR_LOADER, VR_UI],

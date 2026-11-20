@@ -5,7 +5,7 @@
  * and only marks which ones need the transcode time offset.
  */
 import { must } from "@tests/testUtils";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildPlayerSources,
   isDirectSource,
@@ -356,5 +356,34 @@ describe("buildPlayerSources with the signed media link's streams", () => {
     const sources = buildPlayerSources(scene, decodesAll);
 
     for (const source of sources) expect(source.src).not.toContain("sig=");
+  });
+});
+
+describe("buildPlayerSources under a base path", () => {
+  afterEach(() => {
+    vi.doUnmock("@/utils/basePath");
+    vi.resetModules();
+  });
+
+  it("the fallback Direct stream is built from API_PATH", async () => {
+    vi.resetModules();
+    vi.doMock("@/utils/basePath", () => ({
+      BASE_PATH: "/peek",
+      API_PATH: "/peek/api",
+      withBase: (path: string) => `/peek${path}`,
+      stripBase: (pathname: string) => pathname,
+    }));
+    const { buildPlayerSources: prefixed } =
+      await import("@/components/video-player/playerSources");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const sources = prefixed(
+      { id: "5", instanceId: "i", sceneStreams: [], files: [{ duration: 60 }] },
+      decodesAll
+    );
+
+    expect(must(sources[0]).src).toBe(
+      "/peek/api/scene/5/proxy-stream/stream?instanceId=i"
+    );
   });
 });

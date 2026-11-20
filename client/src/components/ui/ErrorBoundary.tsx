@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { getErrorMessage } from "../../api/client";
+import { withBase } from "../../utils/basePath";
 import {
   isChunkLoadError,
   reloadOnceForNewVersion,
@@ -186,7 +187,7 @@ export class AppErrorBoundary extends Component<
         >
           Reload
         </button>
-        <a href="/" style={{ color: "inherit" }}>
+        <a href={withBase("/")} style={{ color: "inherit" }}>
           Home
         </a>
       </div>

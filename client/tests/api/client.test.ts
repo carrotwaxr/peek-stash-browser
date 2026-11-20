@@ -65,6 +65,17 @@ function stubFetch(
   return fetchMock;
 }
 
+/** Serve the app under /peek: the module the client reads BASE_PATH from. */
+function mockBasePath() {
+  vi.doMock("@/utils/basePath", () => ({
+    BASE_PATH: "/peek",
+    API_PATH: "/peek/api",
+    withBase: (path: string) => `/peek${path}`,
+    stripBase: (pathname: string) =>
+      pathname === "/peek" ? "/" : pathname.replace(/^\/peek(?=\/)/, ""),
+  }));
+}
+
 /** A redirect leaves the promise pending forever; race it with a tick. */
 function settleOrPending(promise: Promise<unknown>): Promise<string> {
   return Promise.race([
@@ -86,6 +97,7 @@ describe("api client login redirect", () => {
   });
 
   afterEach(() => {
+    vi.doUnmock("@/utils/basePath");
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -104,6 +116,18 @@ describe("api client login redirect", () => {
     );
     expect(location.href).toBe("/login");
     expect(LOGIN_MESSAGE_STORAGE_KEY).toBe("peek_login_message");
+  });
+
+  it("under a base path, redirectToLogin stores the router path and navigates to the prefixed login", async () => {
+    mockBasePath();
+    location = stubLocation("/peek/scenes", "?x=1");
+    const { redirectToLogin, REDIRECT_STORAGE_KEY } =
+      await import("@/api/client");
+
+    redirectToLogin();
+
+    expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBe("/scenes?x=1");
+    expect(location.href).toBe("/peek/login");
   });
 
   it("apiFetch 401 still redirects without a message", async () => {
@@ -257,6 +281,40 @@ describe("api client login redirect", () => {
       expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBeNull();
     }
   );
+
+  it.each(["/peek/login", "/peek/setup", "/peek/forgot-password"])(
+    "under a base path, a 401 on %s does not redirect",
+    async (pathname) => {
+      mockBasePath();
+      location.pathname = pathname;
+      location.search = "";
+      stubFetch(401, {});
+      const { apiFetch, ApiError, REDIRECT_STORAGE_KEY } =
+        await import("@/api/client");
+
+      const request = apiFetch("/setup/status");
+      expect(await settleOrPending(request)).toBe("rejected");
+      const err = await request.catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as InstanceType<typeof ApiError>).status).toBe(401);
+      expect(location.navigations).toBe(0);
+      expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBeNull();
+    }
+  );
+
+  it("under a base path, a 401 on a page redirects to the prefixed login", async () => {
+    mockBasePath();
+    location.pathname = "/peek/scenes";
+    location.search = "";
+    stubFetch(401, {});
+    const { apiFetch, REDIRECT_STORAGE_KEY } = await import("@/api/client");
+
+    expect(await settleOrPending(apiFetch("/library/scenes"))).toBe("pending");
+
+    expect(location.href).toBe("/peek/login");
+    expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBe("/scenes");
+  });
 });
 
 describe("apiFetch errors and results", () => {

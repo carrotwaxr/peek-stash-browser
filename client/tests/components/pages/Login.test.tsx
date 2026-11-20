@@ -64,4 +64,39 @@ describe("Login", () => {
     expect(location.href).toBe("/performers");
     vi.unstubAllGlobals();
   });
+
+  it("under a base path, a stored redirect and the landing page get the prefix", async () => {
+    vi.resetModules();
+    vi.doMock("@/utils/basePath", () => ({
+      BASE_PATH: "/peek",
+      API_PATH: "/peek/api",
+      withBase: (path: string) => `/peek${path}`,
+      stripBase: (pathname: string) => pathname,
+    }));
+    const { default: PrefixedLogin } = await import("@/components/pages/Login");
+    const { useAuth: useAuthAgain } = await import("@/hooks/useAuth");
+    const login = vi.fn().mockResolvedValue({
+      success: true,
+      user: { id: 1, username: "alice", role: "USER", setupCompleted: true },
+      landingPagePreference: { pages: ["performers"], randomize: false },
+    });
+    vi.mocked(useAuthAgain).mockReturnValue({ login } as unknown as ReturnType<
+      typeof useAuthAgain
+    >);
+    const location = { href: "" };
+    vi.stubGlobal("location", location);
+    sessionStorage.setItem("peek_auth_redirect", "/scenes");
+    const user = userEvent.setup();
+    renderWithProviders(<PrefixedLogin />);
+
+    await user.type(screen.getByLabelText(/username/i), "alice");
+    await user.type(screen.getByLabelText(/password/i), "CorrectPass1");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(location.href).toBe("/peek/scenes");
+
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(location.href).toBe("/peek/performers");
+    vi.unstubAllGlobals();
+    vi.doUnmock("@/utils/basePath");
+  });
 });

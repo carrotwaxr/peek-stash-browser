@@ -8,6 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Relative asset URLs in the built index.html: docker/entrypoint.sh prefixes
+  // them with BASE_PATH when it renders the page (dev serves at /)
+  base: "./",
   plugins: [
     react({
       babel: {

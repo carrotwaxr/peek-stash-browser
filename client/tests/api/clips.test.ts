@@ -5,7 +5,7 @@
  * (item 38, F16).
  */
 import { must } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet, apiPost } from "@/api/client";
 import { findClips, getClipPreviewUrl, getClipsForScene } from "@/api/clips";
 
@@ -27,6 +27,28 @@ describe("getClipPreviewUrl", () => {
     // An empty instance is sent as it is, and the server refuses it
     expect(getClipPreviewUrl("5", "")).toBe(
       "/api/proxy/clip/5/preview?instanceId="
+    );
+  });
+});
+
+describe("getClipPreviewUrl under a base path", () => {
+  afterEach(() => {
+    vi.doUnmock("@/utils/basePath");
+    vi.resetModules();
+  });
+
+  it("starts with API_PATH", async () => {
+    vi.resetModules();
+    vi.doMock("@/utils/basePath", () => ({
+      BASE_PATH: "/peek",
+      API_PATH: "/peek/api",
+      withBase: (path: string) => `/peek${path}`,
+      stripBase: (pathname: string) => pathname,
+    }));
+    const { getClipPreviewUrl: prefixed } = await import("@/api/clips");
+
+    expect(prefixed("5", "a")).toBe(
+      "/peek/api/proxy/clip/5/preview?instanceId=a"
     );
   });
 });

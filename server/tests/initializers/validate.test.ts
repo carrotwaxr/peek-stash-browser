@@ -21,6 +21,7 @@ const ENV_KEYS = [
   "STASH_API_KEY",
   "PROXY_AUTH_HEADER",
   "PROXY_AUTH_TRUSTED_IPS",
+  "BASE_PATH",
 ] as const;
 
 const allLogged = () =>
@@ -42,6 +43,32 @@ describe("validateStartup", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it("refuses to start when BASE_PATH is invalid", () => {
+    process.env.BASE_PATH = "//evil.com";
+
+    expect(() => validateStartup()).toThrow(
+      "BASE_PATH must be a path such as /peek (letters, digits, . _ ~ -, each part after a /), got '//evil.com'"
+    );
+  });
+
+  it("logs an invalid BASE_PATH as given, not as NOT SET", () => {
+    process.env.BASE_PATH = "//evil.com";
+
+    expect(() => validateStartup()).toThrow("BASE_PATH must be a path");
+    expect(allLogged()).toContain('"BASE_PATH":"//evil.com"');
+  });
+
+  it("logs a valid BASE_PATH normalised, and NOT SET without one", () => {
+    process.env.BASE_PATH = "/peek/";
+    validateStartup();
+    expect(allLogged()).toContain('"BASE_PATH":"/peek"');
+
+    vi.clearAllMocks();
+    delete process.env.BASE_PATH;
+    validateStartup();
+    expect(allLogged()).toContain('"BASE_PATH":"NOT SET"');
   });
 
   it("reports whether STASH_API_KEY is set, never its characters", () => {

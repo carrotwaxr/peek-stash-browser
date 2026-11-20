@@ -4,6 +4,7 @@ import videojs from "video.js";
 import "./cast/castMiddleware.js";
 // Import duration middleware (registers via videojs.use)
 import "./durationMiddleware.js";
+import { API_PATH } from "../../utils/basePath";
 
 // Set VideoJS global log level to reduce console spam
 videojs.log.level("warn");
@@ -99,7 +100,7 @@ export const setupSubtitles = (
 
     const trackOptions = {
       kind: "captions", // Use "captions" not "subtitles" to match Stash
-      src: `/api/scene/${sceneId}/caption?lang=${lang}&type=${caption.caption_type}&instanceId=${encodeURIComponent(instanceId)}`,
+      src: `${API_PATH}/scene/${sceneId}/caption?lang=${lang}&type=${caption.caption_type}&instanceId=${encodeURIComponent(instanceId)}`,
       srclang: lang,
       label: label,
       default: setAsDefault,

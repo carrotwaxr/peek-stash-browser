@@ -6,6 +6,7 @@
  * the instance that serves it: without one, the proxy would fall back to the
  * highest-priority instance and show another server's picture.
  */
+import { publicPath } from "./basePath.js";
 
 const PROXY_PREFIX = "/api/proxy/";
 
@@ -64,8 +65,12 @@ export function toProxyUrl(
   instanceId: string
 ): string | null {
   if (!urlOrPath) return null;
-  if (urlOrPath.startsWith(PROXY_PREFIX)) return urlOrPath;
+  // Already a public (prefixed) proxy path: as is; an unprefixed one gets the prefix once
+  if (urlOrPath.startsWith(publicPath(PROXY_PREFIX))) return urlOrPath;
+  if (urlOrPath.startsWith(PROXY_PREFIX)) return publicPath(urlOrPath);
 
   const path = withoutApiKey(pathAndQuery(urlOrPath));
-  return `${PROXY_PREFIX}stash?path=${encodeURIComponent(path)}&instanceId=${encodeURIComponent(instanceId)}`;
+  return publicPath(
+    `${PROXY_PREFIX}stash?path=${encodeURIComponent(path)}&instanceId=${encodeURIComponent(instanceId)}`
+  );
 }

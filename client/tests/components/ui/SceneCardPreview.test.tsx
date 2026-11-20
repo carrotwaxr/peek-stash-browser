@@ -196,4 +196,48 @@ describe("SceneCardPreview", () => {
       "/api/proxy/scene/42/preview?instanceId=inst-a"
     );
   });
+
+  it("under a base path the preview URLs start with API_PATH", async () => {
+    vi.resetModules();
+    vi.doMock("@/utils/basePath", () => ({
+      BASE_PATH: "/peek",
+      API_PATH: "/peek/api",
+      withBase: (path: string) => `/peek${path}`,
+      stripBase: (pathname: string) => pathname,
+    }));
+    const { default: Prefixed } =
+      await import("@/components/ui/SceneCardPreview");
+    const { AuthContext: PrefixedAuth } =
+      await import("@/contexts/AuthContextProvider");
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(
+      queryKeys.user.settings(),
+      userSettingsResponse({ preferredPreviewQuality: "mp4" })
+    );
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <PrefixedAuth.Provider
+          value={createAuthValue({ isAuthenticated: true })}
+        >
+          <Prefixed scene={scene("inst-a")} active />
+        </PrefixedAuth.Provider>
+      </QueryClientProvider>
+    );
+    const video = await waitFor(() => {
+      const el = container.querySelector("video");
+      expect(el).not.toBeNull();
+      return must(el, "the preview video");
+    });
+
+    expect(video.getAttribute("src")).toBe(
+      "/peek/api/proxy/scene/42/preview?instanceId=inst-a"
+    );
+    const [input] = must(fetchMock.mock.calls[0], "the HEAD request");
+    expect(input instanceof Request ? input.url : input.toString()).toBe(
+      "/peek/api/proxy/scene/42/preview?instanceId=inst-a"
+    );
+    vi.doUnmock("@/utils/basePath");
+    vi.resetModules();
+  });
 });

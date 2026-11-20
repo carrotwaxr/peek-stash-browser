@@ -4,6 +4,7 @@ import { LOGIN_MESSAGE_STORAGE_KEY, REDIRECT_STORAGE_KEY } from "../../api";
 import { getLandingPage } from "../../constants/navigation";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../themes/useTheme";
+import { withBase } from "../../utils/basePath";
 import Button from "../ui/Button";
 
 const Login = () => {
@@ -36,11 +37,11 @@ const Login = () => {
         const redirectUrl = sessionStorage.getItem(REDIRECT_STORAGE_KEY);
         if (redirectUrl) {
           sessionStorage.removeItem(REDIRECT_STORAGE_KEY);
-          window.location.href = redirectUrl;
+          window.location.href = withBase(redirectUrl);
         } else {
           // Use landing page preference if available
           const destination = getLandingPage(result.landingPagePreference);
-          window.location.href = destination;
+          window.location.href = withBase(destination);
         }
       } else {
         setError(result.error || "Login failed");

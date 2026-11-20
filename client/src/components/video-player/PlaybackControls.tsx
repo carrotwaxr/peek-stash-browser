@@ -6,6 +6,7 @@ import { useMyPermissions } from "../../api/hooks/useMyPermissions";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
+import { API_PATH } from "../../utils/basePath";
 import { showError, showSuccess } from "../../utils/toast";
 import { ThemedIcon } from "../icons/index";
 import {
@@ -137,7 +138,7 @@ const PlaybackControls = () => {
       // For scenes, download is immediate - redirect to file endpoint
       // Server sets Content-Disposition: attachment to force download
       if (download.status === "COMPLETED") {
-        window.location.href = `/api/downloads/${download.id}/file`;
+        window.location.href = `${API_PATH}/downloads/${download.id}/file`;
       }
       showSuccess("Download started");
     } catch (error: any) {

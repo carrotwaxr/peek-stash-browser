@@ -126,7 +126,7 @@ COPY --chmod=0755 docker/entrypoint.sh docker/start.sh /app/
 COPY server/package.json ./
 
 # Check the nginx config, then create the data directory owned by the app user
-RUN mkdir -p /tmp/nginx && nginx -t -e stderr -g "user peek peek;" && rm -rf /tmp/nginx \
+RUN mkdir -p /tmp/nginx/conf.d /tmp/nginx/html && nginx -t -e stderr -g "user peek peek;" && rm -rf /tmp/nginx \
     && mkdir -p /app/data/tmp && chown -R peek:peek /app/data
 
 # Expose port 80

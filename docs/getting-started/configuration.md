@@ -112,6 +112,7 @@ These settings have sensible defaults but can be customized:
 | `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
 | `PROXY_AUTH_TRUSTED_IPS` | Addresses allowed to send `PROXY_AUTH_HEADER` | Unset (any address, with a startup warning) | Comma-separated IPs and CIDR ranges of your auth proxy. See [Trusted proxy addresses](#trusted-proxy-addresses) |
 | `TRUST_PROXY`        | Reverse proxies in front of Peek | Unset (trusts only the image's own nginx) | Set to the number of reverse proxies between browsers and Peek. See [Behind a reverse proxy](#behind-a-reverse-proxy) |
+| `BASE_PATH`          | Subfolder a reverse proxy serves Peek under | Unset (Peek is at the root) | For example `/peek-stash`. See [Serving Peek under a subfolder](#serving-peek-under-a-subfolder) |
 
 ### Generating a JWT Secret
 
@@ -308,6 +309,44 @@ When `PROXY_AUTH_HEADER` is set but the header is not present in a request, Peek
 - **CRITICAL**: Your proxy is not sanitizing the header properly
 - Verify the proxy strips user-supplied headers before setting the authenticated value
 - Check that Peek is not accessible directly (bypass proxy)
+
+## Serving Peek under a subfolder
+
+By default Peek is served at the root of its address (`https://example.com/`). To serve it under a subfolder instead (`https://example.com/peek-stash/`), set `BASE_PATH` on the Peek container to the same path your reverse proxy uses:
+
+```bash
+BASE_PATH=/peek-stash
+```
+
+The value starts with `/` and has no trailing slash (one is dropped if you add it). Each part of the path may use letters, digits and `. _ ~ -`; `.` and `..` are not allowed as a part. An empty value or `/` means no subfolder. If the value is not valid, the container stops with an error that names `BASE_PATH` (see [Container Won't Start](troubleshooting.md#container-wont-start)).
+
+Your proxy may pass the prefix through to Peek or strip it before it does; both work. The API answers with or without the prefix, and opening a page without it (when your proxy sends that address to Peek) redirects into the subfolder. `/peek-stash` without the trailing slash redirects to `/peek-stash/`.
+
+### Example: SWAG
+
+```nginx
+location /peek-stash {
+    return 301 $scheme://$host/peek-stash/;
+}
+
+location ^~ /peek-stash/ {
+    include /config/nginx/proxy.conf;
+    include /config/nginx/resolver.conf;
+    set $upstream_app peek-stash;
+    set $upstream_port 80;
+    set $upstream_proto http;
+    proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+}
+```
+
+`proxy_pass` has no URI after the port, so nginx passes the prefix through and Peek strips it. Adding a URI (`.../`) makes the proxy strip it instead, which also works.
+
+Peek puts the prefix on everything it links to: images, streams, captions and posters, and the external player, cast and VR links. You do not change anything in those.
+
+!!! note
+    Peek's sign-in cookie is limited to the subfolder. If you move Peek to a different host, people sign in again. On the same host an existing session carries over when you add `BASE_PATH`, and signing out clears it.
+
+If you see a blank page after setting this up, see [Blank page behind a reverse proxy subfolder](troubleshooting.md#blank-page-behind-a-reverse-proxy-subfolder).
 
 ## Example Configurations
 

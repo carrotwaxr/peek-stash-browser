@@ -7,6 +7,7 @@
  * in Stash's order unless this browser cannot decode the file. Kept free of
  * video.js so it can be unit tested.
  */
+import { API_PATH } from "../../utils/basePath";
 
 export interface PlayerSource {
   src: string;
@@ -101,7 +102,7 @@ export function buildPlayerSources(
   const params = new URLSearchParams({ instanceId: scene.instanceId });
   return [
     {
-      src: `/api/scene/${encodeURIComponent(scene.id)}/proxy-stream/stream?${params.toString()}`,
+      src: `${API_PATH}/scene/${encodeURIComponent(scene.id)}/proxy-stream/stream?${params.toString()}`,
       label: "Direct",
       offset: false,
     },

@@ -50,6 +50,16 @@ After an upgrade, a tab that was left open asks for files the new version no lon
 
 If the panel keeps returning, open the browser's console (F12), copy the line that starts with `[route]` and report it when you ask for help (see [Getting Help](#getting-help)). This is different from ["Peek is starting"](#peek-is-starting), which is the server not answering yet; the panel means the page itself failed.
 
+## Blank page behind a reverse proxy subfolder
+
+**Symptoms:** Peek is served at an address such as `https://example.com/peek-stash/` and shows a blank page, or its scripts and styles fail to load in the browser's console (F12, Network tab).
+
+**Cause:** Peek was not told the subfolder, so its page asks for files at the root of the site.
+
+**Solution:** Set `BASE_PATH=/peek-stash` on the Peek container, with the same value as the proxy's location, and recreate the container. The proxy may pass the prefix through or strip it. See [Serving Peek under a subfolder](configuration.md#serving-peek-under-a-subfolder) for the value's rules and a SWAG example. If the container stops with an error that names `BASE_PATH`, the value is not valid: the message says what it must look like.
+
+**BASE_PATH is set but you opened the address without the subfolder:** a page opened without the subfolder (`https://example.com/scenes` rather than `https://example.com/peek-stash/scenes`) now redirects into it. If you still see a blank page there, the image predates this fix: update it.
+
 ## Can't Connect to Stash
 
 **Symptoms:** Empty library, "Connection failed" errors, sync fails.

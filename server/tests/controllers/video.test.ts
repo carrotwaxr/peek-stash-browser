@@ -229,6 +229,10 @@ describe("Video Controller", () => {
     // /scene/{id}/stream.m3u8/{n}.ts?resolution=..., absolute or as a path.
     // -----------------------------------------------------------------------
     describe("HLS playlist rewriting", () => {
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
       it("rewrites absolute Stash URLs, stripping apikey and adding instanceId", async () => {
         const hlsContent = [
           "#EXTM3U",
@@ -258,6 +262,38 @@ describe("Video Controller", () => {
         );
         expect(lines[5]).toBe(
           "/api/scene/123/proxy-stream/stream.m3u8/1.ts?instanceId=inst-a"
+        );
+      });
+
+      it("prefixes every rewritten line with BASE_PATH", async () => {
+        vi.stubEnv("BASE_PATH", "/peek");
+        const hlsContent = [
+          "#EXTM3U",
+          '#EXT-X-MAP:URI="/scene/123/stream.m3u8/init.mp4?apikey=k"',
+          "#EXTINF:10.0,",
+          "http://stash:9999/scene/123/stream.m3u8/0.ts?apikey=secret123&resolution=LOW",
+          "#EXTINF:10.0,",
+          "/scene/123/stream.m3u8/1.ts?apikey=secret123",
+          "",
+        ].join("\n");
+
+        const req = createMockReq();
+        const res = resFor(proxyStashStream);
+        vi.mocked(global.fetch).mockResolvedValue(
+          makeFetchResponse(hlsContent)
+        );
+
+        await proxyStashStream(req, res);
+
+        const lines = sentText(res).split("\n");
+        expect(lines[1]).toBe(
+          '#EXT-X-MAP:URI="/peek/api/scene/123/proxy-stream/stream.m3u8/init.mp4?instanceId=inst-a"'
+        );
+        expect(lines[3]).toBe(
+          "/peek/api/scene/123/proxy-stream/stream.m3u8/0.ts?resolution=LOW&instanceId=inst-a"
+        );
+        expect(lines[5]).toBe(
+          "/peek/api/scene/123/proxy-stream/stream.m3u8/1.ts?instanceId=inst-a"
         );
       });
 
@@ -2052,6 +2088,38 @@ describe("Video Controller", () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.unstubAllEnvs();
+    });
+
+    it("prefixes every URL with BASE_PATH and keeps the signature valid", async () => {
+      vi.stubEnv("BASE_PATH", "/peek");
+      const body = (await mint())._getOkBody();
+      const urls = urlsOf(body);
+      expect(urls.length).toBeGreaterThan(4);
+      expect(body.captions.length).toBeGreaterThan(0);
+      expect(body.poster).toMatch(/^\/peek\/api\/scene\/123\/poster\?/);
+      for (const c of body.captions) {
+        expect(c.url).toMatch(/^\/peek\/api\/scene\/123\/caption\?/);
+      }
+      for (const url of urls) {
+        expect(url).toMatch(/^\/peek\/api\/scene\/123\//);
+        expect(url).not.toMatch(/\/peek\/peek/);
+        const q = new URL(url, "http://peek.test").searchParams;
+        expect(
+          isStreamLinkSignatureValid(
+            {
+              userId: 7,
+              sceneId: "123",
+              instanceId: "inst-a",
+              exp: EXP,
+              passwordChangedAtMs: PASSWORD_CHANGED_AT.getTime(),
+              scope: "media",
+            },
+            must(q.get("sig")),
+            deriveStreamLinkKey("test-secret")
+          )
+        ).toBe(true);
+      }
     });
 
     it("reads the scene once by id and instance", async () => {

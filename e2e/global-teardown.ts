@@ -12,15 +12,14 @@
  * query field it does not know): those would otherwise pass as a silent
  * error or 404. The replay's stderr line above names each one.
  */
-import { request } from "@playwright/test";
-import { bootstrapAdmin, logIn, readReplayStats } from "./global-setup";
+import { bootstrapAdmin, readReplayStats, signedInApi } from "./global-setup";
 import {
   deleteGroups,
   deleteUsers,
   listGroups,
   listUsers,
 } from "./support/cleanup";
-import { baseURL, devStack } from "./support/env";
+import { devStack } from "./support/env";
 import { runPrefix } from "./support/names";
 
 /** Hermetic mode: the replay saw no write and answered every request */
@@ -45,10 +44,8 @@ async function globalTeardown() {
 
   const bootstrap = bootstrapAdmin();
   const prefix = runPrefix();
-  const api = await request.newContext({ baseURL });
+  const api = await signedInApi(bootstrap.username, bootstrap.password);
   try {
-    await logIn(api, bootstrap.username, bootstrap.password);
-
     await deleteUsers(api, prefix, bootstrap.username);
     await deleteGroups(api, prefix);
 

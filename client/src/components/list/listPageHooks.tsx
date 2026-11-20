@@ -21,6 +21,7 @@ import {
   type PageChangeOptions,
   usePaginatedLightbox,
 } from "../../hooks/usePaginatedLightbox";
+import { API_PATH } from "../../utils/basePath";
 import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { buildImageFilter } from "../../utils/filterConfig";
@@ -72,7 +73,7 @@ const viewerImage = (img: ImageListItem): ImageListItem => {
     ? `?instanceId=${encodeURIComponent(img.instanceId)}`
     : "";
   const proxied = (kind: string) =>
-    `/api/proxy/image/${img.id}/${kind}${instanceQuery}`;
+    `${API_PATH}/proxy/image/${img.id}/${kind}${instanceQuery}`;
   return {
     ...img,
     paths: {

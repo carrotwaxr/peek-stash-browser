@@ -86,16 +86,34 @@ export async function readSetupStatus(
   }
 }
 
-/** Signs `api` in; the session cookie stays in its cookie jar */
-export async function logIn(
-  api: APIRequestContext,
+/**
+ * A new API context signed in as the user, by an Authorization header rather
+ * than the session cookie: a Peek served under BASE_PATH sets the cookie on
+ * Path=<BASE_PATH>, which a context that calls the unprefixed /api paths
+ * (global setup and teardown do) never sends back.
+ */
+export async function signedInApi(
   username: string,
   password: string
-): Promise<void> {
-  await mustOk(
-    await api.post("/api/auth/login", { data: { username, password } }),
-    `Logging in as ${username}`
-  );
+): Promise<APIRequestContext> {
+  const login = await request.newContext({ baseURL });
+  let token: string | undefined;
+  try {
+    const response = await mustOk(
+      await login.post("/api/auth/login", { data: { username, password } }),
+      `Logging in as ${username}`
+    );
+    token = /token=([^;]+)/.exec(response.headers()["set-cookie"] ?? "")?.[1];
+  } finally {
+    await login.dispose();
+  }
+  if (!token) {
+    throw new Error(`Logging in as ${username} set no token cookie`);
+  }
+  return request.newContext({
+    baseURL,
+    extraHTTPHeaders: { Authorization: `Bearer ${token}` },
+  });
 }
 
 /** The dev stack's bootstrap admin, from .env.e2e or the shell */
@@ -205,11 +223,11 @@ async function setUpHermetic(
  * bootstrap admin and an instance first.
  */
 async function setUpDevStack(
-  api: APIRequestContext,
+  anonymous: APIRequestContext,
   runId: string
 ): Promise<{ username: string; password: string }> {
   const bootstrap = bootstrapAdmin();
-  const status = await readSetupStatus(api);
+  const status = await readSetupStatus(anonymous);
 
   const stashUrl = process.env.E2E_STASH_URL;
   const stashApiKey = process.env.E2E_STASH_API_KEY;
@@ -221,31 +239,35 @@ async function setUpDevStack(
 
   if (!status.hasUsers) {
     await mustOk(
-      await api.post("/api/setup/create-admin", { data: bootstrap }),
+      await anonymous.post("/api/setup/create-admin", { data: bootstrap }),
       `Creating the bootstrap admin ${bootstrap.username}`
     );
   }
-  await logIn(api, bootstrap.username, bootstrap.password);
 
-  if (!status.hasStashInstance && stashUrl && stashApiKey) {
-    await createStashInstance(api, "E2E Stash", stashUrl, stashApiKey);
+  const api = await signedInApi(bootstrap.username, bootstrap.password);
+  try {
+    if (!status.hasStashInstance && stashUrl && stashApiKey) {
+      await createStashInstance(api, "E2E Stash", stashUrl, stashApiKey);
+    }
+
+    // Leftovers of runs that were killed before their teardown
+    await deleteUsers(api, "e2e-", bootstrap.username);
+    await deleteGroups(api, "e2e-");
+
+    const runAdmin = {
+      username: `e2e-${runId}-admin`,
+      password: randomPassword(),
+    };
+    await mustOk(
+      await api.post("/api/user/create", {
+        data: { ...runAdmin, role: "ADMIN" },
+      }),
+      `Creating the run admin ${runAdmin.username}`
+    );
+    return runAdmin;
+  } finally {
+    await api.dispose();
   }
-
-  // Leftovers of runs that were killed before their teardown
-  await deleteUsers(api, "e2e-", bootstrap.username);
-  await deleteGroups(api, "e2e-");
-
-  const runAdmin = {
-    username: `e2e-${runId}-admin`,
-    password: randomPassword(),
-  };
-  await mustOk(
-    await api.post("/api/user/create", {
-      data: { ...runAdmin, role: "ADMIN" },
-    }),
-    `Creating the run admin ${runAdmin.username}`
-  );
-  return runAdmin;
 }
 
 async function globalSetup() {

@@ -16,7 +16,7 @@
  * upgrades it after backing it up, and the backup restored brings the older
  * image back.
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -44,6 +44,10 @@ const name = `peek-smoke-${process.pid}`;
 const volume = `${name}-data`;
 const upgradeName = `${name}-upgrade`;
 const upgradeVolume = `${upgradeName}-data`;
+const prefixName = `${name}-prefix`;
+const prefixVolume = `${prefixName}-data`;
+const badPrefixNames = [`${name}-badprefix0`, `${name}-badprefix1`];
+const prefixPort = Number(port) + 1;
 const base = `http://127.0.0.1:${port}`;
 const DATABASE = "/app/data/peek-stash-browser.db";
 const APPLIED_MIGRATIONS =
@@ -56,11 +60,14 @@ const sqlIn = (container, query, file = DATABASE) =>
     ? docker("exec", container, "sqlite3", file, query)
     : docker("exec", container, "sqlite3", "-readonly", file, query);
 const sql = (query) => sqlIn(name, query);
-const logsOf = (container, ...args) =>
-  execFileSync("docker", ["logs", ...args, container], {
+// docker logs replays a container's stderr on this process's stderr, so both
+// streams are joined
+const logsOf = (container, ...args) => {
+  const { stdout, stderr } = spawnSync("docker", ["logs", ...args, container], {
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
   });
+  return `${stdout}${stderr}`;
+};
 
 let failures = 0;
 async function check(what, fn) {
@@ -218,6 +225,181 @@ async function checkUpgrade() {
       );
     }
   );
+}
+
+/**
+ * BASE_PATH checks: a second container serves the app under /my.peek (a dot, which
+ * the nginx rewrite must escape; the unprefixed API paths keep working), the main one without BASE_PATH is unchanged,
+ * and an invalid BASE_PATH stops the container with a message.
+ */
+async function checkBasePath() {
+  const prefixBase = `http://127.0.0.1:${prefixPort}`;
+  const fetchPrefix = (path, options) => fetch(`${prefixBase}${path}`, options);
+  const getPrefix = async (path) => {
+    const response = await fetchPrefix(path);
+    expectEqual(response.status, 200, `GET ${path} status`);
+    return response;
+  };
+  const urlsIn = (html) =>
+    [...html.matchAll(/\b(?:src|href)="([^"]*)"/g)].map((m) => m[1]);
+
+  await check("the main container's shell has no base path", async () => {
+    const html = await (await get("/")).text();
+    if (!html.includes('<meta name="peek-base-path" content=""')) {
+      throw new Error('no <meta name="peek-base-path" content=""> in /');
+    }
+    const urls = urlsIn(html).filter(
+      (u) => u.startsWith("/") || u.startsWith(".")
+    );
+    if (!urls.some((u) => u.startsWith("/assets/"))) {
+      throw new Error("no /assets/ URL in the shell");
+    }
+    const bad = urls.filter((u) => !u.startsWith("/") || u.startsWith("//"));
+    if (bad.length) throw new Error(`asset URLs not rooted at /: ${bad}`);
+  });
+
+  docker("volume", "create", prefixVolume);
+  docker(
+    "run",
+    "-d",
+    "--name",
+    prefixName,
+    "-p",
+    `127.0.0.1:${prefixPort}:80`,
+    "-e",
+    "BASE_PATH=/my.peek",
+    "-v",
+    `${prefixVolume}:/app/data`,
+    image
+  );
+
+  await check("a BASE_PATH=/my.peek container turns healthy", async () => {
+    await waitHealthy(prefixName);
+    await getPrefix("/my.peek/api/health");
+  });
+
+  for (const path of ["/my.peek/", "/my.peek/scenes"]) {
+    await check(
+      `${path} serves the shell with the /my.peek prefix`,
+      async () => {
+        const html = await (await getPrefix(path)).text();
+        if (!html.includes('<div id="root">'))
+          throw new Error("no #root in the page");
+        if (!html.includes('<meta name="peek-base-path" content="/my.peek"')) {
+          throw new Error('no <meta name="peek-base-path" content="/my.peek">');
+        }
+        const urls = urlsIn(html);
+        const bad = urls.filter((u) => !u.startsWith("/my.peek/"));
+        if (bad.length) throw new Error(`URLs without /my.peek/: ${bad}`);
+        const script = urls.find((u) => /^\/my.peek\/assets\/.+\.js$/.test(u));
+        if (!script)
+          throw new Error("no /my.peek/assets/*.js script in the shell");
+        const bundle = await getPrefix(script);
+        if (!bundle.headers.get("content-type")?.includes("javascript")) {
+          throw new Error(
+            `bundle content-type ${bundle.headers.get("content-type")}`
+          );
+        }
+        await bundle.arrayBuffer();
+      }
+    );
+  }
+
+  await check("/my.peek/api/health and /api/health both answer", async () => {
+    expectEqual(
+      (await (await getPrefix("/my.peek/api/health")).json()).status,
+      "healthy",
+      "/my.peek/api/health status"
+    );
+    expectEqual(
+      (await (await getPrefix("/api/health")).json()).status,
+      "healthy",
+      "/api/health status"
+    );
+  });
+
+  await check(
+    "/my.peek redirects to /my.peek/ with a relative Location",
+    async () => {
+      const response = await fetchPrefix("/my.peek", { redirect: "manual" });
+      expectEqual(response.status, 301, "GET /my.peek status");
+      expectEqual(response.headers.get("location"), "/my.peek/", "Location");
+    }
+  );
+
+  await check("/my.peek/site.webmanifest is served", async () => {
+    await getPrefix("/my.peek/site.webmanifest");
+  });
+
+  await check(
+    "the stream route under the prefix answers 401 JSON from Node, not the shell",
+    async () => {
+      const response = await fetchPrefix(
+        "/my.peek/api/scene/1/proxy-stream/stream?instanceId=x"
+      );
+      expectEqual(response.status, 401, "stream status");
+      const type = response.headers.get("content-type") ?? "";
+      if (!type.includes("application/json")) {
+        throw new Error(`content-type ${type}, expected JSON`);
+      }
+      await response.json();
+    }
+  );
+
+  await check(
+    "a path that only looks like the prefix (/myXpeek) is not stripped",
+    async () => {
+      const response = await fetchPrefix("/myXpeek/api/health");
+      expectEqual(response.status, 200, "GET /myXpeek/api/health status");
+      const type = response.headers.get("content-type") ?? "";
+      if (!type.includes("text/html")) {
+        throw new Error(`content-type ${type}, expected the SPA's text/html`);
+      }
+      await response.text();
+    }
+  );
+
+  // Each invalid value gets its own container, removed afterwards
+  for (const [index, value] of ["peek", "/a/../b"].entries()) {
+    await check(
+      `an invalid BASE_PATH (${value}) stops the container with a message`,
+      () => {
+        const container = badPrefixNames[index];
+        docker(
+          "run",
+          "-d",
+          "--name",
+          container,
+          "-e",
+          `BASE_PATH=${value}`,
+          image
+        );
+        let exitCode = "";
+        for (let i = 0; i < 30; i++) {
+          if (
+            docker("inspect", "-f", "{{.State.Running}}", container) === "false"
+          ) {
+            exitCode = docker(
+              "inspect",
+              "-f",
+              "{{.State.ExitCode}}",
+              container
+            );
+            break;
+          }
+          execFileSync("sleep", ["1"]);
+        }
+        if (exitCode === "" || exitCode === "0") {
+          throw new Error(
+            `exit code ${JSON.stringify(exitCode)}, expected non-zero`
+          );
+        }
+        if (!logsOf(container).includes("BASE_PATH")) {
+          throw new Error("no BASE_PATH in the log");
+        }
+      }
+    );
+  }
 }
 
 const SECURITY_HEADERS = {
@@ -479,6 +661,8 @@ try {
     }
   );
 
+  await checkBasePath();
+
   if (upgradeFrom) await checkUpgrade();
 } finally {
   if (failures) {
@@ -487,8 +671,25 @@ try {
       stdio: "inherit",
     });
   }
-  execFileSync("docker", ["rm", "-f", name], { stdio: "ignore" });
+  if (failures) {
+    for (const container of [prefixName, ...badPrefixNames]) {
+      try {
+        console.log(`--- ${container} log (last 40 lines) ---`);
+        execFileSync("docker", ["logs", "--tail", "40", container], {
+          stdio: "inherit",
+        });
+      } catch {
+        // never started
+      }
+    }
+  }
+  execFileSync("docker", ["rm", "-f", name, prefixName, ...badPrefixNames], {
+    stdio: "ignore",
+  });
   execFileSync("docker", ["volume", "rm", volume], { stdio: "ignore" });
+  execFileSync("docker", ["volume", "rm", "-f", prefixVolume], {
+    stdio: "ignore",
+  });
   if (upgradeFrom) {
     const running = execFileSync(
       "docker",
