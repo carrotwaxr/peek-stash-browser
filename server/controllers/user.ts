@@ -105,6 +105,7 @@ import type {
   GetMyPermissionsResponse,
   GetRecoveryKeyResponse,
   GetUserGroupMembershipsParams,
+  GetUserInstanceAccessResponse,
   GetUserPermissionsParams,
   GetUserRestrictionsParams,
   GetUserSettingsResponse,
@@ -136,6 +137,8 @@ import type {
   UpdateHideConfirmationBody,
   UpdateHideConfirmationResponse,
   UpdatePermissionOverridesBody,
+  UpdateUserInstanceAccessBody,
+  UpdateUserInstanceAccessResponse,
   UpdateUserRestrictionsBody,
   UpdateUserRestrictionsResponse,
   UpdateUserRoleBody,
@@ -145,6 +148,7 @@ import type {
   UpdateUserSettingsParams,
   UpdateUserSettingsResponse,
   UpdateUserStashInstancesBody,
+  UserInstanceAccessParams,
 } from "../types/api/user.js";
 import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { userDownloadsDir } from "../utils/downloadPaths.js";
@@ -1924,6 +1928,130 @@ export const deleteUserRestrictions = async (
     success: true,
     message: "All content restrictions removed successfully",
   });
+};
+
+/**
+ * Get the Stash servers a user is limited to (Admin only)
+ * GET /api/user/:userId/instance-access
+ *
+ * `limited` is the stored flag and the ids are the stored rows, whatever the
+ * user's role (a limit kept across a promotion applies again on demotion).
+ */
+export const getUserInstanceAccess = async (
+  req: TypedAuthRequest<never, UserInstanceAccessParams>,
+  res: TypedResponse<GetUserInstanceAccessResponse | ApiErrorResponse>
+) => {
+  const targetUserId = parseInt(req.params.userId);
+  if (isNaN(targetUserId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: {
+      instanceAccessLimited: true,
+      instanceAccess: { select: { instanceId: true } },
+    },
+  });
+  if (!target) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  res.json({
+    limited: target.instanceAccessLimited,
+    instanceIds: target.instanceAccess.map((a) => a.instanceId),
+  });
+};
+
+/**
+ * Limit a user to chosen Stash servers, or lift the limit (Admin only)
+ * PUT /api/user/:userId/instance-access
+ *
+ * Body: { limited: boolean; instanceIds: string[] }
+ * - `limited: true` with an empty list leaves the user nothing to see
+ * - The ids may name any StashInstance, enabled or not
+ * - The flag and the rows are replaced in one unit; the user's exclusions
+ *   are then recomputed over their new scope and their library stamp moves
+ */
+export const updateUserInstanceAccess = async (
+  req: TypedAuthRequest<UpdateUserInstanceAccessBody, UserInstanceAccessParams>,
+  res: TypedResponse<UpdateUserInstanceAccessResponse | ApiErrorResponse>
+) => {
+  const targetUserId = parseInt(req.params.userId);
+  if (isNaN(targetUserId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { role: true },
+  });
+  if (!target) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (!restrictionsApplyTo(target.role)) {
+    res
+      .status(400)
+      .json({ error: "Server access limits do not apply to administrators" });
+    return;
+  }
+
+  const { limited } = req.body;
+  if (typeof limited !== "boolean") {
+    throw new ValidationError("Invalid request", {
+      issues: [{ path: "limited", message: "Expected a boolean" }],
+    });
+  }
+  const instanceIds = parseInstanceSelection(
+    req.body.instanceIds,
+    "instanceIds"
+  );
+
+  // Any instance counts, enabled or not: an admin may grant a server that is
+  // switched off for now
+  if (instanceIds.length > 0) {
+    const known = await prisma.stashInstance.findMany({
+      where: { id: { in: instanceIds } },
+      select: { id: true },
+    });
+    const knownIds = new Set(known.map((i) => i.id));
+    const invalidIds = instanceIds.filter((id) => !knownIds.has(id));
+    if (invalidIds.length > 0) {
+      res.status(400).json({
+        error: "Invalid instance IDs",
+        details: invalidIds.join(", "),
+      });
+      return;
+    }
+  }
+
+  await dbWriteTransaction("user.instanceAccess", async (tx) => {
+    await tx.user.update({
+      where: { id: targetUserId },
+      data: { instanceAccessLimited: limited },
+    });
+    await tx.userInstanceAccess.deleteMany({
+      where: { userId: targetUserId },
+    });
+    if (instanceIds.length > 0) {
+      await tx.userInstanceAccess.createMany({
+        data: instanceIds.map((instanceId) => ({
+          userId: targetUserId,
+          instanceId,
+        })),
+      });
+    }
+  });
+
+  // The user's scope changed: their exclusion rows must cover it before
+  // anything on a newly granted server is listed to them, and their cached
+  // library views are stale
+  await exclusionComputationService.recomputeForUser(targetUserId);
+  bumpUser(targetUserId);
+
+  res.json({ limited, instanceIds });
 };
 
 /**

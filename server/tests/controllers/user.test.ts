@@ -11,7 +11,12 @@ import {
   DEFAULT_RECOMMENDATION_PREFERENCES,
   type RecommendationPreferences,
 } from "@peek/shared-types/recommendationPreferences.js";
-import type { CustomTheme, User, UserContentRestriction } from "@prisma/client";
+import type {
+  CustomTheme,
+  Prisma,
+  User,
+  UserContentRestriction,
+} from "@prisma/client";
 import bcrypt from "bcryptjs";
 import * as fs from "fs";
 import jwt from "jsonwebtoken";
@@ -34,6 +39,7 @@ import {
   deleteUserRestrictions,
   getAllUsers,
   getRecoveryKey,
+  getUserInstanceAccess,
   getUserRestrictions,
   getUserSettings,
   overwriteFilterPreset,
@@ -41,6 +47,7 @@ import {
   renameFilterPreset,
   saveFilterPreset,
   setDefaultFilterPreset,
+  updateUserInstanceAccess,
   updateUserRestrictions,
   updateUserRole,
   updateUserSettings,
@@ -72,6 +79,7 @@ import { type UserWithGroups, userRow } from "../helpers/fixtures.js";
 import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 // Mock prisma
 vi.mock(
@@ -1784,6 +1792,244 @@ describe("User Controller", () => {
       expect(atRecompute).toBe(before);
       expect(libraryStampFor(3)).not.toBe(before);
       expect(libraryStampFor(4)).toBe(other);
+    });
+  });
+
+  // ─── instance access (#439) ───
+
+  describe("getUserInstanceAccess", () => {
+    it("answers the stored flag and the stored rows", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        // The handler's `select` shape, which the mock's full-row type cannot hold
+        untrusted(
+          partialRow<
+            Prisma.UserGetPayload<{
+              select: {
+                instanceAccessLimited: true;
+                instanceAccess: { select: { instanceId: true } };
+              };
+            }>
+          >({
+            instanceAccessLimited: true,
+            instanceAccess: [{ instanceId: "A" }, { instanceId: "B" }],
+          })
+        )
+      );
+      const req = reqFor(getUserInstanceAccess, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(getUserInstanceAccess);
+      await getUserInstanceAccess(req, res);
+
+      expect(res._getOkBody()).toEqual({
+        limited: true,
+        instanceIds: ["A", "B"],
+      });
+    });
+
+    it("answers 404 for an unknown user", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      const req = reqFor(getUserInstanceAccess, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(getUserInstanceAccess);
+      await getUserInstanceAccess(req, res);
+
+      expect(res._getStatus()).toBe(404);
+      expect(res._getErrorBody().error).toBe("User not found");
+    });
+  });
+
+  describe("updateUserInstanceAccess", () => {
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ role: "USER" })
+      );
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "A" }),
+        partialRow({ id: "B" }),
+      ]);
+      mockPrisma.user.update.mockResolvedValue(partialRow({}));
+      mockPrisma.userInstanceAccess.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userInstanceAccess.createMany.mockResolvedValue({ count: 2 });
+      mockExclusions.recomputeForUser.mockResolvedValue(undefined);
+    });
+
+    it("answers 404 for an unknown user and writes nothing", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      const req = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: ["A"] },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(req, res);
+
+      expect(res._getStatus()).toBe(404);
+      expect(res._getErrorBody().error).toBe("User not found");
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 for an administrator and writes nothing", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ role: "ADMIN" })
+      );
+      const req = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: ["A"] },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toBe(
+        "Server access limits do not apply to administrators"
+      );
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockExclusions.recomputeForUser).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 naming the ids that are no StashInstance, enabled or not, and writes nothing", async () => {
+      const req = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: ["A", "gone", "also-gone"] },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({
+        error: "Invalid instance IDs",
+        details: "gone, also-gone",
+      });
+      // Any instance is valid: the lookup does not ask for enabled ones
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["A", "gone", "also-gone"] } },
+        select: { id: true },
+      });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("throws a ValidationError for a limited that is no boolean and ids that are no list", async () => {
+      const bad = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: malformed({ limited: "yes", instanceIds: [] }),
+        user: ADMIN,
+      });
+      await expect(
+        updateUserInstanceAccess(bad, resFor(updateUserInstanceAccess))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [objectContaining({ path: "limited" })],
+      });
+
+      const notList = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: malformed({ limited: true, instanceIds: "A" }),
+        user: ADMIN,
+      });
+      await expect(
+        updateUserInstanceAccess(notList, resFor(updateUserInstanceAccess))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [objectContaining({ path: "instanceIds" })],
+      });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("sets the flag and replaces the rows in one dbWriteTransaction, then recomputes and bumps the user", async () => {
+      const before = libraryStampFor(3);
+      const other = libraryStampFor(4);
+      let stampAtRecompute: string | undefined;
+      mockExclusions.recomputeForUser.mockImplementation(() => {
+        stampAtRecompute = libraryStampFor(3);
+        return Promise.resolve();
+      });
+      const req = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: ["A", "B", "A"] },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(req, res);
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.update).toHaveBeenCalledExactlyOnceWith({
+        where: { id: 3 },
+        data: { instanceAccessLimited: true },
+      });
+      expect(
+        mockPrisma.userInstanceAccess.deleteMany
+      ).toHaveBeenCalledExactlyOnceWith({ where: { userId: 3 } });
+      expect(
+        mockPrisma.userInstanceAccess.createMany
+      ).toHaveBeenCalledExactlyOnceWith({
+        data: [
+          { userId: 3, instanceId: "A" },
+          { userId: 3, instanceId: "B" },
+        ],
+      });
+      const [transaction] = mockPrisma.$transaction.mock.invocationCallOrder;
+      const [deleted] =
+        mockPrisma.userInstanceAccess.deleteMany.mock.invocationCallOrder;
+      const [created] =
+        mockPrisma.userInstanceAccess.createMany.mock.invocationCallOrder;
+      const [recomputed] =
+        mockExclusions.recomputeForUser.mock.invocationCallOrder;
+      expect(must(transaction)).toBeLessThan(must(deleted));
+      expect(must(deleted)).toBeLessThan(must(created));
+      expect(must(created)).toBeLessThan(must(recomputed));
+
+      expect(mockExclusions.recomputeForUser).toHaveBeenCalledExactlyOnceWith(
+        3
+      );
+      // The stamp moves after the recompute, for this user only
+      expect(stampAtRecompute).toBe(before);
+      expect(libraryStampFor(3)).not.toBe(before);
+      expect(libraryStampFor(4)).toBe(other);
+      expect(res._getOkBody()).toEqual({
+        limited: true,
+        instanceIds: ["A", "B"],
+      });
+    });
+
+    it("limited with an empty list is stored (the user sees nothing); lifting the limit keeps the given ids", async () => {
+      const empty = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: true, instanceIds: [] },
+        user: ADMIN,
+      });
+      const emptyRes = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(empty, emptyRes);
+      expect(mockPrisma.user.update).toHaveBeenLastCalledWith({
+        where: { id: 3 },
+        data: { instanceAccessLimited: true },
+      });
+      expect(mockPrisma.userInstanceAccess.createMany).not.toHaveBeenCalled();
+      expect(emptyRes._getOkBody()).toEqual({ limited: true, instanceIds: [] });
+
+      const lifted = reqFor(updateUserInstanceAccess, {
+        params: { userId: "3" },
+        body: { limited: false, instanceIds: ["B"] },
+        user: ADMIN,
+      });
+      const liftedRes = resFor(updateUserInstanceAccess);
+      await updateUserInstanceAccess(lifted, liftedRes);
+      expect(mockPrisma.user.update).toHaveBeenLastCalledWith({
+        where: { id: 3 },
+        data: { instanceAccessLimited: false },
+      });
+      expect(mockPrisma.userInstanceAccess.createMany).toHaveBeenCalledWith({
+        data: [{ userId: 3, instanceId: "B" }],
+      });
+      expect(liftedRes._getOkBody()).toEqual({
+        limited: false,
+        instanceIds: ["B"],
+      });
     });
   });
 

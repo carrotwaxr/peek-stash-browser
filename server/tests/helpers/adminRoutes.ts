@@ -47,6 +47,8 @@ export const ADMIN_ROUTES = [
   "POST /api/user/:userId/sync-from-stash",
   "GET /api/user/:userId/permissions",
   "PUT /api/user/:userId/permissions",
+  "GET /api/user/:userId/instance-access",
+  "PUT /api/user/:userId/instance-access",
   "GET /api/user/:userId/groups",
   "POST /api/user/:userId/reset-password",
   "POST /api/user/:userId/regenerate-recovery-key",
