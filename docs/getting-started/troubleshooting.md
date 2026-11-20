@@ -58,6 +58,8 @@ If the panel keeps returning, open the browser's console (F12), copy the line th
 
 **Solution:** Set `BASE_PATH=/peek-stash` on the Peek container, with the same value as the proxy's location, and recreate the container. The proxy may pass the prefix through or strip it. See [Serving Peek under a subfolder](configuration.md#serving-peek-under-a-subfolder) for the value's rules and a SWAG example. If the container stops with an error that names `BASE_PATH`, the value is not valid: the message says what it must look like.
 
+**BASE_PATH is set but you opened the address without the subfolder:** a page opened without the subfolder (`https://example.com/scenes` rather than `https://example.com/peek-stash/scenes`) now redirects into it. If you still see a blank page there, the image predates this fix: update it.
+
 ## Can't Connect to Stash
 
 **Symptoms:** Empty library, "Connection failed" errors, sync fails.

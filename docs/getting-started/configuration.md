@@ -320,7 +320,7 @@ BASE_PATH=/peek-stash
 
 The value starts with `/` and has no trailing slash (one is dropped if you add it). Each part of the path may use letters, digits and `. _ ~ -`; `.` and `..` are not allowed as a part. An empty value or `/` means no subfolder. If the value is not valid, the container stops with an error that names `BASE_PATH` (see [Container Won't Start](troubleshooting.md#container-wont-start)).
 
-Your proxy may pass the prefix through to Peek or strip it before it does; both work, and unprefixed paths keep working too. `/peek-stash` without the trailing slash redirects to `/peek-stash/`.
+Your proxy may pass the prefix through to Peek or strip it before it does; both work. The API answers with or without the prefix, and opening a page without it (when your proxy sends that address to Peek) redirects into the subfolder. `/peek-stash` without the trailing slash redirects to `/peek-stash/`.
 
 ### Example: SWAG
 
@@ -344,7 +344,7 @@ location ^~ /peek-stash/ {
 Peek puts the prefix on everything it links to: images, streams, captions and posters, and the external player, cast and VR links. You do not change anything in those.
 
 !!! note
-    Peek's sign-in cookie is limited to the subfolder. Changing `BASE_PATH` (or adding or removing it) signs everyone out once.
+    Peek's sign-in cookie is limited to the subfolder. If you move Peek to a different host, people sign in again. On the same host an existing session carries over when you add `BASE_PATH`, and signing out clears it.
 
 If you see a blank page after setting this up, see [Blank page behind a reverse proxy subfolder](troubleshooting.md#blank-page-behind-a-reverse-proxy-subfolder).
 
