@@ -19,9 +19,14 @@ import {
   parseBasePath,
   publicPath,
 } from "../../utils/basePath.js";
+import { findHandler, resFor } from "../helpers/controllerTestUtils.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
+import { must } from "../helpers/must.js";
 
-vi.mock("../../prisma/singleton.js", () => ({ default: {} }));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../utils/logger.js", () => ({
   logger: {
@@ -121,11 +126,9 @@ describe("auth cookie path", () => {
   });
 
   const cookieOptions = () => {
-    const cookie =
-      vi.fn<(name: string, value: string, options: object) => void>();
-    const res = { cookie } as unknown as Parameters<typeof setTokenCookie>[0];
+    const res = resFor(findHandler(authRoutes, "post", "/logout"));
     setTokenCookie(res, generateToken({ id: 1, username: "a", role: "USER" }));
-    return cookie.mock.calls[0]?.[2];
+    return must(res.cookie.mock.calls[0], "the cookie call")[2];
   };
 
   it("scopes the token cookie to BASE_PATH", () => {
