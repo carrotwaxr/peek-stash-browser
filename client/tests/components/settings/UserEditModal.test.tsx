@@ -1040,6 +1040,143 @@ describe("UserEditModal", () => {
     });
   });
 
+  describe("Stash Servers section (#439)", () => {
+    const twoServers = [
+      { id: "a", name: "Main Stash", enabled: true },
+      { id: "b", name: "Archive", enabled: false },
+    ];
+
+    /** Answers the instance list and the user's stored limit */
+    const answerServers = (
+      instances: typeof twoServers,
+      stored: { limited: boolean; instanceIds: string[] }
+    ) =>
+      mockApiGet.mockImplementation((path: string) =>
+        Promise.resolve(
+          path === "/setup/stash-instances"
+            ? { instances }
+            : path === "/user/1/instance-access"
+              ? stored
+              : { restrictions: [] }
+        )
+      );
+
+    it("offers a limit, then one checkbox per server, disabled ones marked", async () => {
+      answerServers(twoServers, { limited: false, instanceIds: [] });
+      await renderModal();
+
+      expect(
+        screen.getByRole("heading", { name: "Stash Servers" })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/By default a user sees every Stash server/)
+      ).toBeInTheDocument();
+      const limit = screen.getByRole("checkbox", {
+        name: /Limit to selected servers/,
+      });
+      expect(limit).not.toBeChecked();
+      expect(screen.queryByRole("checkbox", { name: /Main Stash/ })).toBeNull();
+
+      mockApiPut.mockResolvedValue({ limited: true, instanceIds: [] });
+      fireEvent.click(limit);
+      await act(async () => {});
+
+      expect(mockApiPut).toHaveBeenCalledWith("/user/1/instance-access", {
+        limited: true,
+        instanceIds: [],
+      });
+      expect(
+        screen.getByRole("checkbox", { name: "Main Stash" })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: "Archive (disabled)" })
+      ).toBeInTheDocument();
+    });
+
+    it("warns while a limit has no server ticked", async () => {
+      answerServers(twoServers, { limited: true, instanceIds: [] });
+      await renderModal();
+
+      expect(
+        screen.getByText("This user will see nothing until you tick a server.")
+      ).toBeInTheDocument();
+    });
+
+    it("saves each tick as { limited, instanceIds }", async () => {
+      answerServers(twoServers, { limited: true, instanceIds: ["a"] });
+      await renderModal();
+      expect(
+        screen.getByRole("checkbox", { name: "Main Stash" })
+      ).toBeChecked();
+      expect(screen.queryByText(/will see nothing until you tick/)).toBeNull();
+
+      mockApiPut.mockResolvedValue({ limited: true, instanceIds: ["a", "b"] });
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: "Archive (disabled)" })
+      );
+      await act(async () => {});
+
+      expect(mockApiPut).toHaveBeenCalledWith("/user/1/instance-access", {
+        limited: true,
+        instanceIds: ["a", "b"],
+      });
+      expect(
+        screen.getByRole("checkbox", { name: "Archive (disabled)" })
+      ).toBeChecked();
+    });
+
+    it("keeps the stored limit and shows the error when a save fails", async () => {
+      answerServers(twoServers, { limited: true, instanceIds: ["a"] });
+      await renderModal();
+
+      mockApiPut.mockRejectedValue(new Error("Server access refused"));
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: "Archive (disabled)" })
+      );
+      await act(async () => {});
+
+      expect(screen.getByText("Server access refused")).toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: "Archive (disabled)" })
+      ).not.toBeChecked();
+    });
+
+    it("is absent for an administrator", async () => {
+      answerServers(twoServers, { limited: false, instanceIds: [] });
+      render(
+        <UserEditModal
+          user={{ id: 3, username: "otheradmin", role: "ADMIN" }}
+          groups={mockGroups}
+          currentUser={mockCurrentUser}
+          onClose={vi.fn()}
+        />
+      );
+      await act(async () => {});
+
+      expect(screen.queryByText("Stash Servers")).toBeNull();
+      expect(mockApiGet).not.toHaveBeenCalledWith(
+        expect.stringContaining("instance-access")
+      );
+    });
+
+    it("is absent with one server and no limit", async () => {
+      answerServers(twoServers.slice(0, 1), {
+        limited: false,
+        instanceIds: [],
+      });
+      await renderModal();
+
+      expect(screen.queryByText("Stash Servers")).toBeNull();
+    });
+
+    it("stays for a limited user even with one server left", async () => {
+      answerServers(twoServers.slice(0, 1), { limited: true, instanceIds: [] });
+      await renderModal();
+
+      expect(screen.getByText("Stash Servers")).toBeInTheDocument();
+    });
+  });
+
   describe("Role Selection", () => {
     it("shows role dropdown", () => {
       render(
