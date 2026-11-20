@@ -8,8 +8,9 @@ import { expect, test } from "@playwright/test";
  *
  * Runs only against the production image started with BASE_PATH: set
  * E2E_BASE_PATH (for example /peek) and E2E_BASE_URL (the origin). Global
- * setup uses the unprefixed URL, which nginx serves as well. The Vite dev
- * client has no prefix handling, so hermetic runs skip this spec.
+ * setup uses the unprefixed URL: the API answers with or without the prefix,
+ * and a page opened without it redirects into the prefix. The Vite dev client
+ * has no prefix handling, so hermetic runs skip this spec.
  */
 
 const BASE_PATH = process.env.E2E_BASE_PATH ?? "";
@@ -102,10 +103,23 @@ test.describe("Served under BASE_PATH", () => {
       true
     );
 
+    // A page opened without the prefix redirects into it (own page: the
+    // request log above is for the prefixed pages)
+    const unprefixed = await context.newPage();
+    await unprefixed.goto(`${origin}/scenes`);
+    await expect(unprefixed).toHaveURL(`${origin}${BASE_PATH}/scenes`);
+    await expect(unprefixed.getByRole("navigation").first()).toBeVisible();
+    await unprefixed.close();
+
     // 5. Signing out returns to the prefixed login page
     await page.getByRole("button", { name: username, exact: true }).click();
     await page.getByRole("button", { name: "Sign Out" }).click();
     await expect(page).toHaveURL(`${origin}${BASE_PATH}/login`);
+    // A surviving session would not show the login form, or would keep a cookie
+    await expect(page.getByLabel("Username")).toBeVisible();
+    expect(
+      (await context.cookies()).find((cookie) => cookie.name === "token")
+    ).toBeUndefined();
     const after = requested.filter(
       (entry) => !(entry.split(" ")[1] ?? "").startsWith(`${BASE_PATH}/`)
     );
