@@ -154,6 +154,8 @@ function seeders(
       prisma.userPerformerStats.create({
         data: { ...entity, performerId: "1" },
       }),
+    UserInstanceAccess: () =>
+      prisma.userInstanceAccess.create({ data: entity }),
     UserStashInstance: () => prisma.userStashInstance.create({ data: entity }),
     UserStudioStats: () =>
       prisma.userStudioStats.create({ data: { ...entity, studioId: "1" } }),

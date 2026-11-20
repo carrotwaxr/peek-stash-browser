@@ -26,6 +26,12 @@ vi.mock("../../prisma/singleton.js", () => ({
 
 const mockQuery = vi.mocked(prisma.$queryRawUnsafe);
 
+/**
+ * The user id as the access predicate binds it: six times for rule 3 (the
+ * allow-list and the selection), once for rule 4.
+ */
+const USER_BINDS = [7, 7, 7, 7, 7, 7, 7];
+
 /** The SQL text and bound params of the nth query call. */
 function call(n = 0): { sql: string; params: unknown[] } {
   const [sql, ...params] = mockQuery.mock.calls[n] as [string, ...unknown[]];
@@ -52,6 +58,27 @@ describe("EntityAccessService", () => {
       ).resolves.toBe(false);
     });
 
+    it("binds exactly as many parameters as the SQL has placeholders", async () => {
+      for (const entityType of ["scene", "clip"] as const) {
+        mockQuery.mockClear();
+        await canUserAccessEntity(7, entityType, "42", "inst-a");
+        const { sql, params } = call();
+        expect(sql.match(/\?/g)).toHaveLength(params.length);
+      }
+    });
+
+    it("applies the admin's allow-list for a limited non-admin (#439)", async () => {
+      await canUserAccessEntity(7, "scene", "42", "inst-a");
+
+      const { sql } = call();
+      expect(sql).toContain(
+        "lu.role <> 'ADMIN' AND lu.instanceAccessLimited = 1"
+      );
+      expect(sql).toContain(
+        "FROM UserInstanceAccess ua WHERE ua.userId = ? AND ua.instanceId = x.stashInstanceId"
+      );
+    });
+
     it("binds the id, instance, user and type as parameters", async () => {
       const id = "1' OR '1'='1";
       await canUserAccessEntity(7, "scene", id, "inst-a");
@@ -59,7 +86,7 @@ describe("EntityAccessService", () => {
       const { sql, params } = call();
       expect(sql).not.toContain(id);
       expect(sql).not.toContain("inst-a");
-      expect(params).toEqual([id, "inst-a", 7, 7, 7, "scene"]);
+      expect(params).toEqual([id, "inst-a", ...USER_BINDS, "scene"]);
     });
 
     const TABLES: [AccessEntityType, string][] = [
@@ -89,7 +116,7 @@ describe("EntityAccessService", () => {
 
         const { sql, params } = call();
         expect(sql).not.toContain("JOIN StashScene cs");
-        expect(params).toEqual(["42", "inst-a", 7, 7, 7, entityType]);
+        expect(params).toEqual(["42", "inst-a", ...USER_BINDS, entityType]);
       }
     );
 
@@ -99,7 +126,7 @@ describe("EntityAccessService", () => {
       const { sql, params } = call();
       expect(sql).toContain("JOIN StashScene cs");
       expect(sql).toContain("es.entityType = 'scene'");
-      expect(params).toEqual(["42", "inst-a", 7, 7, 7, "clip", 7]);
+      expect(params).toEqual(["42", "inst-a", ...USER_BINDS, "clip", 7]);
     });
 
     it("returns false without a query for an empty id or instance", async () => {
@@ -180,7 +207,7 @@ describe("EntityAccessService", () => {
       const { sql, params } = call();
       expect(sql).toContain("json_each(?)");
       expect(sql).toContain("FROM json_each(?) j");
-      expect(params).toEqual(['[["1","A"],["2","B"]]', 7, 7, 7, "scene"]);
+      expect(params).toEqual(['[["1","A"],["2","B"]]', ...USER_BINDS, "scene"]);
     });
 
     it("binds the extra user id for clips", async () => {
@@ -189,7 +216,7 @@ describe("EntityAccessService", () => {
       const { sql, params } = call();
       expect(sql).toContain("JOIN StashClip x");
       expect(sql).toContain("JOIN StashScene cs");
-      expect(params).toEqual(['[["1","A"]]', 7, 7, 7, "clip", 7]);
+      expect(params).toEqual(['[["1","A"]]', ...USER_BINDS, "clip", 7]);
     });
 
     it('keys the result as id + "\\0" + instanceId', async () => {
@@ -220,7 +247,7 @@ describe("EntityAccessService", () => {
       const { sql, params } = call();
       expect(sql).toContain("x.stashInstanceId = ?");
       expect(sql).not.toContain("ORDER BY");
-      expect(params).toEqual(["42", "inst-a", 7, 7, 7, "scene"]);
+      expect(params).toEqual(["42", "inst-a", ...USER_BINDS, "scene"]);
     });
 
     it("returns null when the entity is not visible", async () => {
@@ -253,9 +280,7 @@ describe("EntityAccessService", () => {
           ["1", "A"],
           ["2", ""],
         ]),
-        7,
-        7,
-        7,
+        ...USER_BINDS,
         "tag",
       ]);
       expect(sql).toContain("FROM json_each(?) j");
