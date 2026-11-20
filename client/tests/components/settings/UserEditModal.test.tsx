@@ -1077,8 +1077,49 @@ describe("UserEditModal", () => {
       expect(limit).not.toBeChecked();
       expect(screen.queryByRole("checkbox", { name: /Main Stash/ })).toBeNull();
 
-      mockApiPut.mockResolvedValue({ limited: true, instanceIds: [] });
+      mockApiPut.mockResolvedValue({ limited: true, instanceIds: ["a", "b"] });
       fireEvent.click(limit);
+      await act(async () => {});
+
+      // Starts with every server ticked (disabled ones too), so nothing is lost
+      expect(mockApiPut).toHaveBeenCalledWith("/user/1/instance-access", {
+        limited: true,
+        instanceIds: ["a", "b"],
+      });
+      expect(
+        screen.getByRole("checkbox", { name: "Main Stash" })
+      ).toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: "Archive (disabled)" })
+      ).toBeChecked();
+      expect(screen.queryByText(/will see nothing until you tick/)).toBeNull();
+    });
+
+    it("turns the limit back on with the ids kept from an earlier limit", async () => {
+      answerServers(twoServers, { limited: false, instanceIds: ["b"] });
+      await renderModal();
+
+      mockApiPut.mockResolvedValue({ limited: true, instanceIds: ["b"] });
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: /Limit to selected servers/ })
+      );
+      await act(async () => {});
+
+      expect(mockApiPut).toHaveBeenCalledWith("/user/1/instance-access", {
+        limited: true,
+        instanceIds: ["b"],
+      });
+      expect(
+        screen.getByRole("checkbox", { name: "Main Stash" })
+      ).not.toBeChecked();
+    });
+
+    it("warns when the last server is unticked", async () => {
+      answerServers(twoServers, { limited: true, instanceIds: ["a"] });
+      await renderModal();
+
+      mockApiPut.mockResolvedValue({ limited: true, instanceIds: [] });
+      fireEvent.click(screen.getByRole("checkbox", { name: "Main Stash" }));
       await act(async () => {});
 
       expect(mockApiPut).toHaveBeenCalledWith("/user/1/instance-access", {
@@ -1086,10 +1127,7 @@ describe("UserEditModal", () => {
         instanceIds: [],
       });
       expect(
-        screen.getByRole("checkbox", { name: "Main Stash" })
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("checkbox", { name: "Archive (disabled)" })
+        screen.getByText("This user will see nothing until you tick a server.")
       ).toBeInTheDocument();
     });
 

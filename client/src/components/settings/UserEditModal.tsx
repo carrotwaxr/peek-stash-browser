@@ -853,7 +853,14 @@ const UserEditModalContent = ({
                       onChange={(e) =>
                         void handleAccessChange({
                           limited: e.target.checked,
-                          instanceIds: access.instanceIds,
+                          // Switching on starts from every server (disabled
+                          // ones too), so the user loses nothing until the
+                          // admin unticks one; ids kept from an earlier limit
+                          // come back as they were
+                          instanceIds:
+                            e.target.checked && access.instanceIds.length === 0
+                              ? servers.map((server) => server.id)
+                              : access.instanceIds,
                         })
                       }
                       className="w-4 h-4 rounded cursor-pointer"
