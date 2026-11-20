@@ -85,6 +85,28 @@ describe("createQueryClient", () => {
     });
   });
 
+  it("stores the reason a 503 names", async () => {
+    const client = createQueryClient();
+    const queryFn = vi.fn().mockRejectedValue(
+      new ApiError("No Stash servers available", 503, {
+        ready: false,
+        reason: "noAccess",
+      })
+    );
+
+    await expect(
+      client.fetchQuery({
+        queryKey: queryKeys.scenes.list(undefined, {}),
+        queryFn,
+      })
+    ).rejects.toThrow("No Stash servers available");
+
+    expect(client.getQueryData(queryKeys.library.ready())).toEqual({
+      ready: false,
+      reason: "noAccess",
+    });
+  });
+
   it("a busy query is asked again after the Retry-After, and its answer used", async () => {
     vi.useFakeTimers();
     const client = createQueryClient();

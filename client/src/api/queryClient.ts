@@ -9,6 +9,7 @@ import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { ApiError, setLibraryStampListener } from "./client";
 import {
   isLibraryInitializing,
+  libraryNotReadyReason,
   markLibraryNotReady,
 } from "./hooks/useLibraryReady";
 import { invalidateExclusionDependents } from "./invalidateExclusionDependents";
@@ -56,7 +57,9 @@ export function createQueryClient(): QueryClient {
   const client: QueryClient = new QueryClient({
     queryCache: new QueryCache({
       onError: (error) => {
-        if (isLibraryInitializing(error)) markLibraryNotReady(client);
+        if (error instanceof ApiError && isLibraryInitializing(error)) {
+          markLibraryNotReady(client, libraryNotReadyReason(error.data));
+        }
       },
     }),
     defaultOptions: {

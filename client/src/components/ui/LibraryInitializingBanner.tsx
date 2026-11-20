@@ -1,5 +1,6 @@
 import { useLibraryReady } from "../../api/hooks/useLibraryReady";
 import LoadingSpinner from "./LoadingSpinner";
+import StatusMessage from "./StatusMessage";
 
 interface Props {
   className?: string;
@@ -8,11 +9,24 @@ interface Props {
 /**
  * The notice every library page shows while the server's first sync runs
  * (the library routes answer 503 `ready: false`). useLibraryReady re-checks
- * every 5 seconds, and the page loads as soon as the library is ready.
+ * every 5 seconds, and the page loads as soon as the library is ready. A
+ * user an admin has given no Stash server (reason `noAccess`) gets a note
+ * to ask for access instead; the same re-check picks up a grant.
  */
 const LibraryInitializingBanner = ({ className = "" }: Props) => {
-  const { ready } = useLibraryReady();
+  const { ready, reason } = useLibraryReady();
   if (ready) return null;
+
+  if (reason === "noAccess") {
+    return (
+      <StatusMessage
+        variant="info"
+        title={null}
+        message="No Stash servers are available to your account. Ask an admin for access."
+        className={`mb-6 ${className}`}
+      />
+    );
+  }
 
   return (
     <div
