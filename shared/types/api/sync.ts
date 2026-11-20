@@ -93,3 +93,39 @@ export interface ApplyDeletionsResponse {
   ok: true;
   message: string;
 }
+
+/**
+ * Why re-probed clips still have no preview, counted by cause. A clip falls
+ * in exactly one: `noPreviewPath` (Stash gave it no preview address, or Peek
+ * cannot build one), else what probing the preview found.
+ */
+export interface ReprobeMisses {
+  /** Stash serves its "pending generate" placeholder image */
+  placeholder: number;
+  /** The preview address answered 404 */
+  notFound: number;
+  /** A file under 5 KB that is not the placeholder */
+  tooSmall: number;
+  /** Peek could not fetch the preview: network error, timeout, another status */
+  fetchError: number;
+  noPreviewPath: number;
+}
+
+/** What re-probing one instance's clips found */
+export interface ReprobeClipsResult {
+  checked: number;
+  /** Clips that now have a preview */
+  updated: number;
+  misses: ReprobeMisses;
+  /** The first fetch error's text (no address, no key) */
+  firstError?: string;
+}
+
+/**
+ * POST /api/sync/reprobe-clips (admins only), body `{ instanceId? }`: one
+ * instance, or every enabled one when it is left out, the results summed.
+ */
+export interface ReprobeClipsResponse extends ReprobeClipsResult {
+  ok: true;
+  message: string;
+}

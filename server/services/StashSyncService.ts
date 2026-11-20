@@ -39,6 +39,8 @@ import type {
 } from "../graphql/generated/graphql.js";
 import prisma from "../prisma/singleton.js";
 import type {
+  ReprobeClipsResult,
+  ReprobeMisses,
   SyncEntityState,
   SyncEntityType,
   SyncJob,
@@ -4939,16 +4941,25 @@ class StashSyncService extends EventEmitter {
   /**
    * Re-probe clips that were synced before previews were generated.
    * Finds all clips with isGenerated=false and re-checks their preview URLs.
-   * Updates any clips that now have valid previews.
+   * Updates any clips that now have valid previews, and counts why the rest
+   * do not (`misses`). Logs one info line per instance; each URL's own
+   * probe is logged at debug.
    *
    * @param stashInstanceId - The instance ID to re-probe clips for
-   * @returns Object with counts of checked and updated clips
+   * @returns Counts of checked and updated clips, the misses by cause, and
+   *   the first fetch error's text
    */
   async reProbeUngeneratedClips(
     stashInstanceId: string
-  ): Promise<{ checked: number; updated: number }> {
-    logger.info("Re-probing ungenerated clips...", { stashInstanceId });
+  ): Promise<ReprobeClipsResult> {
     const startTime = Date.now();
+    const misses: ReprobeMisses = {
+      placeholder: 0,
+      notFound: 0,
+      tooSmall: 0,
+      fetchError: 0,
+      noPreviewPath: 0,
+    };
 
     // Previews are probed with this instance's own key; an instance that is
     // not loaded (disabled or deleted) is skipped
@@ -4962,7 +4973,7 @@ class StashSyncService extends EventEmitter {
       logger.warn("Re-probe skipped: the Stash instance is not loaded", {
         stashInstanceId,
       });
-      return { checked: 0, updated: 0 };
+      return { checked: 0, updated: 0, misses };
     }
 
     // Find all clips with isGenerated=false for this instance
@@ -4976,31 +4987,58 @@ class StashSyncService extends EventEmitter {
     });
 
     if (clips.length === 0) {
-      logger.info("No ungenerated clips to re-probe");
-      return { checked: 0, updated: 0 };
+      logger.info("Re-probe complete: no ungenerated clips", {
+        stashInstanceId,
+      });
+      return { checked: 0, updated: 0, misses };
     }
 
-    logger.info(`Found ${clips.length} ungenerated clips to re-probe`);
-
-    // Preview URLs on the instance's address, with its API key; a path that cannot be built is skipped
-    const urlMap = new Map<string, string>();
+    // Preview URLs on the instance's address, with its API key. A clip with no
+    // path, or one that cannot be built into a URL, is not probed and counts
+    // as noPreviewPath. Clips sharing a URL are probed once.
+    const clipIdsByUrl = new Map<string, string[]>();
     for (const clip of clips) {
       const url = clip.previewPath
         ? stashMediaUrl(baseUrl, clip.previewPath, apiKey)
         : null;
-      if (url) urlMap.set(url, clip.id);
+      if (!url) {
+        misses.noPreviewPath++;
+        continue;
+      }
+      const ids = clipIdsByUrl.get(url);
+      if (ids) ids.push(clip.id);
+      else clipIdsByUrl.set(url, [clip.id]);
     }
 
     // Probe in batches using ClipPreviewProber
-    const results = await clipPreviewProber.probeBatch(
-      Array.from(urlMap.keys())
+    const results = await clipPreviewProber.probeBatchDetailed(
+      Array.from(clipIdsByUrl.keys())
     );
 
-    // Update clips that are now generated, one batch per page
+    // Update clips that are now generated, one batch per page; count the rest
     const generatedIds: string[] = [];
-    for (const [url, isGenerated] of results) {
-      const clipId = isGenerated ? urlMap.get(url) : undefined;
-      if (clipId) generatedIds.push(clipId);
+    let firstError: string | undefined;
+    for (const [url, clipIds] of clipIdsByUrl) {
+      const outcome = results.get(url);
+      if (outcome?.generated) {
+        generatedIds.push(...clipIds);
+        continue;
+      }
+      switch (outcome?.reason) {
+        case "placeholder":
+          misses.placeholder += clipIds.length;
+          break;
+        case "not_found":
+          misses.notFound += clipIds.length;
+          break;
+        case "too_small":
+          misses.tooSmall += clipIds.length;
+          break;
+        case "fetch_error":
+        case undefined:
+          misses.fetchError += clipIds.length;
+          firstError ??= outcome?.error;
+      }
     }
     for (let i = 0; i < generatedIds.length; i += REPROBE_PAGE_SIZE) {
       const checkedAt = new Date();
@@ -5018,12 +5056,18 @@ class StashSyncService extends EventEmitter {
     }
     const updated = generatedIds.length;
 
-    const duration = Date.now() - startTime;
+    // The one info line of the run: the error text carries no URL or key
     logger.info(
-      `Re-probe complete: ${updated}/${clips.length} clips now have previews (${duration}ms)`
+      `Re-probe complete: ${updated}/${clips.length} clips now have previews (${Date.now() - startTime}ms)`,
+      { stashInstanceId, misses, firstError }
     );
 
-    return { checked: clips.length, updated };
+    return {
+      checked: clips.length,
+      updated,
+      misses,
+      ...(firstError === undefined ? {} : { firstError }),
+    };
   }
 
   /**
