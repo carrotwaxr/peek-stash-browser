@@ -46,7 +46,7 @@ const upgradeName = `${name}-upgrade`;
 const upgradeVolume = `${upgradeName}-data`;
 const prefixName = `${name}-prefix`;
 const prefixVolume = `${prefixName}-data`;
-const badPrefixName = `${name}-badprefix`;
+const badPrefixNames = [`${name}-badprefix0`, `${name}-badprefix1`];
 const prefixPort = Number(port) + 1;
 const base = `http://127.0.0.1:${port}`;
 const DATABASE = "/app/data/peek-stash-browser.db";
@@ -228,8 +228,8 @@ async function checkUpgrade() {
 }
 
 /**
- * BASE_PATH checks: a second container serves the app under /peek (and keeps
- * the unprefixed paths working), the main one without BASE_PATH is unchanged,
+ * BASE_PATH checks: a second container serves the app under /my.peek (a dot, which
+ * the nginx rewrite must escape; the unprefixed API paths keep working), the main one without BASE_PATH is unchanged,
  * and an invalid BASE_PATH stops the container with a message.
  */
 async function checkBasePath() {
@@ -267,45 +267,49 @@ async function checkBasePath() {
     "-p",
     `127.0.0.1:${prefixPort}:80`,
     "-e",
-    "BASE_PATH=/peek",
+    "BASE_PATH=/my.peek",
     "-v",
     `${prefixVolume}:/app/data`,
     image
   );
 
-  await check("a BASE_PATH=/peek container turns healthy", async () => {
+  await check("a BASE_PATH=/my.peek container turns healthy", async () => {
     await waitHealthy(prefixName);
-    await getPrefix("/peek/api/health");
+    await getPrefix("/my.peek/api/health");
   });
 
-  for (const path of ["/peek/", "/peek/scenes"]) {
-    await check(`${path} serves the shell with the /peek prefix`, async () => {
-      const html = await (await getPrefix(path)).text();
-      if (!html.includes('<div id="root">'))
-        throw new Error("no #root in the page");
-      if (!html.includes('<meta name="peek-base-path" content="/peek"')) {
-        throw new Error('no <meta name="peek-base-path" content="/peek">');
+  for (const path of ["/my.peek/", "/my.peek/scenes"]) {
+    await check(
+      `${path} serves the shell with the /my.peek prefix`,
+      async () => {
+        const html = await (await getPrefix(path)).text();
+        if (!html.includes('<div id="root">'))
+          throw new Error("no #root in the page");
+        if (!html.includes('<meta name="peek-base-path" content="/my.peek"')) {
+          throw new Error('no <meta name="peek-base-path" content="/my.peek">');
+        }
+        const urls = urlsIn(html);
+        const bad = urls.filter((u) => !u.startsWith("/my.peek/"));
+        if (bad.length) throw new Error(`URLs without /my.peek/: ${bad}`);
+        const script = urls.find((u) => /^\/my.peek\/assets\/.+\.js$/.test(u));
+        if (!script)
+          throw new Error("no /my.peek/assets/*.js script in the shell");
+        const bundle = await getPrefix(script);
+        if (!bundle.headers.get("content-type")?.includes("javascript")) {
+          throw new Error(
+            `bundle content-type ${bundle.headers.get("content-type")}`
+          );
+        }
+        await bundle.arrayBuffer();
       }
-      const urls = urlsIn(html);
-      const bad = urls.filter((u) => !u.startsWith("/peek/"));
-      if (bad.length) throw new Error(`URLs without /peek/: ${bad}`);
-      const script = urls.find((u) => /^\/peek\/assets\/.+\.js$/.test(u));
-      if (!script) throw new Error("no /peek/assets/*.js script in the shell");
-      const bundle = await getPrefix(script);
-      if (!bundle.headers.get("content-type")?.includes("javascript")) {
-        throw new Error(
-          `bundle content-type ${bundle.headers.get("content-type")}`
-        );
-      }
-      await bundle.arrayBuffer();
-    });
+    );
   }
 
-  await check("/peek/api/health and /api/health both answer", async () => {
+  await check("/my.peek/api/health and /api/health both answer", async () => {
     expectEqual(
-      (await (await getPrefix("/peek/api/health")).json()).status,
+      (await (await getPrefix("/my.peek/api/health")).json()).status,
       "healthy",
-      "/peek/api/health status"
+      "/my.peek/api/health status"
     );
     expectEqual(
       (await (await getPrefix("/api/health")).json()).status,
@@ -315,44 +319,87 @@ async function checkBasePath() {
   });
 
   await check(
-    "/peek redirects to /peek/ with a relative Location",
+    "/my.peek redirects to /my.peek/ with a relative Location",
     async () => {
-      const response = await fetchPrefix("/peek", { redirect: "manual" });
-      expectEqual(response.status, 301, "GET /peek status");
-      expectEqual(response.headers.get("location"), "/peek/", "Location");
+      const response = await fetchPrefix("/my.peek", { redirect: "manual" });
+      expectEqual(response.status, 301, "GET /my.peek status");
+      expectEqual(response.headers.get("location"), "/my.peek/", "Location");
     }
   );
 
-  await check("/peek/site.webmanifest is served", async () => {
-    await getPrefix("/peek/site.webmanifest");
+  await check("/my.peek/site.webmanifest is served", async () => {
+    await getPrefix("/my.peek/site.webmanifest");
   });
 
-  await check("an invalid BASE_PATH stops the container with a message", () => {
-    docker("run", "-d", "--name", badPrefixName, "-e", "BASE_PATH=peek", image);
-    let exitCode = "";
-    for (let i = 0; i < 30; i++) {
-      if (
-        docker("inspect", "-f", "{{.State.Running}}", badPrefixName) === "false"
-      ) {
-        exitCode = docker(
-          "inspect",
-          "-f",
-          "{{.State.ExitCode}}",
-          badPrefixName
-        );
-        break;
-      }
-      execFileSync("sleep", ["1"]);
-    }
-    if (exitCode === "" || exitCode === "0") {
-      throw new Error(
-        `exit code ${JSON.stringify(exitCode)}, expected non-zero`
+  await check(
+    "the stream route under the prefix answers 401 JSON from Node, not the shell",
+    async () => {
+      const response = await fetchPrefix(
+        "/my.peek/api/scene/1/proxy-stream/stream?instanceId=x"
       );
+      expectEqual(response.status, 401, "stream status");
+      const type = response.headers.get("content-type") ?? "";
+      if (!type.includes("application/json")) {
+        throw new Error(`content-type ${type}, expected JSON`);
+      }
+      await response.json();
     }
-    if (!logsOf(badPrefixName).includes("BASE_PATH")) {
-      throw new Error("no BASE_PATH in the log");
+  );
+
+  await check(
+    "a path that only looks like the prefix (/myXpeek) is not stripped",
+    async () => {
+      const response = await fetchPrefix("/myXpeek/api/health");
+      expectEqual(response.status, 200, "GET /myXpeek/api/health status");
+      const type = response.headers.get("content-type") ?? "";
+      if (!type.includes("text/html")) {
+        throw new Error(`content-type ${type}, expected the SPA's text/html`);
+      }
+      await response.text();
     }
-  });
+  );
+
+  // Each invalid value gets its own container, removed afterwards
+  for (const [index, value] of ["peek", "/a/../b"].entries()) {
+    await check(
+      `an invalid BASE_PATH (${value}) stops the container with a message`,
+      () => {
+        const container = badPrefixNames[index];
+        docker(
+          "run",
+          "-d",
+          "--name",
+          container,
+          "-e",
+          `BASE_PATH=${value}`,
+          image
+        );
+        let exitCode = "";
+        for (let i = 0; i < 30; i++) {
+          if (
+            docker("inspect", "-f", "{{.State.Running}}", container) === "false"
+          ) {
+            exitCode = docker(
+              "inspect",
+              "-f",
+              "{{.State.ExitCode}}",
+              container
+            );
+            break;
+          }
+          execFileSync("sleep", ["1"]);
+        }
+        if (exitCode === "" || exitCode === "0") {
+          throw new Error(
+            `exit code ${JSON.stringify(exitCode)}, expected non-zero`
+          );
+        }
+        if (!logsOf(container).includes("BASE_PATH")) {
+          throw new Error("no BASE_PATH in the log");
+        }
+      }
+    );
+  }
 }
 
 const SECURITY_HEADERS = {
@@ -625,7 +672,7 @@ try {
     });
   }
   if (failures) {
-    for (const container of [prefixName, badPrefixName]) {
+    for (const container of [prefixName, ...badPrefixNames]) {
       try {
         console.log(`--- ${container} log (last 40 lines) ---`);
         execFileSync("docker", ["logs", "--tail", "40", container], {
@@ -636,7 +683,7 @@ try {
       }
     }
   }
-  execFileSync("docker", ["rm", "-f", name, prefixName, badPrefixName], {
+  execFileSync("docker", ["rm", "-f", name, prefixName, ...badPrefixNames], {
     stdio: "ignore",
   });
   execFileSync("docker", ["volume", "rm", volume], { stdio: "ignore" });
